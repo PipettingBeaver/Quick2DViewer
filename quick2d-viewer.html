@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quick2D Viewer: Parser & Selection Tool for MPI Bioinformatics Quick2D output</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        h2 { margin-top: 0; color: #0f172a; }
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            background-color: #fafafa;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #1d4ed8; }
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .box { width: 15px; height: 15px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); }
+        
+        /* Alignment Grid Layout */
+        .alignment-grid {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: #fafafa;
+            position: relative;
+        }
+        .track-row {
+            display: flex;
+            align-items: center;
+            height: 24px;
+        }
+        .track-row:hover { background-color: #f8fafc; }
+        .track-label {
+            width: 150px;
+            min-width: 150px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding-left: 10px;
+            color: #475569;
+            border-right: 1px solid #e2e8f0;
+            background: #f8fafc;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            cursor: pointer;
+            user-select: none;
+        }
+        .track-label:hover { background: #e2e8f0; }
+        .track-label.active-row { background: #2563eb; color: #fff; }
+        .track-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .type-badges { display: flex; gap: 3px; margin-left: 8px; flex-shrink: 0; }
+        .type-badge {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+            font-size: 0.6rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+        .type-badge:hover { transform: scale(1.15); }
+        .type-badge.active-badge { outline: 2px solid #2563eb; outline-offset: 1px; }
+        .type-badge-H { background-color: #fee2e2; color: #991b1b; }
+        .type-badge-P { background-color: #cffafe; color: #155e75; }
+        .type-badge-E { background-color: #dbeafe; color: #1e3a8a; }
+        .type-badge-C { background-color: #dcfce7; color: #166534; }
+        .type-badge-M { background-color: #f3e8ff; color: #6b21a8; }
+        .type-badge-D { background-color: #ffedd5; color: #9a3412; }
+        .track-cells { display: flex; }
+        .cell {
+            width: 12px;
+            min-width: 12px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.75rem;
+            box-sizing: border-box;
+            user-select: none;
+            cursor: col-resize;
+        }
+        
+        /* Column Highlights */
+        .column-highlight { background-color: #e2e8f0 !important; }
+        .column-selected {
+            box-shadow: inset 0 0 0 999px rgba(37, 99, 235, 0.35) !important;
+            color: #0f172a !important;
+            font-weight: bold;
+        }
+        .cell-AA.column-selected { box-shadow: inset 0 0 0 999px rgba(29, 78, 216, 0.45) !important; }
+        
+        /* Layer Styling */
+        .cell-AA { font-weight: bold; color: #000; background: #fff; border-bottom: 1px solid #cbd5e1; }
+        .cell-H { background-color: #fee2e2; color: #991b1b; } 
+        .cell-P { background-color: #cffafe; color: #155e75; } 
+        .cell-E { background-color: #dbeafe; color: #1e3a8a; } 
+        .cell-C { background-color: #dcfce7; color: #166534; } 
+        .cell-M { background-color: #f3e8ff; color: #6b21a8; font-weight: bold; } 
+        .cell-D { background-color: #ffedd5; color: #9a3412; } 
+        .cell-space { color: #cbd5e1; }
+
+        /* Sidebar Styling */
+        .sidebar {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: fit-content;
+        }
+        .sidebar-title { font-weight: bold; font-size: 1.1rem; color: #0f172a; }
+        .data-box {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            min-height: 20px;
+        }
+        .copy-btn {
+            background: #475569;
+            color: white;
+            font-size: 0.75rem;
+            padding: 5px 10px;
+            margin-top: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #334155; }
+
+        /* Info tooltips */
+        .info-icon {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
+            flex-grow: 0;
+            margin-left: 5px;
+            border-radius: 50%;
+            background: #cbd5e1;
+            color: #1e293b;
+            font-size: 0.65rem;
+            font-weight: bold;
+            font-style: normal;
+            cursor: help;
+        }
+        .info-icon:hover, .info-icon:focus { background: #94a3b8; }
+        /* Tooltip content lives hidden inside each icon as a template; JS
+           clones it into #globalTooltip (appended to <body>) on hover/focus
+           so it renders above every scroll/clip container, not just the
+           icon's own stacking context. */
+        .info-icon .tooltip-content { display: none; }
+        .global-tooltip {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            width: 240px;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            line-height: 1.4;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+            pointer-events: none;
+        }
+        .global-tooltip.pinned {
+            pointer-events: auto;
+            outline: 2px solid #2563eb;
+            outline-offset: 1px;
+            cursor: text;
+            user-select: text;
+        }
+        .global-tooltip.wide { width: 300px; }
+        .global-tooltip strong { color: #fff; }
+        .global-tooltip em { color: #93c5fd; font-style: normal; }
+        .global-tooltip .tt-cite { display: block; margin-top: 6px; color: #94a3b8; font-size: 0.66rem; }
+        .track-label .info-icon { margin-left: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Quick2D Input for Viewer
+        <span class="info-icon tt-wide" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Quick2D / MPI Toolkit</strong><br>
+            The underlying platform and web service suite hosting Quick2D and integrated sequence analysis pipelines. Provides centralized web execution, rapid sequence parsing, and unified multi-tool visualization for protein structure prediction.
+            <span class="tt-cite">Zimmermann et al., J Mol Biol, 2018 &middot; Gabler et al., Curr Protoc Bioinformatics, 2020</span>
+        </span></span>
+    </h2>
+    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
+        Paste raw Quick2D blocks below. Quick2D is a FASTA annotation tool available from the MPI Binformatics Toolkit: https://toolkit.tuebingen.mpg.de/tools/quick2d
+    </p>
+
+    <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..."></textarea>
+    <button onclick="parseAndBuildViewer()">Parse & Render Alignment</button>
+
+    <div class="legend">
+        <div class="legend-item"><div class="box" style="background:#fff;"></div> Amino Acid (AA)</div>
+        <div class="legend-item"><div class="box" style="background:#fee2e2;"></div> SS: Helix (H)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Secondary Structure (SS)</strong><br>
+            Combines predictions from: <em>PSIPRED, SPIDER3, PSSPred4, DeepCNF-SS, NetSurfP-2.0</em>.<br>
+            Identifies alpha-helical, sheet, and pi-helical regions from sequence-based models.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#cffafe;"></div> SS: Pi-Helix (P)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Secondary Structure (SS)</strong><br>
+            Combines predictions from: <em>PSIPRED, SPIDER3, PSSPred4, DeepCNF-SS, NetSurfP-2.0</em>.<br>
+            Identifies alpha-helical, sheet, and pi-helical regions from sequence-based models.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#dbeafe;"></div> SS: Sheet (E)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Secondary Structure (SS)</strong><br>
+            Combines predictions from: <em>PSIPRED, SPIDER3, PSSPred4, DeepCNF-SS, NetSurfP-2.0</em>.<br>
+            Identifies alpha-helical, sheet, and pi-helical regions from sequence-based models.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#dcfce7;"></div> CC: Coiled Coils (C)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Coiled-Coil Domains (CC)</strong><br>
+            Combines predictions from: <em>COILS, PCOILS, MARCOIL</em>.<br>
+            Flags heptad-repeat alpha-helical segments likely to form coiled coils.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#f3e8ff;"></div> TM: Membrane (M)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Transmembrane Topology (TM)</strong><br>
+            Combines predictions from: <em>TMHMM, Phobius, PolyPhobius</em>.<br>
+            Identifies membrane-spanning helical segments based on hydrophobicity and signal-peptide-aware HMMs.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#ffedd5;"></div> DO: Disordered (D)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Disorder &amp; Accessibility (DO)</strong><br>
+            Combines predictions from: <em>NetSurfP-2.0, DISOPRED3, SPOT-Disorder, IUPred</em>.<br>
+            Flags intrinsically disordered, flexible, or non-crystallizable regions.
+        </span></span></div>
+    </div>
+
+    <div class="grid-layout">
+        <div class="alignment-grid" id="alignmentGrid">
+            <p style="padding: 20px; color: #94a3b8; text-align: center;">Paste Quick2D output above to start.</p>
+        </div>
+
+        <div class="sidebar">
+            <div class="sidebar-title">Selection Workspace</div>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0;">
+                Click and drag to highlight continuous segments, click a title on the left to select every non-blank entry along that row, or click one of its type badges (e.g. H, E) to select only that annotation type within the row.
+            </p>
+            
+            <div>
+                <strong>Selected Range:</strong>
+                <div class="data-box" id="rangeDisplay">No selection active</div>
+            </div>
+
+            <div>
+                <strong>FASTA Segment:</strong>
+                <div class="data-box" id="fastaDisplay" style="max-height: 80px; overflow-y: auto;">-</div>
+                <button class="copy-btn" onclick="copyText('fastaDisplay')">Copy Sequence</button>
+            </div>
+
+            <div>
+                <strong>ChimeraX Target:</strong>
+                <input type="text" id="chimeraxTarget" value="#1/A,B,C" oninput="refreshChimeraxDisplay()"
+                    style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <p style="font-size: 0.7rem; color: #94a3b8; margin: 4px 0 0;">
+                    Model/chain spec used in the command below. For a trimer with chains A, B, C, keep as-is; for a single chain use e.g. <code>#1/A</code>. Swap the model number (<code>#1</code>, <code>#2</code>...) per structure when batch-checking multiple candidates.
+                </p>
+            </div>
+
+            <div>
+                <strong>ChimeraX Command:</strong>
+                <div style="display: flex; gap: 6px; margin: 4px 0;">
+                    <select id="cxCommand" onchange="updateCxCommandUI()"
+                        style="flex: 1; font-size: 0.8rem; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        <option value="select">Select</option>
+                        <option value="color" selected>Color</option>
+                        <option value="label">Label</option>
+                    </select>
+                    <select id="cxColor" onchange="refreshChimeraxDisplay()"
+                        style="flex: 1; font-size: 0.8rem; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        <option value="match">Match Selection</option>
+                        <option value="red">Red (H)</option>
+                        <option value="blue">Blue (E)</option>
+                        <option value="cyan">Cyan (P)</option>
+                        <option value="green">Green (C)</option>
+                        <option value="purple">Purple (M)</option>
+                        <option value="orange">Orange (D)</option>
+                        <option value="yellow">Yellow</option>
+                        <option value="magenta">Magenta</option>
+                        <option value="white">White</option>
+                        <option value="black">Black</option>
+                    </select>
+                </div>
+                <div class="data-box" id="chimeraxDisplay" style="color: #0369a1; white-space: pre-wrap;">-</div>
+                <button class="copy-btn" onclick="copyText('chimeraxDisplay')">Copy Command</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="globalTooltip" class="global-tooltip"></div>
+
+<script>
+let selectStart = null;
+let selectEnd = null;
+let isMouseDown = false;
+let parsedTracks = {};
+
+// --- Foreground info tooltips -------------------------------------------
+// Each .info-icon carries its real content in a hidden .tooltip-content
+// child (a template, never shown in place). On hover/focus/tap we clone
+// that markup into #globalTooltip, which is appended directly to <body>
+// with position:fixed - so it renders above every scroll/clip container
+// (the alignment grid's overflow-x:auto, sticky row labels, etc.) instead
+// of being cut off inside them.
+let pinnedIcon = null; // the .info-icon currently locked open via click, or null
+
+function showTooltipFor(icon) {
+    const contentEl = icon.querySelector('.tooltip-content');
+    const tooltipEl = document.getElementById('globalTooltip');
+    if (!contentEl || !tooltipEl) return;
+
+    tooltipEl.innerHTML = contentEl.innerHTML;
+    tooltipEl.classList.toggle('wide', icon.classList.contains('tt-wide'));
+    tooltipEl.style.display = 'block';
+
+    const width = tooltipEl.classList.contains('wide') ? 300 : 240;
+    const rect = icon.getBoundingClientRect();
+
+    let left = rect.left;
+    if (left + width > window.innerWidth - 10) left = window.innerWidth - width - 10;
+    if (left < 10) left = 10;
+
+    // Flip above the icon if there's not much room below.
+    const estimatedHeight = tooltipEl.offsetHeight || 120;
+    let top, flip;
+    if (rect.bottom + estimatedHeight + 10 > window.innerHeight) {
+        top = rect.top - 6;
+        flip = true;
+    } else {
+        top = rect.bottom + 6;
+        flip = false;
+    }
+
+    tooltipEl.style.left = `${left}px`;
+    tooltipEl.style.top = `${top}px`;
+    tooltipEl.style.transform = flip ? 'translateY(-100%)' : 'none';
+}
+
+function hideTooltip() {
+    const tooltipEl = document.getElementById('globalTooltip');
+    if (tooltipEl) {
+        tooltipEl.style.display = 'none';
+        tooltipEl.style.pointerEvents = 'none';
+        tooltipEl.classList.remove('pinned');
+    }
+    pinnedIcon = null;
+}
+
+// Locks a tooltip open (click, not hover) so its text - a citation, say -
+// can be selected and copied. Un-pinned tooltips have pointer-events:none
+// so they never intercept clicks meant for the page underneath.
+function pinTooltip(icon) {
+    showTooltipFor(icon);
+    pinnedIcon = icon;
+    const tooltipEl = document.getElementById('globalTooltip');
+    tooltipEl.style.pointerEvents = 'auto';
+    tooltipEl.classList.add('pinned');
+}
+
+function toggleTooltipPin(icon) {
+    if (pinnedIcon === icon) {
+        hideTooltip();
+    } else {
+        pinTooltip(icon);
+    }
+}
+
+// Delegated listeners cover both the static icons (header, legend) and the
+// row-label icons that get created fresh on every parse/render, without
+// needing to re-attach anything after each render. Hover/focus previews are
+// suspended while a tooltip is pinned, so moving the mouse around while
+// trying to copy text out of the pinned box doesn't swap it out from under you.
+document.addEventListener('mouseover', (e) => {
+    if (pinnedIcon) return;
+    const icon = e.target.closest('.info-icon');
+    if (icon) showTooltipFor(icon);
+});
+document.addEventListener('mouseout', (e) => {
+    if (pinnedIcon) return;
+    if (e.target.closest('.info-icon')) hideTooltip();
+});
+document.addEventListener('focusin', (e) => {
+    if (pinnedIcon) return;
+    const icon = e.target.closest('.info-icon');
+    if (icon) showTooltipFor(icon);
+});
+document.addEventListener('focusout', (e) => {
+    if (pinnedIcon) return;
+    if (e.target.closest('.info-icon')) hideTooltip();
+});
+// Click pins/unpins: click an icon to lock its tooltip open for
+// copy-pasting, click that same icon again or anywhere else outside the
+// tooltip to close it.
+document.addEventListener('click', (e) => {
+    const icon = e.target.closest('.info-icon');
+    if (icon) {
+        toggleTooltipPin(icon);
+    } else if (!e.target.closest('#globalTooltip')) {
+        hideTooltip();
+    }
+});
+
+// Predictor metadata for row-label tooltips, keyed to match Quick2D track
+// keys exactly (e.g. "SS_PSIPRED"). Source: MPI Bioinformatics Toolkit docs.
+const PREDICTOR_INFO = {
+    SS_PSIPRED: { name: 'PSIPRED', category: 'Secondary Structure', description: 'A classic, highly reliable secondary structure predictor using two feed-forward neural networks fed by PSI-BLAST position-specific scoring matrices.', useCase: 'Standard baseline prediction for alpha-helices, beta-strands, and coils; valued for speed and consistent baseline performance.', citation: 'Jones DT, 1999, J Mol Biol' },
+    SS_SPIDER3: { name: 'SPIDER3', category: 'Secondary Structure', description: 'A deep learning method utilizing bidirectional recurrent neural networks (BRNNs) to capture long-range sequence dependencies.', useCase: 'Predicting secondary structure alongside continuous backbone torsion angles (phi and psi) for structural modeling.', citation: 'Heffernan et al., 2017, Bioinformatics' },
+    SS_PSSPRED4: { name: 'PSSPred4', category: 'Secondary Structure', description: 'The updated secondary structure prediction module from the I-TASSER suite, utilizing iterative profile-based neural networks.', useCase: 'Obtaining robust secondary structure constraints specifically tailored to feed into 3D threading and protein structure assembly pipelines.', citation: 'Yan et al., 2013, Sci Rep' },
+    SS_DEEPCNF: { name: 'DeepCNF-SS', category: 'Secondary Structure', description: 'Deep Convolutional Neural Fields model that captures both local sequence motifs and global structural dependencies simultaneously.', useCase: 'High-accuracy secondary structure annotation where complex local-to-global spatial relationships matter.', citation: 'Wang et al., 2016, Sci Rep' },
+    SS_NETSURFP2: { name: 'NetSurfP-2.0', category: 'Secondary Structure', description: 'A deep learning tool utilizing convolutional and LSTM networks to predict multiple structural properties at once.', useCase: 'Simultaneous, integrated prediction of secondary structure, relative accessible surface area (ASA), and backbone dihedral angles.', citation: 'Klausen et al., 2019, Proteins' },
+    TM_TMHMM: { name: 'TMHMM', category: 'Transmembrane Topology', description: 'A Hidden Markov Model trained to distinguish transmembrane helices from non-transmembrane regions based on amino acid hydrophobicity.', useCase: 'High-throughput screening for alpha-helical membrane proteins, though prone to false positives on N-terminal signal peptides.', citation: 'Krogh et al., 2001, J Mol Biol' },
+    TM_PHOBIUS: { name: 'Phobius', category: 'Transmembrane Topology', description: 'A combined HMM architecture that unifies transmembrane helix prediction and signal peptide detection into a single model.', useCase: 'Analyzing single sequences where hydrophobic signal peptides risk being misidentified as transmembrane domains.', citation: 'Käll et al., 2004, J Mol Biol' },
+    TM_POLYPHOBIUS: { name: 'PolyPhobius', category: 'Transmembrane Topology', description: 'An extension of Phobius that integrates evolutionary profiles from multiple sequence alignments (MSAs).', useCase: 'Maximizing topological accuracy for difficult or novel targets when homologous sequences are available.', citation: 'Käll et al., 2005, Bioinformatics' },
+    SP_SIGNALP: { name: 'SignalP 5.0', category: 'Signal Peptides', description: 'A deep neural network model designed to detect signal peptides and locate their exact cleavage sites across all domains of life.', useCase: 'Identifying secretory pathways and preventing N-terminal signal cleavage sites from confusing downstream structural models.', citation: 'Almagro Armenteros et al., 2019, Nat Biotechnol' },
+    CC_COILS: { name: 'COILS', category: 'Coiled-Coil Domains', description: 'A matrix-based method that compares protein sequences against database profiles of known parallel two-stranded coiled coils.', useCase: 'Fast identification of heptad repeat patterns characteristic of alpha-helical coiled-coil segments.', citation: 'Lupas et al., 1991, Science' },
+    CC_PCOILS: { name: 'PCOILS', category: 'Coiled-Coil Domains', description: 'A profile-based implementation of COILS that incorporates position-specific scoring matrices derived from sequence alignments.', useCase: 'High-sensitivity detection of coiled-coil domains, particularly useful when searching family conservation rather than single sequences.', citation: 'Gruber et al., 2006, J Struct Biol' },
+    CC_MARCOIL: { name: 'MARCOIL', category: 'Coiled-Coil Domains', description: 'A Hidden Markov Model approach that models state transitions between heptad register positions in coiled coils.', useCase: 'Unbiased prediction of coiled-coil regions without relying on fixed sliding window sizes.', citation: 'Delorenzi & Speed, 2002, Bioinformatics' },
+    DO_NETSURFPD2: { name: 'NetSurfP-2.0 (Disorder)', category: 'Disorder & Accessibility', description: "The disorder-prediction output of NetSurfP-2.0, which uses one integrated deep learning model (CNN + bidirectional LSTM) to jointly predict secondary structure, relative solvent accessibility, and intrinsic disorder directly from sequence in a single multi-task pass, without needing alignments at inference time.", useCase: "Cross-check disorder calls against this tool's own SS_NETSURFP2 secondary-structure/accessibility output, since both tracks come from the same shared model rather than independent runs.", citation: 'Klausen et al., 2019, Proteins 87(6):520-527' },
+    DO_DISOPRED: { name: 'DISOPRED3', category: 'Disorder & Accessibility', description: 'A machine-learning tool designed explicitly to locate intrinsically disordered regions (IDRs) and protein-binding sites within disordered sequences.', useCase: 'Flagging flexible, non-crystallizable loops or unstructured terminal tails that complicate structural determination.', citation: 'Jones & Cozzetto, 2015, Bioinformatics' },
+    DO_SPOTD: { name: 'SPOT-Disorder', category: 'Disorder & Accessibility', description: 'An ensemble predictor using deep bidirectional LSTM networks trained on mobile/disordered segments in protein databanks.', useCase: 'Rapid identification of disorder propensity, capturing both local and long-range sequence context.', citation: 'Hanson et al., 2017, Bioinformatics' },
+    DO_IUPRED: { name: 'IUPred', category: 'Disorder & Accessibility', description: 'A physics-based method estimating pairwise amino acid energetic interactions, identifying regions unlikely to form stable contacts.', useCase: 'Pinpointing disordered regions based on estimated local energy content without relying on sequence alignment or neural network training sets.', citation: 'Dosztányi et al., 2005, J Mol Biol' }
+};
+
+// Selection can be a single manual drag ('point') or a set of piecewise
+// ranges derived from every non-blank run in a clicked track ('row').
+let selectionMode = 'point'; // 'point' | 'row'
+let activeRowKey = null;
+let activeRowType = null; // null = every non-blank entry; 'H'/'E'/etc = just that type
+let rowRanges = []; // array of [startIdx, endIdx] (0-indexed, inclusive)
+
+// Recognized annotation letters, in the order badges should appear.
+const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
+const TYPE_NAMES = { H: 'Helix', P: 'Pi-Helix', E: 'Sheet', C: 'Coiled Coil', M: 'Membrane', D: 'Disordered' };
+// Default ChimeraX color offered when a type-badge selection is made,
+// matching the viewer's own annotation palette.
+const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
+
+// Residue-range string (e.g. "12-18" or "12-18,63-73") behind the current
+// ChimeraX command, or null when there's no active selection.
+let lastRangeString = null;
+
+function parseAndBuildViewer() {
+    const rawText = document.getElementById('rawInput').value;
+    if (!rawText.trim()) {
+        alert("Please paste some raw Quick2D data!");
+        return;
+    }
+
+    // Split text into clean lines, removing any CR (\r) characters right out of the gate
+    const lines = rawText.replace(/\r/g, '').split('\n');
+
+    const knownTracks = [
+        'SS_PSIPRED', 'SS_SPIDER3', 'SS_PSSPRED4', 'SS_DEEPCNF', 'SS_NETSURFP2',
+        'TM_TMHMM', 'TM_PHOBIUS', 'TM_POLYPHOBIUS',
+        'DO_NETSURFPD2', 'DO_DISOPRED', 'DO_SPOTD', 'DO_IUPRED'
+    ];
+
+    // Quick2D lines are column-aligned using raw TAB characters as tab stops
+    // (like a terminal/editor with tabWidth=8), NOT literal character counts.
+    // Track-name labels differ in length (e.g. "AA_QUERY" = 8 chars vs
+    // "DO_NETSURFPD2" = 13 chars), so the data only lines up correctly once
+    // tabs are expanded to their visual columns. Slicing raw characters (or
+    // slicing from the end of the line, which also breaks on the trailing
+    // tab most tools append) shifts every track relative to the sequence.
+    function expandTabs(line, tabWidth = 8) {
+        let result = '';
+        let col = 0;
+        for (const ch of line) {
+            if (ch === '\t') {
+                const spaces = tabWidth - (col % tabWidth);
+                result += ' '.repeat(spaces);
+                col += spaces;
+            } else {
+                result += ch;
+                col += 1;
+            }
+        }
+        return result;
+    }
+
+    let fullAA = '';
+    const trackChunks = { 'AA': [] };
+    knownTracks.forEach(t => { trackChunks[t] = []; });
+
+    let blockLengths = [];
+    let blockAnchors = []; // column where sequence/data begins, per block
+    let currentBlockIdx = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const line = expandTabs(lines[i]);
+
+        // 1. Process AA_QUERY blocks
+        if (line.includes('AA_QUERY')) {
+            currentBlockIdx++;
+
+            // Prefix is "AA_QUERY" + whitespace + start-residue-number + whitespace,
+            // now at fixed, tab-expanded columns. Everything after it, up to the
+            // first run of non-letter characters, is the sequence itself.
+            const prefixMatch = line.match(/^\s*AA_QUERY\s+\d+\s+/);
+            if (!prefixMatch) continue;
+
+            const anchorCol = prefixMatch[0].length;
+            const seqMatch = line.slice(anchorCol).match(/^[A-Za-z\-]+/);
+            const sequence = seqMatch ? seqMatch[0] : '';
+
+            if (sequence) {
+                blockLengths.push(sequence.length);
+                blockAnchors.push(anchorCol);
+                fullAA += sequence;
+                trackChunks['AA'].push(sequence);
+            }
+            continue;
+        }
+
+        // 2. Process Prediction Tracks: extract exactly L characters starting
+        //    at the same anchor column as this block's AA_QUERY sequence.
+        if (currentBlockIdx >= 0) {
+            for (let track of knownTracks) {
+                if (line.includes(track)) {
+                    const expectedLength = blockLengths[currentBlockIdx];
+                    const anchorCol = blockAnchors[currentBlockIdx];
+
+                    let segment = line.slice(anchorCol, anchorCol + expectedLength);
+
+                    // Pad if the pasted line was clipped short
+                    if (segment.length < expectedLength) {
+                        segment = segment.padEnd(expectedLength, ' ');
+                    }
+
+                    trackChunks[track][currentBlockIdx] = segment;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!fullAA) {
+        alert("Unable to parse AA_QUERY sequences. Check paste format.");
+        return;
+    }
+
+    // Join parsed chunks
+    parsedTracks = { 'AA': fullAA };
+    knownTracks.forEach(t => {
+        const joined = [];
+        for (let b = 0; b < blockLengths.length; b++) {
+            const chunk = trackChunks[t][b] || ' '.repeat(blockLengths[b]);
+            joined.push(chunk);
+        }
+        parsedTracks[t] = joined.join('');
+    });
+
+    // Fresh data invalidates any prior selection
+    selectStart = null;
+    selectEnd = null;
+    selectionMode = 'point';
+    activeRowKey = null;
+    rowRanges = [];
+    document.getElementById('rangeDisplay').textContent = 'No selection active';
+    document.getElementById('fastaDisplay').textContent = '-';
+    lastRangeString = null;
+    refreshChimeraxDisplay();
+
+    renderViewer(parsedTracks);
+}
+
+function renderViewer(tracks) {
+    const grid = document.getElementById('alignmentGrid');
+    grid.innerHTML = ''; 
+    
+    const trackKeys = Object.keys(tracks);
+    const totalLength = tracks.AA.length;
+
+    trackKeys.forEach(key => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'track-row';
+        
+        const labelEl = document.createElement('div');
+        labelEl.className = 'track-label';
+        labelEl.dataset.track = key;
+        labelEl.addEventListener('click', () => handleRowLabelClick(key, null));
+
+        const labelText = document.createElement('span');
+        labelText.className = 'track-label-text';
+        labelText.textContent = key;
+        // Scoped to just the text span (not the whole row div) so hovering
+        // the info icon or type badges - which have their own titles/
+        // tooltips - doesn't also trigger this one underneath them.
+        labelText.title = 'Click to select every non-blank entry in this row';
+        labelEl.appendChild(labelText);
+
+        // Row-level tooltip: predictor name, description, use case, citation.
+        // Only rendered when the track key matches a known predictor.
+        const info = PREDICTOR_INFO[key];
+        if (info) {
+            const infoIcon = document.createElement('span');
+            infoIcon.className = 'info-icon';
+            infoIcon.tabIndex = 0;
+            // Row labels have their own click handler (select-all-non-blank);
+            // stop that from firing when the icon itself is tapped, but still
+            // pin/unpin the tooltip directly here since stopPropagation would
+            // otherwise also block the global click delegation above.
+            infoIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleTooltipPin(infoIcon);
+            });
+            infoIcon.innerHTML = `\u24d8<span class="tooltip-content">` +
+                `<strong>${info.name}</strong> <em>(${info.category})</em><br>` +
+                `${info.description}<br><br>` +
+                `<em>Use:</em> ${info.useCase}` +
+                `<span class="tt-cite">${info.citation}</span>` +
+                `</span>`;
+            labelEl.appendChild(infoIcon);
+        }
+
+        // AA is the sequence row itself, not an annotation track - no badges needed.
+        if (key !== 'AA') {
+            const presentTypes = TYPE_ORDER.filter(t => tracks[key].includes(t));
+            if (presentTypes.length) {
+                const badgesEl = document.createElement('span');
+                badgesEl.className = 'type-badges';
+                presentTypes.forEach(t => {
+                    const badge = document.createElement('span');
+                    badge.className = `type-badge type-badge-${t}`;
+                    badge.dataset.track = key;
+                    badge.dataset.type = t;
+                    badge.textContent = t;
+                    badge.title = `Select only ${TYPE_NAMES[t]} (${t}) entries in this row`;
+                    badge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleRowLabelClick(key, t);
+                    });
+                    badgesEl.appendChild(badge);
+                });
+                labelEl.appendChild(badgesEl);
+            }
+        }
+
+        rowEl.appendChild(labelEl);
+        
+        const cellsContainer = document.createElement('div');
+        cellsContainer.className = 'track-cells';
+        
+        for (let i = 0; i < totalLength; i++) {
+            const cellEl = document.createElement('div');
+            const char = tracks[key][i] || ' ';
+            cellEl.className = `cell col-${i}`;
+            cellEl.dataset.idx = i;
+            cellEl.textContent = char;
+            
+            if (key === 'AA') {
+                cellEl.classList.add('cell-AA');
+            } else if (char === 'H') {
+                cellEl.classList.add('cell-H');
+            } else if (char === 'P') {
+                cellEl.classList.add('cell-P');
+            } else if (char === 'E') {
+                cellEl.classList.add('cell-E');
+            } else if (char === 'C') {
+                cellEl.classList.add('cell-C');
+            } else if (char === 'M') {
+                cellEl.classList.add('cell-M');
+            } else if (char === 'D') {
+                cellEl.classList.add('cell-D');
+            } else if (char === ' ' || char === '-' || char === '\t') {
+                cellEl.classList.add('cell-space');
+                cellEl.textContent = '-';
+            }
+            
+            cellEl.addEventListener('mousedown', (e) => handleMouseDown(i));
+            cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
+            
+            cellsContainer.appendChild(cellEl);
+        }
+        
+        rowEl.appendChild(cellsContainer);
+        grid.appendChild(rowEl);
+    });
+
+    window.addEventListener('mouseup', handleMouseUp);
+}
+
+function handleMouseDown(idx) {
+    // A manual drag always starts (or returns to) point-selection mode
+    exitRowMode();
+    isMouseDown = true;
+    selectStart = idx;
+    selectEnd = idx;
+    updateSelectionUI();
+}
+
+function handleMouseEnter(idx) {
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('column-highlight'));
+    document.querySelectorAll(`.col-${idx}`).forEach(c => c.classList.add('column-highlight'));
+
+    if (isMouseDown) {
+        selectEnd = idx;
+        updateSelectionUI();
+    }
+}
+
+function handleMouseUp() {
+    if (isMouseDown) {
+        isMouseDown = false;
+        calculateSelectionMetadata();
+    }
+}
+
+// Finds every contiguous run of matching characters in a track string.
+// typeChar === null matches any non-blank character (the "whole row" mode);
+// otherwise it matches only that specific annotation letter.
+// Blank = space, '-', tab, or missing data (the same characters rendered
+// as 'cell-space' in the grid).
+function getTypeRanges(trackStr, typeChar) {
+    const ranges = [];
+    let start = null;
+
+    for (let i = 0; i < trackStr.length; i++) {
+        const ch = trackStr[i];
+        const isBlank = (ch === undefined || ch === ' ' || ch === '-' || ch === '\t');
+        const matches = typeChar === null ? !isBlank : (ch === typeChar);
+
+        if (matches && start === null) {
+            start = i;
+        } else if (!matches && start !== null) {
+            ranges.push([start, i - 1]);
+            start = null;
+        }
+    }
+    if (start !== null) ranges.push([start, trackStr.length - 1]);
+
+    return ranges;
+}
+
+function exitRowMode() {
+    selectionMode = 'point';
+    activeRowKey = null;
+    activeRowType = null;
+    rowRanges = [];
+    document.querySelectorAll('.track-label').forEach(l => l.classList.remove('active-row'));
+    document.querySelectorAll('.type-badge').forEach(b => b.classList.remove('active-badge'));
+}
+
+// typeChar: null selects every non-blank entry in the row (existing behavior),
+// or a specific annotation letter (e.g. 'H') to select only that type.
+function handleRowLabelClick(trackKey, typeChar) {
+    // Clicking the already-active row+type toggles the selection off
+    if (selectionMode === 'row' && activeRowKey === trackKey && activeRowType === typeChar) {
+        exitRowMode();
+        selectStart = null;
+        selectEnd = null;
+        updateSelectionUI();
+        document.getElementById('rangeDisplay').textContent = 'No selection active';
+        document.getElementById('fastaDisplay').textContent = '-';
+        lastRangeString = null;
+        refreshChimeraxDisplay();
+        return;
+    }
+
+    if (!parsedTracks[trackKey]) return;
+
+    selectionMode = 'row';
+    activeRowKey = trackKey;
+    activeRowType = typeChar;
+    selectStart = null;
+    selectEnd = null;
+    rowRanges = getTypeRanges(parsedTracks[trackKey], typeChar);
+
+    document.querySelectorAll('.track-label').forEach(l => {
+        l.classList.toggle('active-row', l.dataset.track === trackKey);
+    });
+    document.querySelectorAll('.type-badge').forEach(b => {
+        b.classList.toggle('active-badge', b.dataset.track === trackKey && b.dataset.type === typeChar);
+    });
+
+    // Suggest the matching annotation color when a specific type badge was
+    // clicked, so switching to "Color" mode already looks right. Leave it
+    // alone if "Match Selection" is active - that's already type-aware.
+    const cxColorEl = document.getElementById('cxColor');
+    if (typeChar && TYPE_CX_COLOR[typeChar] && cxColorEl.value !== 'match') {
+        cxColorEl.value = TYPE_CX_COLOR[typeChar];
+    }
+
+    updateSelectionUI();
+    calculateRowSelectionMetadata(trackKey, typeChar);
+}
+
+function updateSelectionUI() {
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('column-selected'));
+
+    if (selectionMode === 'row') {
+        rowRanges.forEach(([start, end]) => {
+            for (let i = start; i <= end; i++) {
+                document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+            }
+        });
+        return;
+    }
+
+    if (selectStart === null || selectEnd === null) return;
+
+    const start = Math.min(selectStart, selectEnd);
+    const end = Math.max(selectStart, selectEnd);
+
+    for (let i = start; i <= end; i++) {
+        document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+    }
+}
+
+function calculateSelectionMetadata() {
+    if (selectStart === null || selectEnd === null) return;
+    
+    const startIdx = Math.min(selectStart, selectEnd);
+    const endIdx = Math.max(selectStart, selectEnd);
+    
+    const resStart = startIdx + 1;
+    const resEnd = endIdx + 1;
+    const length = resEnd - resStart + 1;
+
+    const selectedSequence = parsedTracks.AA.substring(startIdx, endIdx + 1);
+
+    document.getElementById('rangeDisplay').innerHTML = 
+        `Residues: <strong>${resStart} - ${resEnd}</strong> <span style="color:#64748b;">(Length: ${length}aa)</span>`;
+    
+    document.getElementById('fastaDisplay').textContent = selectedSequence;
+    lastRangeString = `${resStart}-${resEnd}`;
+    refreshChimeraxDisplay();
+}
+
+// Piecewise version of calculateSelectionMetadata: builds one comma-joined
+// output from every non-blank run found in the clicked track.
+function calculateRowSelectionMetadata(trackKey, typeChar) {
+    const rowLabel = typeChar === null
+        ? trackKey
+        : `${trackKey} &mdash; ${TYPE_NAMES[typeChar] || typeChar} (${typeChar})`;
+
+    if (!rowRanges.length) {
+        document.getElementById('rangeDisplay').innerHTML =
+            `<strong>${rowLabel}</strong>: no matching entries found`;
+        document.getElementById('fastaDisplay').textContent = '-';
+        lastRangeString = null;
+        refreshChimeraxDisplay();
+        return;
+    }
+
+    const rangeLabels = [];
+    const fastaSegments = [];
+    let totalLength = 0;
+
+    rowRanges.forEach(([startIdx, endIdx]) => {
+        const resStart = startIdx + 1;
+        const resEnd = endIdx + 1;
+        rangeLabels.push(`${resStart}-${resEnd}`);
+        fastaSegments.push(parsedTracks.AA.substring(startIdx, endIdx + 1));
+        totalLength += (endIdx - startIdx + 1);
+    });
+
+    const segmentWord = rowRanges.length === 1 ? 'segment' : 'segments';
+
+    document.getElementById('rangeDisplay').innerHTML =
+        `Row: <strong>${rowLabel}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> ` +
+        `<span style="color:#64748b;">(Length: ${totalLength}aa, ${rowRanges.length} ${segmentWord})</span>`;
+
+    document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
+    lastRangeString = rangeLabels.join(',');
+    refreshChimeraxDisplay();
+}
+
+// Reads the model/chain spec (e.g. "#1/A,B,C") from the sidebar input,
+// falling back to a sane default if the field is empty.
+function getChimeraxTarget() {
+    const val = document.getElementById('chimeraxTarget').value.trim();
+    return val || '#1';
+}
+
+// Shows/hides the color picker based on the chosen command, then rebuilds.
+function updateCxCommandUI() {
+    const isColor = document.getElementById('cxCommand').value === 'color';
+    document.getElementById('cxColor').style.display = isColor ? '' : 'none';
+    refreshChimeraxDisplay();
+}
+
+// Rebuilds the ChimeraX command from the last computed range plus whatever
+// command/color/target the sidebar controls currently say. Called both
+// after a new selection and whenever a sidebar control changes, so the
+// command always reflects the current dropdowns without re-selecting.
+function refreshChimeraxDisplay() {
+    const el = document.getElementById('chimeraxDisplay');
+    if (!lastRangeString) { el.textContent = '-'; return; }
+
+    const target = getChimeraxTarget();
+    const cmd = document.getElementById('cxCommand').value;
+
+    if (cmd === 'select') {
+        el.textContent = `select ${target}:${lastRangeString}`;
+        return;
+    }
+    if (cmd === 'label') {
+        el.textContent = `label ${target}:${lastRangeString}`;
+        return;
+    }
+
+    const color = document.getElementById('cxColor').value;
+    if (color !== 'match') {
+        el.textContent = `color ${target}:${lastRangeString} ${color}`;
+        return;
+    }
+
+    // Match Selection: color each residue by its own annotation type,
+    // splitting into one command per type actually present.
+    const lines = buildMatchColorCommands(target);
+    el.textContent = lines.length
+        ? lines.join('\n')
+        : '# Match Selection needs a row or type-badge selection (click a track label, not a drag)';
+}
+
+// Regroups the currently active row's track string by annotation letter and
+// returns one "color ... <color>" line per type present. If a specific type
+// badge is active (e.g. only "E"), that's the sole type checked - otherwise
+// every recognized type is checked so mixed rows (e.g. H and E together)
+// get split into separate, correctly-colored commands.
+function buildMatchColorCommands(target) {
+    if (selectionMode !== 'row' || !activeRowKey || !parsedTracks[activeRowKey]) return [];
+
+    const trackStr = parsedTracks[activeRowKey];
+    const typesToCheck = activeRowType ? [activeRowType] : TYPE_ORDER;
+    const lines = [];
+
+    typesToCheck.forEach(t => {
+        if (!TYPE_CX_COLOR[t]) return;
+        const ranges = getTypeRanges(trackStr, t);
+        if (!ranges.length) return;
+        const rangeStr = ranges.map(([s, e]) => `${s + 1}-${e + 1}`).join(',');
+        lines.push(`color ${target}:${rangeStr} ${TYPE_CX_COLOR[t]}`);
+    });
+
+    return lines;
+}
+
+function copyText(elementId) {
+    const text = document.getElementById(elementId).textContent;
+    if (text === '-' || text === 'No selection active' || text.startsWith('#')) return;
+    navigator.clipboard.writeText(text).then(() => {
+        alert("Copied selection data to clipboard!");
+    });
+}
+</script>
+
+</body>
+</html>
