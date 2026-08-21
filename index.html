@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quick2D Viewer: Parser & Selection Tool for MPI Bioinformatics Quick2D output</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        h2 { margin-top: 0; color: #0f172a; }
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            background-color: #fafafa;
+        }
+        .upload-section {
+            background: #e2e8f0;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 0.85rem;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #1d4ed8; }
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .box { width: 15px; height: 15px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); }
+        
+        .alignment-grid {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: #fafafa;
+            position: relative;
+        }
+        .track-row {
+            display: flex;
+            align-items: center;
+            height: 24px;
+        }
+        .track-row:hover { background-color: #f8fafc; }
+        .track-label {
+            width: 150px;
+            min-width: 150px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding-left: 10px;
+            color: #475569;
+            border-right: 1px solid #e2e8f0;
+            background: #f8fafc;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            cursor: pointer;
+            user-select: none;
+        }
+        .track-label:hover { background: #e2e8f0; }
+        .track-label.active-row { background: #2563eb; color: #fff; }
+        .track-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .type-badges { display: flex; gap: 3px; margin-left: 8px; flex-shrink: 0; }
+        .type-badge {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+            font-size: 0.6rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+        .type-badge:hover { transform: scale(1.15); }
+        .type-badge.active-badge { outline: 2px solid #2563eb; outline-offset: 1px; }
+        
+        .type-badge-H { background-color: #fee2e2; color: #991b1b; }
+        .type-badge-P { background-color: #cffafe; color: #155e75; }
+        .type-badge-E { background-color: #dbeafe; color: #1e3a8a; }
+        .type-badge-C { background-color: #dcfce7; color: #166534; }
+        .type-badge-M { background-color: #f3e8ff; color: #6b21a8; }
+        .type-badge-D { background-color: #ffedd5; color: #9a3412; }
+        
+        .track-cells { display: flex; }
+        .cell {
+            width: 12px;
+            min-width: 12px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.75rem;
+            box-sizing: border-box;
+            user-select: none;
+            cursor: col-resize;
+        }
+        
+        .column-highlight { background-color: #e2e8f0 !important; }
+        .column-selected {
+            box-shadow: inset 0 0 0 999px rgba(37, 99, 235, 0.35) !important;
+            color: #0f172a !important;
+            font-weight: bold;
+        }
+        .cell-AA.column-selected { box-shadow: inset 0 0 0 999px rgba(29, 78, 216, 0.45) !important; }
+        
+        .cell-AA { font-weight: bold; color: #000; background: #fff; border-bottom: 1px solid #cbd5e1; }
+        .cell-H { background-color: #fee2e2; color: #991b1b; } 
+        .cell-P { background-color: #cffafe; color: #155e75; } 
+        .cell-E { background-color: #dbeafe; color: #1e3a8a; } 
+        .cell-C { background-color: #dcfce7; color: #166534; } 
+        .cell-M { background-color: #f3e8ff; color: #6b21a8; font-weight: bold; } 
+        .cell-D { background-color: #ffedd5; color: #9a3412; } 
+        .cell-space { color: #cbd5e1; }
+
+        .sidebar {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: fit-content;
+        }
+        .sidebar-title { font-weight: bold; font-size: 1.1rem; color: #0f172a; }
+        .data-box {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            min-height: 20px;
+        }
+        .copy-btn {
+            background: #475569;
+            color: white;
+            font-size: 0.75rem;
+            padding: 5px 10px;
+            margin-top: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #334155; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Quick2D & Structural Annotation Viewer</h2>
+    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
+        Paste raw Quick2D blocks below. Attach PDB, CIF, or JSON model files to automatically append pLDDT and RSA structural metrics (RSA calculation requires FreeSASA WASM initialization).
+    </p>
+
+    <div class="upload-section">
+        <strong>Attach Structure:</strong>
+        <input type="file" id="structureUpload" accept=".pdb,.cif,.json" multiple>
+        <span style="color: #64748b; font-size: 0.75rem;">Requires parsed FASTA sequence first.</span>
+    </div>
+
+    <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..."></textarea>
+    <button onclick="parseAndBuildViewer()">Parse & Render Alignment</button>
+
+    <div class="legend">
+        <div class="legend-item"><div class="box" style="background:#fff;"></div> Amino Acid (AA)</div>
+        <div class="legend-item"><div class="box" style="background:#fee2e2;"></div> SS: Helix (H)</div>
+        <div class="legend-item"><div class="box" style="background:#cffafe;"></div> SS: Pi-Helix (P)</div>
+        <div class="legend-item"><div class="box" style="background:#dbeafe;"></div> SS: Sheet (E)</div>
+        <div class="legend-item"><div class="box" style="background:#dcfce7;"></div> CC: Coiled Coils (C)</div>
+        <div class="legend-item"><div class="box" style="background:#f3e8ff;"></div> TM: Membrane (M)</div>
+        <div class="legend-item"><div class="box" style="background:#ffedd5;"></div> DO: Disordered (D)</div>
+        <div class="legend-item"><div class="box" style="background:#0053d6;"></div> pLDDT > 90</div>
+        <div class="legend-item"><div class="box" style="background:#00c1df;"></div> pLDDT > 70</div>
+        <div class="legend-item"><div class="box" style="background:#ffd700;"></div> pLDDT > 50</div>
+        <div class="legend-item"><div class="box" style="background:#ff7d45;"></div> pLDDT < 50</div>
+    </div>
+
+    <div class="grid-layout">
+        <div class="alignment-grid" id="alignmentGrid">
+            <p style="padding: 20px; color: #94a3b8; text-align: center;">Paste Quick2D output above to start.</p>
+        </div>
+
+        <div class="sidebar">
+            <div class="sidebar-title">Selection Workspace</div>
+            
+            <div>
+                <strong>Selected Range:</strong>
+                <div class="data-box" id="rangeDisplay">No selection active</div>
+            </div>
+
+            <div>
+                <strong>FASTA Segment:</strong>
+                <div class="data-box" id="fastaDisplay" style="max-height: 80px; overflow-y: auto;">-</div>
+                <button class="copy-btn" onclick="copyText('fastaDisplay')">Copy Sequence</button>
+            </div>
+
+            <div>
+                <strong>ChimeraX Target:</strong>
+                <input type="text" id="chimeraxTarget" value="#1/A,B,C" oninput="refreshChimeraxDisplay()"
+                    style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+
+            <div>
+                <strong>ChimeraX Command:</strong>
+                <div style="display: flex; gap: 6px; margin: 4px 0;">
+                    <select id="cxCommand" onchange="updateCxCommandUI()"
+                        style="flex: 1; font-size: 0.8rem; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        <option value="select">Select</option>
+                        <option value="color" selected>Color</option>
+                        <option value="label">Label</option>
+                    </select>
+                    <select id="cxColor" onchange="refreshChimeraxDisplay()"
+                        style="flex: 1; font-size: 0.8rem; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        <option value="match">Match Selection</option>
+                        <option value="red">Red</option>
+                        <option value="blue">Blue</option>
+                        <option value="cyan">Cyan</option>
+                        <option value="green">Green</option>
+                        <option value="purple">Purple</option>
+                        <option value="orange">Orange</option>
+                        <option value="white">White</option>
+                    </select>
+                </div>
+                <div class="data-box" id="chimeraxDisplay" style="color: #0369a1; white-space: pre-wrap;">-</div>
+                <button class="copy-btn" onclick="copyText('chimeraxDisplay')">Copy Command</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectStart = null;
+let selectEnd = null;
+let isMouseDown = false;
+let parsedTracks = {};
+let selectionMode = 'point'; 
+let activeRowKey = null;
+let activeRowType = null; 
+let rowRanges = []; 
+let lastRangeString = null;
+
+const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
+const TYPE_NAMES = { H: 'Helix', P: 'Pi-Helix', E: 'Sheet', C: 'Coiled Coil', M: 'Membrane', D: 'Disordered' };
+const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
+
+// Theoretical Maximum ASA values for RSA normalization (Tien et al. 2013)
+const MAX_ASA = {
+    'ALA': 129.0, 'ARG': 274.0, 'ASN': 195.0, 'ASP': 193.0,
+    'CYS': 167.0, 'GLN': 225.0, 'GLU': 223.0, 'GLY': 104.0,
+    'HIS': 224.0, 'ILE': 197.0, 'LEU': 201.0, 'LYS': 236.0,
+    'MET': 224.0, 'PHE': 240.0, 'PRO': 159.0, 'SER': 155.0,
+    'THR': 172.0, 'TRP': 285.0, 'TYR': 263.0, 'VAL': 174.0
+};
+
+// Structural File Listeners
+document.getElementById('structureUpload').addEventListener('change', async (event) => {
+    if (!parsedTracks.AA) {
+        alert("Please paste and parse the Quick2D FASTA sequence first.");
+        event.target.value = '';
+        return;
+    }
+    
+    const files = event.target.files;
+    for (const file of files) {
+        const text = await file.text();
+        const ext = file.name.split('.').pop().toLowerCase();
+        const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+        const plddtData = new Array(parsedTracks.AA.length).fill(null);
+        const rsaData = new Array(parsedTracks.AA.length).fill(null);
+        let structureResidues = {};
+
+        if (ext === 'pdb') {
+            structureResidues = parsePDB(text);
+            await applyFreeSASA(text, structureResidues, file.name);
+        } else if (ext === 'cif') {
+            structureResidues = parseCIF(text);
+            await applyFreeSASA(text, structureResidues, file.name);
+        } else if (ext === 'json') {
+            structureResidues = parseAF3JSON(text);
+        }
+
+        // Align structural sequence sequentially based on explicit numbering mapped to 0-index.
+        // Assumes typical 1-indexed structurally modelled FASTA mapping.
+        Object.keys(structureResidues).forEach(resSeq => {
+            const idx = parseInt(resSeq) - 1;
+            if (idx >= 0 && idx < parsedTracks.AA.length) {
+                plddtData[idx] = { type: 'plddt', val: structureResidues[resSeq].plddt };
+                if (structureResidues[resSeq].rsa !== undefined) {
+                    rsaData[idx] = { type: 'rsa', val: structureResidues[resSeq].rsa };
+                }
+            }
+        });
+
+        parsedTracks[`${baseName}_pLDDT`] = plddtData;
+        
+        // Only append RSA track if values were populated by FreeSASA
+        const hasRSA = rsaData.some(x => x !== null);
+        if (hasRSA) {
+            parsedTracks[`${baseName}_RSA`] = rsaData;
+        }
+    }
+    
+    renderViewer(parsedTracks);
+    event.target.value = ''; // Reset UI
+});
+
+// Structural Parsers
+function parsePDB(text) {
+    const residues = {};
+    const lines = text.split('\n');
+    for (let line of lines) {
+        if (line.startsWith('ATOM') && line.substring(12, 16).trim() === 'CA') {
+            const resSeq = parseInt(line.substring(22, 26).trim(), 10);
+            const bFactor = parseFloat(line.substring(60, 66).trim());
+            const resName = line.substring(17, 20).trim().toUpperCase();
+            if (!residues[resSeq]) {
+                residues[resSeq] = { plddt: bFactor, resName: resName };
+            }
+        }
+    }
+    return residues;
+}
+
+function parseCIF(text) {
+    const residues = {};
+    const lines = text.split('\n');
+    let inAtomSite = false;
+    let seqIdIdx = -1, bFactorIdx = -1, atomIdIdx = -1, resNameIdx = -1;
+    let colIndex = 0;
+
+    for (let line of lines) {
+        if (line.startsWith('_atom_site.')) {
+            inAtomSite = true;
+            if (line.includes('label_seq_id')) seqIdIdx = colIndex;
+            if (line.includes('B_iso_or_equiv')) bFactorIdx = colIndex;
+            if (line.includes('label_atom_id')) atomIdIdx = colIndex;
+            if (line.includes('label_comp_id')) resNameIdx = colIndex;
+            colIndex++;
+        } else if (inAtomSite && line.startsWith('ATOM')) {
+            const cols = line.trim().split(/\s+/);
+            if (cols[atomIdIdx] === 'CA') {
+                const resSeq = parseInt(cols[seqIdIdx], 10);
+                const bFactor = parseFloat(cols[bFactorIdx]);
+                const resName = cols[resNameIdx].toUpperCase();
+                if (!residues[resSeq]) residues[resSeq] = { plddt: bFactor, resName: resName };
+            }
+        } else if (inAtomSite && line.startsWith('#')) {
+            inAtomSite = false;
+        }
+    }
+    return residues;
+}
+
+function parseAF3JSON(text) {
+    const residues = {};
+    const data = JSON.parse(text);
+    if (data.plddt) {
+        // AF3 maps pLDDT linearly per atom, requires aggregation per residue or naive index mapping.
+        // Assuming summarized JSON formatted per-residue for this scope.
+        data.plddt.forEach((val, i) => {
+            residues[i + 1] = { plddt: val, resName: 'UNK' };
+        });
+    }
+    return residues;
+}
+
+// Emscripten FreeSASA WASM Wrapper
+async function applyFreeSASA(fileText, residues, fileName) {
+    try {
+        if (typeof FS === 'undefined' || typeof Module === 'undefined' || !Module.ccall) {
+            console.warn("FreeSASA WebAssembly environment not initialized. Skipping RSA generation for " + fileName);
+            return;
+        }
+
+        const vFileName = 'temp_structure.pdb'; // or .cif based on input format
+        FS.writeFile(vFileName, fileText);
+
+        // Execute structural standard Emscripten call. Adjust bindings to match your specific WASM compile.
+        // This is a standard scaffold: freesasa [options] structure
+        // The implementation assumes FreeSASA writes to a virtual 'output.txt' or returns a JSON string via ccall
+        
+        // Example execution stub:
+        // const output = Module.ccall('freesasa_run', 'string', ['string'], [vFileName]);
+        // parseFreeSASAOutput(output, residues);
+
+        console.log(`[FreeSASA WASM] Execution stub complete for ${fileName}. Bind execution logic here.`);
+
+    } catch (err) {
+        console.error("FreeSASA WASM execution failed:", err);
+    }
+}
+
+// Used inside applyFreeSASA after output generation
+function calculateRSA(absoluteASA, resName) {
+    const maxASA = MAX_ASA[resName] || 200.0; // Fallback for unknown standard
+    const rsa = absoluteASA / maxASA;
+    return Math.min(Math.max(rsa, 0.0), 1.0); // Clamp to 0-1
+}
+
+function parseAndBuildViewer() {
+    const rawText = document.getElementById('rawInput').value;
+    if (!rawText.trim()) { alert("Please paste some raw Quick2D data!"); return; }
+
+    const lines = rawText.replace(/\r/g, '').split('\n');
+    const knownTracks = [
+        'SS_PSIPRED', 'SS_SPIDER3', 'SS_PSSPRED4', 'SS_DEEPCNF', 'SS_NETSURFP2',
+        'TM_TMHMM', 'TM_PHOBIUS', 'TM_POLYPHOBIUS',
+        'DO_NETSURFPD2', 'DO_DISOPRED', 'DO_SPOTD', 'DO_IUPRED'
+    ];
+
+    function expandTabs(line, tabWidth = 8) {
+        let result = ''; let col = 0;
+        for (const ch of line) {
+            if (ch === '\t') {
+                const spaces = tabWidth - (col % tabWidth);
+                result += ' '.repeat(spaces);
+                col += spaces;
+            } else {
+                result += ch;
+                col += 1;
+            }
+        }
+        return result;
+    }
+
+    let fullAA = '';
+    const trackChunks = { 'AA': [] };
+    knownTracks.forEach(t => { trackChunks[t] = []; });
+
+    let blockLengths = [];
+    let blockAnchors = [];
+    let currentBlockIdx = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const line = expandTabs(lines[i]);
+
+        if (line.includes('AA_QUERY')) {
+            currentBlockIdx++;
+            const prefixMatch = line.match(/^\s*AA_QUERY\s+\d+\s+/);
+            if (!prefixMatch) continue;
+
+            const anchorCol = prefixMatch[0].length;
+            const seqMatch = line.slice(anchorCol).match(/^[A-Za-z\-]+/);
+            const sequence = seqMatch ? seqMatch[0] : '';
+
+            if (sequence) {
+                blockLengths.push(sequence.length);
+                blockAnchors.push(anchorCol);
+                fullAA += sequence;
+                trackChunks['AA'].push(sequence);
+            }
+            continue;
+        }
+
+        if (currentBlockIdx >= 0) {
+            for (let track of knownTracks) {
+                if (line.includes(track)) {
+                    const expectedLength = blockLengths[currentBlockIdx];
+                    const anchorCol = blockAnchors[currentBlockIdx];
+                    let segment = line.slice(anchorCol, anchorCol + expectedLength);
+                    if (segment.length < expectedLength) segment = segment.padEnd(expectedLength, ' ');
+                    trackChunks[track][currentBlockIdx] = segment;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!fullAA) { alert("Unable to parse AA_QUERY sequences. Check paste format."); return; }
+
+    const newParsedTracks = { 'AA': fullAA };
+    knownTracks.forEach(t => {
+        const joined = [];
+        for (let b = 0; b < blockLengths.length; b++) {
+            const chunk = trackChunks[t][b] || ' '.repeat(blockLengths[b]);
+            joined.push(chunk);
+        }
+        newParsedTracks[t] = joined.join('');
+    });
+
+    // Retain struct metrics if already parsed, update sequence length bounds.
+    Object.keys(parsedTracks).forEach(key => {
+        if (key.includes('_pLDDT') || key.includes('_RSA')) {
+            newParsedTracks[key] = parsedTracks[key]; 
+        }
+    });
+
+    parsedTracks = newParsedTracks;
+
+    selectStart = null; selectEnd = null; selectionMode = 'point';
+    activeRowKey = null; rowRanges = [];
+    document.getElementById('rangeDisplay').textContent = 'No selection active';
+    document.getElementById('fastaDisplay').textContent = '-';
+    lastRangeString = null; refreshChimeraxDisplay();
+
+    renderViewer(parsedTracks);
+}
+
+function renderViewer(tracks) {
+    const grid = document.getElementById('alignmentGrid');
+    grid.innerHTML = ''; 
+    const trackKeys = Object.keys(tracks);
+    const totalLength = tracks.AA.length;
+
+    trackKeys.forEach(key => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'track-row';
+        
+        const labelEl = document.createElement('div');
+        labelEl.className = 'track-label';
+        labelEl.dataset.track = key;
+        labelEl.addEventListener('click', () => handleRowLabelClick(key, null));
+
+        const labelText = document.createElement('span');
+        labelText.className = 'track-label-text';
+        labelText.textContent = key;
+        labelText.title = 'Select row entries';
+        labelEl.appendChild(labelText);
+
+        if (key !== 'AA' && typeof tracks[key] === 'string') {
+            const presentTypes = TYPE_ORDER.filter(t => tracks[key].includes(t));
+            if (presentTypes.length) {
+                const badgesEl = document.createElement('span');
+                badgesEl.className = 'type-badges';
+                presentTypes.forEach(t => {
+                    const badge = document.createElement('span');
+                    badge.className = `type-badge type-badge-${t}`;
+                    badge.dataset.track = key; badge.dataset.type = t;
+                    badge.textContent = t;
+                    badge.addEventListener('click', (e) => {
+                        e.stopPropagation(); handleRowLabelClick(key, t);
+                    });
+                    badgesEl.appendChild(badge);
+                });
+                labelEl.appendChild(badgesEl);
+            }
+        }
+        rowEl.appendChild(labelEl);
+        
+        const cellsContainer = document.createElement('div');
+        cellsContainer.className = 'track-cells';
+        
+        for (let i = 0; i < totalLength; i++) {
+            const cellEl = document.createElement('div');
+            const dataVal = tracks[key][i];
+            cellEl.className = `cell col-${i}`;
+            cellEl.dataset.idx = i;
+            
+            if (typeof dataVal === 'object' && dataVal !== null) {
+                cellEl.textContent = '█';
+                if (dataVal.type === 'plddt') {
+                    const v = dataVal.val;
+                    if (v > 90) cellEl.style.color = '#0053d6';
+                    else if (v > 70) cellEl.style.color = '#00c1df';
+                    else if (v > 50) cellEl.style.color = '#ffd700';
+                    else cellEl.style.color = '#ff7d45';
+                    cellEl.title = `pLDDT: ${v.toFixed(2)}`;
+                } else if (dataVal.type === 'rsa') {
+                    // RSA coloring scale: 0 = #e2e8f0 (Light Gray) to 1 = #0f172a (Dark Gray)
+                    const intensity = 226 - Math.floor(dataVal.val * 211);
+                    cellEl.style.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                    cellEl.title = `RSA: ${dataVal.val.toFixed(2)}`;
+                }
+            } else {
+                const char = dataVal || ' ';
+                cellEl.textContent = char;
+                if (key === 'AA') cellEl.classList.add('cell-AA');
+                else if (char === 'H') cellEl.classList.add('cell-H');
+                else if (char === 'P') cellEl.classList.add('cell-P');
+                else if (char === 'E') cellEl.classList.add('cell-E');
+                else if (char === 'C') cellEl.classList.add('cell-C');
+                else if (char === 'M') cellEl.classList.add('cell-M');
+                else if (char === 'D') cellEl.classList.add('cell-D');
+                else if (char === ' ' || char === '-' || char === '\t') {
+                    cellEl.classList.add('cell-space'); cellEl.textContent = '-';
+                }
+            }
+            
+            cellEl.addEventListener('mousedown', () => handleMouseDown(i));
+            cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
+            cellsContainer.appendChild(cellEl);
+        }
+        
+        rowEl.appendChild(cellsContainer);
+        grid.appendChild(rowEl);
+    });
+    window.addEventListener('mouseup', handleMouseUp);
+}
+
+function handleMouseDown(idx) {
+    exitRowMode();
+    isMouseDown = true; selectStart = idx; selectEnd = idx;
+    updateSelectionUI();
+}
+
+function handleMouseEnter(idx) {
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('column-highlight'));
+    document.querySelectorAll(`.col-${idx}`).forEach(c => c.classList.add('column-highlight'));
+    if (isMouseDown) { selectEnd = idx; updateSelectionUI(); }
+}
+
+function handleMouseUp() {
+    if (isMouseDown) { isMouseDown = false; calculateSelectionMetadata(); }
+}
+
+function getTypeRanges(trackStr, typeChar) {
+    const ranges = [];
+    let start = null;
+    
+    // Support object arrays (pLDDT/RSA) or categorical strings
+    const isArray = Array.isArray(trackStr);
+    const length = isArray ? trackStr.length : trackStr.length;
+
+    for (let i = 0; i < length; i++) {
+        let ch = trackStr[i];
+        let matches = false;
+
+        if (isArray) {
+            matches = (ch !== null && ch !== undefined);
+        } else {
+            const isBlank = (ch === undefined || ch === ' ' || ch === '-' || ch === '\t');
+            matches = typeChar === null ? !isBlank : (ch === typeChar);
+        }
+
+        if (matches && start === null) start = i;
+        else if (!matches && start !== null) {
+            ranges.push([start, i - 1]); start = null;
+        }
+    }
+    if (start !== null) ranges.push([start, length - 1]);
+    return ranges;
+}
+
+function exitRowMode() {
+    selectionMode = 'point'; activeRowKey = null; activeRowType = null; rowRanges = [];
+    document.querySelectorAll('.track-label').forEach(l => l.classList.remove('active-row'));
+    document.querySelectorAll('.type-badge').forEach(b => b.classList.remove('active-badge'));
+}
+
+function handleRowLabelClick(trackKey, typeChar) {
+    if (selectionMode === 'row' && activeRowKey === trackKey && activeRowType === typeChar) {
+        exitRowMode(); selectStart = null; selectEnd = null; updateSelectionUI();
+        document.getElementById('rangeDisplay').textContent = 'No selection active';
+        document.getElementById('fastaDisplay').textContent = '-';
+        lastRangeString = null; refreshChimeraxDisplay();
+        return;
+    }
+    if (!parsedTracks[trackKey]) return;
+
+    selectionMode = 'row'; activeRowKey = trackKey; activeRowType = typeChar;
+    selectStart = null; selectEnd = null;
+    rowRanges = getTypeRanges(parsedTracks[trackKey], typeChar);
+
+    document.querySelectorAll('.track-label').forEach(l => {
+        l.classList.toggle('active-row', l.dataset.track === trackKey);
+    });
+    document.querySelectorAll('.type-badge').forEach(b => {
+        b.classList.toggle('active-badge', b.dataset.track === trackKey && b.dataset.type === typeChar);
+    });
+
+    const cxColorEl = document.getElementById('cxColor');
+    if (typeChar && TYPE_CX_COLOR[typeChar] && cxColorEl.value !== 'match') cxColorEl.value = TYPE_CX_COLOR[typeChar];
+
+    updateSelectionUI(); calculateRowSelectionMetadata(trackKey, typeChar);
+}
+
+function updateSelectionUI() {
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('column-selected'));
+    if (selectionMode === 'row') {
+        rowRanges.forEach(([start, end]) => {
+            for (let i = start; i <= end; i++) document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+        });
+        return;
+    }
+    if (selectStart === null || selectEnd === null) return;
+    const start = Math.min(selectStart, selectEnd); const end = Math.max(selectStart, selectEnd);
+    for (let i = start; i <= end; i++) document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+}
+
+function calculateSelectionMetadata() {
+    if (selectStart === null || selectEnd === null) return;
+    const startIdx = Math.min(selectStart, selectEnd);
+    const endIdx = Math.max(selectStart, selectEnd);
+    const resStart = startIdx + 1; const resEnd = endIdx + 1;
+    const length = resEnd - resStart + 1;
+    const selectedSequence = parsedTracks.AA.substring(startIdx, endIdx + 1);
+
+    document.getElementById('rangeDisplay').innerHTML = `Residues: <strong>${resStart} - ${resEnd}</strong> <span style="color:#64748b;">(Length: ${length}aa)</span>`;
+    document.getElementById('fastaDisplay').textContent = selectedSequence;
+    lastRangeString = `${resStart}-${resEnd}`;
+    refreshChimeraxDisplay();
+}
+
+function calculateRowSelectionMetadata(trackKey, typeChar) {
+    const rowLabel = typeChar === null ? trackKey : `${trackKey} &mdash; ${TYPE_NAMES[typeChar] || typeChar} (${typeChar})`;
+    if (!rowRanges.length) {
+        document.getElementById('rangeDisplay').innerHTML = `<strong>${rowLabel}</strong>: no matching entries found`;
+        document.getElementById('fastaDisplay').textContent = '-';
+        lastRangeString = null; refreshChimeraxDisplay();
+        return;
+    }
+    const rangeLabels = []; const fastaSegments = []; let totalLength = 0;
+    rowRanges.forEach(([startIdx, endIdx]) => {
+        rangeLabels.push(`${startIdx + 1}-${endIdx + 1}`);
+        fastaSegments.push(parsedTracks.AA.substring(startIdx, endIdx + 1));
+        totalLength += (endIdx - startIdx + 1);
+    });
+
+    document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${rowLabel}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(Length: ${totalLength}aa, ${rowRanges.length} segments)</span>`;
+    document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
+    lastRangeString = rangeLabels.join(','); refreshChimeraxDisplay();
+}
+
+function getChimeraxTarget() { return document.getElementById('chimeraxTarget').value.trim() || '#1'; }
+
+function updateCxCommandUI() {
+    const isColor = document.getElementById('cxCommand').value === 'color';
+    document.getElementById('cxColor').style.display = isColor ? '' : 'none';
+    refreshChimeraxDisplay();
+}
+
+function refreshChimeraxDisplay() {
+    const el = document.getElementById('chimeraxDisplay');
+    if (!lastRangeString) { el.textContent = '-'; return; }
+    const target = getChimeraxTarget();
+    const cmd = document.getElementById('cxCommand').value;
+
+    if (cmd === 'select') { el.textContent = `select ${target}:${lastRangeString}`; return; }
+    if (cmd === 'label') { el.textContent = `label ${target}:${lastRangeString}`; return; }
+
+    const color = document.getElementById('cxColor').value;
+    if (color !== 'match') { el.textContent = `color ${target}:${lastRangeString} ${color}`; return; }
+
+    const lines = buildMatchColorCommands(target);
+    el.textContent = lines.length ? lines.join('\n') : '# Match Selection requires a standard categorical Q2D row selection';
+}
+
+function buildMatchColorCommands(target) {
+    if (selectionMode !== 'row' || !activeRowKey || !parsedTracks[activeRowKey]) return [];
+    if (typeof parsedTracks[activeRowKey] !== 'string') return []; // Prevent matching on numeric arrays
+
+    const trackStr = parsedTracks[activeRowKey];
+    const typesToCheck = activeRowType ? [activeRowType] : TYPE_ORDER;
+    const lines = [];
+
+    typesToCheck.forEach(t => {
+        if (!TYPE_CX_COLOR[t]) return;
+        const ranges = getTypeRanges(trackStr, t);
+        if (!ranges.length) return;
+        const rangeStr = ranges.map(([s, e]) => `${s + 1}-${e + 1}`).join(',');
+        lines.push(`color ${target}:${rangeStr} ${TYPE_CX_COLOR[t]}`);
+    });
+    return lines;
+}
+
+function copyText(elementId) {
+    const text = document.getElementById(elementId).textContent;
+    if (text === '-' || text === 'No selection active' || text.startsWith('#')) return;
+    navigator.clipboard.writeText(text).then(() => { alert("Copied selection data to clipboard!"); });
+}
+</script>
+
+</body>
+</html>
