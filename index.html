@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quick2D Viewer: Synchronized Overlaid Graphs & Scale Bars</title>
+    <title>Quick2D Viewer: Overlaid Graphs & Interactive Selection</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -110,7 +110,6 @@
             z-index: 10;
             cursor: pointer;
             user-select: none;
-            box-sizing: border-box;
         }
         .track-label:hover { background: #e2e8f0; }
         .track-label.active-row { background: #2563eb; color: #fff; }
@@ -171,55 +170,50 @@
         .cell-D { background-color: #ffedd5; color: #9a3412; } 
         .cell-space { color: #cbd5e1; }
 
-        /* Graph Row Styling */
-        .graph-row {
-            display: flex;
-            align-items: center;
-            height: 160px;
-            border-bottom: 1px solid #cbd5e1;
+        /* Graph View Styling */
+        .graph-section-wrapper {
             background: #fff;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 10px 15px;
         }
-        .graph-label-container {
-            width: 195px;
-            min-width: 195px;
-            height: 100%;
-            background: #f8fafc;
-            border-right: 1px solid #e2e8f0;
-            padding: 10px;
-            box-sizing: border-box;
+        .graph-header {
             display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            position: sticky;
-            left: 0;
-            z-index: 10;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #334155;
         }
-        .graph-title { font-size: 0.75rem; font-weight: bold; color: #334155; margin-bottom: 6px; }
-        .graph-pills { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; max-height: 110px; }
+        .graph-legend-pills {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
         .graph-pill {
-            font-size: 0.68rem;
-            padding: 2px 6px;
+            font-size: 0.72rem;
+            padding: 2px 8px;
             border-radius: 4px;
             cursor: pointer;
             border: 1px solid #cbd5e1;
             background: #f1f5f9;
             user-select: none;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         .graph-pill.active {
             font-weight: bold;
             color: white;
             border-color: transparent;
         }
-        .graph-svg-container {
-            overflow-x: auto;
+        .graph-container-inner {
             position: relative;
             background: #fafafa;
-            height: 100%;
-            display: flex;
-            align-items: center;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+        }
+        .graph-annotations-wrapper {
+            border-bottom: 2px solid #cbd5e1;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
         }
         .graph-svg {
             display: block;
@@ -227,12 +221,38 @@
         }
         .graph-svg circle {
             cursor: pointer;
-            transition: r 0.15s ease;
+            transition: stroke 0.1s ease, stroke-width 0.1s ease;
         }
         .graph-svg circle:hover {
-            r: 5.5;
             stroke: #0f172a;
             stroke-width: 1.5;
+        }
+        .graph-svg circle.column-highlight {
+            stroke: #0f172a;
+            stroke-width: 1.5;
+        }
+        .graph-svg circle.column-selected {
+            stroke: #1d4ed8;
+            stroke-width: 2.5;
+        }
+        .graph-svg .selection-guide {
+            fill: rgba(37, 99, 235, 0.12);
+            pointer-events: none;
+        }
+        .graph-axis-tick {
+            font-size: 9px;
+            fill: #64748b;
+            font-family: "Courier New", Courier, monospace;
+        }
+        .graph-axis-title {
+            font-size: 11px;
+            fill: #334155;
+            font-weight: 600;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .graph-axis-line {
+            stroke: #94a3b8;
+            stroke-width: 1;
         }
 
         .sidebar {
@@ -307,7 +327,7 @@
 <div class="container">
     <h2>Quick2D & Structural Annotation Viewer</h2>
     <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
-        Paste Quick2D outputs and attach model files. View annotations alongside synchronized overlaid graphs with scale bars.
+        Paste Quick2D outputs and attach model files. Use Heatmap Grid or Overlaid Graph views with interactive range selection.
     </p>
 
     <div class="toolbar">
@@ -417,13 +437,24 @@ let activeRowKey = null;
 let activeRowType = null; 
 let rowRanges = []; 
 let lastRangeString = null;
-let currentViewMode = 'grid'; 
+let currentViewMode = 'grid'; // 'grid' or 'graph'
+window.addEventListener('mouseup', handleMouseUp);
+
+// Shared layout constants so annotation rows (label + per-residue cells) and
+// the graph SVGs line up on the same pixel grid: the axis/label column and
+// the residue-cell width must match the .track-label / .cell CSS exactly.
+const GRAPH_AXIS_WIDTH = 195;
+const GRAPH_CELL_WIDTH = 12;
+const GRAPH_HEIGHT = 180;
+const GRAPH_TOP_PAD = 15;
+const GRAPH_BOTTOM_PAD = 15;
 
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
-let graphHighlights = {}; 
+let graphHighlights = {}; // Track key -> boolean (true if highlighted/active)
 
+// Format Track Labels to: [Prefix]_[State/Model]_[Metric]
 function formatTrackLabel(fullKey) {
     if (fullKey === 'AA' || fullKey.startsWith('SS_') || fullKey.startsWith('TM_') || fullKey.startsWith('DO_')) {
         return fullKey;
@@ -470,6 +501,7 @@ function switchViewMode() {
     renderViewer(parsedTracks);
 }
 
+// Structure File Upload Handler
 document.getElementById('structureUpload').addEventListener('change', async (event) => {
     if (!parsedTracks.AA) {
         alert("Please paste and parse the Quick2D FASTA sequence first.");
@@ -680,58 +712,117 @@ function renderViewer(tracks) {
     const totalLength = tracks.AA ? tracks.AA.length : 0;
     if (totalLength === 0) return;
 
-    // 1. Render categorical track rows (AA, SS, TM, DO) in both views for synchronization
-    const categoricalKeys = Object.keys(tracks).filter(k => !k.endsWith('_pLDDT') && !k.endsWith('_RSA')).sort((a, b) => {
+    if (currentViewMode === 'graph') {
+        // Q2D annotation tracks (AA/SS/TM/DO - anything still stored as a plain
+        // string) render as the same heatmap rows used in Grid mode, so residue
+        // columns line up pixel-for-pixel with the graphs plotted underneath.
+        const annotationKeys = Object.keys(tracks)
+            .filter(k => typeof tracks[k] === 'string')
+            .sort((a, b) => {
+                const orderA = getTrackCategoryOrder(a), orderB = getTrackCategoryOrder(b);
+                return orderA !== orderB ? orderA - orderB : a.localeCompare(b);
+            });
+
+        if (annotationKeys.length) {
+            const annoWrapper = document.createElement('div');
+            annoWrapper.className = 'graph-annotations-wrapper';
+            annotationKeys.forEach(key => annoWrapper.appendChild(buildTrackRow(key, tracks, totalLength)));
+            grid.appendChild(annoWrapper);
+        }
+
+        const plddtKeys = Object.keys(tracks).filter(k => k.endsWith('_pLDDT'));
+        const rsaKeys = Object.keys(tracks).filter(k => k.endsWith('_RSA'));
+
+        if (plddtKeys.length > 0) {
+            grid.appendChild(createOverlayGraphSection("pLDDT Confidence Overlay (0 - 100)", plddtKeys, totalLength, true));
+        }
+        if (rsaKeys.length > 0) {
+            grid.appendChild(createOverlayGraphSection("Relative Solvent Accessibility (RSA) Overlay (0.0 - 1.0)", rsaKeys, totalLength, false));
+        }
+        if (plddtKeys.length === 0 && rsaKeys.length === 0) {
+            const msg = document.createElement('p');
+            msg.style.cssText = 'padding: 20px; color: #94a3b8; text-align: center;';
+            msg.textContent = 'No PDB/JSON structural model files attached yet. Please upload files to view overlaid graphs.';
+            grid.appendChild(msg);
+        }
+        updateSelectionUI();
+        return;
+    }
+
+    // Heatmap Grid View Mode
+    const trackKeys = Object.keys(tracks).sort((a, b) => {
         const orderA = getTrackCategoryOrder(a);
         const orderB = getTrackCategoryOrder(b);
         if (orderA !== orderB) return orderA - orderB;
         return a.localeCompare(b);
     });
 
-    categoricalKeys.forEach(key => {
-        const rowEl = document.createElement('div');
-        rowEl.className = 'track-row';
-        
-        const labelEl = document.createElement('div');
-        labelEl.className = 'track-label';
-        labelEl.dataset.track = key;
-        labelEl.addEventListener('click', () => handleRowLabelClick(key, null));
+    trackKeys.forEach(key => grid.appendChild(buildTrackRow(key, tracks, totalLength)));
+    updateSelectionUI();
+}
 
-        const labelText = document.createElement('span');
-        labelText.className = 'track-label-text';
-        labelText.textContent = formatTrackLabel(key);
-        labelText.title = key;
-        labelEl.appendChild(labelText);
+// Builds one heatmap row (label + badges + per-residue cells) for a single
+// track. Shared by Grid mode (every track) and Graph mode (annotation tracks
+// only, rendered above the overlaid graphs for visual cross-reference).
+function buildTrackRow(key, tracks, totalLength) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'track-row';
 
-        if (key !== 'AA' && typeof tracks[key] === 'string') {
-            const presentTypes = TYPE_ORDER.filter(t => tracks[key].includes(t));
-            if (presentTypes.length) {
-                const badgesEl = document.createElement('span');
-                badgesEl.className = 'type-badges';
-                presentTypes.forEach(t => {
-                    const badge = document.createElement('span');
-                    badge.className = `type-badge type-badge-${t}`;
-                    badge.dataset.track = key; badge.dataset.type = t;
-                    badge.textContent = t;
-                    badge.addEventListener('click', (e) => {
-                        e.stopPropagation(); handleRowLabelClick(key, t);
-                    });
-                    badgesEl.appendChild(badge);
+    const labelEl = document.createElement('div');
+    labelEl.className = 'track-label';
+    labelEl.dataset.track = key;
+    labelEl.addEventListener('click', () => handleRowLabelClick(key, null));
+
+    const labelText = document.createElement('span');
+    labelText.className = 'track-label-text';
+    labelText.textContent = formatTrackLabel(key);
+    labelText.title = key;
+    labelEl.appendChild(labelText);
+
+    if (key !== 'AA' && typeof tracks[key] === 'string') {
+        const presentTypes = TYPE_ORDER.filter(t => tracks[key].includes(t));
+        if (presentTypes.length) {
+            const badgesEl = document.createElement('span');
+            badgesEl.className = 'type-badges';
+            presentTypes.forEach(t => {
+                const badge = document.createElement('span');
+                badge.className = `type-badge type-badge-${t}`;
+                badge.dataset.track = key; badge.dataset.type = t;
+                badge.textContent = t;
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation(); handleRowLabelClick(key, t);
                 });
-                labelEl.appendChild(badgesEl);
-            }
+                badgesEl.appendChild(badge);
+            });
+            labelEl.appendChild(badgesEl);
         }
-        rowEl.appendChild(labelEl);
-        
-        const cellsContainer = document.createElement('div');
-        cellsContainer.className = 'track-cells';
-        
-        for (let i = 0; i < totalLength; i++) {
-            const cellEl = document.createElement('div');
-            const dataVal = tracks[key][i];
-            cellEl.className = `cell col-${i}`;
-            cellEl.dataset.idx = i;
-            
+    }
+    rowEl.appendChild(labelEl);
+
+    const cellsContainer = document.createElement('div');
+    cellsContainer.className = 'track-cells';
+
+    for (let i = 0; i < totalLength; i++) {
+        const cellEl = document.createElement('div');
+        const dataVal = tracks[key][i];
+        cellEl.className = `cell col-${i}`;
+        cellEl.dataset.idx = i;
+
+        if (typeof dataVal === 'object' && dataVal !== null) {
+            cellEl.textContent = '█';
+            if (dataVal.type === 'plddt') {
+                const v = dataVal.val;
+                if (v > 90) cellEl.style.color = '#0053d6';
+                else if (v > 70) cellEl.style.color = '#00c1df';
+                else if (v > 50) cellEl.style.color = '#ffd700';
+                else cellEl.style.color = '#ff7d45';
+                cellEl.title = `Residue ${i+1} pLDDT: ${v.toFixed(1)}`;
+            } else if (dataVal.type === 'rsa') {
+                const intensity = 226 - Math.floor(dataVal.val * 211);
+                cellEl.style.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
+            }
+        } else {
             const char = dataVal || ' ';
             cellEl.textContent = char;
             if (key === 'AA') cellEl.classList.add('cell-AA');
@@ -744,55 +835,31 @@ function renderViewer(tracks) {
             else if (char === ' ' || char === '-' || char === '\t') {
                 cellEl.classList.add('cell-space'); cellEl.textContent = '-';
             }
-            
-            cellEl.addEventListener('mousedown', () => handleMouseDown(i));
-            cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
-            cellsContainer.appendChild(cellEl);
         }
-        rowEl.appendChild(cellsContainer);
-        grid.appendChild(rowEl);
-    });
 
-    // 2. If Graph view mode is enabled, append synchronized graph rows below categorical annotations
-    if (currentViewMode === 'graph') {
-        const plddtKeys = Object.keys(tracks).filter(k => k.endsWith('_pLDDT'));
-        const rsaKeys = Object.keys(tracks).filter(k => k.endsWith('_RSA'));
-
-        if (plddtKeys.length > 0) {
-            grid.appendChild(createOverlayGraphRow("pLDDT Confidence", plddtKeys, totalLength, true));
-        }
-        if (rsaKeys.length > 0) {
-            grid.appendChild(createOverlayGraphRow("RSA Accessibility", rsaKeys, totalLength, false));
-        }
-        if (plddtKeys.length === 0 && rsaKeys.length === 0) {
-            const notice = document.createElement('div');
-            notice.style.padding = '20px';
-            notice.style.color = '#94a3b8';
-            notice.style.textAlign = 'center';
-            notice.textContent = 'No structural model files attached. Upload PDB/CIF/JSON files to render overlaid graphs.';
-            grid.appendChild(notice);
-        }
+        cellEl.addEventListener('mousedown', () => handleMouseDown(i));
+        cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
+        cellsContainer.appendChild(cellEl);
     }
-
-    window.addEventListener('mouseup', handleMouseUp);
-    updateSelectionUI();
+    rowEl.appendChild(cellsContainer);
+    return rowEl;
 }
 
-// Create Synchronized Overlaid Graph Row with Y-Axis Scale Bar
-function createOverlayGraphRow(titleText, trackKeys, totalLength, isPlddt) {
-    const row = document.createElement('div');
-    row.className = 'graph-row';
+// Create Overlaid Graph Section with interactive toggle pills, a y-axis, and
+// selectable points (columns line up with the annotation rows rendered above).
+function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'graph-section-wrapper';
 
-    const labelContainer = document.createElement('div');
-    labelContainer.className = 'graph-label-container';
-
-    const title = document.createElement('div');
-    title.className = 'graph-title';
+    const header = document.createElement('div');
+    header.className = 'graph-header';
+    
+    const title = document.createElement('span');
     title.textContent = titleText;
-    labelContainer.appendChild(title);
+    header.appendChild(title);
 
     const pillsContainer = document.createElement('div');
-    pillsContainer.className = 'graph-pills';
+    pillsContainer.className = 'graph-legend-pills';
 
     trackKeys.forEach((key, idx) => {
         const color = MODEL_PALETTE[idx % MODEL_PALETTE.length];
@@ -811,48 +878,71 @@ function createOverlayGraphRow(titleText, trackKeys, totalLength, isPlddt) {
         });
         pillsContainer.appendChild(pill);
     });
-    labelContainer.appendChild(pillsContainer);
-    row.appendChild(labelContainer);
+    header.appendChild(pillsContainer);
+    wrapper.appendChild(header);
 
-    const svgContainer = document.createElement('div');
-    svgContainer.className = 'graph-svg-container';
+    const inner = document.createElement('div');
+    inner.className = 'graph-container-inner';
 
-    const cellWidth = 12;
-    const leftMargin = 45; // Space allocated for Y-axis scale bar
-    const width = leftMargin + (totalLength * cellWidth);
-    const height = 160;
+    const cellWidth = GRAPH_CELL_WIDTH;
+    const axisWidth = GRAPH_AXIS_WIDTH; // reserved for y-axis + matches annotation row label width, so data columns start at the same x as the .track-cells above
+    const plotWidth = totalLength * cellWidth;
+    const width = axisWidth + plotWidth;
+    const height = GRAPH_HEIGHT;
     const maxVal = isPlddt ? 100.0 : 1.0;
+    const plotTop = GRAPH_TOP_PAD, plotBottom = height - GRAPH_BOTTOM_PAD;
+
+    const valueToY = (val) => plotBottom - (Math.min(Math.max(val, 0), maxVal) / maxVal) * (plotBottom - plotTop);
 
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", width);
     svg.setAttribute("height", height);
     svg.setAttribute("class", "graph-svg");
+    svg.dataset.axisWidth = axisWidth;
+    svg.dataset.cellWidth = cellWidth;
 
-    // Y-Axis Scale Bar & Gridlines
+    // Y-axis: ticks at even fractions of the value range, gridlines spanning
+    // just the plot area (not the axis label column), and a rotated title.
     const axisGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    const ticks = isPlddt ? [0, 25, 50, 75, 100] : [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
+    const tickFractions = [0, 0.25, 0.5, 0.75, 1.0];
+    tickFractions.forEach(frac => {
+        const val = frac * maxVal;
+        const y = valueToY(val);
 
-    ticks.forEach(val => {
-        const y = height - (val / maxVal) * (height - 35) - 15;
-        
-        // Gridline
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", leftMargin); line.setAttribute("x2", width);
-        line.setAttribute("y1", y); line.setAttribute("y2", y);
-        line.setAttribute("stroke", val === 0 ? "#94a3b8" : "#e2e8f0");
-        line.setAttribute("stroke-dasharray", val === 0 ? "none" : "3,3");
-        axisGroup.appendChild(line);
+        const grid = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        grid.setAttribute("x1", axisWidth); grid.setAttribute("x2", width);
+        grid.setAttribute("y1", y); grid.setAttribute("y2", y);
+        grid.setAttribute("stroke", "#e2e8f0"); grid.setAttribute("stroke-dasharray", "3,3");
+        axisGroup.appendChild(grid);
 
-        // Tick label
-        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        text.setAttribute("x", leftMargin - 6);
-        text.setAttribute("y", y + 3);
-        text.setAttribute("font-size", "9px");
-        text.setAttribute("fill", "#64748b");
-        text.setAttribute("text-anchor", "end");
-        text.textContent = isPlddt ? val : val.toFixed(1);
-        axisGroup.appendChild(text);
+        const tick = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        tick.setAttribute("x1", axisWidth - 5); tick.setAttribute("x2", axisWidth);
+        tick.setAttribute("y1", y); tick.setAttribute("y2", y);
+        tick.setAttribute("class", "graph-axis-line");
+        axisGroup.appendChild(tick);
+
+        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", axisWidth - 8);
+        label.setAttribute("y", y + 3);
+        label.setAttribute("text-anchor", "end");
+        label.setAttribute("class", "graph-axis-tick");
+        label.textContent = isPlddt ? Math.round(val) : val.toFixed(2);
+        axisGroup.appendChild(label);
     });
+
+    const axisLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    axisLine.setAttribute("x1", axisWidth); axisLine.setAttribute("x2", axisWidth);
+    axisLine.setAttribute("y1", plotTop); axisLine.setAttribute("y2", plotBottom);
+    axisLine.setAttribute("class", "graph-axis-line");
+    axisGroup.appendChild(axisLine);
+
+    const axisTitle = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    axisTitle.setAttribute("class", "graph-axis-title");
+    axisTitle.setAttribute("text-anchor", "middle");
+    axisTitle.setAttribute("transform", `translate(14, ${height / 2}) rotate(-90)`);
+    axisTitle.textContent = isPlddt ? "pLDDT (0-100)" : "RSA (0-1)";
+    axisGroup.appendChild(axisTitle);
+
     svg.appendChild(axisGroup);
 
     trackKeys.forEach((key, idx) => {
@@ -864,10 +954,9 @@ function createOverlayGraphRow(titleText, trackKeys, totalLength, isPlddt) {
         let points = [];
         trackData.forEach((item, i) => {
             if (item && item.val !== undefined && item.val !== null) {
-                const x = leftMargin + (i * cellWidth) + (cellWidth / 2);
+                const x = axisWidth + i * cellWidth + cellWidth / 2;
                 const val = Math.min(Math.max(item.val, 0), maxVal);
-                const y = height - (val / maxVal) * (height - 35) - 15;
-                points.push({ x, y, val, idx: i });
+                points.push({ x, y: valueToY(val), val, idx: i });
             }
         });
 
@@ -885,6 +974,9 @@ function createOverlayGraphRow(titleText, trackKeys, totalLength, isPlddt) {
             svg.appendChild(path);
         }
 
+        // Clickable residue points on graph - shares the same col-<idx> class
+        // convention as the heatmap cells, so the existing selection/highlight
+        // system (updateSelectionUI, handleMouseEnter) picks these up too.
         points.forEach(p => {
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
@@ -892,27 +984,26 @@ function createOverlayGraphRow(titleText, trackKeys, totalLength, isPlddt) {
             circle.setAttribute("fill", color);
             circle.setAttribute("stroke", "#fff");
             circle.setAttribute("stroke-width", "1");
+            circle.setAttribute("class", `col-${p.idx}`);
             circle.dataset.idx = p.idx;
 
-            const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-            title.textContent = `${formatTrackLabel(key)} | Residue ${p.idx + 1} (${parsedTracks.AA[p.idx] || ''}): ${p.val.toFixed(2)}`;
-            circle.appendChild(title);
+            const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
+            titleEl.textContent = `${formatTrackLabel(key)} | Residue ${p.idx + 1} (${parsedTracks.AA[p.idx] || ''}): ${p.val.toFixed(2)}`;
+            circle.appendChild(titleEl);
 
             circle.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 handleMouseDown(p.idx);
             });
-            circle.addEventListener('mouseenter', () => {
-                handleMouseEnter(p.idx);
-            });
+            circle.addEventListener('mouseenter', () => handleMouseEnter(p.idx));
 
             svg.appendChild(circle);
         });
     });
 
-    svgContainer.appendChild(svg);
-    row.appendChild(svgContainer);
-    return row;
+    inner.appendChild(svg);
+    wrapper.appendChild(inner);
+    return wrapper;
 }
 
 function handleMouseDown(idx) {
@@ -922,13 +1013,37 @@ function handleMouseDown(idx) {
 }
 
 function handleMouseEnter(idx) {
-    document.querySelectorAll('.cell').forEach(c => c.classList.remove('column-highlight'));
+    document.querySelectorAll('.column-highlight').forEach(c => c.classList.remove('column-highlight'));
     document.querySelectorAll(`.col-${idx}`).forEach(c => c.classList.add('column-highlight'));
     if (isMouseDown) { selectEnd = idx; updateSelectionUI(); }
 }
 
 function handleMouseUp() {
     if (isMouseDown) { isMouseDown = false; calculateSelectionMetadata(); }
+}
+
+// Draws a translucent vertical band across each graph's full plot height for
+// every currently-selected residue index, so a selection made anywhere (grid
+// cell, annotation row, or a graph point) is visible on the graphs even where
+// a given model has no data point at that index.
+function updateGraphSelectionGuides(selectedIdxs) {
+    document.querySelectorAll('.graph-svg').forEach(svg => {
+        svg.querySelectorAll('.selection-guide').forEach(el => el.remove());
+        if (!selectedIdxs.length) return;
+        const axisWidth = parseFloat(svg.dataset.axisWidth || GRAPH_AXIS_WIDTH);
+        const cellWidth = parseFloat(svg.dataset.cellWidth || GRAPH_CELL_WIDTH);
+        const height = parseFloat(svg.getAttribute('height'));
+        const axisGroup = svg.querySelector('g'); // insert guides just above axis/gridlines, below data
+        selectedIdxs.forEach(idx => {
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", axisWidth + idx * cellWidth);
+            rect.setAttribute("y", 0);
+            rect.setAttribute("width", cellWidth);
+            rect.setAttribute("height", height);
+            rect.setAttribute("class", "selection-guide");
+            svg.insertBefore(rect, svg.children[1] || null);
+        });
+    });
 }
 
 function getTypeRanges(trackStr, typeChar) {
@@ -992,16 +1107,22 @@ function handleRowLabelClick(trackKey, typeChar) {
 }
 
 function updateSelectionUI() {
-    document.querySelectorAll('.cell').forEach(c => c.classList.remove('column-selected'));
+    document.querySelectorAll('.column-selected').forEach(c => c.classList.remove('column-selected'));
+
+    let selectedIdxs = [];
     if (selectionMode === 'row') {
         rowRanges.forEach(([start, end]) => {
-            for (let i = start; i <= end; i++) document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+            for (let i = start; i <= end; i++) selectedIdxs.push(i);
         });
-        return;
+    } else if (selectStart !== null && selectEnd !== null) {
+        const start = Math.min(selectStart, selectEnd), end = Math.max(selectStart, selectEnd);
+        for (let i = start; i <= end; i++) selectedIdxs.push(i);
     }
-    if (selectStart === null || selectEnd === null) return;
-    const start = Math.min(selectStart, selectEnd); const end = Math.max(selectStart, selectEnd);
-    for (let i = start; i <= end; i++) document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+
+    selectedIdxs.forEach(i => {
+        document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+    });
+    updateGraphSelectionGuides(selectedIdxs);
 }
 
 function calculateSelectionMetadata() {
