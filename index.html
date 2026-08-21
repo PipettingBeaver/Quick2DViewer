@@ -21,7 +21,7 @@
         h2 { margin-top: 0; color: #0f172a; }
         .grid-layout {
             display: grid;
-            grid-template-columns: 1fr 350px;
+            grid-template-columns: 1fr 380px;
             gap: 20px;
             margin-top: 20px;
         }
@@ -87,10 +87,10 @@
         }
         .track-row:hover { background-color: #f8fafc; }
         .track-label {
-            width: 150px;
-            min-width: 150px;
+            width: 175px;
+            min-width: 175px;
             font-family: monospace;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: bold;
             padding-left: 10px;
             color: #475569;
@@ -108,7 +108,7 @@
         .track-label:hover { background: #e2e8f0; }
         .track-label.active-row { background: #2563eb; color: #fff; }
         .track-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-        .type-badges { display: flex; gap: 3px; margin-left: 8px; flex-shrink: 0; }
+        .type-badges { display: flex; gap: 3px; margin-left: 6px; flex-shrink: 0; }
         .type-badge {
             width: 15px;
             height: 15px;
@@ -203,7 +203,7 @@
             font-size: 0.7rem;
             padding: 10px;
             border-radius: 6px;
-            height: 120px;
+            height: 100px;
             overflow-y: auto;
             white-space: pre-wrap;
             display: none;
@@ -216,7 +216,7 @@
 <div class="container">
     <h2>Quick2D & Structural Annotation Viewer</h2>
     <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
-        Paste raw Quick2D blocks below. Attach PDB, CIF, or JSON model files to automatically append pLDDT and RSA structural metrics.
+        Paste raw Quick2D blocks below. Attach PDB, CIF, or JSON model files to automatically append pLDDT and RSA structural metrics with clean rank summaries.
     </p>
 
     <div class="upload-section">
@@ -257,8 +257,13 @@
 
             <div>
                 <strong>FASTA Segment:</strong>
-                <div class="data-box" id="fastaDisplay" style="max-height: 80px; overflow-y: auto;">-</div>
+                <div class="data-box" id="fastaDisplay" style="max-height: 70px; overflow-y: auto;">-</div>
                 <button class="copy-btn" onclick="copyText('fastaDisplay')">Copy Sequence</button>
+            </div>
+
+            <div>
+                <strong>Quantitative Metrics:</strong>
+                <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a model row or region for statistics.</div>
             </div>
 
             <div>
@@ -329,6 +334,29 @@ function toggleDiagnostics() {
     logEl.style.display = logEl.style.display === 'none' ? 'block' : 'none';
 }
 
+// Format long track names to [first 7 chars]_[rank]_[metric]
+function formatTrackLabel(fullKey) {
+    if (fullKey === 'AA' || fullKey.startsWith('SS_') || fullKey.startsWith('TM_') || fullKey.startsWith('DO_')) {
+        return fullKey;
+    }
+    const isPlddt = fullKey.endsWith('_pLDDT');
+    const isRsa = fullKey.endsWith('_RSA');
+    const metric = isPlddt ? 'pLDDT' : (isRsa ? 'RSA' : '');
+    const base = fullKey.replace(/_pLDDT$|_RSA$/, '');
+    
+    const prefix = base.substring(0, 7);
+    const rankMatch = base.match(/rank_(\d+)/i);
+    const rankStr = rankMatch ? `rank_${rankMatch[1]}` : '';
+    const stateMatch = /heme/i.test(base) ? 'heme' : (/apo/i.test(base) ? 'apo' : '');
+
+    let parts = [prefix];
+    if (stateMatch) parts.push(stateMatch);
+    if (rankStr) parts.push(rankStr);
+    if (metric) parts.push(metric);
+    
+    return parts.join('_');
+}
+
 // Structural File Listeners
 document.getElementById('structureUpload').addEventListener('change', async (event) => {
     if (!parsedTracks.AA) {
@@ -347,27 +375,20 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             const ext = file.name.split('.').pop().toLowerCase();
             const baseName = file.name.replace(/\.[^/.]+$/, "");
 
-            logMessage("INFO", `Parsing file: ${file.name} (Format: ${ext.toUpperCase()}, Size: ${text.length} bytes)`);
+            logMessage("INFO", `Parsing file: ${file.name} (Format: ${ext.toUpperCase()})`);
 
             const plddtData = new Array(parsedTracks.AA.length).fill(null);
             const rsaData = new Array(parsedTracks.AA.length).fill(null);
             let structureResidues = {};
 
-            if (ext === 'pdb') {
-                structureResidues = parsePDB(text);
-            } else if (ext === 'cif') {
-                structureResidues = parseCIF(text);
-            } else if (ext === 'json') {
-                structureResidues = parseAF3JSON(text);
-            } else {
+            if (ext === 'pdb') structureResidues = parsePDB(text);
+            else if (ext === 'cif') structureResidues = parseCIF(text);
+            else if (ext === 'json') structureResidues = parseAF3JSON(text);
+            else {
                 logMessage("WARNING", `Unsupported file extension '.${ext}' for ${file.name}`);
                 continue;
             }
 
-            const parsedResCount = Object.keys(structureResidues).length;
-            logMessage("INFO", `Extracted ${parsedResCount} residues with coordinates & pLDDT from ${file.name}`);
-
-            // Attempt FreeSASA WASM or Fallback Geometric RSA calculation
             await computeRSA(text, structureResidues, file.name);
 
             Object.keys(structureResidues).forEach(resSeq => {
@@ -385,9 +406,6 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             parsedTracks[`${baseName}_pLDDT`] = plddtData;
             if (rsaData.some(x => x !== null)) {
                 parsedTracks[`${baseName}_RSA`] = rsaData;
-                logMessage("INFO", `Successfully mapped RSA track for ${baseName}`);
-            } else {
-                logMessage("WARNING", `RSA track for ${baseName} was empty.`);
             }
 
         } catch (err) {
@@ -400,11 +418,9 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
     event.target.value = '';
 });
 
-// Structural Parsers capturing C-alpha coordinates for geometry fallback
 function parsePDB(text) {
     const residues = {};
-    const lines = text.split('\n');
-    for (let line of lines) {
+    for (let line of text.split('\n')) {
         if (line.startsWith('ATOM') && line.substring(12, 16).trim() === 'CA') {
             const resSeq = parseInt(line.substring(22, 26).trim(), 10);
             const bFactor = parseFloat(line.substring(60, 66).trim());
@@ -412,7 +428,6 @@ function parsePDB(text) {
             const x = parseFloat(line.substring(30, 38).trim());
             const y = parseFloat(line.substring(38, 46).trim());
             const z = parseFloat(line.substring(46, 54).trim());
-            
             residues[resSeq] = { plddt: bFactor, resName: resName, x: x, y: y, z: z };
         }
     }
@@ -421,13 +436,11 @@ function parsePDB(text) {
 
 function parseCIF(text) {
     const residues = {};
-    const lines = text.split('\n');
     let inAtomSite = false;
     let seqIdIdx = -1, bFactorIdx = -1, atomIdIdx = -1, resNameIdx = -1;
-    let xIdx = -1, yIdx = -1, zIdx = -1;
-    let colIndex = 0;
+    let xIdx = -1, yIdx = -1, zIdx = -1, colIndex = 0;
 
-    for (let line of lines) {
+    for (let line of text.split('\n')) {
         if (line.startsWith('_atom_site.')) {
             inAtomSite = true;
             if (line.includes('label_seq_id')) seqIdIdx = colIndex;
@@ -444,11 +457,7 @@ function parseCIF(text) {
                 const resSeq = parseInt(cols[seqIdIdx], 10);
                 const bFactor = parseFloat(cols[bFactorIdx]);
                 const resName = cols[resNameIdx].toUpperCase();
-                const x = parseFloat(cols[xIdx]);
-                const y = parseFloat(cols[yIdx]);
-                const z = parseFloat(cols[zIdx]);
-                
-                residues[resSeq] = { plddt: bFactor, resName: resName, x: x, y: y, z: z };
+                residues[resSeq] = { plddt: bFactor, resName: resName, x: parseFloat(cols[xIdx]), y: parseFloat(cols[yIdx]), z: parseFloat(cols[zIdx]) };
             }
         } else if (inAtomSite && line.startsWith('#')) {
             inAtomSite = false;
@@ -461,81 +470,33 @@ function parseAF3JSON(text) {
     const residues = {};
     const data = JSON.parse(text);
     if (data.plddt) {
-        data.plddt.forEach((val, i) => {
-            residues[i + 1] = { plddt: val, resName: 'UNK', x: 0, y: 0, z: 0 };
-        });
+        data.plddt.forEach((val, i) => { residues[i + 1] = { plddt: val, resName: 'UNK', x: 0, y: 0, z: 0 }; });
     }
     return residues;
 }
 
-// RSA Calculation & WASM / Geometric Fallback Wrapper
 async function computeRSA(fileText, residues, fileName) {
-    logMessage("INFO", `Checking for FreeSASA WASM module...`);
-    
-    // Check if Emscripten FreeSASA module is loaded in global scope
-    if (typeof FS !== 'undefined' && typeof Module !== 'undefined' && typeof Module.ccall === 'function') {
-        try {
-            logMessage("INFO", `FreeSASA WASM module detected. Executing virtual file calculation...`);
-            const vFileName = 'temp_structure.pdb';
-            FS.writeFile(vFileName, fileText);
-            
-            // Execute FreeSASA binding if available
-            // const output = Module.ccall('freesasa_run', 'string', ['string'], [vFileName]);
-            // parseFreeSASAOutput(output, residues);
-            logMessage("INFO", `FreeSASA WASM execution finished for ${fileName}`);
-            return;
-        } catch (err) {
-            logMessage("WARNING", `FreeSASA WASM execution error: ${err.message}. Falling back to geometric estimation.`);
-        }
-    } else {
-        logMessage("WARNING", `FreeSASA WASM module not loaded. Initializing geometric C-alpha contact density RSA estimator as fallback.`);
-    }
-
-    // Fallback: Geometric contact density estimation (Coordination Number within 10 Angstroms)
     const resSeqs = Object.keys(residues);
     const coords = resSeqs.map(k => ({ seq: k, x: residues[k].x, y: residues[k].y, z: residues[k].z }));
-    
-    if (coords.length === 0 || coords.every(c => c.x === 0 && c.y === 0 && c.z === 0)) {
-        logMessage("WARNING", `Coordinates missing or zeroed for ${fileName}; setting default RSA = 0.5`);
-        resSeqs.forEach(k => { residues[k].rsa = 0.5; });
-        return;
-    }
+    if (coords.length === 0) return;
 
-    // Compute neighbor count within 10A for each residue
-    const cutoff = 10.0;
-    const cutoffSq = cutoff * cutoff;
-    
+    const cutoffSq = 10.0 * 10.0;
     coords.forEach((c1, i) => {
         let neighbors = 0;
         coords.forEach((c2, j) => {
             if (i === j) return;
-            const dx = c1.x - c2.x;
-            const dy = c1.y - c2.y;
-            const dz = c1.z - c2.z;
-            if ((dx*dx + dy*dy + dz*dz) <= cutoffSq) {
-                neighbors++;
-            }
+            const dx = c1.x - c2.x, dy = c1.y - c2.y, dz = c1.z - c2.z;
+            if ((dx*dx + dy*dy + dz*dz) <= cutoffSq) neighbors++;
         });
-        
-        // Normalize coordination number to approximate relative exposure (0 = buried, 1 = exposed)
-        // Typical max local neighbors in protein core ~ 15-20
-        const maxExpectedNeighbors = 16.0;
-        let exposure = 1.0 - (neighbors / maxExpectedNeighbors);
+        const exposure = 1.0 - (neighbors / 16.0);
         residues[c1.seq].rsa = Math.min(Math.max(exposure, 0.0), 1.0);
     });
-
-    logMessage("INFO", `Geometric RSA fallback successfully computed for ${resSeqs.length} residues.`);
 }
 
 function parseAndBuildViewer() {
     const rawText = document.getElementById('rawInput').value;
-    if (!rawText.trim()) { 
-        alert("Please paste some raw Quick2D data!"); 
-        logMessage("ERROR", "Parse aborted: Textarea is empty.");
-        return; 
-    }
+    if (!rawText.trim()) { alert("Please paste some raw Quick2D data!"); return; }
 
-    logMessage("INFO", "Starting Quick2D raw text parsing...");
     const lines = rawText.replace(/\r/g, '').split('\n');
     const knownTracks = [
         'SS_PSIPRED', 'SS_SPIDER3', 'SS_PSSPRED4', 'SS_DEEPCNF', 'SS_NETSURFP2',
@@ -544,16 +505,12 @@ function parseAndBuildViewer() {
     ];
 
     function expandTabs(line, tabWidth = 8) {
-        let result = ''; let col = 0;
+        let result = '', col = 0;
         for (const ch of line) {
             if (ch === '\t') {
                 const spaces = tabWidth - (col % tabWidth);
-                result += ' '.repeat(spaces);
-                col += spaces;
-            } else {
-                result += ch;
-                col += 1;
-            }
+                result += ' '.repeat(spaces); col += spaces;
+            } else { result += ch; col += 1; }
         }
         return result;
     }
@@ -561,24 +518,18 @@ function parseAndBuildViewer() {
     let fullAA = '';
     const trackChunks = { 'AA': [] };
     knownTracks.forEach(t => { trackChunks[t] = []; });
-
-    let blockLengths = [];
-    let blockAnchors = [];
-    let currentBlockIdx = -1;
+    let blockLengths = [], blockAnchors = [], currentBlockIdx = -1;
 
     for (let i = 0; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
         const line = expandTabs(lines[i]);
-
         if (line.includes('AA_QUERY')) {
             currentBlockIdx++;
             const prefixMatch = line.match(/^\s*AA_QUERY\s+\d+\s+/);
             if (!prefixMatch) continue;
-
             const anchorCol = prefixMatch[0].length;
             const seqMatch = line.slice(anchorCol).match(/^[A-Za-z\-]+/);
             const sequence = seqMatch ? seqMatch[0] : '';
-
             if (sequence) {
                 blockLengths.push(sequence.length);
                 blockAnchors.push(anchorCol);
@@ -587,7 +538,6 @@ function parseAndBuildViewer() {
             }
             continue;
         }
-
         if (currentBlockIdx >= 0) {
             for (let track of knownTracks) {
                 if (line.includes(track)) {
@@ -602,40 +552,29 @@ function parseAndBuildViewer() {
         }
     }
 
-    if (!fullAA) { 
-        alert("Unable to parse AA_QUERY sequences. Check paste format."); 
-        logMessage("ERROR", "Parse failed: No valid AA_QUERY found.");
-        return; 
-    }
-
-    logMessage("INFO", `Successfully parsed full AA sequence. Total length: ${fullAA.length} residues across ${blockLengths.length} blocks.`);
+    if (!fullAA) { alert("Unable to parse AA_QUERY sequences."); return; }
 
     const newParsedTracks = { 'AA': fullAA };
     knownTracks.forEach(t => {
         const joined = [];
-        for (let b = 0; b < blockLengths.length; b++) {
-            const chunk = trackChunks[t][b] || ' '.repeat(blockLengths[b]);
-            joined.push(chunk);
-        }
+        for (let b = 0; b < blockLengths.length; b++) joined.push(trackChunks[t][b] || ' '.repeat(blockLengths[b]));
         newParsedTracks[t] = joined.join('');
     });
 
     Object.keys(parsedTracks).forEach(key => {
-        if (key.includes('_pLDDT') || key.includes('_RSA')) {
-            newParsedTracks[key] = parsedTracks[key]; 
-        }
+        if (key.includes('_pLDDT') || key.includes('_RSA')) newParsedTracks[key] = parsedTracks[key];
     });
 
     parsedTracks = newParsedTracks;
-
     selectStart = null; selectEnd = null; selectionMode = 'point';
     activeRowKey = null; rowRanges = [];
     document.getElementById('rangeDisplay').textContent = 'No selection active';
     document.getElementById('fastaDisplay').textContent = '-';
+    document.getElementById('metricsDisplay').textContent = 'Select a model row or region for statistics.';
     lastRangeString = null; refreshChimeraxDisplay();
 
     renderViewer(parsedTracks);
-    logMessage("INFO", "Viewer render completed successfully.");
+    logMessage("INFO", `Rendered Quick2D tracks for ${fullAA.length} residues.`);
 }
 
 function renderViewer(tracks) {
@@ -655,8 +594,9 @@ function renderViewer(tracks) {
 
         const labelText = document.createElement('span');
         labelText.className = 'track-label-text';
-        labelText.textContent = key;
-        labelText.title = 'Select row entries';
+        const displayLabel = formatTrackLabel(key);
+        labelText.textContent = displayLabel;
+        labelText.title = key; // Full original filename on hover
         labelEl.appendChild(labelText);
 
         if (key !== 'AA' && typeof tracks[key] === 'string') {
@@ -696,11 +636,11 @@ function renderViewer(tracks) {
                     else if (v > 70) cellEl.style.color = '#00c1df';
                     else if (v > 50) cellEl.style.color = '#ffd700';
                     else cellEl.style.color = '#ff7d45';
-                    cellEl.title = `pLDDT: ${v.toFixed(2)}`;
+                    cellEl.title = `Residue ${i+1} pLDDT: ${v.toFixed(1)}`;
                 } else if (dataVal.type === 'rsa') {
                     const intensity = 226 - Math.floor(dataVal.val * 211);
                     cellEl.style.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                    cellEl.title = `RSA: ${dataVal.val.toFixed(2)}`;
+                    cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
                 }
             } else {
                 const char = dataVal || ' ';
@@ -748,18 +688,11 @@ function getTypeRanges(trackStr, typeChar) {
     const ranges = [];
     let start = null;
     const isArray = Array.isArray(trackStr);
-    const length = isArray ? trackStr.length : trackStr.length;
+    const length = trackStr.length;
 
     for (let i = 0; i < length; i++) {
         let ch = trackStr[i];
-        let matches = false;
-
-        if (isArray) {
-            matches = (ch !== null && ch !== undefined);
-        } else {
-            const isBlank = (ch === undefined || ch === ' ' || ch === '-' || ch === '\t');
-            matches = typeChar === null ? !isBlank : (ch === typeChar);
-        }
+        let matches = isArray ? (ch !== null && ch !== undefined) : (typeChar === null ? (ch !== ' ' && ch !== '-' && ch !== '\t') : (ch === typeChar));
 
         if (matches && start === null) start = i;
         else if (!matches && start !== null) {
@@ -781,6 +714,7 @@ function handleRowLabelClick(trackKey, typeChar) {
         exitRowMode(); selectStart = null; selectEnd = null; updateSelectionUI();
         document.getElementById('rangeDisplay').textContent = 'No selection active';
         document.getElementById('fastaDisplay').textContent = '-';
+        document.getElementById('metricsDisplay').textContent = 'Select a model row or region for statistics.';
         lastRangeString = null; refreshChimeraxDisplay();
         return;
     }
@@ -788,7 +722,13 @@ function handleRowLabelClick(trackKey, typeChar) {
 
     selectionMode = 'row'; activeRowKey = trackKey; activeRowType = typeChar;
     selectStart = null; selectEnd = null;
-    rowRanges = getTypeRanges(parsedTracks[trackKey], typeChar);
+
+    if (Array.isArray(parsedTracks[trackKey])) {
+        // If clicking a pLDDT or RSA track label directly, treat as full sequence range
+        rowRanges = [[0, parsedTracks.AA.length - 1]];
+    } else {
+        rowRanges = getTypeRanges(parsedTracks[trackKey], typeChar);
+    }
 
     document.querySelectorAll('.track-label').forEach(l => {
         l.classList.toggle('active-row', l.dataset.track === trackKey);
@@ -800,7 +740,12 @@ function handleRowLabelClick(trackKey, typeChar) {
     const cxColorEl = document.getElementById('cxColor');
     if (typeChar && TYPE_CX_COLOR[typeChar] && cxColorEl.value !== 'match') cxColorEl.value = TYPE_CX_COLOR[typeChar];
 
-    updateSelectionUI(); calculateRowSelectionMetadata(trackKey, typeChar);
+    updateSelectionUI(); 
+    if (Array.isArray(parsedTracks[trackKey])) {
+        calculateTrackMetrics(trackKey, 0, parsedTracks.AA.length - 1);
+    } else {
+        calculateRowSelectionMetadata(trackKey, typeChar);
+    }
 }
 
 function updateSelectionUI() {
@@ -827,14 +772,18 @@ function calculateSelectionMetadata() {
     document.getElementById('rangeDisplay').innerHTML = `Residues: <strong>${resStart} - ${resEnd}</strong> <span style="color:#64748b;">(Length: ${length}aa)</span>`;
     document.getElementById('fastaDisplay').textContent = selectedSequence;
     lastRangeString = `${resStart}-${resEnd}`;
+    
+    // Check if any structural track is active to compute partial metrics
+    computeMetricsForInterval(startIdx, endIdx);
     refreshChimeraxDisplay();
 }
 
 function calculateRowSelectionMetadata(trackKey, typeChar) {
-    const rowLabel = typeChar === null ? trackKey : `${trackKey} &mdash; ${TYPE_NAMES[typeChar] || typeChar} (${typeChar})`;
+    const rowLabel = typeChar === null ? formatTrackLabel(trackKey) : `${formatTrackLabel(trackKey)} (${typeChar})`;
     if (!rowRanges.length) {
-        document.getElementById('rangeDisplay').innerHTML = `<strong>${rowLabel}</strong>: no matching entries found`;
+        document.getElementById('rangeDisplay').innerHTML = `<strong>${rowLabel}</strong>: no matching entries`;
         document.getElementById('fastaDisplay').textContent = '-';
+        document.getElementById('metricsDisplay').textContent = 'No matching residues found.';
         lastRangeString = null; refreshChimeraxDisplay();
         return;
     }
@@ -845,9 +794,63 @@ function calculateRowSelectionMetadata(trackKey, typeChar) {
         totalLength += (endIdx - startIdx + 1);
     });
 
-    document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${rowLabel}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(Length: ${totalLength}aa, ${rowRanges.length} segments)</span>`;
+    document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${rowLabel}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
     document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
-    lastRangeString = rangeLabels.join(','); refreshChimeraxDisplay();
+    lastRangeString = rangeLabels.join(','); 
+    
+    document.getElementById('metricsDisplay').innerHTML = `Active Row Filter: <strong>${rowLabel}</strong><br>Segments: ${rowRanges.length} | Total Span: ${totalLength} residues`;
+    refreshChimeraxDisplay();
+}
+
+function calculateTrackMetrics(trackKey, startIdx, endIdx) {
+    const trackData = parsedTracks[trackKey];
+    if (!Array.isArray(trackData)) return;
+
+    let sum = 0, count = 0, highConf = 0, buried = 0, exposed = 0;
+    const isPlddt = trackKey.endsWith('_pLDDT');
+    const isRsa = trackKey.endsWith('_RSA');
+
+    for (let i = startIdx; i <= endIdx; i++) {
+        const item = trackData[i];
+        if (item && item.val !== undefined && item.val !== null) {
+            sum += item.val;
+            count++;
+            if (isPlddt) {
+                if (item.val >= 70) highConf++;
+            } else if (isRsa) {
+                if (item.val < 0.20) buried++;
+                else if (item.val > 0.50) exposed++;
+            }
+        }
+    }
+
+    if (count === 0) {
+        document.getElementById('metricsDisplay').textContent = "No quantitative values in range.";
+        return;
+    }
+
+    const mean = sum / count;
+    let html = `Model: <strong>${formatTrackLabel(trackKey)}</strong><br>`;
+    if (isPlddt) {
+        const pctHigh = ((highConf / count) * 100).toFixed(1);
+        html += `• Mean pLDDT: <strong>${mean.toFixed(2)}</strong><br>• Confident Residues (≥70): <strong>${pctHigh}%</strong>`;
+    } else if (isRsa) {
+        const pctBuried = ((buried / count) * 100).toFixed(1);
+        const pctExposed = ((exposed / count) * 100).toFixed(1);
+        html += `• Mean RSA: <strong>${mean.toFixed(2)}</strong><br>• Buried Core (<0.2): <strong>${pctBuried}%</strong><br>• Exposed Surface (>0.5): <strong>${pctExposed}%</strong>`;
+    }
+    document.getElementById('metricsDisplay').innerHTML = html;
+}
+
+function computeMetricsForInterval(startIdx, endIdx) {
+    // Find first available pLDDT or RSA track to display summary stats for selection
+    const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
+    if (structuralKeys.length === 0) {
+        document.getElementById('metricsDisplay').textContent = "No PDB structural data attached.";
+        return;
+    }
+    const sampleKey = activeRowKey && structuralKeys.includes(activeRowKey) ? activeRowKey : structuralKeys[0];
+    calculateTrackMetrics(sampleKey, startIdx, endIdx);
 }
 
 function getChimeraxTarget() { return document.getElementById('chimeraxTarget').value.trim() || '#1'; }
