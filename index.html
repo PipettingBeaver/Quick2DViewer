@@ -174,13 +174,14 @@
         .graph-section-wrapper {
             background: #fff;
             border-bottom: 1px solid #cbd5e1;
-            padding: 10px 15px;
+            padding: 10px 0;
         }
         .graph-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
+            padding: 0 15px;
             font-size: 0.85rem;
             font-weight: bold;
             color: #334155;
@@ -207,8 +208,8 @@
         .graph-container-inner {
             position: relative;
             background: #fafafa;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
         }
         .graph-annotations-wrapper {
             border-bottom: 2px solid #cbd5e1;
@@ -726,6 +727,7 @@ function renderViewer(tracks) {
         if (annotationKeys.length) {
             const annoWrapper = document.createElement('div');
             annoWrapper.className = 'graph-annotations-wrapper';
+            annoWrapper.style.width = (GRAPH_AXIS_WIDTH + totalLength * GRAPH_CELL_WIDTH) + 'px';
             annotationKeys.forEach(key => annoWrapper.appendChild(buildTrackRow(key, tracks, totalLength)));
             grid.appendChild(annoWrapper);
         }
@@ -1002,6 +1004,8 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     });
 
     inner.appendChild(svg);
+    inner.style.width = width + 'px';
+    wrapper.style.width = width + 'px';
     wrapper.appendChild(inner);
     return wrapper;
 }
