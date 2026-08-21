@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quick2D Viewer: Parser, Metrics Table & Graph View</title>
+    <title>Quick2D Viewer: Overlaid Graphs & Interactive Selection</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -27,7 +27,7 @@
         }
         textarea {
             width: 100%;
-            height: 150px;
+            height: 120px;
             font-family: monospace;
             font-size: 0.8rem;
             padding: 10px;
@@ -170,16 +170,59 @@
         .cell-D { background-color: #ffedd5; color: #9a3412; } 
         .cell-space { color: #cbd5e1; }
 
-        /* Graph Row Styling */
-        .graph-row-container {
-            height: 90px;
+        /* Graph View Styling */
+        .graph-section-wrapper {
             background: #fff;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 10px 15px;
+        }
+        .graph-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #334155;
+        }
+        .graph-legend-pills {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .graph-pill {
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            background: #f1f5f9;
+            user-select: none;
+        }
+        .graph-pill.active {
+            font-weight: bold;
+            color: white;
+            border-color: transparent;
+        }
+        .graph-container-inner {
+            overflow-x: auto;
+            position: relative;
+            background: #fafafa;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
         }
         .graph-svg {
-            overflow: visible;
+            display: block;
+            cursor: crosshair;
+        }
+        .graph-svg circle {
+            cursor: pointer;
+            transition: r 0.15s ease;
+        }
+        .graph-svg circle:hover {
+            r: 5.5;
+            stroke: #0f172a;
+            stroke-width: 1.5;
         }
 
         .sidebar {
@@ -254,7 +297,7 @@
 <div class="container">
     <h2>Quick2D & Structural Annotation Viewer</h2>
     <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
-        Paste raw Quick2D blocks below. Attach PDB, CIF, or JSON model files to analyze pLDDT & RSA with smart labels.
+        Paste Quick2D outputs and attach model files. Use Heatmap Grid or Overlaid Graph views with interactive range selection.
     </p>
 
     <div class="toolbar">
@@ -264,13 +307,7 @@
             <label style="font-size: 0.8rem; font-weight: bold;">View Mode:</label>
             <select id="viewModeSelect" onchange="switchViewMode()" style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem;">
                 <option value="grid">Heatmap Grid</option>
-                <option value="graph">Interactive Graph (pLDDT/RSA)</option>
-            </select>
-            <select id="graphOverlaySelect" onchange="renderViewer(parsedTracks)" style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem; display:none;">
-                <option value="none">Overlay: None</option>
-                <option value="TM">Overlay: TM (Membrane)</option>
-                <option value="DO">Overlay: DO (Disorder)</option>
-                <option value="SS">Overlay: SS (Helix/Sheet)</option>
+                <option value="graph">Overlaid Graph View</option>
             </select>
             <button class="secondary" onclick="openMetricsTable()">Metrics Table</button>
         </div>
@@ -287,9 +324,6 @@
         <div class="legend-item"><div class="box" style="background:#dcfce7;"></div> CC: Coiled Coils (C)</div>
         <div class="legend-item"><div class="box" style="background:#f3e8ff;"></div> TM: Membrane (M)</div>
         <div class="legend-item"><div class="box" style="background:#ffedd5;"></div> DO: Disordered (D)</div>
-        <div class="legend-item"><div class="box" style="background:#0053d6;"></div> pLDDT > 90</div>
-        <div class="legend-item"><div class="box" style="background:#00c1df;"></div> pLDDT > 70</div>
-        <div class="legend-item"><div class="box" style="background:#ffd700;"></div> pLDDT > 50</div>
     </div>
 
     <div class="grid-layout">
@@ -313,7 +347,7 @@
 
             <div>
                 <strong>Quantitative Metrics:</strong>
-                <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a model row or region for statistics.</div>
+                <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a region or graph point for statistics.</div>
             </div>
 
             <div>
@@ -377,6 +411,8 @@ let currentViewMode = 'grid'; // 'grid' or 'graph'
 
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
+const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
+let graphHighlights = {}; // Track key -> boolean (true if highlighted/active)
 
 // Format Track Labels to: [Prefix]_[State/Model]_[Metric]
 function formatTrackLabel(fullKey) {
@@ -388,19 +424,14 @@ function formatTrackLabel(fullKey) {
     const metric = isPlddt ? 'pLDDT' : (isRsa ? 'RSA' : '');
     const base = fullKey.replace(/_pLDDT$|_RSA$/, '');
     
-    // Check for model_X or rank_00X
     let modelId = '';
     const modelMatch = base.match(/(model_\d+|rank_\d+|rank\d+)/i);
-    if (modelMatch) {
-        modelId = modelMatch[1];
-    }
+    if (modelMatch) modelId = modelMatch[1];
 
-    // Check state (heme / apo)
     let state = '';
     if (/heme/i.test(base)) state = 'heme';
     else if (/apo/i.test(base)) state = 'apo';
 
-    // Extract smart prefix
     let prefix = base.split('_')[0] || base.substring(0, 6);
     if (prefix.length < 6 && base.includes('_')) {
         const parts = base.split('_');
@@ -416,7 +447,6 @@ function formatTrackLabel(fullKey) {
     return parts.join('_');
 }
 
-// Track Category Sorting Order
 function getTrackCategoryOrder(key) {
     if (key === 'AA') return 0;
     if (key.startsWith('SS_')) return 1;
@@ -426,10 +456,8 @@ function getTrackCategoryOrder(key) {
     return 5;
 }
 
-// Switch View Mode (Grid vs Graph)
 function switchViewMode() {
     currentViewMode = document.getElementById('viewModeSelect').value;
-    document.getElementById('graphOverlaySelect').style.display = (currentViewMode === 'graph') ? 'inline-block' : 'none';
     renderViewer(parsedTracks);
 }
 
@@ -471,9 +499,13 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
                 }
             });
 
-            parsedTracks[`${baseName}_pLDDT`] = plddtData;
+            const plddtKey = `${baseName}_pLDDT`;
+            const rsaKey = `${baseName}_RSA`;
+            parsedTracks[plddtKey] = plddtData;
+            graphHighlights[plddtKey] = true;
             if (rsaData.some(x => x !== null)) {
-                parsedTracks[`${baseName}_RSA`] = rsaData;
+                parsedTracks[rsaKey] = rsaData;
+                graphHighlights[rsaKey] = true;
             }
         } catch (err) {
             console.error(err);
@@ -617,7 +649,10 @@ function parseAndBuildViewer() {
     });
 
     Object.keys(parsedTracks).forEach(key => {
-        if (key.includes('_pLDDT') || key.includes('_RSA')) newParsedTracks[key] = parsedTracks[key];
+        if (key.includes('_pLDDT') || key.includes('_RSA')) {
+            newParsedTracks[key] = parsedTracks[key];
+            if (graphHighlights[key] === undefined) graphHighlights[key] = true;
+        }
     });
 
     parsedTracks = newParsedTracks;
@@ -625,7 +660,7 @@ function parseAndBuildViewer() {
     activeRowKey = null; rowRanges = [];
     document.getElementById('rangeDisplay').textContent = 'No selection active';
     document.getElementById('fastaDisplay').textContent = '-';
-    document.getElementById('metricsDisplay').textContent = 'Select a model row or region for statistics.';
+    document.getElementById('metricsDisplay').textContent = 'Select a region or graph point for statistics.';
     lastRangeString = null; refreshChimeraxDisplay();
 
     renderViewer(parsedTracks);
@@ -637,7 +672,24 @@ function renderViewer(tracks) {
     const totalLength = tracks.AA ? tracks.AA.length : 0;
     if (totalLength === 0) return;
 
-    // Sort tracks logically by type
+    if (currentViewMode === 'graph') {
+        const plddtKeys = Object.keys(tracks).filter(k => k.endsWith('_pLDDT'));
+        const rsaKeys = Object.keys(tracks).filter(k => k.endsWith('_RSA'));
+
+        if (plddtKeys.length > 0) {
+            grid.appendChild(createOverlayGraphSection("pLDDT Confidence Overlay (0 - 100)", plddtKeys, totalLength, true));
+        }
+        if (rsaKeys.length > 0) {
+            grid.appendChild(createOverlayGraphSection("Relative Solvent Accessibility (RSA) Overlay (0.0 - 1.0)", rsaKeys, totalLength, false));
+        }
+        if (plddtKeys.length === 0 && rsaKeys.length === 0) {
+            grid.innerHTML = '<p style="padding: 20px; color: #94a3b8; text-align: center;">No PDB/JSON structural model files attached yet. Please upload files to view overlaid graphs.</p>';
+        }
+        updateSelectionUI();
+        return;
+    }
+
+    // Heatmap Grid View Mode
     const trackKeys = Object.keys(tracks).sort((a, b) => {
         const orderA = getTrackCategoryOrder(a);
         const orderB = getTrackCategoryOrder(b);
@@ -680,71 +732,96 @@ function renderViewer(tracks) {
         }
         rowEl.appendChild(labelEl);
         
-        const isStructuralTrack = key.endsWith('_pLDDT') || key.endsWith('_RSA');
-
-        if (currentViewMode === 'graph' && isStructuralTrack) {
-            rowEl.style.height = '90px';
-            const graphContainer = document.createElement('div');
-            graphContainer.className = 'track-cells graph-row-container';
-            const svg = createGraphSVG(tracks[key], totalLength, key.endsWith('_pLDDT'));
-            graphContainer.appendChild(svg);
-            rowEl.appendChild(graphContainer);
-        } else {
-            const cellsContainer = document.createElement('div');
-            cellsContainer.className = 'track-cells';
+        const cellsContainer = document.createElement('div');
+        cellsContainer.className = 'track-cells';
+        
+        for (let i = 0; i < totalLength; i++) {
+            const cellEl = document.createElement('div');
+            const dataVal = tracks[key][i];
+            cellEl.className = `cell col-${i}`;
+            cellEl.dataset.idx = i;
             
-            for (let i = 0; i < totalLength; i++) {
-                const cellEl = document.createElement('div');
-                const dataVal = tracks[key][i];
-                cellEl.className = `cell col-${i}`;
-                cellEl.dataset.idx = i;
-                
-                if (typeof dataVal === 'object' && dataVal !== null) {
-                    cellEl.textContent = '█';
-                    if (dataVal.type === 'plddt') {
-                        const v = dataVal.val;
-                        if (v > 90) cellEl.style.color = '#0053d6';
-                        else if (v > 70) cellEl.style.color = '#00c1df';
-                        else if (v > 50) cellEl.style.color = '#ffd700';
-                        else cellEl.style.color = '#ff7d45';
-                        cellEl.title = `Residue ${i+1} pLDDT: ${v.toFixed(1)}`;
-                    } else if (dataVal.type === 'rsa') {
-                        const intensity = 226 - Math.floor(dataVal.val * 211);
-                        cellEl.style.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                        cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
-                    }
-                } else {
-                    const char = dataVal || ' ';
-                    cellEl.textContent = char;
-                    if (key === 'AA') cellEl.classList.add('cell-AA');
-                    else if (char === 'H') cellEl.classList.add('cell-H');
-                    else if (char === 'P') cellEl.classList.add('cell-P');
-                    else if (char === 'E') cellEl.classList.add('cell-E');
-                    else if (char === 'C') cellEl.classList.add('cell-C');
-                    else if (char === 'M') cellEl.classList.add('cell-M');
-                    else if (char === 'D') cellEl.classList.add('cell-D');
-                    else if (char === ' ' || char === '-' || char === '\t') {
-                        cellEl.classList.add('cell-space'); cellEl.textContent = '-';
-                    }
+            if (typeof dataVal === 'object' && dataVal !== null) {
+                cellEl.textContent = '█';
+                if (dataVal.type === 'plddt') {
+                    const v = dataVal.val;
+                    if (v > 90) cellEl.style.color = '#0053d6';
+                    else if (v > 70) cellEl.style.color = '#00c1df';
+                    else if (v > 50) cellEl.style.color = '#ffd700';
+                    else cellEl.style.color = '#ff7d45';
+                    cellEl.title = `Residue ${i+1} pLDDT: ${v.toFixed(1)}`;
+                } else if (dataVal.type === 'rsa') {
+                    const intensity = 226 - Math.floor(dataVal.val * 211);
+                    cellEl.style.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                    cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
                 }
-                
-                cellEl.addEventListener('mousedown', () => handleMouseDown(i));
-                cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
-                cellsContainer.appendChild(cellEl);
+            } else {
+                const char = dataVal || ' ';
+                cellEl.textContent = char;
+                if (key === 'AA') cellEl.classList.add('cell-AA');
+                else if (char === 'H') cellEl.classList.add('cell-H');
+                else if (char === 'P') cellEl.classList.add('cell-P');
+                else if (char === 'E') cellEl.classList.add('cell-E');
+                else if (char === 'C') cellEl.classList.add('cell-C');
+                else if (char === 'M') cellEl.classList.add('cell-M');
+                else if (char === 'D') cellEl.classList.add('cell-D');
+                else if (char === ' ' || char === '-' || char === '\t') {
+                    cellEl.classList.add('cell-space'); cellEl.textContent = '-';
+                }
             }
-            rowEl.appendChild(cellsContainer);
+            
+            cellEl.addEventListener('mousedown', () => handleMouseDown(i));
+            cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
+            cellsContainer.appendChild(cellEl);
         }
+        rowEl.appendChild(cellsContainer);
         grid.appendChild(rowEl);
     });
     window.addEventListener('mouseup', handleMouseUp);
     updateSelectionUI();
 }
 
-// Generate SVG Graph View for pLDDT / RSA
-function createGraphSVG(trackData, totalLength, isPlddt) {
+// Create Overlaid Graph Section with interactive toggle pills & selectable points
+function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'graph-section-wrapper';
+
+    const header = document.createElement('div');
+    header.className = 'graph-header';
+    
+    const title = document.createElement('span');
+    title.textContent = titleText;
+    header.appendChild(title);
+
+    const pillsContainer = document.createElement('div');
+    pillsContainer.className = 'graph-legend-pills';
+
+    trackKeys.forEach((key, idx) => {
+        const color = MODEL_PALETTE[idx % MODEL_PALETTE.length];
+        if (graphHighlights[key] === undefined) graphHighlights[key] = true;
+
+        const pill = document.createElement('span');
+        pill.className = `graph-pill ${graphHighlights[key] ? 'active' : ''}`;
+        pill.style.backgroundColor = graphHighlights[key] ? color : '#f1f5f9';
+        pill.style.color = graphHighlights[key] ? '#fff' : '#475569';
+        pill.style.borderColor = color;
+        pill.textContent = formatTrackLabel(key);
+        
+        pill.addEventListener('click', () => {
+            graphHighlights[key] = !graphHighlights[key];
+            renderViewer(parsedTracks);
+        });
+        pillsContainer.appendChild(pill);
+    });
+    header.appendChild(pillsContainer);
+    wrapper.appendChild(header);
+
+    const inner = document.createElement('div');
+    inner.className = 'graph-container-inner';
+
     const cellWidth = 12;
     const width = totalLength * cellWidth;
-    const height = 90;
+    const height = 180;
     const maxVal = isPlddt ? 100.0 : 1.0;
 
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -752,9 +829,9 @@ function createGraphSVG(trackData, totalLength, isPlddt) {
     svg.setAttribute("height", height);
     svg.setAttribute("class", "graph-svg");
 
-    // Background axes / guidelines
+    // Grid guidelines
     const gridGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    [0.25, 0.5, 0.75].forEach(ratio => {
+    [0.2, 0.4, 0.6, 0.8].forEach(ratio => {
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("x1", 0); line.setAttribute("x2", width);
         line.setAttribute("y1", height * ratio); line.setAttribute("y2", height * ratio);
@@ -763,58 +840,66 @@ function createGraphSVG(trackData, totalLength, isPlddt) {
     });
     svg.appendChild(gridGroup);
 
-    // Build polyline points
-    let points = [];
-    trackData.forEach((item, i) => {
-        if (item && item.val !== undefined && item.val !== null) {
-            const x = i * cellWidth + cellWidth / 2;
-            const val = Math.min(Math.max(item.val, 0), maxVal);
-            const y = height - (val / maxVal) * (height - 15) - 10;
-            points.push({ x, y, val, idx: i });
-        }
-    });
+    trackKeys.forEach((key, idx) => {
+        if (!graphHighlights[key]) return;
+        const color = MODEL_PALETTE[idx % MODEL_PALETTE.length];
+        const trackData = parsedTracks[key];
+        if (!trackData) return;
 
-    if (points.length > 1) {
-        let pathStr = `M ${points[0].x} ${points[0].y}`;
-        for (let i = 1; i < points.length; i++) {
-            pathStr += ` L ${points[i].x} ${points[i].y}`;
-        }
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", pathStr);
-        path.setAttribute("fill", "none");
-        path.setAttribute("stroke", isPlddt ? "#2563eb" : "#0d9488");
-        path.setAttribute("stroke-width", "2");
-        svg.appendChild(path);
-    }
-
-    // Overlay coloring based on selected track feature
-    const overlayType = document.getElementById('graphOverlaySelect').value;
-    points.forEach(p => {
-        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
-        circle.setAttribute("r", "3.5");
-        
-        let fillColor = isPlddt ? "#2563eb" : "#0d9488";
-        if (overlayType !== 'none') {
-            const trackKey = Object.keys(parsedTracks).find(k => k.startsWith(overlayType + '_'));
-            if (trackKey && parsedTracks[trackKey]) {
-                const char = parsedTracks[trackKey][p.idx];
-                if (char && char !== ' ' && char !== '-') {
-                    fillColor = TYPE_CX_COLOR[char] || '#e11d48';
-                }
+        let points = [];
+        trackData.forEach((item, i) => {
+            if (item && item.val !== undefined && item.val !== null) {
+                const x = i * cellWidth + cellWidth / 2;
+                const val = Math.min(Math.max(item.val, 0), maxVal);
+                const y = height - (val / maxVal) * (height - 30) - 15;
+                points.push({ x, y, val, idx: i });
             }
+        });
+
+        if (points.length > 1) {
+            let pathStr = `M ${points[0].x} ${points[0].y}`;
+            for (let i = 1; i < points.length; i++) {
+                pathStr += ` L ${points[i].x} ${points[i].y}`;
+            }
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", pathStr);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", color);
+            path.setAttribute("stroke-width", "2");
+            path.setAttribute("stroke-opacity", "0.85");
+            svg.appendChild(path);
         }
-        circle.setAttribute("fill", fillColor);
-        circle.setAttribute("stroke", "#fff");
-        circle.setAttribute("stroke-width", "1");
-        
-        const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-        title.textContent = `Residue ${p.idx + 1}: ${p.val.toFixed(2)}`;
-        circle.appendChild(title);
-        svg.appendChild(circle);
+
+        // Clickable residue points on graph
+        points.forEach(p => {
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
+            circle.setAttribute("r", "3.5");
+            circle.setAttribute("fill", color);
+            circle.setAttribute("stroke", "#fff");
+            circle.setAttribute("stroke-width", "1");
+            circle.dataset.idx = p.idx;
+
+            const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+            title.textContent = `${formatTrackLabel(key)} | Residue ${p.idx + 1} (${parsedTracks.AA[p.idx] || ''}): ${p.val.toFixed(2)}`;
+            circle.appendChild(title);
+
+            // Make graph dots selectable
+            circle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                handleMouseDown(p.idx);
+            });
+            circle.addEventListener('mouseenter', () => {
+                handleMouseEnter(p.idx);
+            });
+
+            svg.appendChild(circle);
+        });
     });
 
-    return svg;
+    inner.appendChild(svg);
+    wrapper.appendChild(inner);
+    return wrapper;
 }
 
 function handleMouseDown(idx) {
@@ -863,7 +948,7 @@ function handleRowLabelClick(trackKey, typeChar) {
         exitRowMode(); selectStart = null; selectEnd = null; updateSelectionUI();
         document.getElementById('rangeDisplay').textContent = 'No selection active';
         document.getElementById('fastaDisplay').textContent = '-';
-        document.getElementById('metricsDisplay').textContent = 'Select a model row or region for statistics.';
+        document.getElementById('metricsDisplay').textContent = 'Select a region or graph point for statistics.';
         lastRangeString = null; refreshChimeraxDisplay();
         return;
     }
@@ -950,7 +1035,7 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
     const trackData = parsedTracks[trackKey];
     if (!Array.isArray(trackData)) return;
 
-    let sum = 0, count = 0, highConf = 0, buried = 0, exposed = 0;
+    let sum = 0, count = 0, highConf = 0, buried = 0;
     const isPlddt = trackKey.endsWith('_pLDDT');
     const isRsa = trackKey.endsWith('_RSA');
 
@@ -960,10 +1045,7 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
             sum += item.val;
             count++;
             if (isPlddt && item.val >= 70) highConf++;
-            else if (isRsa) {
-                if (item.val < 0.20) buried++;
-                else if (item.val > 0.50) exposed++;
-            }
+            else if (isRsa && item.val < 0.20) buried++;
         }
     }
 
@@ -994,7 +1076,6 @@ function computeMetricsForInterval(startIdx, endIdx) {
     calculateTrackMetrics(sampleKey, startIdx, endIdx);
 }
 
-// Metrics Table Modal Controls
 function openMetricsTable() {
     const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
     if (structuralKeys.length === 0) {
