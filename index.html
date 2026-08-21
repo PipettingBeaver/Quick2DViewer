@@ -95,6 +95,7 @@
         .track-label {
             width: 195px;
             min-width: 195px;
+            box-sizing: border-box;
             font-family: monospace;
             font-size: 0.72rem;
             font-weight: bold;
@@ -160,6 +161,12 @@
             font-weight: bold;
         }
         .cell-AA.column-selected { box-shadow: inset 0 0 0 999px rgba(29, 78, 216, 0.45) !important; }
+        /* Applied instead of .column-selected to rows/tracks that are not the
+           one actually clicked, when a row/segment selection is active - keeps
+           the column position visible without implying those rows matched too. */
+        .column-selected-dim {
+            box-shadow: inset 0 0 0 999px rgba(37, 99, 235, 0.08) !important;
+        }
         
         .cell-AA { font-weight: bold; color: #000; background: #fff; border-bottom: 1px solid #cbd5e1; }
         .cell-H { background-color: #fee2e2; color: #991b1b; } 
@@ -236,9 +243,17 @@
             stroke: #1d4ed8;
             stroke-width: 2.5;
         }
+        .graph-svg circle.column-selected-dim {
+            stroke: #93c5fd;
+            stroke-width: 1.5;
+            opacity: 0.65;
+        }
         .graph-svg .selection-guide {
             fill: rgba(37, 99, 235, 0.12);
             pointer-events: none;
+        }
+        .graph-svg .selection-guide.selection-guide-dim {
+            fill: rgba(37, 99, 235, 0.04);
         }
         .graph-axis-tick {
             font-size: 9px;
@@ -809,6 +824,7 @@ function buildTrackRow(key, tracks, totalLength) {
         const dataVal = tracks[key][i];
         cellEl.className = `cell col-${i}`;
         cellEl.dataset.idx = i;
+        cellEl.dataset.track = key;
 
         if (typeof dataVal === 'object' && dataVal !== null) {
             cellEl.textContent = '█';
@@ -902,6 +918,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     svg.setAttribute("class", "graph-svg");
     svg.dataset.axisWidth = axisWidth;
     svg.dataset.cellWidth = cellWidth;
+    svg.dataset.trackKeys = trackKeys.join('|');
 
     // Y-axis: ticks at even fractions of the value range, gridlines spanning
     // just the plot area (not the axis label column), and a rotated title.
@@ -988,6 +1005,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
             circle.setAttribute("stroke-width", "1");
             circle.setAttribute("class", `col-${p.idx}`);
             circle.dataset.idx = p.idx;
+            circle.dataset.track = key;
 
             const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
             titleEl.textContent = `${formatTrackLabel(key)} | Residue ${p.idx + 1} (${parsedTracks.AA[p.idx] || ''}): ${p.val.toFixed(2)}`;
@@ -1030,21 +1048,22 @@ function handleMouseUp() {
 // every currently-selected residue index, so a selection made anywhere (grid
 // cell, annotation row, or a graph point) is visible on the graphs even where
 // a given model has no data point at that index.
-function updateGraphSelectionGuides(selectedIdxs) {
+function updateGraphSelectionGuides(selectedIdxs, restrictToRow) {
     document.querySelectorAll('.graph-svg').forEach(svg => {
         svg.querySelectorAll('.selection-guide').forEach(el => el.remove());
         if (!selectedIdxs.length) return;
         const axisWidth = parseFloat(svg.dataset.axisWidth || GRAPH_AXIS_WIDTH);
         const cellWidth = parseFloat(svg.dataset.cellWidth || GRAPH_CELL_WIDTH);
         const height = parseFloat(svg.getAttribute('height'));
-        const axisGroup = svg.querySelector('g'); // insert guides just above axis/gridlines, below data
+        const svgTrackKeys = (svg.dataset.trackKeys || '').split('|');
+        const dim = !!restrictToRow && !svgTrackKeys.includes(restrictToRow);
         selectedIdxs.forEach(idx => {
             const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             rect.setAttribute("x", axisWidth + idx * cellWidth);
             rect.setAttribute("y", 0);
             rect.setAttribute("width", cellWidth);
             rect.setAttribute("height", height);
-            rect.setAttribute("class", "selection-guide");
+            rect.setAttribute("class", dim ? "selection-guide selection-guide-dim" : "selection-guide");
             svg.insertBefore(rect, svg.children[1] || null);
         });
     });
@@ -1111,7 +1130,9 @@ function handleRowLabelClick(trackKey, typeChar) {
 }
 
 function updateSelectionUI() {
-    document.querySelectorAll('.column-selected').forEach(c => c.classList.remove('column-selected'));
+    document.querySelectorAll('.column-selected, .column-selected-dim').forEach(c => {
+        c.classList.remove('column-selected', 'column-selected-dim');
+    });
 
     let selectedIdxs = [];
     if (selectionMode === 'row') {
@@ -1123,10 +1144,18 @@ function updateSelectionUI() {
         for (let i = start; i <= end; i++) selectedIdxs.push(i);
     }
 
+    // Only a row/segment selection (clicking a track label or type badge) is
+    // tied to one specific row - a manual drag selects a residue range with
+    // no single owning row, so it stays uniformly highlighted everywhere.
+    const restrictToRow = selectionMode === 'row' ? activeRowKey : null;
+
     selectedIdxs.forEach(i => {
-        document.querySelectorAll(`.col-${i}`).forEach(c => c.classList.add('column-selected'));
+        document.querySelectorAll(`.col-${i}`).forEach(el => {
+            const isActiveRow = !restrictToRow || el.dataset.track === restrictToRow;
+            el.classList.add(isActiveRow ? 'column-selected' : 'column-selected-dim');
+        });
     });
-    updateGraphSelectionGuides(selectedIdxs);
+    updateGraphSelectionGuides(selectedIdxs, restrictToRow);
 }
 
 function calculateSelectionMetadata() {
