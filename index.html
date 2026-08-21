@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quick2D Viewer: Parser & Selection Tool for MPI Bioinformatics Quick2D output</title>
+    <title>Quick2D Viewer: Parser, Metrics Table & Graph View</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -11,7 +11,7 @@
             color: #1e293b;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1450px;
             margin: 0 auto;
             background: white;
             padding: 25px;
@@ -27,7 +27,7 @@
         }
         textarea {
             width: 100%;
-            height: 180px;
+            height: 150px;
             font-family: monospace;
             font-size: 0.8rem;
             padding: 10px;
@@ -36,7 +36,7 @@
             box-sizing: border-box;
             background-color: #fafafa;
         }
-        .upload-section {
+        .toolbar {
             background: #e2e8f0;
             padding: 10px 15px;
             border-radius: 6px;
@@ -45,19 +45,23 @@
             align-items: center;
             gap: 15px;
             font-size: 0.85rem;
+            flex-wrap: wrap;
         }
         button {
             background-color: #2563eb;
             color: white;
             border: none;
-            padding: 10px 18px;
+            padding: 8px 14px;
             font-weight: 600;
             border-radius: 6px;
             cursor: pointer;
-            margin-top: 10px;
             transition: background-color 0.2s;
+            font-size: 0.85rem;
         }
         button:hover { background-color: #1d4ed8; }
+        button.secondary { background-color: #475569; }
+        button.secondary:hover { background-color: #334155; }
+        
         .legend {
             display: flex;
             gap: 15px;
@@ -79,6 +83,8 @@
             border-radius: 6px;
             background: #fafafa;
             position: relative;
+            max-height: 650px;
+            overflow-y: auto;
         }
         .track-row {
             display: flex;
@@ -87,8 +93,8 @@
         }
         .track-row:hover { background-color: #f8fafc; }
         .track-label {
-            width: 175px;
-            min-width: 175px;
+            width: 195px;
+            min-width: 195px;
             font-family: monospace;
             font-size: 0.72rem;
             font-weight: bold;
@@ -164,6 +170,18 @@
         .cell-D { background-color: #ffedd5; color: #9a3412; } 
         .cell-space { color: #cbd5e1; }
 
+        /* Graph Row Styling */
+        .graph-row-container {
+            height: 90px;
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+        }
+        .graph-svg {
+            overflow: visible;
+        }
+
         .sidebar {
             background: #f1f5f9;
             padding: 20px;
@@ -196,19 +214,39 @@
             cursor: pointer;
         }
         .copy-btn:hover { background: #334155; }
-        .log-terminal {
-            background: #0f172a;
-            color: #38bdf8;
-            font-family: monospace;
-            font-size: 0.7rem;
-            padding: 10px;
-            border-radius: 6px;
-            height: 100px;
-            overflow-y: auto;
-            white-space: pre-wrap;
+        
+        /* Modal Overlay for Qualitative Table */
+        .modal-overlay {
             display: none;
-            margin-top: 5px;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
         }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        table.metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.85rem;
+        }
+        table.metrics-table th, table.metrics-table td {
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        table.metrics-table th { background: #e2e8f0; color: #0f172a; }
+        table.metrics-table tr:hover { background: #f8fafc; }
     </style>
 </head>
 <body>
@@ -216,13 +254,26 @@
 <div class="container">
     <h2>Quick2D & Structural Annotation Viewer</h2>
     <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
-        Paste raw Quick2D blocks below. Attach PDB, CIF, or JSON model files to automatically append pLDDT and RSA structural metrics with clean rank summaries.
+        Paste raw Quick2D blocks below. Attach PDB, CIF, or JSON model files to analyze pLDDT & RSA with smart labels.
     </p>
 
-    <div class="upload-section">
+    <div class="toolbar">
         <strong>Attach Structure:</strong>
         <input type="file" id="structureUpload" accept=".pdb,.cif,.json" multiple>
-        <span style="color: #64748b; font-size: 0.75rem;">Requires parsed FASTA sequence first.</span>
+        <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+            <label style="font-size: 0.8rem; font-weight: bold;">View Mode:</label>
+            <select id="viewModeSelect" onchange="switchViewMode()" style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem;">
+                <option value="grid">Heatmap Grid</option>
+                <option value="graph">Interactive Graph (pLDDT/RSA)</option>
+            </select>
+            <select id="graphOverlaySelect" onchange="renderViewer(parsedTracks)" style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem; display:none;">
+                <option value="none">Overlay: None</option>
+                <option value="TM">Overlay: TM (Membrane)</option>
+                <option value="DO">Overlay: DO (Disorder)</option>
+                <option value="SS">Overlay: SS (Helix/Sheet)</option>
+            </select>
+            <button class="secondary" onclick="openMetricsTable()">Metrics Table</button>
+        </div>
     </div>
 
     <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..."></textarea>
@@ -239,7 +290,6 @@
         <div class="legend-item"><div class="box" style="background:#0053d6;"></div> pLDDT > 90</div>
         <div class="legend-item"><div class="box" style="background:#00c1df;"></div> pLDDT > 70</div>
         <div class="legend-item"><div class="box" style="background:#ffd700;"></div> pLDDT > 50</div>
-        <div class="legend-item"><div class="box" style="background:#ff7d45;"></div> pLDDT < 50</div>
     </div>
 
     <div class="grid-layout">
@@ -296,11 +346,19 @@
                 <div class="data-box" id="chimeraxDisplay" style="color: #0369a1; white-space: pre-wrap;">-</div>
                 <button class="copy-btn" onclick="copyText('chimeraxDisplay')">Copy Command</button>
             </div>
+        </div>
+    </div>
+</div>
 
-            <div>
-                <button class="copy-btn" style="background:#0f172a; width: 100%; margin-top: 0;" onclick="toggleDiagnostics()">Toggle Diagnostic Log</button>
-                <div id="diagnosticLog" class="log-terminal">System initialized. Ready for parsing.\n</div>
-            </div>
+<!-- Metrics Table Modal -->
+<div class="modal-overlay" id="metricsModal">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #0f172a;">Comparative Model Metrics Table</h3>
+            <button onclick="closeMetricsTable()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <div id="modalTableBody" style="margin-top: 15px;">
+            <p style="color: #64748b;">No structure files loaded yet.</p>
         </div>
     </div>
 </div>
@@ -315,26 +373,12 @@ let activeRowKey = null;
 let activeRowType = null; 
 let rowRanges = []; 
 let lastRangeString = null;
+let currentViewMode = 'grid'; // 'grid' or 'graph'
 
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
-const TYPE_NAMES = { H: 'Helix', P: 'Pi-Helix', E: 'Sheet', C: 'Coiled Coil', M: 'Membrane', D: 'Disordered' };
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 
-function logMessage(level, msg) {
-    const logEl = document.getElementById('diagnosticLog');
-    const timestamp = new Date().toISOString().substring(11, 19);
-    const line = `[${timestamp}] [${level}] ${msg}\n`;
-    logEl.textContent += line;
-    logEl.scrollTop = logEl.scrollHeight;
-    console.log(`[Quick2DViewer] [${level}] ${msg}`);
-}
-
-function toggleDiagnostics() {
-    const logEl = document.getElementById('diagnosticLog');
-    logEl.style.display = logEl.style.display === 'none' ? 'block' : 'none';
-}
-
-// Format long track names to [first 7 chars]_[rank]_[metric]
+// Format Track Labels to: [Prefix]_[State/Model]_[Metric]
 function formatTrackLabel(fullKey) {
     if (fullKey === 'AA' || fullKey.startsWith('SS_') || fullKey.startsWith('TM_') || fullKey.startsWith('DO_')) {
         return fullKey;
@@ -344,38 +388,65 @@ function formatTrackLabel(fullKey) {
     const metric = isPlddt ? 'pLDDT' : (isRsa ? 'RSA' : '');
     const base = fullKey.replace(/_pLDDT$|_RSA$/, '');
     
-    const prefix = base.substring(0, 7);
-    const rankMatch = base.match(/rank_(\d+)/i);
-    const rankStr = rankMatch ? `rank_${rankMatch[1]}` : '';
-    const stateMatch = /heme/i.test(base) ? 'heme' : (/apo/i.test(base) ? 'apo' : '');
+    // Check for model_X or rank_00X
+    let modelId = '';
+    const modelMatch = base.match(/(model_\d+|rank_\d+|rank\d+)/i);
+    if (modelMatch) {
+        modelId = modelMatch[1];
+    }
+
+    // Check state (heme / apo)
+    let state = '';
+    if (/heme/i.test(base)) state = 'heme';
+    else if (/apo/i.test(base)) state = 'apo';
+
+    // Extract smart prefix
+    let prefix = base.split('_')[0] || base.substring(0, 6);
+    if (prefix.length < 6 && base.includes('_')) {
+        const parts = base.split('_');
+        prefix = parts.slice(0, 2).join('_');
+    }
+    if (prefix.length > 8) prefix = prefix.substring(0, 8);
 
     let parts = [prefix];
-    if (stateMatch) parts.push(stateMatch);
-    if (rankStr) parts.push(rankStr);
+    if (state && !prefix.includes(state)) parts.push(state);
+    if (modelId) parts.push(modelId);
     if (metric) parts.push(metric);
     
     return parts.join('_');
 }
 
-// Structural File Listeners
+// Track Category Sorting Order
+function getTrackCategoryOrder(key) {
+    if (key === 'AA') return 0;
+    if (key.startsWith('SS_')) return 1;
+    if (key.startsWith('TM_')) return 2;
+    if (key.startsWith('DO_')) return 3;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 4;
+    return 5;
+}
+
+// Switch View Mode (Grid vs Graph)
+function switchViewMode() {
+    currentViewMode = document.getElementById('viewModeSelect').value;
+    document.getElementById('graphOverlaySelect').style.display = (currentViewMode === 'graph') ? 'inline-block' : 'none';
+    renderViewer(parsedTracks);
+}
+
+// Structure File Upload Handler
 document.getElementById('structureUpload').addEventListener('change', async (event) => {
     if (!parsedTracks.AA) {
         alert("Please paste and parse the Quick2D FASTA sequence first.");
-        logMessage("ERROR", "Structure upload rejected: FASTA sequence missing.");
         event.target.value = '';
         return;
     }
     
     const files = event.target.files;
-    logMessage("INFO", `Processing ${files.length} uploaded structure file(s)...`);
-
     for (const file of files) {
         try {
             const text = await file.text();
             const ext = file.name.split('.').pop().toLowerCase();
             const baseName = file.name.replace(/\.[^/.]+$/, "");
-
-            logMessage("INFO", `Parsing file: ${file.name} (Format: ${ext.toUpperCase()})`);
 
             const plddtData = new Array(parsedTracks.AA.length).fill(null);
             const rsaData = new Array(parsedTracks.AA.length).fill(null);
@@ -384,12 +455,9 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             if (ext === 'pdb') structureResidues = parsePDB(text);
             else if (ext === 'cif') structureResidues = parseCIF(text);
             else if (ext === 'json') structureResidues = parseAF3JSON(text);
-            else {
-                logMessage("WARNING", `Unsupported file extension '.${ext}' for ${file.name}`);
-                continue;
-            }
+            else continue;
 
-            await computeRSA(text, structureResidues, file.name);
+            await computeRSA(text, structureResidues);
 
             Object.keys(structureResidues).forEach(resSeq => {
                 const idx = parseInt(resSeq) - 1;
@@ -407,13 +475,10 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             if (rsaData.some(x => x !== null)) {
                 parsedTracks[`${baseName}_RSA`] = rsaData;
             }
-
         } catch (err) {
-            logMessage("ERROR", `Failed processing ${file.name}: ${err.message}`);
             console.error(err);
         }
     }
-    
     renderViewer(parsedTracks);
     event.target.value = '';
 });
@@ -424,11 +489,7 @@ function parsePDB(text) {
         if (line.startsWith('ATOM') && line.substring(12, 16).trim() === 'CA') {
             const resSeq = parseInt(line.substring(22, 26).trim(), 10);
             const bFactor = parseFloat(line.substring(60, 66).trim());
-            const resName = line.substring(17, 20).trim().toUpperCase();
-            const x = parseFloat(line.substring(30, 38).trim());
-            const y = parseFloat(line.substring(38, 46).trim());
-            const z = parseFloat(line.substring(46, 54).trim());
-            residues[resSeq] = { plddt: bFactor, resName: resName, x: x, y: y, z: z };
+            residues[resSeq] = { plddt: bFactor, x: parseFloat(line.substring(30, 38).trim()), y: parseFloat(line.substring(38, 46).trim()), z: parseFloat(line.substring(46, 54).trim()) };
         }
     }
     return residues;
@@ -437,8 +498,7 @@ function parsePDB(text) {
 function parseCIF(text) {
     const residues = {};
     let inAtomSite = false;
-    let seqIdIdx = -1, bFactorIdx = -1, atomIdIdx = -1, resNameIdx = -1;
-    let xIdx = -1, yIdx = -1, zIdx = -1, colIndex = 0;
+    let seqIdIdx = -1, bFactorIdx = -1, atomIdIdx = -1, xIdx = -1, yIdx = -1, zIdx = -1, colIndex = 0;
 
     for (let line of text.split('\n')) {
         if (line.startsWith('_atom_site.')) {
@@ -446,7 +506,6 @@ function parseCIF(text) {
             if (line.includes('label_seq_id')) seqIdIdx = colIndex;
             if (line.includes('B_iso_or_equiv')) bFactorIdx = colIndex;
             if (line.includes('label_atom_id')) atomIdIdx = colIndex;
-            if (line.includes('label_comp_id')) resNameIdx = colIndex;
             if (line.includes('Cartn_x')) xIdx = colIndex;
             if (line.includes('Cartn_y')) yIdx = colIndex;
             if (line.includes('Cartn_z')) zIdx = colIndex;
@@ -455,9 +514,7 @@ function parseCIF(text) {
             const cols = line.trim().split(/\s+/);
             if (cols[atomIdIdx] === 'CA') {
                 const resSeq = parseInt(cols[seqIdIdx], 10);
-                const bFactor = parseFloat(cols[bFactorIdx]);
-                const resName = cols[resNameIdx].toUpperCase();
-                residues[resSeq] = { plddt: bFactor, resName: resName, x: parseFloat(cols[xIdx]), y: parseFloat(cols[yIdx]), z: parseFloat(cols[zIdx]) };
+                residues[resSeq] = { plddt: parseFloat(cols[bFactorIdx]), x: parseFloat(cols[xIdx]), y: parseFloat(cols[yIdx]), z: parseFloat(cols[zIdx]) };
             }
         } else if (inAtomSite && line.startsWith('#')) {
             inAtomSite = false;
@@ -470,16 +527,15 @@ function parseAF3JSON(text) {
     const residues = {};
     const data = JSON.parse(text);
     if (data.plddt) {
-        data.plddt.forEach((val, i) => { residues[i + 1] = { plddt: val, resName: 'UNK', x: 0, y: 0, z: 0 }; });
+        data.plddt.forEach((val, i) => { residues[i + 1] = { plddt: val, x: 0, y: 0, z: 0 }; });
     }
     return residues;
 }
 
-async function computeRSA(fileText, residues, fileName) {
+async function computeRSA(fileText, residues) {
     const resSeqs = Object.keys(residues);
     const coords = resSeqs.map(k => ({ seq: k, x: residues[k].x, y: residues[k].y, z: residues[k].z }));
     if (coords.length === 0) return;
-
     const cutoffSq = 10.0 * 10.0;
     coords.forEach((c1, i) => {
         let neighbors = 0;
@@ -488,8 +544,7 @@ async function computeRSA(fileText, residues, fileName) {
             const dx = c1.x - c2.x, dy = c1.y - c2.y, dz = c1.z - c2.z;
             if ((dx*dx + dy*dy + dz*dz) <= cutoffSq) neighbors++;
         });
-        const exposure = 1.0 - (neighbors / 16.0);
-        residues[c1.seq].rsa = Math.min(Math.max(exposure, 0.0), 1.0);
+        residues[c1.seq].rsa = Math.min(Math.max(1.0 - (neighbors / 16.0), 0.0), 1.0);
     });
 }
 
@@ -574,14 +629,21 @@ function parseAndBuildViewer() {
     lastRangeString = null; refreshChimeraxDisplay();
 
     renderViewer(parsedTracks);
-    logMessage("INFO", `Rendered Quick2D tracks for ${fullAA.length} residues.`);
 }
 
 function renderViewer(tracks) {
     const grid = document.getElementById('alignmentGrid');
     grid.innerHTML = ''; 
-    const trackKeys = Object.keys(tracks);
-    const totalLength = tracks.AA.length;
+    const totalLength = tracks.AA ? tracks.AA.length : 0;
+    if (totalLength === 0) return;
+
+    // Sort tracks logically by type
+    const trackKeys = Object.keys(tracks).sort((a, b) => {
+        const orderA = getTrackCategoryOrder(a);
+        const orderB = getTrackCategoryOrder(b);
+        if (orderA !== orderB) return orderA - orderB;
+        return a.localeCompare(b);
+    });
 
     trackKeys.forEach(key => {
         const rowEl = document.createElement('div');
@@ -594,9 +656,8 @@ function renderViewer(tracks) {
 
         const labelText = document.createElement('span');
         labelText.className = 'track-label-text';
-        const displayLabel = formatTrackLabel(key);
-        labelText.textContent = displayLabel;
-        labelText.title = key; // Full original filename on hover
+        labelText.textContent = formatTrackLabel(key);
+        labelText.title = key;
         labelEl.appendChild(labelText);
 
         if (key !== 'AA' && typeof tracks[key] === 'string') {
@@ -619,53 +680,141 @@ function renderViewer(tracks) {
         }
         rowEl.appendChild(labelEl);
         
-        const cellsContainer = document.createElement('div');
-        cellsContainer.className = 'track-cells';
-        
-        for (let i = 0; i < totalLength; i++) {
-            const cellEl = document.createElement('div');
-            const dataVal = tracks[key][i];
-            cellEl.className = `cell col-${i}`;
-            cellEl.dataset.idx = i;
+        const isStructuralTrack = key.endsWith('_pLDDT') || key.endsWith('_RSA');
+
+        if (currentViewMode === 'graph' && isStructuralTrack) {
+            rowEl.style.height = '90px';
+            const graphContainer = document.createElement('div');
+            graphContainer.className = 'track-cells graph-row-container';
+            const svg = createGraphSVG(tracks[key], totalLength, key.endsWith('_pLDDT'));
+            graphContainer.appendChild(svg);
+            rowEl.appendChild(graphContainer);
+        } else {
+            const cellsContainer = document.createElement('div');
+            cellsContainer.className = 'track-cells';
             
-            if (typeof dataVal === 'object' && dataVal !== null) {
-                cellEl.textContent = '█';
-                if (dataVal.type === 'plddt') {
-                    const v = dataVal.val;
-                    if (v > 90) cellEl.style.color = '#0053d6';
-                    else if (v > 70) cellEl.style.color = '#00c1df';
-                    else if (v > 50) cellEl.style.color = '#ffd700';
-                    else cellEl.style.color = '#ff7d45';
-                    cellEl.title = `Residue ${i+1} pLDDT: ${v.toFixed(1)}`;
-                } else if (dataVal.type === 'rsa') {
-                    const intensity = 226 - Math.floor(dataVal.val * 211);
-                    cellEl.style.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                    cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
+            for (let i = 0; i < totalLength; i++) {
+                const cellEl = document.createElement('div');
+                const dataVal = tracks[key][i];
+                cellEl.className = `cell col-${i}`;
+                cellEl.dataset.idx = i;
+                
+                if (typeof dataVal === 'object' && dataVal !== null) {
+                    cellEl.textContent = '█';
+                    if (dataVal.type === 'plddt') {
+                        const v = dataVal.val;
+                        if (v > 90) cellEl.style.color = '#0053d6';
+                        else if (v > 70) cellEl.style.color = '#00c1df';
+                        else if (v > 50) cellEl.style.color = '#ffd700';
+                        else cellEl.style.color = '#ff7d45';
+                        cellEl.title = `Residue ${i+1} pLDDT: ${v.toFixed(1)}`;
+                    } else if (dataVal.type === 'rsa') {
+                        const intensity = 226 - Math.floor(dataVal.val * 211);
+                        cellEl.style.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                        cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
+                    }
+                } else {
+                    const char = dataVal || ' ';
+                    cellEl.textContent = char;
+                    if (key === 'AA') cellEl.classList.add('cell-AA');
+                    else if (char === 'H') cellEl.classList.add('cell-H');
+                    else if (char === 'P') cellEl.classList.add('cell-P');
+                    else if (char === 'E') cellEl.classList.add('cell-E');
+                    else if (char === 'C') cellEl.classList.add('cell-C');
+                    else if (char === 'M') cellEl.classList.add('cell-M');
+                    else if (char === 'D') cellEl.classList.add('cell-D');
+                    else if (char === ' ' || char === '-' || char === '\t') {
+                        cellEl.classList.add('cell-space'); cellEl.textContent = '-';
+                    }
                 }
-            } else {
-                const char = dataVal || ' ';
-                cellEl.textContent = char;
-                if (key === 'AA') cellEl.classList.add('cell-AA');
-                else if (char === 'H') cellEl.classList.add('cell-H');
-                else if (char === 'P') cellEl.classList.add('cell-P');
-                else if (char === 'E') cellEl.classList.add('cell-E');
-                else if (char === 'C') cellEl.classList.add('cell-C');
-                else if (char === 'M') cellEl.classList.add('cell-M');
-                else if (char === 'D') cellEl.classList.add('cell-D');
-                else if (char === ' ' || char === '-' || char === '\t') {
-                    cellEl.classList.add('cell-space'); cellEl.textContent = '-';
-                }
+                
+                cellEl.addEventListener('mousedown', () => handleMouseDown(i));
+                cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
+                cellsContainer.appendChild(cellEl);
             }
-            
-            cellEl.addEventListener('mousedown', () => handleMouseDown(i));
-            cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
-            cellsContainer.appendChild(cellEl);
+            rowEl.appendChild(cellsContainer);
         }
-        
-        rowEl.appendChild(cellsContainer);
         grid.appendChild(rowEl);
     });
     window.addEventListener('mouseup', handleMouseUp);
+    updateSelectionUI();
+}
+
+// Generate SVG Graph View for pLDDT / RSA
+function createGraphSVG(trackData, totalLength, isPlddt) {
+    const cellWidth = 12;
+    const width = totalLength * cellWidth;
+    const height = 90;
+    const maxVal = isPlddt ? 100.0 : 1.0;
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.setAttribute("class", "graph-svg");
+
+    // Background axes / guidelines
+    const gridGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    [0.25, 0.5, 0.75].forEach(ratio => {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", 0); line.setAttribute("x2", width);
+        line.setAttribute("y1", height * ratio); line.setAttribute("y2", height * ratio);
+        line.setAttribute("stroke", "#e2e8f0"); line.setAttribute("stroke-dasharray", "3,3");
+        gridGroup.appendChild(line);
+    });
+    svg.appendChild(gridGroup);
+
+    // Build polyline points
+    let points = [];
+    trackData.forEach((item, i) => {
+        if (item && item.val !== undefined && item.val !== null) {
+            const x = i * cellWidth + cellWidth / 2;
+            const val = Math.min(Math.max(item.val, 0), maxVal);
+            const y = height - (val / maxVal) * (height - 15) - 10;
+            points.push({ x, y, val, idx: i });
+        }
+    });
+
+    if (points.length > 1) {
+        let pathStr = `M ${points[0].x} ${points[0].y}`;
+        for (let i = 1; i < points.length; i++) {
+            pathStr += ` L ${points[i].x} ${points[i].y}`;
+        }
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathStr);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", isPlddt ? "#2563eb" : "#0d9488");
+        path.setAttribute("stroke-width", "2");
+        svg.appendChild(path);
+    }
+
+    // Overlay coloring based on selected track feature
+    const overlayType = document.getElementById('graphOverlaySelect').value;
+    points.forEach(p => {
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
+        circle.setAttribute("r", "3.5");
+        
+        let fillColor = isPlddt ? "#2563eb" : "#0d9488";
+        if (overlayType !== 'none') {
+            const trackKey = Object.keys(parsedTracks).find(k => k.startsWith(overlayType + '_'));
+            if (trackKey && parsedTracks[trackKey]) {
+                const char = parsedTracks[trackKey][p.idx];
+                if (char && char !== ' ' && char !== '-') {
+                    fillColor = TYPE_CX_COLOR[char] || '#e11d48';
+                }
+            }
+        }
+        circle.setAttribute("fill", fillColor);
+        circle.setAttribute("stroke", "#fff");
+        circle.setAttribute("stroke-width", "1");
+        
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+        title.textContent = `Residue ${p.idx + 1}: ${p.val.toFixed(2)}`;
+        circle.appendChild(title);
+        svg.appendChild(circle);
+    });
+
+    return svg;
 }
 
 function handleMouseDown(idx) {
@@ -724,7 +873,6 @@ function handleRowLabelClick(trackKey, typeChar) {
     selectStart = null; selectEnd = null;
 
     if (Array.isArray(parsedTracks[trackKey])) {
-        // If clicking a pLDDT or RSA track label directly, treat as full sequence range
         rowRanges = [[0, parsedTracks.AA.length - 1]];
     } else {
         rowRanges = getTypeRanges(parsedTracks[trackKey], typeChar);
@@ -736,9 +884,6 @@ function handleRowLabelClick(trackKey, typeChar) {
     document.querySelectorAll('.type-badge').forEach(b => {
         b.classList.toggle('active-badge', b.dataset.track === trackKey && b.dataset.type === typeChar);
     });
-
-    const cxColorEl = document.getElementById('cxColor');
-    if (typeChar && TYPE_CX_COLOR[typeChar] && cxColorEl.value !== 'match') cxColorEl.value = TYPE_CX_COLOR[typeChar];
 
     updateSelectionUI(); 
     if (Array.isArray(parsedTracks[trackKey])) {
@@ -773,7 +918,6 @@ function calculateSelectionMetadata() {
     document.getElementById('fastaDisplay').textContent = selectedSequence;
     lastRangeString = `${resStart}-${resEnd}`;
     
-    // Check if any structural track is active to compute partial metrics
     computeMetricsForInterval(startIdx, endIdx);
     refreshChimeraxDisplay();
 }
@@ -798,7 +942,7 @@ function calculateRowSelectionMetadata(trackKey, typeChar) {
     document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
     lastRangeString = rangeLabels.join(','); 
     
-    document.getElementById('metricsDisplay').innerHTML = `Active Row Filter: <strong>${rowLabel}</strong><br>Segments: ${rowRanges.length} | Total Span: ${totalLength} residues`;
+    document.getElementById('metricsDisplay').innerHTML = `Active Filter: <strong>${rowLabel}</strong><br>Segments: ${rowRanges.length} | Span: ${totalLength} residues`;
     refreshChimeraxDisplay();
 }
 
@@ -815,9 +959,8 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
         if (item && item.val !== undefined && item.val !== null) {
             sum += item.val;
             count++;
-            if (isPlddt) {
-                if (item.val >= 70) highConf++;
-            } else if (isRsa) {
+            if (isPlddt && item.val >= 70) highConf++;
+            else if (isRsa) {
                 if (item.val < 0.20) buried++;
                 else if (item.val > 0.50) exposed++;
             }
@@ -833,17 +976,15 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
     let html = `Model: <strong>${formatTrackLabel(trackKey)}</strong><br>`;
     if (isPlddt) {
         const pctHigh = ((highConf / count) * 100).toFixed(1);
-        html += `• Mean pLDDT: <strong>${mean.toFixed(2)}</strong><br>• Confident Residues (≥70): <strong>${pctHigh}%</strong>`;
+        html += `• Mean pLDDT: <strong>${mean.toFixed(2)}</strong><br>• Confident (≥70): <strong>${pctHigh}%</strong>`;
     } else if (isRsa) {
         const pctBuried = ((buried / count) * 100).toFixed(1);
-        const pctExposed = ((exposed / count) * 100).toFixed(1);
-        html += `• Mean RSA: <strong>${mean.toFixed(2)}</strong><br>• Buried Core (<0.2): <strong>${pctBuried}%</strong><br>• Exposed Surface (>0.5): <strong>${pctExposed}%</strong>`;
+        html += `• Mean RSA: <strong>${mean.toFixed(2)}</strong><br>• Buried Core (<0.2): <strong>${pctBuried}%</strong>`;
     }
     document.getElementById('metricsDisplay').innerHTML = html;
 }
 
 function computeMetricsForInterval(startIdx, endIdx) {
-    // Find first available pLDDT or RSA track to display summary stats for selection
     const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
     if (structuralKeys.length === 0) {
         document.getElementById('metricsDisplay').textContent = "No PDB structural data attached.";
@@ -851,6 +992,48 @@ function computeMetricsForInterval(startIdx, endIdx) {
     }
     const sampleKey = activeRowKey && structuralKeys.includes(activeRowKey) ? activeRowKey : structuralKeys[0];
     calculateTrackMetrics(sampleKey, startIdx, endIdx);
+}
+
+// Metrics Table Modal Controls
+function openMetricsTable() {
+    const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
+    if (structuralKeys.length === 0) {
+        alert("Please attach structure files first.");
+        return;
+    }
+
+    const startIdx = selectStart !== null && selectEnd !== null ? Math.min(selectStart, selectEnd) : 0;
+    const endIdx = selectStart !== null && selectEnd !== null ? Math.max(selectStart, selectEnd) : parsedTracks.AA.length - 1;
+
+    let html = `<p style="font-size:0.85rem; color:#64748b;">Evaluating Region: <strong>Residues ${startIdx + 1} - ${endIdx + 1}</strong></p>`;
+    html += `<table class="metrics-table"><thead><tr><th>Model / Track</th><th>Metric</th><th>Mean Value</th><th>High Conf (≥70) / Buried (<0.2)</th></tr></thead><tbody>`;
+
+    structuralKeys.forEach(key => {
+        const data = parsedTracks[key];
+        const isPlddt = key.endsWith('_pLDDT');
+        let sum = 0, count = 0, metricCount = 0;
+        
+        for (let i = startIdx; i <= endIdx; i++) {
+            if (data[i] && data[i].val !== undefined && data[i].val !== null) {
+                sum += data[i].val;
+                count++;
+                if (isPlddt && data[i].val >= 70) metricCount++;
+                else if (!isPlddt && data[i].val < 0.20) metricCount++;
+            }
+        }
+        const mean = count > 0 ? (sum / count).toFixed(2) : 'N/A';
+        const pct = count > 0 ? ((metricCount / count) * 100).toFixed(1) + '%' : 'N/A';
+        
+        html += `<tr><td><strong>${formatTrackLabel(key)}</strong></td><td>${isPlddt ? 'pLDDT' : 'RSA'}</td><td>${mean}</td><td>${pct}</td></tr>`;
+    });
+
+    html += `</tbody></table>`;
+    document.getElementById('modalTableBody').innerHTML = html;
+    document.getElementById('metricsModal').style.display = 'flex';
+}
+
+function closeMetricsTable() {
+    document.getElementById('metricsModal').style.display = 'none';
 }
 
 function getChimeraxTarget() { return document.getElementById('chimeraxTarget').value.trim() || '#1'; }
@@ -873,26 +1056,20 @@ function refreshChimeraxDisplay() {
     const color = document.getElementById('cxColor').value;
     if (color !== 'match') { el.textContent = `color ${target}:${lastRangeString} ${color}`; return; }
 
-    const lines = buildMatchColorCommands(target);
-    el.textContent = lines.length ? lines.join('\n') : '# Match Selection requires a standard categorical Q2D row selection';
-}
-
-function buildMatchColorCommands(target) {
-    if (selectionMode !== 'row' || !activeRowKey || !parsedTracks[activeRowKey]) return [];
-    if (typeof parsedTracks[activeRowKey] !== 'string') return [];
-
-    const trackStr = parsedTracks[activeRowKey];
-    const typesToCheck = activeRowType ? [activeRowType] : TYPE_ORDER;
     const lines = [];
-
-    typesToCheck.forEach(t => {
-        if (!TYPE_CX_COLOR[t]) return;
-        const ranges = getTypeRanges(trackStr, t);
-        if (!ranges.length) return;
-        const rangeStr = ranges.map(([s, e]) => `${s + 1}-${e + 1}`).join(',');
-        lines.push(`color ${target}:${rangeStr} ${TYPE_CX_COLOR[t]}`);
-    });
-    return lines;
+    if (selectionMode === 'row' && activeRowKey && parsedTracks[activeRowKey] && typeof parsedTracks[activeRowKey] === 'string') {
+        const trackStr = parsedTracks[activeRowKey];
+        const typesToCheck = activeRowType ? [activeRowType] : TYPE_ORDER;
+        typesToCheck.forEach(t => {
+            if (!TYPE_CX_COLOR[t]) return;
+            const ranges = getTypeRanges(trackStr, t);
+            if (ranges.length) {
+                const rangeStr = ranges.map(([s, e]) => `${s + 1}-${e + 1}`).join(',');
+                lines.push(`color ${target}:${rangeStr} ${TYPE_CX_COLOR[t]}`);
+            }
+        });
+    }
+    el.textContent = lines.length ? lines.join('\n') : '# Match Selection requires categorical Q2D row selection';
 }
 
 function copyText(elementId) {
