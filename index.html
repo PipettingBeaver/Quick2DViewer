@@ -183,22 +183,34 @@
             border-bottom: 1px solid #cbd5e1;
             padding: 10px 0;
         }
+        /* Matches .track-label exactly (width, background, border-right,
+           sticky-left) so the overlay title stays pinned during horizontal
+           scroll the same way the Q2D annotation row labels do, instead of
+           scrolling away with the rest of the graph content. Wraps instead
+           of truncating since these titles are longer than a row label. */
         .graph-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+            width: 195px;
+            min-width: 195px;
+            box-sizing: border-box;
             margin-bottom: 8px;
-            padding: 0 15px;
-            font-size: 0.85rem;
+            padding: 6px 10px;
+            font-size: 0.78rem;
             font-weight: bold;
             color: #334155;
-        }
-        .graph-legend-pills {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            background: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            white-space: normal;
+            position: sticky;
+            left: 0;
+            z-index: 10;
         }
         .graph-pill {
+            display: inline-flex;
+            align-items: center;
             font-size: 0.72rem;
             padding: 2px 8px;
             border-radius: 4px;
@@ -217,6 +229,44 @@
             background: #fafafa;
             border-top: 1px solid #e2e8f0;
             border-bottom: 1px solid #e2e8f0;
+        }
+        /* Sticky, zero-height wrapper so its content (the actual pill list)
+           renders on top of the SVG's left axis margin - which lines up with
+           the annotation row-label column above - without pushing the SVG
+           down or losing its pinned-left-edge behavior on horizontal scroll. */
+        .graph-pills-overlay {
+            position: sticky;
+            left: 0;
+            width: 195px;
+            height: 0;
+            overflow: visible;
+            z-index: 5;
+        }
+        .graph-pills-inner {
+            width: 195px;
+            box-sizing: border-box;
+            padding: 6px 8px 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(250, 250, 250, 0.95);
+            border-right: 1px solid #e2e8f0;
+            /* More than ~5 PDB entries used to push this list past the
+               graph's own height, overflowing into whatever came below it.
+               Cap it to the graph's visible height and let it scroll
+               internally instead. */
+            overflow-y: auto;
+        }
+        .graph-pill.graph-pill-stacked {
+            width: 100%;
+            box-sizing: border-box;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .graph-pill-stacked .graph-pill-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .graph-annotations-wrapper {
             border-bottom: 2px solid #cbd5e1;
@@ -336,6 +386,113 @@
         }
         table.metrics-table th { background: #e2e8f0; color: #0f172a; }
         table.metrics-table tr:hover { background: #f8fafc; }
+
+        /* --- Info tooltips ---------------------------------------------- */
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 4px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            font-size: 0.72rem;
+            line-height: 1;
+            color: #94a3b8;
+            cursor: pointer;
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .info-icon:hover, .info-icon:focus { color: #2563eb; outline: none; }
+        .track-label.active-row .info-icon { color: rgba(255,255,255,0.8); }
+        .track-label.active-row .info-icon:hover { color: #fff; }
+        /* Real tooltip content lives here as a hidden template; it's cloned
+           into #globalTooltip on hover/focus/click rather than shown in place,
+           so it can render above sticky/scrolling containers. */
+        .info-icon .tooltip-content { display: none; }
+        #globalTooltip {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            width: 240px;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            line-height: 1.45;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+        #globalTooltip.wide { width: 300px; }
+        #globalTooltip.pinned {
+            pointer-events: auto;
+            outline: 2px solid #2563eb;
+            outline-offset: 1px;
+            user-select: text;
+        }
+        #globalTooltip strong { color: #fff; }
+        #globalTooltip em { color: #93c5fd; font-style: italic; }
+        #globalTooltip .tooltip-empty-note { color: #94a3b8; font-style: italic; }
+
+        /* --- pLDDT/RSA score-band quick-select ("S" button) -------------- */
+        .s-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 4px;
+            padding: 0 4px;
+            height: 15px;
+            min-width: 15px;
+            border-radius: 3px;
+            font-size: 0.62rem;
+            font-weight: bold;
+            cursor: pointer;
+            background: #e2e8f0;
+            color: #334155;
+            border: 1px solid rgba(0,0,0,0.15);
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .s-badge:hover { background: #cbd5e1; }
+        .s-badge.active-badge { outline: 2px solid #2563eb; outline-offset: 1px; }
+        .track-label.active-row .s-badge:not(.active-badge) { background: rgba(255,255,255,0.85); }
+
+        #bandPopover {
+            display: none;
+            flex-direction: column;
+            gap: 3px;
+            position: fixed;
+            z-index: 2001;
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            padding: 6px;
+            min-width: 110px;
+        }
+        #bandPopover.open { display: flex; }
+        #bandPopover .band-popover-title {
+            font-size: 0.68rem;
+            font-weight: bold;
+            color: #64748b;
+            padding: 0 4px 2px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 2px;
+        }
+        #bandPopover button {
+            background: #f1f5f9;
+            color: #334155;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+            text-align: left;
+        }
+        #bandPopover button:hover { background: #dbeafe; border-color: #93c5fd; }
+        #bandPopover button.active-band { background: #2563eb; color: #fff; border-color: #2563eb; }
     </style>
 </head>
 <body>
@@ -356,20 +513,63 @@
                 <option value="graph">Overlaid Graph View</option>
             </select>
             <button class="secondary" onclick="openMetricsTable()">Metrics Table</button>
+            <button class="secondary" onclick="openOptionsModal()">⚙ Options</button>
         </div>
     </div>
 
     <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..."></textarea>
-    <button onclick="parseAndBuildViewer()">Parse & Render Alignment</button>
+    <div style="display: flex; gap: 10px;">
+        <button onclick="parseAndBuildViewer()">Parse & Render Alignment</button>
+        <button class="secondary" onclick="loadSampleData()">Add Sample Data</button>
+    </div>
 
     <div class="legend">
         <div class="legend-item"><div class="box" style="background:#fff;"></div> Amino Acid (AA)</div>
-        <div class="legend-item"><div class="box" style="background:#fee2e2;"></div> SS: Helix (H)</div>
-        <div class="legend-item"><div class="box" style="background:#cffafe;"></div> SS: Pi-Helix (P)</div>
-        <div class="legend-item"><div class="box" style="background:#dbeafe;"></div> SS: Sheet (E)</div>
-        <div class="legend-item"><div class="box" style="background:#dcfce7;"></div> CC: Coiled Coils (C)</div>
-        <div class="legend-item"><div class="box" style="background:#f3e8ff;"></div> TM: Membrane (M)</div>
-        <div class="legend-item"><div class="box" style="background:#ffedd5;"></div> DO: Disordered (D)</div>
+        <div class="legend-item"><div class="box" style="background:#fee2e2;"></div> SS: Helix (H)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Secondary Structure (SS)</strong><br>
+            Combines predictions from: <em>PSIPRED, SPIDER3, PSSPred4, DeepCNF-SS, NetSurfP-2.0</em>.<br>
+            Identifies alpha-helical, sheet, and pi-helical regions from sequence-based models.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#cffafe;"></div> SS: Pi-Helix (P)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Secondary Structure (SS)</strong><br>
+            Combines predictions from: <em>PSIPRED, SPIDER3, PSSPred4, DeepCNF-SS, NetSurfP-2.0</em>.<br>
+            Identifies alpha-helical, sheet, and pi-helical regions from sequence-based models.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#dbeafe;"></div> SS: Sheet (E)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Secondary Structure (SS)</strong><br>
+            Combines predictions from: <em>PSIPRED, SPIDER3, PSSPred4, DeepCNF-SS, NetSurfP-2.0</em>.<br>
+            Identifies alpha-helical, sheet, and pi-helical regions from sequence-based models.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#dcfce7;"></div> CC: Coiled Coils (C)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Coiled-Coil Domains (CC)</strong><br>
+            Combines predictions from: <em>COILS, PCOILS, MARCOIL</em>.<br>
+            Flags heptad-repeat alpha-helical segments likely to form coiled coils.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#f3e8ff;"></div> TM: Membrane (M)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Transmembrane Topology (TM)</strong><br>
+            Combines predictions from: <em>TMHMM, Phobius, PolyPhobius</em>.<br>
+            Identifies membrane-spanning helical segments based on hydrophobicity and signal-peptide-aware HMMs.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#ffedd5;"></div> DO: Disordered (D)<span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <strong>Disorder &amp; Accessibility (DO)</strong><br>
+            Combines predictions from: <em>NetSurfP-2.0, DISOPRED3, SPOT-Disorder, IUPred</em>.<br>
+            Flags intrinsically disordered, flexible, or non-crystallizable regions.
+        </span></span></div>
+        <div class="legend-item">
+            <span style="font-weight:600; font-size:0.8rem;">pLDDT:</span>
+            <div class="box" style="background:#0053d6;" title="&gt;90 - Very high confidence"></div>
+            <div class="box" style="background:#00c1df;" title="70-90 - High confidence"></div>
+            <div class="box" style="background:#ffd700;" title="50-70 - Low confidence"></div>
+            <div class="box" style="background:#ff7d45;" title="&lt;50 - Very low confidence"></div>
+            <span class="info-icon" id="plddtLegendIcon" tabindex="0">ⓘ<span class="tooltip-content"></span></span>
+        </div>
+        <div class="legend-item">
+            <span style="font-weight:600; font-size:0.8rem;">RSA:</span>
+            <div class="box" style="background:rgb(205,205,205);" title="0.0-0.2 - Buried"></div>
+            <div class="box" style="background:rgb(153,153,153);" title="0.2-0.5 - Intermediate"></div>
+            <div class="box" style="background:rgb(68,68,68);" title="0.5-1.0 - Highly exposed"></div>
+            <span class="info-icon" id="rsaLegendIcon" tabindex="0">ⓘ<span class="tooltip-content"></span></span>
+        </div>
     </div>
 
     <div class="grid-layout">
@@ -381,29 +581,56 @@
             <div class="sidebar-title">Selection Workspace</div>
             
             <div>
-                <strong>Selected Range:</strong>
+                <strong>Selected Range:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                    <strong>Selected Range</strong><br>
+                    The residue range(s) currently selected - from a manual click-and-drag, or from clicking a track label / type badge to select every matching residue.<br>
+                    Multiple piecewise segments (e.g. from a row/type selection) are listed comma-separated.
+                </span></span>
                 <div class="data-box" id="rangeDisplay">No selection active</div>
             </div>
 
             <div>
-                <strong>FASTA Segment:</strong>
+                <strong>FASTA Segment:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                    <strong>FASTA Segment</strong><br>
+                    The amino acid sequence for the selected residue range(s).<br>
+                    For piecewise selections, each contiguous segment's sequence is joined by a comma, matching the residue ranges above.
+                </span></span>
                 <div class="data-box" id="fastaDisplay" style="max-height: 70px; overflow-y: auto;">-</div>
                 <button class="copy-btn" onclick="copyText('fastaDisplay')">Copy Sequence</button>
             </div>
 
             <div>
                 <strong>Quantitative Metrics:</strong>
+                <select id="metricsCrossRef" onchange="onCrossRefChange()" title="Cross-reference the current selection against another track"
+                    style="font-size: 0.68rem; padding: 1px 3px; border: 1px solid #cbd5e1; border-radius: 4px; margin-left: 4px; max-width: 105px; vertical-align: middle;">
+                    <option value="">— none —</option>
+                </select>
+                <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                    <strong>Quantitative Metrics</strong><br>
+                    Structural statistics computed from attached PDB / CIF / AlphaFold JSON files for the current selection.<br><br>
+                    <strong>pLDDT</strong> - AlphaFold's per-residue confidence score (1-100). Hover the pLDDT row's ⓘ for full score bands.<br>
+                    <strong>RSA</strong> - Relative Solvent Accessibility (0.0-1.0). Hover the RSA row's ⓘ for full score bands.<br><br>
+                    Requires at least one structure file attached above.<br><br>
+                    <strong>Cross-reference dropdown</strong> - pick any loaded SS/TM/DO/CC track or pLDDT/RSA model to see how the <em>current selection</em> (manual range, or a row/band/residue-type filter) overlaps with it, shown below the metrics above.
+                </span></span>
                 <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a region or graph point for statistics.</div>
             </div>
 
             <div>
-                <strong>ChimeraX Target:</strong>
+                <strong id="cmdTargetLabel">ChimeraX Target:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                    <strong>Command Target</strong><br>
+                    The model/chain (or equivalent) specifier that generated commands will apply to - its exact format depends on the engine chosen in <em>Options &gt; Command Engine</em>.
+                </span></span>
                 <input type="text" id="chimeraxTarget" value="#1/A,B,C" oninput="refreshChimeraxDisplay()"
                     style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 4px;">
             </div>
 
             <div>
-                <strong>ChimeraX Command:</strong>
+                <strong id="cmdCommandLabel">ChimeraX Command:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                    <strong>Visualization Command</strong><br>
+                    A ready-to-paste command (<em>select</em> / <em>color</em> / <em>label</em>) built from the current selection and target above, in whichever tool's syntax is chosen in <em>Options &gt; Command Engine</em> (ChimeraX by default).<br><br>
+                    <strong>Match Selection</strong> (color mode) auto-colors each SS/TM/DO/CC type present in a row selection by its own residue ranges, instead of a single flat color.
+                </span></span>
                 <div style="display: flex; gap: 6px; margin: 4px 0;">
                     <select id="cxCommand" onchange="updateCxCommandUI()"
                         style="flex: 1; font-size: 0.8rem; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
@@ -426,9 +653,15 @@
                 <div class="data-box" id="chimeraxDisplay" style="color: #0369a1; white-space: pre-wrap;">-</div>
                 <button class="copy-btn" onclick="copyText('chimeraxDisplay')">Copy Command</button>
             </div>
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-top: -8px;">
+                Change engine (ChimeraX / PyMOL / VMD) in <a href="#" onclick="openOptionsModal(); return false;" style="color: #2563eb;">Options</a>.
+            </div>
         </div>
     </div>
 </div>
+
+<div id="globalTooltip"></div>
+<div id="bandPopover"></div>
 
 <!-- Metrics Table Modal -->
 <div class="modal-overlay" id="metricsModal">
@@ -443,6 +676,37 @@
     </div>
 </div>
 
+<!-- Options Modal -->
+<div class="modal-overlay" id="optionsModal">
+    <div class="modal-content" style="width: 560px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #0f172a;">Options</h3>
+            <button onclick="closeOptionsModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+
+        <div style="margin-top: 18px;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Command Engine</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Which tool's syntax the sidebar's Target/Command panel generates. Support for more tools can be added later without any other UI changes.
+            </p>
+            <select id="commandEngineSelect" onchange="onCommandEngineChange()"
+                style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </select>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Cached Data</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Your pasted Quick2D text, the pLDDT/RSA data derived from attached structure files, current selection, and view preferences are saved automatically in this browser (via <code>localStorage</code>) so they survive a page refresh or reopening this tab later. Nothing is uploaded anywhere - it never leaves your device.<br><br>
+                <span style="color: #94a3b8;">Note: the raw structure file text itself isn't cached (only its derived confidence/exposure values, plus its name for reference) to keep the cache well under the browser's storage limit - re-attach a file after a refresh only if you need its original text again.</span>
+            </p>
+            <div id="cachedDataInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">No cached data yet.</div>
+            <button onclick="resetAllData()" style="background: #dc2626; margin-top: 10px;">Reset Data</button>
+            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px;">Permanently clears everything above and resets the page.</span>
+        </div>
+    </div>
+</div>
+
 <script>
 let selectStart = null;
 let selectEnd = null;
@@ -452,9 +716,24 @@ let selectionMode = 'point';
 let activeRowKey = null;
 let activeRowType = null; 
 let rowRanges = []; 
-let lastRangeString = null;
+let lastRanges = null; // array of 1-indexed [start,end] pairs, or null when nothing is selected
+// Which track key a manual (point-mode) drag started on, e.g. the specific
+// model's pLDDT/RSA line/row that was clicked - as opposed to activeRowKey,
+// which only applies in row-select mode and gets cleared by exitRowMode()
+// on every manual drag. Used so Quantitative Metrics reports on the model
+// actually dragged across, not just whichever structural track loaded first.
+let dragOriginTrackKey = null;
 let currentViewMode = 'grid'; // 'grid' or 'graph'
 window.addEventListener('mouseup', handleMouseUp);
+
+// --- Client-side persistence state ----------------------------------------
+// Raw text of every uploaded structure file (name/ext/size/text), kept
+// alongside parsedTracks so the Options > Cached Data panel can list them
+// and so a page reload can show what's cached without re-deriving anything.
+const STORAGE_KEY = 'q2dViewer_state_v1';
+let uploadedStructureFiles = []; // [{name, ext, size}] - metadata only, see note at push() site below
+let persistTimer = null;
+let lastPersistError = null;
 
 // Shared layout constants so annotation rows (label + per-residue cells) and
 // the graph SVGs line up on the same pixel grid: the axis/label column and
@@ -465,10 +744,610 @@ const GRAPH_HEIGHT = 180;
 const GRAPH_TOP_PAD = 15;
 const GRAPH_BOTTOM_PAD = 15;
 
+// Verbatim Quick2D sample block (histone H2A, AAN59974.1) so users can
+// try the viewer without needing their own Quick2D output first.
+const SAMPLE_DATA = `Protein ID: AAN59974.1 histone H2A [Homo sapiens]
+AA_QUERY	1	MSGRGKQGGKARAKAKTRSSRAGLQFPVGRVHRLLRKGNYAERVGAGAPVYLAAVLEYLTAEILELAGNAARDNKKTRIIPRHLQ   85
+SS_PSIPRED		                           HHHHHHHHH     HH    HHHHHHHHHHHHHHHHHHHHHHHHH         HHHH	
+SS_SPIDER3		                  HHH      HHHHHHHHH     EE    HHHHHHHHHHHHHHHHHHHHHHHH         HHHHH	
+SS_PSSPRED4		         HHHHHHHHHH         HHHHHHHHH  HHHHH    HHHHHHHHHHHHHHHHHHHHHHHHH       HHHHH	
+SS_DEEPCNF		         HHHHHHH           HHHHHHHHHH  HHHHH   HHHHHHHHHHHHHHHHHHHHHHHHH           EE	
+SS_NETSURFP2		                           HHHHHHHHH    HHH    HHHHHHHHHHHHHHHHHHHHHHHHHH       HHHHH	
+DO_NETSURFPD2		DDDDDDDDDDDDDDDDDD                                                                   	
+DO_DISOPRED		DDDDDDDDDDDDDDDDDD                                                                   	
+DO_SPOTD		DDDDDDDDDDDDDDDDDDDDDDDD                                                             	
+DO_IUPRED		DDDDDDDDDDDDDDDDDDD  D                                                          DD   	
+AA_QUERY	86	LAIRNDEELNKLLGKVTIAQGGVLPNIQAVLLPKKTESHHKAKGK   130
+SS_PSIPRED		HHHH HHHHHHH    EE          HHH              	
+SS_SPIDER3		HHHH HHHHHHHH  EEE          HHH              	
+SS_PSSPRED4		HHHH HHHHHHHH HHEEEE      EEEEE     HHHHH    	
+SS_DEEPCNF		EEE  HHHHHHHHH  HE        EEEEE       HHH    	
+SS_NETSURFP2		HHHH  HHHHHHH               H                	
+DO_NETSURFPD2		                                 DDDDDDDDDDDD	
+DO_DISOPRED		                                   DDDDDDDDDD	
+DO_SPOTD		                                 DDDDDDDDDDDD	
+DO_IUPRED		                                 DDDDDDDDDDDD`;
+
+function loadSampleData() {
+    document.getElementById('rawInput').value = SAMPLE_DATA;
+    parseAndBuildViewer();
+}
+
+// Predictor metadata for row-label tooltips, keyed to match Quick2D track
+// keys exactly (e.g. "SS_PSIPRED"). Source: MPI Bioinformatics Toolkit docs.
+// PLDDT / RSA are generic entries (not exact track keys, since those are
+// named after whatever structure file was uploaded, e.g. "model1_pLDDT") -
+// left empty for now and filled in via getPredictorInfo() below.
+const PREDICTOR_INFO = {
+    SS_PSIPRED: { name: 'PSIPRED', category: 'Secondary Structure', description: 'A classic, highly reliable secondary structure predictor using two feed-forward neural networks fed by PSI-BLAST position-specific scoring matrices.', useCase: 'Standard baseline prediction for alpha-helices, beta-strands, and coils; valued for speed and consistent baseline performance.', citation: 'Jones DT, 1999, J Mol Biol' },
+    SS_SPIDER3: { name: 'SPIDER3', category: 'Secondary Structure', description: 'A deep learning method utilizing bidirectional recurrent neural networks (BRNNs) to capture long-range sequence dependencies.', useCase: 'Predicting secondary structure alongside continuous backbone torsion angles (phi and psi) for structural modeling.', citation: 'Heffernan et al., 2017, Bioinformatics' },
+    SS_PSSPRED4: { name: 'PSSPred4', category: 'Secondary Structure', description: 'The updated secondary structure prediction module from the I-TASSER suite, utilizing iterative profile-based neural networks.', useCase: 'Obtaining robust secondary structure constraints specifically tailored to feed into 3D threading and protein structure assembly pipelines.', citation: 'Yan et al., 2013, Sci Rep' },
+    SS_DEEPCNF: { name: 'DeepCNF-SS', category: 'Secondary Structure', description: 'Deep Convolutional Neural Fields model that captures both local sequence motifs and global structural dependencies simultaneously.', useCase: 'High-accuracy secondary structure annotation where complex local-to-global spatial relationships matter.', citation: 'Wang et al., 2016, Sci Rep' },
+    SS_NETSURFP2: { name: 'NetSurfP-2.0', category: 'Secondary Structure', description: 'A deep learning tool utilizing convolutional and LSTM networks to predict multiple structural properties at once.', useCase: 'Simultaneous, integrated prediction of secondary structure, relative accessible surface area (ASA), and backbone dihedral angles.', citation: 'Klausen et al., 2019, Proteins' },
+    TM_TMHMM: { name: 'TMHMM', category: 'Transmembrane Topology', description: 'A Hidden Markov Model trained to distinguish transmembrane helices from non-transmembrane regions based on amino acid hydrophobicity.', useCase: 'High-throughput screening for alpha-helical membrane proteins, though prone to false positives on N-terminal signal peptides.', citation: 'Krogh et al., 2001, J Mol Biol' },
+    TM_PHOBIUS: { name: 'Phobius', category: 'Transmembrane Topology', description: 'A combined HMM architecture that unifies transmembrane helix prediction and signal peptide detection into a single model.', useCase: 'Analyzing single sequences where hydrophobic signal peptides risk being misidentified as transmembrane domains.', citation: 'Käll et al., 2004, J Mol Biol' },
+    TM_POLYPHOBIUS: { name: 'PolyPhobius', category: 'Transmembrane Topology', description: 'An extension of Phobius that integrates evolutionary profiles from multiple sequence alignments (MSAs).', useCase: 'Maximizing topological accuracy for difficult or novel targets when homologous sequences are available.', citation: 'Käll et al., 2005, Bioinformatics' },
+    SP_SIGNALP: { name: 'SignalP 5.0', category: 'Signal Peptides', description: 'A deep neural network model designed to detect signal peptides and locate their exact cleavage sites across all domains of life.', useCase: 'Identifying secretory pathways and preventing N-terminal signal cleavage sites from confusing downstream structural models.', citation: 'Almagro Armenteros et al., 2019, Nat Biotechnol' },
+    CC_COILS: { name: 'COILS', category: 'Coiled-Coil Domains', description: 'A matrix-based method that compares protein sequences against database profiles of known parallel two-stranded coiled coils.', useCase: 'Fast identification of heptad repeat patterns characteristic of alpha-helical coiled-coil segments.', citation: 'Lupas et al., 1991, Science' },
+    CC_PCOILS: { name: 'PCOILS', category: 'Coiled-Coil Domains', description: 'A profile-based implementation of COILS that incorporates position-specific scoring matrices derived from sequence alignments.', useCase: 'High-sensitivity detection of coiled-coil domains, particularly useful when searching family conservation rather than single sequences.', citation: 'Gruber et al., 2006, J Struct Biol' },
+    CC_MARCOIL: { name: 'MARCOIL', category: 'Coiled-Coil Domains', description: 'A Hidden Markov Model approach that models state transitions between heptad register positions in coiled coils.', useCase: 'Unbiased prediction of coiled-coil regions without relying on fixed sliding window sizes.', citation: 'Delorenzi & Speed, 2002, Bioinformatics' },
+    DO_NETSURFPD2: { name: 'NetSurfP-2.0 (Disorder)', category: 'Disorder & Accessibility', description: "The disorder-prediction output of NetSurfP-2.0, which uses one integrated deep learning model (CNN + bidirectional LSTM) to jointly predict secondary structure, relative solvent accessibility, and intrinsic disorder directly from sequence in a single multi-task pass, without needing alignments at inference time.", useCase: "Cross-check disorder calls against this tool's own SS_NETSURFP2 secondary-structure/accessibility output, since both tracks come from the same shared model rather than independent runs.", citation: 'Klausen et al., 2019, Proteins 87(6):520-527' },
+    DO_DISOPRED: { name: 'DISOPRED3', category: 'Disorder & Accessibility', description: 'A machine-learning tool designed explicitly to locate intrinsically disordered regions (IDRs) and protein-binding sites within disordered sequences.', useCase: 'Flagging flexible, non-crystallizable loops or unstructured terminal tails that complicate structural determination.', citation: 'Jones & Cozzetto, 2015, Bioinformatics' },
+    DO_SPOTD: { name: 'SPOT-Disorder', category: 'Disorder & Accessibility', description: 'An ensemble predictor using deep bidirectional LSTM networks trained on mobile/disordered segments in protein databanks.', useCase: 'Rapid identification of disorder propensity, capturing both local and long-range sequence context.', citation: 'Hanson et al., 2017, Bioinformatics' },
+    DO_IUPRED: { name: 'IUPred', category: 'Disorder & Accessibility', description: 'A physics-based method estimating pairwise amino acid energetic interactions, identifying regions unlikely to form stable contacts.', useCase: 'Pinpointing disordered regions based on estimated local energy content without relying on sequence alignment or neural network training sets.', citation: 'Dosztányi et al., 2005, J Mol Biol' },
+    // Empty placeholders - filled in later. Kept in the object (rather than
+    // left out) so pLDDT/RSA rows and graph headers still get an info icon
+    // instead of silently having none.
+    // pLDDT/RSA aren't exact track keys (see getPredictorInfo below), but
+    // carry the same shape as the other entries plus an optional `bands`
+    // list rendered as a bullet list in the tooltip.
+    PLDDT: {
+        name: 'pLDDT',
+        category: 'Confidence Metric',
+        description: "AlphaFold's per-residue confidence metric estimating local structural prediction accuracy.",
+        bands: [
+            { range: '>90', desc: 'Very high confidence; well-resolved side-chain order and backbone geometry.' },
+            { range: '70–90', desc: 'High confidence; reliable backbone prediction and overall tertiary fold.' },
+            { range: '50–70', desc: 'Low confidence; general topology likely correct, but individual loops uncertain.' },
+            { range: '<50', desc: 'Very low confidence; typically unstructured, disordered, or highly flexible regions.' }
+        ],
+        useCase: '',
+        citation: 'Jumper, J. et al. Nature 596, 583–589 (2021).'
+    },
+    RSA: {
+        name: 'Relative Solvent Accessibility (RSA)',
+        category: 'Surface Exposure Metric',
+        description: "Ratio of exposed residue surface area to its theoretical maximum.",
+        bands: [
+            { range: '0.0–0.2', desc: "Buried; residue is tucked inside the protein's hydrophobic core." },
+            { range: '0.2–0.5', desc: 'Intermediate; partially exposed to solvent along the protein surface.' },
+            { range: '0.5–1.0', desc: 'Highly exposed; fully accessible to water, common for surface loops and binding sites.' }
+        ],
+        useCase: '',
+        citation: 'Tien, M. Z. et al. PLoS ONE 8, e80635 (2013).'
+    }
+};
+
+// Resolves the right PREDICTOR_INFO entry for a track key. Q2D annotation
+// tracks (SS_*/TM_*/DO_*/etc.) match exactly; structure-derived tracks are
+// named after the uploaded file (e.g. "model1_pLDDT") so they're matched by
+// suffix against the generic PLDDT/RSA entries instead. Returns null for
+// keys with no applicable entry (e.g. "AA").
+function getPredictorInfo(trackKey) {
+    if (PREDICTOR_INFO[trackKey]) return PREDICTOR_INFO[trackKey];
+    if (trackKey.endsWith('_pLDDT')) return PREDICTOR_INFO.PLDDT;
+    if (trackKey.endsWith('_RSA')) return PREDICTOR_INFO.RSA;
+    return null;
+}
+
+function buildPredictorTooltipHTML(info) {
+    if (!info || (!info.name && !info.description)) {
+        return '<em>No details added yet.</em>';
+    }
+    let html = '';
+    if (info.name) html += `<strong>${info.name}</strong>`;
+    if (info.category) html += ` <span style="opacity:0.75;">(${info.category})</span>`;
+    if (info.description) html += `<br>${info.description}`;
+    if (info.bands && info.bands.length) {
+        html += '<ul style="margin:6px 0 0 16px; padding:0;">';
+        info.bands.forEach(b => {
+            html += `<li style="margin-bottom:3px;"><strong>${b.range}:</strong> ${b.desc}</li>`;
+        });
+        html += '</ul>';
+    }
+    if (info.useCase) html += `<br><br><strong>Use case:</strong> ${info.useCase}`;
+    if (info.citation) html += `<br><strong>Citation:</strong> ${info.citation}`;
+    return html;
+}
+
+// Builds a ready-to-insert <span class="info-icon"> matching the same
+// hidden-template pattern as the static legend/sidebar icons in the HTML,
+// so both static and JS-generated icons are picked up by the same
+// delegated hover/click handlers below.
+function buildInfoIcon(html, wide) {
+    const icon = document.createElement('span');
+    icon.className = 'info-icon' + (wide ? ' tt-wide' : '');
+    icon.tabIndex = 0;
+    icon.textContent = 'ⓘ';
+    const content = document.createElement('span');
+    content.className = 'tooltip-content';
+    content.innerHTML = html;
+    icon.appendChild(content);
+    return icon;
+}
+
+// The pLDDT/RSA color-band swatches in the top legend are static HTML (like
+// the SS/CC/TM/DO swatches), but their tooltip text is filled in here from
+// PREDICTOR_INFO so it can never drift out of sync with the row-label and
+// graph-header tooltips, which pull from the same object.
+(function populateLegendMetricTooltips() {
+    const plddtIcon = document.getElementById('plddtLegendIcon');
+    const rsaIcon = document.getElementById('rsaLegendIcon');
+    if (plddtIcon) {
+        plddtIcon.classList.add('tt-wide');
+        plddtIcon.querySelector('.tooltip-content').innerHTML = buildPredictorTooltipHTML(PREDICTOR_INFO.PLDDT);
+    }
+    if (rsaIcon) {
+        rsaIcon.classList.add('tt-wide');
+        rsaIcon.querySelector('.tooltip-content').innerHTML = buildPredictorTooltipHTML(PREDICTOR_INFO.RSA);
+    }
+})();
+
+// --- Foreground info tooltips -------------------------------------------
+// Each .info-icon carries its real content in a hidden .tooltip-content
+// child (a template, never shown in place). On hover/focus/tap we clone
+// that markup into #globalTooltip, which is appended directly to <body>
+// with position:fixed - so it renders above every scroll/clip container
+// (the alignment grid's overflow-x:auto, sticky row labels, etc.) instead
+// of being cut off inside them.
+let pinnedIcon = null; // the .info-icon currently locked open via click, or null
+function showTooltipFor(icon) {
+    const contentEl = icon.querySelector('.tooltip-content');
+    const tooltipEl = document.getElementById('globalTooltip');
+    if (!contentEl || !tooltipEl) return;
+    tooltipEl.innerHTML = contentEl.innerHTML;
+    tooltipEl.classList.toggle('wide', icon.classList.contains('tt-wide'));
+    tooltipEl.style.display = 'block';
+    const width = tooltipEl.classList.contains('wide') ? 300 : 240;
+    const rect = icon.getBoundingClientRect();
+    let left = rect.left;
+    if (left + width > window.innerWidth - 10) left = window.innerWidth - width - 10;
+    if (left < 10) left = 10;
+    // Flip above the icon if there's not much room below.
+    const estimatedHeight = tooltipEl.offsetHeight || 120;
+    let top, flip;
+    if (rect.bottom + estimatedHeight + 10 > window.innerHeight) {
+        top = rect.top - 6;
+        flip = true;
+    } else {
+        top = rect.bottom + 6;
+        flip = false;
+    }
+    tooltipEl.style.left = `${left}px`;
+    tooltipEl.style.top = `${top}px`;
+    tooltipEl.style.transform = flip ? 'translateY(-100%)' : 'none';
+}
+function hideTooltip() {
+    const tooltipEl = document.getElementById('globalTooltip');
+    if (tooltipEl) {
+        tooltipEl.style.display = 'none';
+        tooltipEl.style.pointerEvents = 'none';
+        tooltipEl.classList.remove('pinned');
+    }
+    pinnedIcon = null;
+}
+// Locks a tooltip open (click, not hover) so its text - a citation, say -
+// can be selected and copied. Un-pinned tooltips have pointer-events:none
+// so they never intercept clicks meant for the page underneath.
+function pinTooltip(icon) {
+    showTooltipFor(icon);
+    pinnedIcon = icon;
+    const tooltipEl = document.getElementById('globalTooltip');
+    tooltipEl.style.pointerEvents = 'auto';
+    tooltipEl.classList.add('pinned');
+}
+function toggleTooltipPin(icon) {
+    if (pinnedIcon === icon) {
+        hideTooltip();
+    } else {
+        pinTooltip(icon);
+    }
+}
+// Delegated listeners cover both the static icons (header, legend) and the
+// row-label icons that get created fresh on every parse/render, without
+// needing to re-attach anything after each render. Hover/focus previews are
+// suspended while a tooltip is pinned, so moving the mouse around while
+// trying to copy text out of the pinned box doesn't swap it out from under you.
+document.addEventListener('mouseover', (e) => {
+    if (pinnedIcon) return;
+    const icon = e.target.closest('.info-icon');
+    if (icon) showTooltipFor(icon);
+});
+document.addEventListener('mouseout', (e) => {
+    if (pinnedIcon) return;
+    if (e.target.closest('.info-icon')) hideTooltip();
+});
+document.addEventListener('focusin', (e) => {
+    if (pinnedIcon) return;
+    const icon = e.target.closest('.info-icon');
+    if (icon) showTooltipFor(icon);
+});
+document.addEventListener('focusout', (e) => {
+    if (pinnedIcon) return;
+    if (e.target.closest('.info-icon')) hideTooltip();
+});
+// Click pins/unpins: click an icon to lock its tooltip open for
+// copy-pasting, click that same icon again or anywhere else outside the
+// tooltip to close it.
+document.addEventListener('click', (e) => {
+    const icon = e.target.closest('.info-icon');
+    if (icon) {
+        toggleTooltipPin(icon);
+    } else if (!e.target.closest('#globalTooltip')) {
+        hideTooltip();
+    }
+});
+
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 let graphHighlights = {}; // Track key -> boolean (true if highlighted/active)
+
+// --- Visualization command engines ----------------------------------------
+// One entry per supported external tool. This is the ONLY place engine-
+// specific syntax lives - the sidebar's Target/Command panel, the Options
+// dropdown that picks between them, and persistence all read this array
+// rather than hardcoding any one tool, so adding support for another engine
+// later should just mean adding one more entry here.
+//
+// Each entry:
+//   id            - stable key, used in persisted preferences
+//   label         - display name (Options dropdown, sidebar labels)
+//   targetDefault - placeholder/default value for the Target field
+//   targetHint    - short description shown in the Target field's tooltip
+//   formatRanges(ranges) - ranges is an array of 1-indexed [start, end]
+//                   pairs; returns this engine's syntax for that set
+//                   (comma/plus/"or"-joined, whichever the tool expects)
+//   buildCommand(cmdType, target, ranges, color) - cmdType is
+//                   'select' | 'label' | 'color' (color only passes a
+//                   `color` argument); returns the full command line
+//
+// Real ChimeraX/PyMOL/VMD syntax has more depth than modeled here (VMD in
+// particular normally colors via separate `mol color`/`mol representation`
+// calls rather than one line) - these are deliberately kept simple and
+// consistent with each other, and can be tweaked per-engine independently
+// without touching anything else.
+const COMMAND_ENGINES = [
+    {
+        id: 'chimerax',
+        label: 'ChimeraX',
+        targetDefault: '#1/A,B,C',
+        targetHint: 'Model/chain spec, e.g. #1 or #1/A,B,C',
+        formatRanges(ranges) {
+            return ranges.map(([s, e]) => s === e ? `${s}` : `${s}-${e}`).join(',');
+        },
+        buildCommand(cmdType, target, ranges, color) {
+            const spec = `${target}:${this.formatRanges(ranges)}`;
+            if (cmdType === 'select') return `select ${spec}`;
+            if (cmdType === 'label') return `label ${spec}`;
+            return `color ${spec} ${color}`;
+        }
+    },
+    {
+        id: 'pymol',
+        label: 'PyMOL',
+        targetDefault: 'A+B+C',
+        targetHint: 'Chain letter(s), e.g. A or A+B+C',
+        formatRanges(ranges) {
+            return ranges.map(([s, e]) => s === e ? `${s}` : `${s}-${e}`).join('+');
+        },
+        buildCommand(cmdType, target, ranges, color) {
+            const sel = `chain ${target} and resi ${this.formatRanges(ranges)}`;
+            if (cmdType === 'select') return `select sele, ${sel}`;
+            if (cmdType === 'label') return `label ${sel}, "%s%s" % (resn, resi)`;
+            return `color ${color}, ${sel}`;
+        }
+    },
+    {
+        id: 'vmd',
+        label: 'VMD',
+        targetDefault: 'A',
+        targetHint: 'Segname/chain, e.g. A',
+        formatRanges(ranges) {
+            return ranges.map(([s, e]) => `resid ${s} to ${e}`).join(' or ');
+        },
+        buildCommand(cmdType, target, ranges, color) {
+            const sel = `Segname ${target} ${this.formatRanges(ranges)}`;
+            if (cmdType === 'select') return `select ${sel}`;
+            if (cmdType === 'label') return `label ${sel}`;
+            return `color ${sel} ${color}`;
+        }
+    }
+];
+let commandEngineId = 'chimerax';
+
+function getSelectedCommandEngine() {
+    return COMMAND_ENGINES.find(e => e.id === commandEngineId) || COMMAND_ENGINES[0];
+}
+
+// --- pLDDT/RSA score-band quick-select -----------------------------------
+// Quantitative equivalent of the H/E/M/D type badges: instead of a fixed
+// character to match, each band is a numeric predicate over a track's
+// {val} entries. Bounds mirror the PREDICTOR_INFO.PLDDT/RSA band tables.
+const PLDDT_BANDS = [
+    { label: '>90', test: v => v > 90 },
+    { label: '70-90', test: v => v >= 70 && v <= 90 },
+    { label: '50-70', test: v => v >= 50 && v < 70 },
+    { label: '<50', test: v => v < 50 }
+];
+const RSA_BANDS = [
+    { label: '0.0-0.2', test: v => v >= 0.0 && v < 0.2 },
+    { label: '0.2-0.5', test: v => v >= 0.2 && v < 0.5 },
+    { label: '0.5-1.0', test: v => v >= 0.5 && v <= 1.0 }
+];
+
+function getBandsForTrackKey(trackKey) {
+    if (trackKey.endsWith('_pLDDT')) return PLDDT_BANDS;
+    if (trackKey.endsWith('_RSA')) return RSA_BANDS;
+    return null;
+}
+
+function getNumericBandRanges(trackData, band) {
+    const ranges = [];
+    let start = null;
+    for (let i = 0; i < trackData.length; i++) {
+        const item = trackData[i];
+        const val = (item && item.val !== undefined && item.val !== null) ? item.val : null;
+        const inBand = val !== null && band.test(val);
+        if (inBand && start === null) start = i;
+        else if (!inBand && start !== null) { ranges.push([start, i - 1]); start = null; }
+    }
+    if (start !== null) ranges.push([start, trackData.length - 1]);
+    return ranges;
+}
+
+// A single "S" badge (space is tight next to pLDDT/RSA rows/pills for 3-4
+// separate band buttons) that expands a small popover of band buttons on
+// click - same select-by-category idea as the H/E/M/D type badges, just for
+// numeric bands instead of characters.
+let openBandKey = null; // trackKey whose popover is currently open, or null
+
+function buildSBadge(trackKey) {
+    const badge = document.createElement('span');
+    badge.className = 's-badge';
+    badge.dataset.track = trackKey;
+    badge.textContent = 'S';
+    badge.title = 'Select residues by score band';
+    badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleBandPopover(badge, trackKey);
+    });
+    return badge;
+}
+
+function positionPopover(anchorEl, popover) {
+    const rect = anchorEl.getBoundingClientRect();
+    const width = popover.offsetWidth || 110;
+    let left = rect.left;
+    if (left + width > window.innerWidth - 10) left = window.innerWidth - width - 10;
+    if (left < 10) left = 10;
+    popover.style.left = `${left}px`;
+
+    const estHeight = popover.offsetHeight || 140;
+    let top = rect.bottom + 4;
+    if (top + estHeight + 10 > window.innerHeight) top = rect.top - estHeight - 4;
+    popover.style.top = `${top}px`;
+}
+
+function toggleBandPopover(anchorEl, trackKey) {
+    const popover = document.getElementById('bandPopover');
+    if (openBandKey === trackKey && popover.classList.contains('open')) {
+        closeBandPopover();
+        return;
+    }
+    const bands = getBandsForTrackKey(trackKey);
+    if (!bands) return;
+
+    popover.innerHTML = '';
+    popover.style.minWidth = '';
+    const title = document.createElement('div');
+    title.className = 'band-popover-title';
+    title.textContent = formatTrackLabel(trackKey);
+    popover.appendChild(title);
+
+    bands.forEach(band => {
+        const btn = document.createElement('button');
+        btn.textContent = band.label;
+        if (selectionMode === 'row' && activeRowKey === trackKey && activeRowType === band.label) {
+            btn.classList.add('active-band');
+        }
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectBand(trackKey, band);
+            closeBandPopover();
+        });
+        popover.appendChild(btn);
+    });
+
+    popover.classList.add('open');
+    openBandKey = trackKey;
+    positionPopover(anchorEl, popover);
+}
+
+function closeBandPopover() {
+    const popover = document.getElementById('bandPopover');
+    popover.classList.remove('open');
+    openBandKey = null;
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#bandPopover') && !e.target.closest('.s-badge')) {
+        closeBandPopover();
+    }
+});
+
+// Selects every residue in `trackKey` falling inside `band`, using the same
+// row-selection pipeline (rowRanges/calculateRowSelectionMetadata) as the
+// categorical type badges - clicking the same band again toggles it off.
+function selectBand(trackKey, band) {
+    if (selectionMode === 'row' && activeRowKey === trackKey && activeRowType === band.label) {
+        exitRowMode(); selectStart = null; selectEnd = null; updateSelectionUI();
+        document.getElementById('rangeDisplay').textContent = 'No selection active';
+        document.getElementById('fastaDisplay').textContent = '-';
+        setMetricsBase('Select a region or graph point for statistics.');
+        lastRanges = null; refreshChimeraxDisplay();
+        return;
+    }
+    if (!parsedTracks[trackKey] || !Array.isArray(parsedTracks[trackKey])) return;
+
+    selectionMode = 'row'; activeRowKey = trackKey; activeRowType = band.label;
+    selectStart = null; selectEnd = null;
+    rowRanges = getNumericBandRanges(parsedTracks[trackKey], band);
+
+    document.querySelectorAll('.track-label').forEach(l => {
+        l.classList.toggle('active-row', l.dataset.track === trackKey);
+    });
+    document.querySelectorAll('.type-badge').forEach(b => b.classList.remove('active-badge'));
+    document.querySelectorAll('.s-badge').forEach(b => {
+        b.classList.toggle('active-badge', b.dataset.track === trackKey);
+    });
+
+    updateSelectionUI();
+    calculateRowSelectionMetadata(trackKey, band.label);
+}
+
+// --- AA row residue-type quick-select ("R" button) -----------------------
+// Same select-by-category idea as the S band buttons, but for the AA
+// sequence row: grouped by standard biochemical class, plus one quick
+// bulk-select button per class.
+const AA_GROUPS = {
+    Acidic: ['D', 'E'],
+    Basic: ['K', 'R', 'H'],
+    Polar: ['S', 'T', 'N', 'Q', 'C', 'Y'],
+    'Non-polar': ['A', 'V', 'L', 'I', 'M', 'F', 'W', 'P', 'G']
+};
+const AA_FULL_NAMES = {
+    A: 'Alanine', R: 'Arginine', N: 'Asparagine', D: 'Aspartate', C: 'Cysteine',
+    Q: 'Glutamine', E: 'Glutamate', G: 'Glycine', H: 'Histidine', I: 'Isoleucine',
+    L: 'Leucine', K: 'Lysine', M: 'Methionine', F: 'Phenylalanine', P: 'Proline',
+    S: 'Serine', T: 'Threonine', W: 'Tryptophan', Y: 'Tyrosine', V: 'Valine'
+};
+
+function buildRBadge() {
+    const badge = document.createElement('span');
+    badge.className = 's-badge'; // shares the same compact visual style as S
+    badge.dataset.track = 'AA';
+    badge.textContent = 'R';
+    badge.title = 'Select residues by amino acid type';
+    badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleResiduePopover(badge);
+    });
+    return badge;
+}
+
+function toggleResiduePopover(anchorEl) {
+    const popover = document.getElementById('bandPopover');
+    if (openBandKey === 'AA' && popover.classList.contains('open')) {
+        closeBandPopover();
+        return;
+    }
+
+    popover.innerHTML = '';
+    popover.style.minWidth = '190px';
+
+    const catTitle = document.createElement('div');
+    catTitle.className = 'band-popover-title';
+    catTitle.textContent = 'By category';
+    popover.appendChild(catTitle);
+
+    const catRow = document.createElement('div');
+    catRow.style.cssText = 'display:flex; flex-wrap:wrap; gap:3px; margin:2px 0 6px;';
+    Object.keys(AA_GROUPS).forEach(cat => {
+        const btn = document.createElement('button');
+        btn.textContent = cat;
+        btn.style.flex = '1 1 auto';
+        if (selectionMode === 'row' && activeRowKey === 'AA' && activeRowType === cat) {
+            btn.classList.add('active-band');
+        }
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectAminoAcids(AA_GROUPS[cat], cat);
+            closeBandPopover();
+        });
+        catRow.appendChild(btn);
+    });
+    popover.appendChild(catRow);
+
+    Object.entries(AA_GROUPS).forEach(([cat, letters]) => {
+        const subTitle = document.createElement('div');
+        subTitle.className = 'band-popover-title';
+        subTitle.style.marginTop = '4px';
+        subTitle.textContent = cat;
+        popover.appendChild(subTitle);
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; flex-wrap:wrap; gap:3px; margin:2px 0 4px;';
+        letters.forEach(letter => {
+            const btn = document.createElement('button');
+            btn.textContent = letter;
+            btn.title = AA_FULL_NAMES[letter] || letter;
+            btn.style.cssText = 'flex:0 0 auto; min-width:24px; text-align:center;';
+            if (selectionMode === 'row' && activeRowKey === 'AA' && activeRowType === letter) {
+                btn.classList.add('active-band');
+            }
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectAminoAcids([letter], letter);
+                closeBandPopover();
+            });
+            row.appendChild(btn);
+        });
+        popover.appendChild(row);
+    });
+
+    popover.classList.add('open');
+    openBandKey = 'AA';
+    positionPopover(anchorEl, popover);
+}
+
+function getAARanges(sequence, letterSet) {
+    const ranges = [];
+    let start = null;
+    for (let i = 0; i < sequence.length; i++) {
+        const inSet = letterSet.has(sequence[i]);
+        if (inSet && start === null) start = i;
+        else if (!inSet && start !== null) { ranges.push([start, i - 1]); start = null; }
+    }
+    if (start !== null) ranges.push([start, sequence.length - 1]);
+    return ranges;
+}
+
+// Selects every AA-row residue matching any letter in `letters` (either one
+// specific amino acid, or a whole biochemical class) - same toggle-off-on-
+// repeat-click behavior as selectBand.
+function selectAminoAcids(letters, label) {
+    if (selectionMode === 'row' && activeRowKey === 'AA' && activeRowType === label) {
+        exitRowMode(); selectStart = null; selectEnd = null; updateSelectionUI();
+        document.getElementById('rangeDisplay').textContent = 'No selection active';
+        document.getElementById('fastaDisplay').textContent = '-';
+        setMetricsBase('Select a region or graph point for statistics.');
+        lastRanges = null; refreshChimeraxDisplay();
+        return;
+    }
+    if (!parsedTracks.AA) return;
+
+    selectionMode = 'row'; activeRowKey = 'AA'; activeRowType = label;
+    selectStart = null; selectEnd = null;
+    rowRanges = getAARanges(parsedTracks.AA, new Set(letters));
+
+    document.querySelectorAll('.track-label').forEach(l => l.classList.toggle('active-row', l.dataset.track === 'AA'));
+    document.querySelectorAll('.type-badge').forEach(b => b.classList.remove('active-badge'));
+    document.querySelectorAll('.s-badge').forEach(b => b.classList.toggle('active-badge', b.dataset.track === 'AA'));
+
+    updateSelectionUI();
+    calculateRowSelectionMetadata('AA', label);
+}
 
 // Format Track Labels to: [Prefix]_[State/Model]_[Metric]
 function formatTrackLabel(fullKey) {
@@ -515,6 +1394,7 @@ function getTrackCategoryOrder(key) {
 function switchViewMode() {
     currentViewMode = document.getElementById('viewModeSelect').value;
     renderViewer(parsedTracks);
+    schedulePersist();
 }
 
 // Structure File Upload Handler
@@ -563,12 +1443,34 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
                 parsedTracks[rsaKey] = rsaData;
                 graphHighlights[rsaKey] = true;
             }
+
+            // Only cache lightweight metadata here (name/ext/size) for the
+            // Cached Data listing - NOT the raw file text. The derived
+            // pLDDT/RSA arrays above are already what gets restored on
+            // reload; raw multi-model PDB/CIF text is never read again
+            // after this point, and was previously stored redundantly
+            // alongside those arrays - easily pushing the total cached
+            // payload past localStorage's ~5MB quota after just a handful
+            // of files, silently failing every save after that (including
+            // ones for data that WOULD have fit). Re-uploading the same
+            // filename replaces its entry rather than duplicating it.
+            uploadedStructureFiles = uploadedStructureFiles.filter(f => f.name !== file.name);
+            uploadedStructureFiles.push({ name: file.name, ext, size: text.length });
         } catch (err) {
             console.error(err);
         }
     }
+    populateCrossRefDropdown();
     renderViewer(parsedTracks);
     event.target.value = '';
+    saveStateToStorage();
+    if (lastPersistError) {
+        alert(
+            'Structure data was added and is active for this session, but caching it locally failed:\n\n' +
+            lastPersistError +
+            '\n\nIt may not survive a page refresh. See Options > Cached Data for details.'
+        );
+    }
 });
 
 function parsePDB(text) {
@@ -716,8 +1618,9 @@ function parseAndBuildViewer() {
     activeRowKey = null; rowRanges = [];
     document.getElementById('rangeDisplay').textContent = 'No selection active';
     document.getElementById('fastaDisplay').textContent = '-';
-    document.getElementById('metricsDisplay').textContent = 'Select a region or graph point for statistics.';
-    lastRangeString = null; refreshChimeraxDisplay();
+    setMetricsBase('Select a region or graph point for statistics.');
+    lastRanges = null; refreshChimeraxDisplay();
+    populateCrossRefDropdown();
 
     renderViewer(parsedTracks);
 }
@@ -788,7 +1691,10 @@ function buildTrackRow(key, tracks, totalLength) {
     const labelEl = document.createElement('div');
     labelEl.className = 'track-label';
     labelEl.dataset.track = key;
-    labelEl.addEventListener('click', () => handleRowLabelClick(key, null));
+    labelEl.addEventListener('click', (e) => {
+        if (e.target.closest('.info-icon')) return; // let the icon's own click (pin/unpin) handle itself
+        handleRowLabelClick(key, null);
+    });
 
     const labelText = document.createElement('span');
     labelText.className = 'track-label-text';
@@ -796,7 +1702,16 @@ function buildTrackRow(key, tracks, totalLength) {
     labelText.title = key;
     labelEl.appendChild(labelText);
 
-    if (key !== 'AA' && typeof tracks[key] === 'string') {
+    const predictorInfo = getPredictorInfo(key);
+    if (predictorInfo) {
+        labelEl.appendChild(buildInfoIcon(buildPredictorTooltipHTML(predictorInfo), !!(predictorInfo.bands && predictorInfo.bands.length)));
+    } else if (key === 'AA') {
+        labelEl.appendChild(buildInfoIcon('<strong>AA</strong><br>The amino acid sequence for the input FASTA / Quick2D data.'));
+    }
+
+    if (key === 'AA') {
+        labelEl.appendChild(buildRBadge());
+    } else if (typeof tracks[key] === 'string') {
         const presentTypes = TYPE_ORDER.filter(t => tracks[key].includes(t));
         if (presentTypes.length) {
             const badgesEl = document.createElement('span');
@@ -813,6 +1728,8 @@ function buildTrackRow(key, tracks, totalLength) {
             });
             labelEl.appendChild(badgesEl);
         }
+    } else if (Array.isArray(tracks[key]) && getBandsForTrackKey(key)) {
+        labelEl.appendChild(buildSBadge(key));
     }
     rowEl.appendChild(labelEl);
 
@@ -855,7 +1772,7 @@ function buildTrackRow(key, tracks, totalLength) {
             }
         }
 
-        cellEl.addEventListener('mousedown', () => handleMouseDown(i));
+        cellEl.addEventListener('mousedown', () => handleMouseDown(i, key));
         cellEl.addEventListener('mouseenter', () => handleMouseEnter(i));
         cellsContainer.appendChild(cellEl);
     }
@@ -872,35 +1789,63 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     const header = document.createElement('div');
     header.className = 'graph-header';
     
+    const titleWrap = document.createElement('span');
+    titleWrap.style.display = 'inline-flex';
+    titleWrap.style.alignItems = 'center';
+
     const title = document.createElement('span');
     title.textContent = titleText;
-    header.appendChild(title);
+    titleWrap.appendChild(title);
 
+    const overlayInfo = isPlddt ? PREDICTOR_INFO.PLDDT : PREDICTOR_INFO.RSA;
+    titleWrap.appendChild(buildInfoIcon(buildPredictorTooltipHTML(overlayInfo), !!(overlayInfo.bands && overlayInfo.bands.length)));
+    header.appendChild(titleWrap);
+    wrapper.appendChild(header);
+
+    const inner = document.createElement('div');
+    inner.className = 'graph-container-inner';
+
+    // Model/PDB legend pills now live here, in the SVG's left axis margin -
+    // which lines up with the annotation row-label column above - rather
+    // than off in the header's far-right corner.
+    const pillsOverlay = document.createElement('div');
+    pillsOverlay.className = 'graph-pills-overlay';
     const pillsContainer = document.createElement('div');
-    pillsContainer.className = 'graph-legend-pills';
+    pillsContainer.className = 'graph-pills-inner';
+    // Bound to the graph's own visible height (not a hardcoded guess) so it
+    // never grows past the SVG it overlays - beyond ~5 entries this scrolls
+    // internally instead of pushing content below it downward.
+    pillsContainer.style.maxHeight = GRAPH_HEIGHT + 'px';
 
     trackKeys.forEach((key, idx) => {
         const color = MODEL_PALETTE[idx % MODEL_PALETTE.length];
         if (graphHighlights[key] === undefined) graphHighlights[key] = true;
 
         const pill = document.createElement('span');
-        pill.className = `graph-pill ${graphHighlights[key] ? 'active' : ''}`;
+        pill.className = `graph-pill graph-pill-stacked ${graphHighlights[key] ? 'active' : ''}`;
         pill.style.backgroundColor = graphHighlights[key] ? color : '#f1f5f9';
         pill.style.color = graphHighlights[key] ? '#fff' : '#475569';
         pill.style.borderColor = color;
-        pill.textContent = formatTrackLabel(key);
-        
-        pill.addEventListener('click', () => {
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'graph-pill-label';
+        labelSpan.textContent = formatTrackLabel(key);
+        labelSpan.title = key;
+        pill.appendChild(labelSpan);
+
+        if (getBandsForTrackKey(key)) {
+            pill.appendChild(buildSBadge(key));
+        }
+
+        pill.addEventListener('click', (e) => {
+            if (e.target.closest('.s-badge')) return; // badge handles its own click
             graphHighlights[key] = !graphHighlights[key];
             renderViewer(parsedTracks);
         });
         pillsContainer.appendChild(pill);
     });
-    header.appendChild(pillsContainer);
-    wrapper.appendChild(header);
-
-    const inner = document.createElement('div');
-    inner.className = 'graph-container-inner';
+    pillsOverlay.appendChild(pillsContainer);
+    inner.appendChild(pillsOverlay);
 
     const cellWidth = GRAPH_CELL_WIDTH;
     const axisWidth = GRAPH_AXIS_WIDTH; // reserved for y-axis + matches annotation row label width, so data columns start at the same x as the .track-cells above
@@ -1013,7 +1958,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
 
             circle.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
-                handleMouseDown(p.idx);
+                handleMouseDown(p.idx, key);
             });
             circle.addEventListener('mouseenter', () => handleMouseEnter(p.idx));
 
@@ -1028,9 +1973,10 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     return wrapper;
 }
 
-function handleMouseDown(idx) {
+function handleMouseDown(idx, trackKey) {
     exitRowMode();
     isMouseDown = true; selectStart = idx; selectEnd = idx;
+    dragOriginTrackKey = trackKey || null;
     updateSelectionUI();
 }
 
@@ -1099,8 +2045,8 @@ function handleRowLabelClick(trackKey, typeChar) {
         exitRowMode(); selectStart = null; selectEnd = null; updateSelectionUI();
         document.getElementById('rangeDisplay').textContent = 'No selection active';
         document.getElementById('fastaDisplay').textContent = '-';
-        document.getElementById('metricsDisplay').textContent = 'Select a region or graph point for statistics.';
-        lastRangeString = null; refreshChimeraxDisplay();
+        setMetricsBase('Select a region or graph point for statistics.');
+        lastRanges = null; refreshChimeraxDisplay();
         return;
     }
     if (!parsedTracks[trackKey]) return;
@@ -1158,6 +2104,161 @@ function updateSelectionUI() {
     updateGraphSelectionGuides(selectedIdxs, restrictToRow);
 }
 
+// --- Quantitative Metrics cross-reference ---------------------------------
+// The metrics box previously only ever showed ONE thing: either the pLDDT/
+// RSA stats for whichever track a manual drag originated on, or (for a row/
+// band/residue-type selection) just a filter summary with no quantitative
+// data at all. This lets the user additionally pick ANY loaded track - SS/
+// TM/DO annotation or pLDDT/RSA model - to cross-reference against whatever
+// is currently selected, regardless of how that selection was made, and see
+// the overlap appended below the existing info rather than replacing it.
+let lastMetricsBaseHTML = 'Select a region or graph point for statistics.';
+let crossRefTrackKey = '';
+
+function setMetricsBase(html) {
+    lastMetricsBaseHTML = html;
+    renderMetricsDisplay();
+}
+
+function renderMetricsDisplay() {
+    const el = document.getElementById('metricsDisplay');
+    if (!el) return;
+    let html = lastMetricsBaseHTML;
+    if (crossRefTrackKey && parsedTracks[crossRefTrackKey]) {
+        const indices = getSelectedIndices();
+        if (indices.length) {
+            const crossHTML = computeCrossReferenceHTML(crossRefTrackKey, indices);
+            if (crossHTML) html += crossHTML;
+        }
+    }
+    el.innerHTML = html;
+}
+
+// Every residue index currently selected, regardless of which mechanism
+// produced the selection (manual drag = selectStart/selectEnd; row/band/
+// residue-type click = piecewise rowRanges).
+function getSelectedIndices() {
+    if (selectionMode === 'row' && rowRanges.length) {
+        const idxs = [];
+        rowRanges.forEach(([s, e]) => { for (let i = s; i <= e; i++) idxs.push(i); });
+        return idxs;
+    }
+    if (selectStart !== null && selectEnd !== null) {
+        const s = Math.min(selectStart, selectEnd), e = Math.max(selectStart, selectEnd);
+        const idxs = [];
+        for (let i = s; i <= e; i++) idxs.push(i);
+        return idxs;
+    }
+    return [];
+}
+
+const CROSSREF_DIVIDER = '<hr style="border:none; border-top:1px solid #a7f3d0; margin:6px 0 4px;">';
+
+// Computes the overlap between `indices` (the current selection) and
+// `trackKey`'s data. Categorical tracks (SS/TM/DO) get a type-letter
+// breakdown; numeric tracks (pLDDT/RSA) get the same mean/band-percentage
+// summary calculateTrackMetrics shows, just scoped to the selection instead
+// of one contiguous range or the whole track.
+function computeCrossReferenceHTML(trackKey, indices) {
+    const trackData = parsedTracks[trackKey];
+    if (!trackData) return '';
+    const label = formatTrackLabel(trackKey);
+
+    if (Array.isArray(trackData)) {
+        const isPlddt = trackKey.endsWith('_pLDDT');
+        const isRsa = trackKey.endsWith('_RSA');
+        let sum = 0, count = 0, highConf = 0, buried = 0;
+        indices.forEach(i => {
+            const item = trackData[i];
+            if (item && item.val !== undefined && item.val !== null) {
+                sum += item.val; count++;
+                if (isPlddt && item.val >= 70) highConf++;
+                else if (isRsa && item.val < 0.20) buried++;
+            }
+        });
+        if (count === 0) {
+            return `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong>: no quantitative values in selection.`;
+        }
+        const mean = sum / count;
+        let html = `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong> (n=${count}):<br>`;
+        if (isPlddt) {
+            html += `• Mean pLDDT: <strong>${mean.toFixed(2)}</strong><br>• Confident (≥70): <strong>${((highConf / count) * 100).toFixed(1)}%</strong>`;
+        } else if (isRsa) {
+            html += `• Mean RSA: <strong>${mean.toFixed(2)}</strong><br>• Buried Core (<0.2): <strong>${((buried / count) * 100).toFixed(1)}%</strong>`;
+        }
+        return html;
+    }
+
+    if (typeof trackData === 'string') {
+        const counts = {};
+        let annotated = 0;
+        indices.forEach(i => {
+            const ch = trackData[i];
+            if (ch && ch !== ' ' && ch !== '-' && ch !== '\t') {
+                counts[ch] = (counts[ch] || 0) + 1;
+                annotated++;
+            }
+        });
+        const n = indices.length;
+        if (annotated === 0) {
+            return `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong>: no annotated residues in selection.`;
+        }
+        const rows = Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([t, c]) => `• ${t}: <strong>${c}</strong> (${((c / n) * 100).toFixed(1)}%)`)
+            .join('<br>');
+        return `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong> (of ${n}aa selected):<br>${rows}`;
+    }
+
+    return '';
+}
+
+function onCrossRefChange() {
+    crossRefTrackKey = document.getElementById('metricsCrossRef').value;
+    renderMetricsDisplay();
+}
+
+// Rebuilds the cross-reference dropdown's options from whatever tracks are
+// currently loaded, grouped to match the legend's categories. Called after
+// every (re-)parse and after structure files are attached, since either can
+// change which tracks exist. Preserves the current selection if it's still
+// a valid option.
+function populateCrossRefDropdown() {
+    const select = document.getElementById('metricsCrossRef');
+    if (!select) return;
+    const prevValue = select.value;
+
+    const groups = [
+        ['Secondary Structure (SS)', k => k.startsWith('SS_')],
+        ['Coiled-Coil (CC)', k => k.startsWith('CC_')],
+        ['Transmembrane (TM)', k => k.startsWith('TM_')],
+        ['Disorder (DO)', k => k.startsWith('DO_')],
+        ['pLDDT Confidence', k => k.endsWith('_pLDDT')],
+        ['RSA Exposure', k => k.endsWith('_RSA')]
+    ];
+
+    select.innerHTML = '<option value="">— none —</option>';
+    const trackKeys = Object.keys(parsedTracks).filter(k => k !== 'AA');
+
+    groups.forEach(([groupLabel, matches]) => {
+        const keys = trackKeys.filter(matches);
+        if (!keys.length) return;
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = groupLabel;
+        keys.forEach(key => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = formatTrackLabel(key);
+            optgroup.appendChild(opt);
+        });
+        select.appendChild(optgroup);
+    });
+
+    const stillValid = [...select.options].some(o => o.value === prevValue);
+    select.value = stillValid ? prevValue : '';
+    crossRefTrackKey = select.value;
+}
+
 function calculateSelectionMetadata() {
     if (selectStart === null || selectEnd === null) return;
     const startIdx = Math.min(selectStart, selectEnd);
@@ -1168,7 +2269,7 @@ function calculateSelectionMetadata() {
 
     document.getElementById('rangeDisplay').innerHTML = `Residues: <strong>${resStart} - ${resEnd}</strong> <span style="color:#64748b;">(Length: ${length}aa)</span>`;
     document.getElementById('fastaDisplay').textContent = selectedSequence;
-    lastRangeString = `${resStart}-${resEnd}`;
+    lastRanges = [[resStart, resEnd]];
     
     computeMetricsForInterval(startIdx, endIdx);
     refreshChimeraxDisplay();
@@ -1179,8 +2280,8 @@ function calculateRowSelectionMetadata(trackKey, typeChar) {
     if (!rowRanges.length) {
         document.getElementById('rangeDisplay').innerHTML = `<strong>${rowLabel}</strong>: no matching entries`;
         document.getElementById('fastaDisplay').textContent = '-';
-        document.getElementById('metricsDisplay').textContent = 'No matching residues found.';
-        lastRangeString = null; refreshChimeraxDisplay();
+        setMetricsBase('No matching residues found.');
+        lastRanges = null; refreshChimeraxDisplay();
         return;
     }
     const rangeLabels = []; const fastaSegments = []; let totalLength = 0;
@@ -1192,9 +2293,9 @@ function calculateRowSelectionMetadata(trackKey, typeChar) {
 
     document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${rowLabel}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
     document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
-    lastRangeString = rangeLabels.join(','); 
+    lastRanges = rowRanges.map(([s, e]) => [s + 1, e + 1]);
     
-    document.getElementById('metricsDisplay').innerHTML = `Active Filter: <strong>${rowLabel}</strong><br>Segments: ${rowRanges.length} | Span: ${totalLength} residues`;
+    setMetricsBase(`Active Filter: <strong>${rowLabel}</strong><br>Segments: ${rowRanges.length} | Span: ${totalLength} residues`);
     refreshChimeraxDisplay();
 }
 
@@ -1217,7 +2318,7 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
     }
 
     if (count === 0) {
-        document.getElementById('metricsDisplay').textContent = "No quantitative values in range.";
+        setMetricsBase("No quantitative values in range.");
         return;
     }
 
@@ -1230,16 +2331,18 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
         const pctBuried = ((buried / count) * 100).toFixed(1);
         html += `• Mean RSA: <strong>${mean.toFixed(2)}</strong><br>• Buried Core (<0.2): <strong>${pctBuried}%</strong>`;
     }
-    document.getElementById('metricsDisplay').innerHTML = html;
+    setMetricsBase(html);
 }
 
 function computeMetricsForInterval(startIdx, endIdx) {
     const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
     if (structuralKeys.length === 0) {
-        document.getElementById('metricsDisplay').textContent = "No PDB structural data attached.";
+        setMetricsBase("No PDB structural data attached.");
         return;
     }
-    const sampleKey = activeRowKey && structuralKeys.includes(activeRowKey) ? activeRowKey : structuralKeys[0];
+    const sampleKey = (dragOriginTrackKey && structuralKeys.includes(dragOriginTrackKey))
+        ? dragOriginTrackKey
+        : (activeRowKey && structuralKeys.includes(activeRowKey) ? activeRowKey : structuralKeys[0]);
     calculateTrackMetrics(sampleKey, startIdx, endIdx);
 }
 
@@ -1284,25 +2387,29 @@ function closeMetricsTable() {
     document.getElementById('metricsModal').style.display = 'none';
 }
 
-function getChimeraxTarget() { return document.getElementById('chimeraxTarget').value.trim() || '#1'; }
-
 function updateCxCommandUI() {
     const isColor = document.getElementById('cxCommand').value === 'color';
     document.getElementById('cxColor').style.display = isColor ? '' : 'none';
     refreshChimeraxDisplay();
 }
 
+function getChimeraxTarget() {
+    return document.getElementById('chimeraxTarget').value.trim() || getSelectedCommandEngine().targetDefault;
+}
+
 function refreshChimeraxDisplay() {
+    schedulePersist(); // called on every selection change & command-panel field edit - the one reliable hook point
     const el = document.getElementById('chimeraxDisplay');
-    if (!lastRangeString) { el.textContent = '-'; return; }
+    if (!lastRanges || !lastRanges.length) { el.textContent = '-'; return; }
+    const engine = getSelectedCommandEngine();
     const target = getChimeraxTarget();
     const cmd = document.getElementById('cxCommand').value;
 
-    if (cmd === 'select') { el.textContent = `select ${target}:${lastRangeString}`; return; }
-    if (cmd === 'label') { el.textContent = `label ${target}:${lastRangeString}`; return; }
+    if (cmd === 'select') { el.textContent = engine.buildCommand('select', target, lastRanges); return; }
+    if (cmd === 'label') { el.textContent = engine.buildCommand('label', target, lastRanges); return; }
 
     const color = document.getElementById('cxColor').value;
-    if (color !== 'match') { el.textContent = `color ${target}:${lastRangeString} ${color}`; return; }
+    if (color !== 'match') { el.textContent = engine.buildCommand('color', target, lastRanges, color); return; }
 
     const lines = [];
     if (selectionMode === 'row' && activeRowKey && parsedTracks[activeRowKey] && typeof parsedTracks[activeRowKey] === 'string') {
@@ -1310,14 +2417,308 @@ function refreshChimeraxDisplay() {
         const typesToCheck = activeRowType ? [activeRowType] : TYPE_ORDER;
         typesToCheck.forEach(t => {
             if (!TYPE_CX_COLOR[t]) return;
-            const ranges = getTypeRanges(trackStr, t);
+            const ranges = getTypeRanges(trackStr, t); // 0-indexed [s,e] pairs
             if (ranges.length) {
-                const rangeStr = ranges.map(([s, e]) => `${s + 1}-${e + 1}`).join(',');
-                lines.push(`color ${target}:${rangeStr} ${TYPE_CX_COLOR[t]}`);
+                const oneIndexedRanges = ranges.map(([s, e]) => [s + 1, e + 1]);
+                lines.push(engine.buildCommand('color', target, oneIndexedRanges, TYPE_CX_COLOR[t]));
             }
         });
     }
     el.textContent = lines.length ? lines.join('\n') : '# Match Selection requires categorical Q2D row selection';
+}
+
+function populateCommandEngineSelect() {
+    const select = document.getElementById('commandEngineSelect');
+    if (!select) return;
+    select.innerHTML = '';
+    COMMAND_ENGINES.forEach(engine => {
+        const opt = document.createElement('option');
+        opt.value = engine.id;
+        opt.textContent = engine.label;
+        select.appendChild(opt);
+    });
+    select.value = commandEngineId;
+}
+
+// Keeps the sidebar's "<Engine> Target:" / "<Engine> Command:" labels in
+// sync with whichever engine is currently selected.
+function updateSidebarCommandLabels() {
+    const engine = getSelectedCommandEngine();
+    const targetLabel = document.getElementById('cmdTargetLabel');
+    const commandLabel = document.getElementById('cmdCommandLabel');
+    if (targetLabel) targetLabel.textContent = `${engine.label} Target:`;
+    if (commandLabel) commandLabel.textContent = `${engine.label} Command:`;
+    const targetInput = document.getElementById('chimeraxTarget');
+    if (targetInput) targetInput.title = engine.targetHint;
+}
+
+function onCommandEngineChange() {
+    const oldEngine = getSelectedCommandEngine();
+    commandEngineId = document.getElementById('commandEngineSelect').value;
+    const newEngine = getSelectedCommandEngine();
+
+    // Only swap the Target field's value if it still holds the PREVIOUS
+    // engine's default (i.e. the user hasn't customized it) - a custom
+    // value the user typed is left alone even though its syntax may no
+    // longer match the new engine.
+    const targetInput = document.getElementById('chimeraxTarget');
+    if (targetInput.value.trim() === oldEngine.targetDefault) {
+        targetInput.value = newEngine.targetDefault;
+    }
+
+    updateSidebarCommandLabels();
+    refreshChimeraxDisplay();
+}
+
+// --- Client-side persistence (Options > Cached Data) ----------------------
+// Everything needed to reconstruct the page - parsed Q2D tracks (which
+// already include any attached structure files' derived pLDDT/RSA data),
+// the raw structure file text (for display/management), the current
+// selection, and view/ChimeraX preferences - lives under one localStorage
+// key so a refresh or reopening the tab picks up right where it left off.
+// Cookies are avoided deliberately: multi-model PDB text can run from tens
+// of KB into low MBs, far past typical ~4KB cookie limits.
+
+function schedulePersist() {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(saveStateToStorage, 400);
+}
+
+function gatherPersistableState() {
+    return {
+        v: 1,
+        savedAt: Date.now(),
+        rawInput: document.getElementById('rawInput').value,
+        parsedTracks: parsedTracks,
+        structureFiles: uploadedStructureFiles,
+        graphHighlights: graphHighlights,
+        selection: {
+            selectStart, selectEnd, selectionMode, activeRowKey, activeRowType,
+            rowRanges, dragOriginTrackKey, crossRefTrackKey, lastRanges
+        },
+        preferences: {
+            currentViewMode,
+            commandEngineId,
+            chimeraxTarget: document.getElementById('chimeraxTarget').value,
+            cxCommand: document.getElementById('cxCommand').value,
+            cxColor: document.getElementById('cxColor').value
+        }
+    };
+}
+
+function saveStateToStorage() {
+    if (!parsedTracks.AA) return; // nothing meaningful parsed yet
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(gatherPersistableState()));
+        lastPersistError = null;
+    } catch (err) {
+        console.error('Failed to save cached data:', err);
+        lastPersistError = (err && err.name === 'QuotaExceededError')
+            ? 'Storage quota exceeded - some data (likely a large structure file) could not be cached.'
+            : 'Failed to save cached data: ' + (err && err.message ? err.message : err);
+    }
+    const modal = document.getElementById('optionsModal');
+    if (modal && modal.style.display === 'flex') renderCachedDataInfo();
+}
+
+// Re-applies whichever selection was active when the state was saved, by
+// calling the exact same functions the original interaction would have
+// called (updateSelectionUI + calculateSelectionMetadata / -RowSelectionMetadata
+// / calculateTrackMetrics) - rather than duplicating their logic - so the
+// range/FASTA/metrics panels and active-row/badge highlighting all come
+// back correctly instead of just the raw selection state.
+function restoreSelectionVisuals() {
+    if (selectionMode === 'row' && activeRowKey && parsedTracks[activeRowKey] && rowRanges.length) {
+        document.querySelectorAll('.track-label').forEach(l => {
+            l.classList.toggle('active-row', l.dataset.track === activeRowKey);
+        });
+        document.querySelectorAll('.type-badge').forEach(b => {
+            b.classList.toggle('active-badge', b.dataset.track === activeRowKey && b.dataset.type === activeRowType);
+        });
+        document.querySelectorAll('.s-badge').forEach(b => {
+            b.classList.toggle('active-badge', b.dataset.track === activeRowKey && activeRowType !== null);
+        });
+        updateSelectionUI();
+
+        const trackData = parsedTracks[activeRowKey];
+        if (Array.isArray(trackData) && activeRowType === null) {
+            calculateTrackMetrics(activeRowKey, 0, parsedTracks.AA.length - 1);
+        } else {
+            calculateRowSelectionMetadata(activeRowKey, activeRowType);
+        }
+    } else if (selectStart !== null && selectEnd !== null) {
+        updateSelectionUI();
+        calculateSelectionMetadata();
+    }
+}
+
+function loadStateFromStorage() {
+    let raw;
+    try {
+        raw = localStorage.getItem(STORAGE_KEY);
+    } catch (err) {
+        console.error('Failed to read cached data:', err);
+        return false;
+    }
+    if (!raw) return false;
+
+    let state;
+    try {
+        state = JSON.parse(raw);
+    } catch (err) {
+        console.error('Cached data is corrupted, ignoring:', err);
+        return false;
+    }
+    if (!state || !state.parsedTracks || !state.parsedTracks.AA) return false;
+
+    document.getElementById('rawInput').value = state.rawInput || '';
+    parsedTracks = state.parsedTracks;
+    uploadedStructureFiles = state.structureFiles || [];
+    graphHighlights = state.graphHighlights || {};
+
+    const sel = state.selection || {};
+    selectStart = sel.selectStart !== undefined ? sel.selectStart : null;
+    selectEnd = sel.selectEnd !== undefined ? sel.selectEnd : null;
+    selectionMode = sel.selectionMode || 'point';
+    activeRowKey = sel.activeRowKey || null;
+    activeRowType = sel.activeRowType !== undefined ? sel.activeRowType : null;
+    rowRanges = sel.rowRanges || [];
+    dragOriginTrackKey = sel.dragOriginTrackKey || null;
+    lastRanges = sel.lastRanges || null;
+
+    const prefs = state.preferences || {};
+    currentViewMode = prefs.currentViewMode || 'grid';
+    document.getElementById('viewModeSelect').value = currentViewMode;
+    commandEngineId = COMMAND_ENGINES.some(e => e.id === prefs.commandEngineId) ? prefs.commandEngineId : 'chimerax';
+    populateCommandEngineSelect();
+    updateSidebarCommandLabels();
+    if (prefs.chimeraxTarget) document.getElementById('chimeraxTarget').value = prefs.chimeraxTarget;
+    if (prefs.cxCommand) document.getElementById('cxCommand').value = prefs.cxCommand;
+    if (prefs.cxColor) document.getElementById('cxColor').value = prefs.cxColor;
+    document.getElementById('cxColor').style.display = document.getElementById('cxCommand').value === 'color' ? '' : 'none';
+
+    renderViewer(parsedTracks);
+
+    // Rebuild the cross-ref dropdown against the restored tracks, then
+    // re-apply the saved selection (populateCrossRefDropdown resets it to
+    // '' first since the dropdown starts empty on a fresh page load).
+    populateCrossRefDropdown();
+    const desiredCrossRef = sel.crossRefTrackKey || '';
+    const crossRefSelect = document.getElementById('metricsCrossRef');
+    if ([...crossRefSelect.options].some(o => o.value === desiredCrossRef)) {
+        crossRefSelect.value = desiredCrossRef;
+        crossRefTrackKey = desiredCrossRef;
+    }
+
+    restoreSelectionVisuals();
+    return true;
+}
+
+function renderCachedDataInfo() {
+    const el = document.getElementById('cachedDataInfo');
+    if (!el) return;
+
+    let raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (err) { /* storage unavailable */ }
+
+    if (!raw) {
+        el.textContent = 'No cached data yet - it will be saved automatically as you paste/parse data, attach structures, and make selections.';
+        return;
+    }
+
+    let state;
+    try {
+        state = JSON.parse(raw);
+    } catch (err) {
+        el.textContent = 'Cached data is present but could not be read (possibly corrupted). Use Reset Data below to clear it.';
+        return;
+    }
+
+    const lines = [];
+    if (state.savedAt) lines.push(`Last saved: ${new Date(state.savedAt).toLocaleString()}`);
+
+    const aa = state.parsedTracks && state.parsedTracks.AA;
+    lines.push(`Sequence: ${aa ? aa.length + ' residues' : 'none'}`);
+
+    const trackKeys = state.parsedTracks ? Object.keys(state.parsedTracks).filter(k => k !== 'AA') : [];
+    const ssCount = trackKeys.filter(k => k.startsWith('SS_')).length;
+    const ccCount = trackKeys.filter(k => k.startsWith('CC_')).length;
+    const tmCount = trackKeys.filter(k => k.startsWith('TM_')).length;
+    const doCount = trackKeys.filter(k => k.startsWith('DO_')).length;
+    const plddtCount = trackKeys.filter(k => k.endsWith('_pLDDT')).length;
+    const rsaCount = trackKeys.filter(k => k.endsWith('_RSA')).length;
+    lines.push(`Q2D tracks: SS ${ssCount}, CC ${ccCount}, TM ${tmCount}, DO ${doCount}`);
+    lines.push(`Structure-derived tracks: pLDDT ${plddtCount}, RSA ${rsaCount}`);
+
+    const files = state.structureFiles || [];
+    if (files.length) {
+        lines.push(`Structure files (${files.length}):`);
+        files.forEach(f => lines.push(`  • ${f.name} (${(f.size / 1024).toFixed(1)} KB)`));
+    } else {
+        lines.push('Structure files: none');
+    }
+
+    if (state.selection && (state.selection.selectStart !== null || (state.selection.rowRanges && state.selection.rowRanges.length))) {
+        lines.push('Selection: saved');
+    }
+    lines.push(`View mode: ${(state.preferences && state.preferences.currentViewMode) || 'grid'}`);
+    const cachedEngineId = state.preferences && state.preferences.commandEngineId;
+    const cachedEngine = COMMAND_ENGINES.find(e => e.id === cachedEngineId) || COMMAND_ENGINES[0];
+    lines.push(`Command engine: ${cachedEngine.label}`);
+
+    const sizeKB = (raw.length / 1024).toFixed(1);
+    lines.push(`Total cache size: ~${sizeKB} KB`);
+
+    if (lastPersistError) lines.push('', '⚠ ' + lastPersistError);
+
+    el.textContent = lines.join('\n');
+}
+
+function openOptionsModal() {
+    renderCachedDataInfo();
+    document.getElementById('optionsModal').style.display = 'flex';
+}
+
+function closeOptionsModal() {
+    document.getElementById('optionsModal').style.display = 'none';
+}
+
+function resetAllData() {
+    if (!confirm('This permanently deletes all cached data - parsed sequence, structure files, selection, and preferences - and resets the page. Continue?')) {
+        return;
+    }
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.error(err); }
+    lastPersistError = null;
+
+    parsedTracks = {};
+    uploadedStructureFiles = [];
+    graphHighlights = {};
+    selectStart = null; selectEnd = null; selectionMode = 'point';
+    activeRowKey = null; activeRowType = null; rowRanges = [];
+    dragOriginTrackKey = null; crossRefTrackKey = '';
+    lastRanges = null;
+    currentViewMode = 'grid';
+    commandEngineId = 'chimerax';
+
+    document.getElementById('rawInput').value = '';
+    document.getElementById('structureUpload').value = '';
+    document.getElementById('viewModeSelect').value = 'grid';
+    populateCommandEngineSelect();
+    updateSidebarCommandLabels();
+    document.getElementById('chimeraxTarget').value = COMMAND_ENGINES[0].targetDefault;
+    document.getElementById('cxCommand').value = 'color';
+    document.getElementById('cxColor').value = 'match';
+    document.getElementById('cxColor').style.display = '';
+    document.getElementById('rangeDisplay').textContent = 'No selection active';
+    document.getElementById('fastaDisplay').textContent = '-';
+    setMetricsBase('Select a region or graph point for statistics.');
+    document.getElementById('chimeraxDisplay').textContent = '-';
+    document.getElementById('metricsCrossRef').innerHTML = '<option value="">— none —</option>';
+
+    document.getElementById('alignmentGrid').innerHTML =
+        '<p style="padding: 20px; color: #94a3b8; text-align: center;">Paste Quick2D output above to start.</p>';
+
+    renderCachedDataInfo();
 }
 
 function copyText(elementId) {
@@ -1325,6 +2726,15 @@ function copyText(elementId) {
     if (text === '-' || text === 'No selection active' || text.startsWith('#')) return;
     navigator.clipboard.writeText(text).then(() => { alert("Copied selection data to clipboard!"); });
 }
+
+// Restore whatever was cached from a previous visit, if any. Runs last so
+// every function/handler above already exists to be called during restore.
+// populateCommandEngineSelect() runs unconditionally first since
+// loadStateFromStorage() only touches it along its restore path - a fresh
+// visit with nothing cached would otherwise leave the Options dropdown empty.
+populateCommandEngineSelect();
+updateSidebarCommandLabels();
+loadStateFromStorage();
 </script>
 
 </body>
