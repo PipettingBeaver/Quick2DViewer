@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quick2D Viewer: Overlaid Graphs & Interactive Selection</title>
+    <title>Quick2D Viewer: 1D Characterization and Interactivity Tool</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 20px;
+            padding: 0px;
             background-color: #f8fafc;
             color: #1e293b;
         }
@@ -36,17 +36,123 @@
             box-sizing: border-box;
             background-color: #fafafa;
         }
-        .toolbar {
-            background: #e2e8f0;
-            padding: 10px 15px;
-            border-radius: 6px;
-            margin-bottom: 10px;
+
+        /* --- Top action toolbar ------------------------------------------ */
+        .top-toolbar {
             display: flex;
             align-items: center;
-            gap: 15px;
-            font-size: 0.85rem;
-            flex-wrap: wrap;
+            gap: 10px;
+            padding: 8px 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            max-height: 56px;
+            box-sizing: border-box;
+            overflow-x: auto;
         }
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .toolbar-group-view { margin-left: auto; }
+        .toolbar-divider {
+            width: 1px;
+            align-self: stretch;
+            background: #cbd5e1;
+            margin: 4px 2px;
+            flex-shrink: 0;
+        }
+        .tb-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .tb-btn-primary {
+            background: #2563eb;
+            color: #fff;
+            border: 1px solid #2563eb;
+        }
+        .tb-btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+        .tb-btn-secondary {
+            background: transparent;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+        .tb-btn-secondary:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .tb-btn-text {
+            background: transparent;
+            border: none;
+            color: #2563eb;
+            padding: 6px 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .tb-btn-text:hover { background: transparent; text-decoration: underline; }
+        .tb-select {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.8rem;
+            background: #fff;
+            color: #1e293b;
+        }
+        .tb-btn:focus-visible, .tb-select:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+        }
+
+        /* --- Collapsible raw-input drawer --------------------------------- */
+        .raw-input-drawer {
+            margin-bottom: 12px;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .raw-input-drawer[hidden] { display: none; }
+        .drawer-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        /* --- Toast notifications ------------------------------------------ */
+        #toastContainer {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            max-width: 320px;
+        }
+        .toast-visible { opacity: 1; transform: translateY(0); }
+        .toast-success { background: #065f46; }
+        .toast-error { background: #991b1b; }
         button {
             background-color: #2563eb;
             color: white;
@@ -500,27 +606,49 @@
 <div class="container">
     <h2>Quick2D & Structural Annotation Viewer</h2>
     <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
-        Paste Quick2D outputs and attach model files. Use Heatmap Grid or Overlaid Graph views with interactive range selection.
+        Welcome. To start, paste output from <a href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">MPI's Quick2D</a> output, and attach related PDB/CIF model files for comparative pLDDT/RSA and cofactor viewing.
     </p>
 
-    <div class="toolbar">
-        <strong>Attach Structure:</strong>
-        <input type="file" id="structureUpload" accept=".pdb,.cif,.json" multiple>
-        <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
-            <label style="font-size: 0.8rem; font-weight: bold;">View Mode:</label>
-            <select id="viewModeSelect" onchange="switchViewMode()" style="padding: 5px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.8rem;">
+    <div id="toastContainer" aria-live="polite"></div>
+
+    <input type="file" id="structureUpload" accept=".pdb,.cif,.json" multiple style="display: none;">
+
+    <div class="top-toolbar" role="toolbar" aria-label="Data input and view controls">
+        <div class="toolbar-group toolbar-group-input">
+            <button type="button" class="tb-btn tb-btn-primary" onclick="document.getElementById('structureUpload').click()">
+                📎 Attach Structure(s) or JSON
+            </button>
+            <button type="button" class="tb-btn tb-btn-primary" onclick="handlePasteFromClipboard()">
+                📋 Paste Quick2D from Clipboard
+            </button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="loadSampleData()">Load Sample Data</button>
+            <button type="button" id="btnToggleDrawer" class="tb-btn tb-btn-text"
+                aria-expanded="false" aria-controls="rawInputDrawer" onclick="toggleRawInputDrawer()">
+                Show raw text ▾
+            </button>
+        </div>
+
+        <div class="toolbar-divider" role="separator" aria-orientation="vertical"></div>
+
+        <div class="toolbar-group toolbar-group-view">
+            <label for="viewModeSelect" style="font-size: 0.8rem; font-weight: bold;">View Mode:</label>
+            <select id="viewModeSelect" class="tb-select" onchange="switchViewMode()">
                 <option value="grid">Heatmap Grid</option>
                 <option value="graph">Overlaid Graph View</option>
             </select>
-            <button class="secondary" onclick="openMetricsTable()">Metrics Table</button>
-            <button class="secondary" onclick="openOptionsModal()">⚙ Options</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openMetricsTable()">Metrics Table</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openOptionsModal()">⚙ Options</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openDataModal()">📋 Data</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openHelpModal()">❓ Help</button>
         </div>
     </div>
 
-    <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..."></textarea>
-    <div style="display: flex; gap: 10px;">
-        <button onclick="parseAndBuildViewer()">Parse & Render Alignment</button>
-        <button class="secondary" onclick="loadSampleData()">Add Sample Data</button>
+    <div id="rawInputDrawer" class="raw-input-drawer" hidden>
+        <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..." aria-label="Raw Quick2D text input"></textarea>
+        <div class="drawer-actions">
+            <button type="button" class="tb-btn tb-btn-primary" onclick="confirmDrawerParse()">Confirm &amp; Parse</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="cancelRawInputDrawer()">Cancel</button>
+        </div>
     </div>
 
     <div class="legend">
@@ -611,7 +739,8 @@
                     <strong>pLDDT</strong> - AlphaFold's per-residue confidence score (1-100). Hover the pLDDT row's ⓘ for full score bands.<br>
                     <strong>RSA</strong> - Relative Solvent Accessibility (0.0-1.0). Hover the RSA row's ⓘ for full score bands.<br><br>
                     Requires at least one structure file attached above.<br><br>
-                    <strong>Cross-reference dropdown</strong> - pick any loaded SS/TM/DO/CC track or pLDDT/RSA model to see how the <em>current selection</em> (manual range, or a row/band/residue-type filter) overlaps with it, shown below the metrics above.
+                    <strong>Cross-reference dropdown</strong> - pick any loaded SS/TM/DO/CC track or pLDDT/RSA model to see how the <em>current selection</em> (manual range, or a row/band/residue-type filter) overlaps with it, shown below the metrics above.<br><br>
+                    For pLDDT/RSA, <strong>All</strong>/<strong>Apo</strong>/<strong>Holo</strong>/oligomeric-state (Monomer/Dimer/Trimer/...) mass-selections are also available - each shows every matching model's stats individually, plus an <strong>Average of N</strong> summary line when more than one model is included.
                 </span></span>
                 <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a region or graph point for statistics.</div>
             </div>
@@ -668,7 +797,10 @@
     <div class="modal-content">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
             <h3 style="margin: 0; color: #0f172a;">Comparative Model Metrics Table</h3>
-            <button onclick="closeMetricsTable()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="exportMetricsTableTSV()" class="secondary" style="padding: 4px 10px; font-size: 0.8rem;">⬇ Export to TSV</button>
+                <button onclick="closeMetricsTable()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+            </div>
         </div>
         <div id="modalTableBody" style="margin-top: 15px;">
             <p style="color: #64748b;">No structure files loaded yet.</p>
@@ -695,6 +827,15 @@
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Save File</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Export the full current session - sequence, attached structures, selection, and preferences - as a portable <code>.json</code> file you can move to another browser or machine. To bring one back in, attach it via the toolbar's <strong>Attach Structure(s) or JSON</strong> button like any other file - Q2DV recognizes it automatically from a marker inside the file, without needing a separate import control.<br><br>
+                <span style="color: #94a3b8;">This is a different, restorable format from the Data modal's "Raw JSON" export, which is a read-only report and can't be re-imported.</span>
+            </p>
+            <button onclick="exportFullSave()">⬇ Export Save (.json)</button>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Cached Data</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Your pasted Quick2D text, the pLDDT/RSA data derived from attached structure files, current selection, and view preferences are saved automatically in this browser (via <code>localStorage</code>) so they survive a page refresh or reopening this tab later. Nothing is uploaded anywhere - it never leaves your device.<br><br>
@@ -703,6 +844,61 @@
             <div id="cachedDataInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">No cached data yet.</div>
             <button onclick="resetAllData()" style="background: #dc2626; margin-top: 10px;">Reset Data</button>
             <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px;">Permanently clears everything above and resets the page.</span>
+        </div>
+    </div>
+</div>
+
+<!-- Data Modal -->
+<div class="modal-overlay" id="dataModal">
+    <div class="modal-content" style="width: 720px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #0f172a;">Data</h3>
+            <button onclick="closeDataModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+
+        <div style="margin-top: 18px;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Q2D FASTA</h4>
+            <div id="dataFastaSummary" class="data-box" style="font-size: 0.8rem; white-space: pre-wrap; line-height: 1.5;">No sequence parsed yet.</div>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Structure Files</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Each PDB/CIF file is scanned on upload for a rough protein classification, apo/holo ligand state, and oligomeric state (chain count). This is best-effort: many files - especially computational models like AlphaFold predictions - simply don't record this information, in which case it's reported as such rather than guessed.
+            </p>
+            <div id="dataStructureTableWrap" style="overflow-x: auto;">
+                <p style="color: #94a3b8; font-size: 0.85rem;">No structure files attached yet.</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <h4 style="margin: 0; color: #0f172a; font-size: 0.95rem;">Raw JSON</h4>
+                <button class="copy-btn" onclick="copyDataJSON()">Copy JSON</button>
+            </div>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                The same data above, in one ordered columns/rows structure - safe to expand with more columns later, or pull into another tool.<br>
+                <span style="color: #94a3b8;">This is a read-only report - attaching it back into Q2DV won't restore a session. For that, use Options &gt; Export Save.</span>
+            </p>
+            <pre id="dataJSONView" class="data-box" style="font-size: 0.72rem; max-height: 220px; overflow: auto; margin: 0;">{}</pre>
+        </div>
+    </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal-overlay" id="helpModal">
+    <div class="modal-content" style="width: 480px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #0f172a;">Help</h3>
+            <button onclick="closeHelpModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <div style="margin-top: 18px;">
+            <p style="font-size: 0.85rem; color: #64748b; line-height: 1.5;">
+                Help content is on the way - this panel will cover pasting/attaching data, keyboard shortcuts, and how to read each view.
+            </p>
+            <p style="font-size: 0.85rem; color: #64748b; line-height: 1.5;">
+                In the meantime, every ⓘ icon throughout the page (legend, row labels, sidebar fields) explains that specific piece in place.
+            </p>
         </div>
     </div>
 </div>
@@ -732,8 +928,122 @@ window.addEventListener('mouseup', handleMouseUp);
 // and so a page reload can show what's cached without re-deriving anything.
 const STORAGE_KEY = 'q2dViewer_state_v1';
 let uploadedStructureFiles = []; // [{name, ext, size}] - metadata only, see note at push() site below
+// Free-text "Protein ID: ..." header line, if the pasted Quick2D block
+// included one (the parser otherwise just skips it) - shown in the Data
+// modal's FASTA summary.
+let currentProteinLabel = null;
 let persistTimer = null;
 let lastPersistError = null;
+
+// --- Toast notifications --------------------------------------------------
+// Lightweight, non-blocking feedback (vs. alert()) for actions like the
+// clipboard paste flow below. aria-live="polite" on the container means
+// screen readers announce new toasts without needing focus to move.
+function showToast(message, type) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast' + (type ? ' toast-' + type : '');
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('toast-visible'));
+    setTimeout(() => {
+        toast.classList.remove('toast-visible');
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
+// --- Raw-input drawer ------------------------------------------------------
+// Collapsed by default to keep the toolbar compact; opens either when the
+// user explicitly asks to see/edit the raw text, or as the fail-safe when
+// clipboard access isn't available/granted.
+function setDrawerOpen(isOpen) {
+    const drawer = document.getElementById('rawInputDrawer');
+    const toggleBtn = document.getElementById('btnToggleDrawer');
+    if (!drawer || !toggleBtn) return;
+    drawer.hidden = !isOpen;
+    toggleBtn.setAttribute('aria-expanded', String(isOpen));
+    toggleBtn.textContent = isOpen ? 'Hide raw text ▴' : 'Show raw text ▾';
+}
+
+function toggleRawInputDrawer() {
+    const drawer = document.getElementById('rawInputDrawer');
+    if (!drawer) return;
+    setDrawerOpen(drawer.hidden);
+}
+
+// Opens the drawer specifically to receive a fresh manual paste (clipboard
+// access failed or was empty) - clears any stale text first, since whatever
+// was there before isn't what the user just tried to paste.
+function openDrawerForManualPaste() {
+    setDrawerOpen(true);
+    const textarea = document.getElementById('rawInput');
+    if (textarea) { textarea.value = ''; textarea.focus(); }
+}
+
+function confirmDrawerParse() {
+    const text = document.getElementById('rawInput').value;
+    if (!text.trim()) {
+        showToast('Paste or type some Quick2D text first.', 'error');
+        return;
+    }
+    const beforeRef = parsedTracks;
+    parseAndBuildViewer();
+    if (parsedTracks !== beforeRef) {
+        setDrawerOpen(false);
+        showToast('Parsed successfully.', 'success');
+    }
+    // On failure, parseAndBuildViewer already raised its own toast and the
+    // drawer stays open so the user can fix the text without retyping it.
+}
+
+function cancelRawInputDrawer() {
+    setDrawerOpen(false);
+}
+
+// --- Clipboard paste ---------------------------------------------------
+async function handlePasteFromClipboard() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+        showToast('Clipboard access isn\u2019t available in this browser - paste manually below.', 'error');
+        openDrawerForManualPaste();
+        return;
+    }
+    let text;
+    try {
+        text = await navigator.clipboard.readText();
+    } catch (err) {
+        console.error('Clipboard read failed:', err);
+        showToast('Clipboard access denied - paste manually below.', 'error');
+        openDrawerForManualPaste();
+        return;
+    }
+    if (!text || !text.trim()) {
+        showToast('Clipboard is empty.', 'error');
+        openDrawerForManualPaste();
+        return;
+    }
+    document.getElementById('rawInput').value = text;
+    const beforeRef = parsedTracks;
+    parseAndBuildViewer();
+    if (parsedTracks !== beforeRef) {
+        setDrawerOpen(false);
+        showToast('Parsed Quick2D data from clipboard.', 'success');
+    } else {
+        // Parse failed - parseAndBuildViewer already raised its own error
+        // toast. The textarea already holds what was pasted, so just reveal
+        // the drawer so the user can see and fix it, rather than clearing it.
+        setDrawerOpen(true);
+        document.getElementById('rawInput').focus();
+    }
+}
+
+function openHelpModal() {
+    document.getElementById('helpModal').style.display = 'flex';
+}
+function closeHelpModal() {
+    document.getElementById('helpModal').style.display = 'none';
+}
 
 // Shared layout constants so annotation rows (label + per-residue cells) and
 // the graph SVGs line up on the same pixel grid: the axis/label column and
@@ -825,18 +1135,30 @@ const PREDICTOR_INFO = {
         ],
         useCase: '',
         citation: 'Tien, M. Z. et al. PLoS ONE 8, e80635 (2013).'
+    },
+    COFACTOR: {
+        name: 'Cofactor Neighborhoods',
+        category: 'Structure-Derived',
+        description: 'Each digit marks a residue found near one of this file\'s bound cofactors (metal ions, hemes, nucleotide coenzymes, etc.), using class-specific distance cutoffs on heavy-atom contacts. Residues near cofactor #1 are labeled "1", cofactor #2 "2", and so on, up to 9 cofactors per file.',
+        bands: [
+            { range: '1–9', desc: 'Residue is within that cofactor\'s neighborhood-search radius; if it qualifies for more than one cofactor, the closer one wins the label.' },
+            { range: '(blank)', desc: 'Not within any detected cofactor\'s neighborhood.' }
+        ],
+        useCase: 'See Data > Structure Files for the full neighbor list per cofactor (identity, category, distance, and confidence), including the raw JSON export.',
+        citation: ''
     }
 };
 
 // Resolves the right PREDICTOR_INFO entry for a track key. Q2D annotation
 // tracks (SS_*/TM_*/DO_*/etc.) match exactly; structure-derived tracks are
 // named after the uploaded file (e.g. "model1_pLDDT") so they're matched by
-// suffix against the generic PLDDT/RSA entries instead. Returns null for
-// keys with no applicable entry (e.g. "AA").
+// suffix against the generic PLDDT/RSA/COFACTOR entries instead. Returns
+// null for keys with no applicable entry (e.g. "AA").
 function getPredictorInfo(trackKey) {
     if (PREDICTOR_INFO[trackKey]) return PREDICTOR_INFO[trackKey];
     if (trackKey.endsWith('_pLDDT')) return PREDICTOR_INFO.PLDDT;
     if (trackKey.endsWith('_RSA')) return PREDICTOR_INFO.RSA;
+    if (trackKey.endsWith('_Cofactors')) return PREDICTOR_INFO.COFACTOR;
     return null;
 }
 
@@ -991,6 +1313,10 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
+// One color per cofactor label (1-9), shared between the heatmap
+// "_Cofactors" row and the graph-mode dot highlighting so the same cofactor
+// reads as the same color in both views.
+const COFACTOR_DOT_COLORS = ['#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#22c55e', '#ec4899', '#eab308', '#14b8a6', '#6366f1'];
 let graphHighlights = {}; // Track key -> boolean (true if highlighted/active)
 
 // --- Visualization command engines ----------------------------------------
@@ -1356,8 +1682,9 @@ function formatTrackLabel(fullKey) {
     }
     const isPlddt = fullKey.endsWith('_pLDDT');
     const isRsa = fullKey.endsWith('_RSA');
-    const metric = isPlddt ? 'pLDDT' : (isRsa ? 'RSA' : '');
-    const base = fullKey.replace(/_pLDDT$|_RSA$/, '');
+    const isCofactors = fullKey.endsWith('_Cofactors');
+    const metric = isPlddt ? 'pLDDT' : (isRsa ? 'RSA' : (isCofactors ? 'Cofactors' : ''));
+    const base = fullKey.replace(/_pLDDT$|_RSA$|_Cofactors$/, '');
     
     let modelId = '';
     const modelMatch = base.match(/(model_\d+|rank_\d+|rank\d+)/i);
@@ -1388,7 +1715,8 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('TM_')) return 2;
     if (key.startsWith('DO_')) return 3;
     if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 4;
-    return 5;
+    if (key.endsWith('_Cofactors')) return 5;
+    return 6;
 }
 
 function switchViewMode() {
@@ -1399,14 +1727,51 @@ function switchViewMode() {
 
 // Structure File Upload Handler
 document.getElementById('structureUpload').addEventListener('change', async (event) => {
-    if (!parsedTracks.AA) {
+    const files = [...event.target.files];
+
+    // Detect Q2DV save-file exports first (recognized purely by the
+    // q2dvSave marker in the file's own JSON, not by filename or which
+    // button was clicked) - these bypass the "sequence already parsed"
+    // requirement below entirely, since importing a save is exactly how a
+    // fresh page gets its sequence in the first place. Any file that fails
+    // to parse as JSON, or parses but isn't marked as a save, falls through
+    // to the normal structure-file handling further down unchanged.
+    const remainingFiles = [];
+    for (const file of files) {
+        if (file.name.split('.').pop().toLowerCase() !== 'json') { remainingFiles.push(file); continue; }
+        let text, maybeSave;
+        try {
+            text = await file.text();
+            maybeSave = JSON.parse(text);
+        } catch (err) {
+            remainingFiles.push(file); // not JSON we could parse - let AF3 handling attempt/reject it
+            continue;
+        }
+        if (maybeSave && maybeSave.q2dvSave === true) {
+            importSaveFile(maybeSave, file.name);
+        } else {
+            remainingFiles.push(file); // valid JSON, but not one of our saves (e.g. an AF3 prediction)
+        }
+    }
+
+    if (remainingFiles.length && !parsedTracks.AA) {
         alert("Please paste and parse the Quick2D FASTA sequence first.");
         event.target.value = '';
         return;
     }
-    
-    const files = event.target.files;
-    for (const file of files) {
+
+    if (!remainingFiles.length) {
+        // Nothing left to process - any save import(s) above already ran
+        // their own complete render + persist via applyPersistedState().
+        // Re-running renderViewer() here would rebuild the DOM from scratch
+        // and silently drop the active-row/type-badge highlighting that
+        // restoreSelectionVisuals() just applied, without changing any
+        // underlying state - so just stop here instead.
+        event.target.value = '';
+        return;
+    }
+
+    for (const file of remainingFiles) {
         try {
             const text = await file.text();
             const ext = file.name.split('.').pop().toLowerCase();
@@ -1444,6 +1809,24 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
                 graphHighlights[rsaKey] = true;
             }
 
+            let cofactorResult = { cofactors: [], labelByResSeq: new Map() };
+            if (ext === 'pdb' || ext === 'cif') {
+                try {
+                    cofactorResult = extractCofactorNeighborhoods(text, ext);
+                } catch (err) {
+                    console.error('Cofactor extraction failed for', file.name, err);
+                }
+            }
+            if (cofactorResult.cofactors.length) {
+                const cofactorChars = new Array(parsedTracks.AA.length).fill(' ');
+                cofactorResult.labelByResSeq.forEach((cofactorNum, resSeq) => {
+                    const idx = resSeq - 1;
+                    if (idx >= 0 && idx < cofactorChars.length) cofactorChars[idx] = String(cofactorNum);
+                });
+                const cofactorKey = `${baseName}_Cofactors`;
+                parsedTracks[cofactorKey] = cofactorChars.join('');
+            }
+
             // Only cache lightweight metadata here (name/ext/size) for the
             // Cached Data listing - NOT the raw file text. The derived
             // pLDDT/RSA arrays above are already what gets restored on
@@ -1455,13 +1838,18 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             // ones for data that WOULD have fit). Re-uploading the same
             // filename replaces its entry rather than duplicating it.
             uploadedStructureFiles = uploadedStructureFiles.filter(f => f.name !== file.name);
-            uploadedStructureFiles.push({ name: file.name, ext, size: text.length });
+            uploadedStructureFiles.push({
+                name: file.name, ext, size: text.length,
+                ...scanStructureMetadata(text, ext),
+                cofactors: cofactorResult.cofactors
+            });
         } catch (err) {
             console.error(err);
         }
     }
     populateCrossRefDropdown();
     renderViewer(parsedTracks);
+    restoreSelectionVisuals(); // renderViewer just rebuilt the DOM from scratch - reapply any active-row/type-badge/s-badge highlighting (from an earlier save import in this same batch, or a pre-existing selection) instead of silently dropping it
     event.target.value = '';
     saveStateToStorage();
     if (lastPersistError) {
@@ -1472,6 +1860,365 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
         );
     }
 });
+
+// --- Structure metadata scan (Data modal) ---------------------------------
+// Best-effort scan for three things PDB/CIF files sometimes - but often
+// don't - record, run once at upload time alongside the existing pLDDT/RSA
+// extraction: a rough protein classification, whether a ligand/cofactor
+// looks bound (apo vs holo, inferred from HETATM residue names), and the
+// oligomeric state (inferred from the number of distinct protein chains).
+// Computational models (AlphaFold PDB/CIF/JSON in particular) commonly
+// carry none of this, since they're not experimental depositions - that's
+// reported honestly rather than guessed at.
+//
+// Only monatomic alkali/halide ions and clear crystallization additives are
+// ignored here - deliberately NOT metals like Zn/Mg/Ca/Fe/Mn/Cu, which are
+// very often genuine functional cofactors (zinc fingers, metalloenzyme
+// active sites, Ca-binding domains) rather than buffer artifacts, and would
+// otherwise cause real ligand-bound ("holo") structures to be mislabeled.
+const HETERO_IGNORE_LIST = new Set([
+    'HOH', 'WAT', 'H2O', 'DOD',                                    // water
+    'NA', 'CL', 'K',                                                // inert monatomic ions
+    'SO4', 'PO4', 'GOL', 'EDO', 'PEG', 'PG4', 'ACT', 'TRS', 'FMT', // crystallization additives
+    'IPA', 'DMS', 'BME', 'MPD', 'CIT', 'IOD', 'UNK', 'UNX', 'UNL'
+]);
+const OLIGOMER_NAMES = ['', 'Monomer', 'Dimer', 'Trimer', 'Tetramer', 'Pentamer', 'Hexamer', 'Heptamer', 'Octamer'];
+
+function summarizeApoState(heteroResidues) {
+    const ligands = [...heteroResidues].filter(r => !HETERO_IGNORE_LIST.has(r));
+    if (ligands.length) {
+        const shown = ligands.slice(0, 4).join(', ') + (ligands.length > 4 ? ', …' : '');
+        return `Holo (${shown})`;
+    }
+    return heteroResidues.size ? 'Apo (buffer/ions only)' : 'Apo (no heteroatoms found)';
+}
+
+function summarizeOligomer(chainIds) {
+    const n = chainIds.size;
+    if (n === 0) return 'Unknown (no chains found)';
+    if (n < OLIGOMER_NAMES.length) return `${OLIGOMER_NAMES[n]} (${n} chain${n > 1 ? 's' : ''})`;
+    return `${n}-mer (${n} chains)`;
+}
+
+function scanStructureMetadata(text, ext) {
+    if (ext === 'json') {
+        return {
+            proteinClass: 'N/A (AF3 JSON prediction)',
+            apoState: 'N/A (no ligand records in this format)',
+            oligomer: 'Unknown (not recorded in AF3 JSON output)'
+        };
+    }
+
+    const lines = text.split('\n');
+    let proteinClass = null;
+    const chainIds = new Set();
+    const heteroResidues = new Set();
+
+    if (ext === 'pdb') {
+        for (const line of lines) {
+            if (!proteinClass && line.startsWith('HEADER')) {
+                const cls = line.substring(10, 50).trim();
+                if (cls) proteinClass = cls;
+            } else if (line.startsWith('ATOM')) {
+                const chain = line.substring(21, 22).trim();
+                if (chain) chainIds.add(chain);
+            } else if (line.startsWith('HETATM')) {
+                const resName = line.substring(17, 20).trim();
+                if (resName) heteroResidues.add(resName);
+            }
+        }
+    } else if (ext === 'cif') {
+        const keywordMatch = text.match(/_struct_keywords\.pdbx_keywords\s+['"]?([^'"\n]+)['"]?/)
+            || text.match(/_struct\.pdbx_descriptor\s+['"]?([^'"\n]+)['"]?/);
+        if (keywordMatch) proteinClass = keywordMatch[1].trim();
+
+        let inAtomSite = false, groupIdx = -1, chainIdx = -1, resNameIdx = -1, colIndex = 0;
+        for (const line of lines) {
+            if (line.startsWith('_atom_site.')) {
+                inAtomSite = true;
+                if (line.includes('group_PDB')) groupIdx = colIndex;
+                if (line.includes('auth_asym_id')) chainIdx = colIndex;
+                if (line.includes('label_comp_id') && resNameIdx === -1) resNameIdx = colIndex;
+                colIndex++;
+            } else if (inAtomSite && (line.startsWith('ATOM') || line.startsWith('HETATM'))) {
+                const cols = line.trim().split(/\s+/);
+                const group = groupIdx >= 0 ? cols[groupIdx] : (line.startsWith('HETATM') ? 'HETATM' : 'ATOM');
+                if (group === 'ATOM' && chainIdx >= 0 && cols[chainIdx]) chainIds.add(cols[chainIdx]);
+                if (group === 'HETATM' && resNameIdx >= 0 && cols[resNameIdx]) heteroResidues.add(cols[resNameIdx]);
+            } else if (inAtomSite && line.startsWith('#')) {
+                inAtomSite = false;
+            }
+        }
+    }
+
+    return {
+        proteinClass: proteinClass || 'Not specified in file',
+        apoState: summarizeApoState(heteroResidues),
+        oligomer: summarizeOligomer(chainIds)
+    };
+}
+
+// --- Cofactor neighborhood extraction (Data modal / new "_Cofactors" track)
+// ---------------------------------------------------------------------------
+// Finds up to 9 non-solvent HETATM cofactors per structure file, classifies
+// each, and finds the nearest protein residues to each within a
+// class-specific heavy-atom distance cutoff. Feeds a new per-residue label
+// track ("1".."9" = nearest that cofactor, blank = none) shown in the
+// heatmap/graph views, plus a `cofactors` column on the file's Data-modal
+// JSON row with the full neighbor list.
+//
+// This is inherently heuristic:
+//  - Distance cutoffs use the RANGE's upper bound as the search radius; the
+//    lower bound in the source spec describes typical coordination
+//    distance, not a hard floor - excluding closer contacts would drop
+//    exactly the most important neighbors (e.g. direct metal-coordinating
+//    residues).
+//  - "AF3 confidence" is inferred from B-factor-as-pLDDT, which is only
+//    literally valid for computational models - applied the same way this
+//    app already treats B-factor as pLDDT everywhere else, for consistency,
+//    but on a genuine experimental structure this check is not meaningful.
+//  - "Evenly sample" for coenzymes is approximated as an alternating
+//    first-half/second-half atom-index split, not true chemical
+//    substructure (adenine/ribose vs phosphate) - that would need
+//    per-cofactor atom-naming tables not reliably standardized across
+//    depositions.
+const COFACTOR_CLASSES = [
+    { label: 'Monatomic Metals', ids: ['ZN', 'MG', 'CA', 'FE', 'MN', 'CU', 'NI', 'CO'], maxDist: 3.5, maxResidues: 6, axialDist: null },
+    { label: 'Polynuclear Clusters', ids: ['SF4', 'F3S', 'F4S', 'CLF', 'CUB'], maxDist: 4.0, maxResidues: 8, axialDist: null },
+    { label: 'Macrocycles & Ring Systems', ids: ['HEM', 'HEA', 'HEC', 'CHL', 'FAD', 'FMN'], maxDist: 5.5, maxResidues: 10, axialDist: 2.5 },
+    { label: 'Extended Organic Coenzymes', ids: ['ATP', 'ADP', 'GTP', 'SAM', 'PLP', 'COA', 'NAD', 'NAP'], maxDist: 4.5, maxResidues: 8, axialDist: null, evenSample: true },
+    { label: 'Metalloids & Exotics', ids: ['TE', 'SE', 'TES', 'CLT', 'WO4', 'VO4'], maxDist: 4.5, maxResidues: 6, axialDist: null }
+];
+const COFACTOR_FALLBACK = { label: 'Fallback HETATM', maxDist: 4.5, maxResidues: 6, axialDist: null };
+const MODIFIED_RESIDUE_IGNORE = new Set(['MSE', 'SEC']); // covalent, part of the polymer chain - never a cofactor
+
+function classifyCofactor(resName) {
+    for (const cls of COFACTOR_CLASSES) {
+        if (cls.ids.includes(resName)) return cls;
+    }
+    return COFACTOR_FALLBACK;
+}
+
+function isHydrogenAtom(element, atomName) {
+    if (element) return element === 'H' || element === 'D';
+    // No element column (common in older files) - fall back to name
+    // heuristics: strip a leading digit (PDB convention, e.g. "1HB2"),
+    // then check the first letter.
+    return atomName.replace(/^\d/, '').charAt(0) === 'H';
+}
+
+function dist3D(a, b) {
+    const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+// Parses every heavy (non-H) atom's coordinates, split into protein ATOM
+// records (grouped by residue) and HETATM groups (grouped by
+// chain+resSeq+insCode+resName - one entry per hetero group instance).
+// Also carries each atom's B-factor (used as pLDDT for the confidence
+// check above) since the existing lightweight parsers don't expose it
+// per-atom in a form usable for spatial search.
+function parseAllAtoms(text, ext) {
+    const proteinResidues = new Map();
+    const hetGroups = new Map();
+
+    function addAtom(map, key, meta, atom) {
+        if (!map.has(key)) map.set(key, { ...meta, atoms: [] });
+        map.get(key).atoms.push(atom);
+    }
+
+    if (ext === 'pdb') {
+        for (const line of text.split('\n')) {
+            const isAtomRec = line.startsWith('ATOM');
+            const isHetRec = line.startsWith('HETATM');
+            if (!isAtomRec && !isHetRec) continue;
+
+            const atomName = line.substring(12, 16).trim();
+            const resName = line.substring(17, 20).trim();
+            const chain = line.substring(21, 22).trim();
+            const resSeq = line.substring(22, 26).trim();
+            const iCode = line.substring(26, 27).trim();
+            const x = parseFloat(line.substring(30, 38));
+            const y = parseFloat(line.substring(38, 46));
+            const z = parseFloat(line.substring(46, 54));
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+            const element = line.substring(76, 78).trim().toUpperCase();
+            if (isHydrogenAtom(element, atomName)) continue;
+            if (MODIFIED_RESIDUE_IGNORE.has(resName)) continue;
+            const bFactorRaw = parseFloat(line.substring(60, 66));
+            const atom = { x, y, z, bFactor: Number.isFinite(bFactorRaw) ? bFactorRaw : null };
+
+            if (isAtomRec) {
+                addAtom(proteinResidues, `${chain}_${resSeq}${iCode}`, { chain, resSeq, iCode }, atom);
+            } else {
+                addAtom(hetGroups, `${chain}_${resSeq}${iCode}_${resName}`, { resName, chain, resSeq, iCode }, atom);
+            }
+        }
+    } else if (ext === 'cif') {
+        let inAtomSite = false;
+        const idx = { group: -1, atomId: -1, compId: -1, asymId: -1, seqId: -1, authSeqId: -1, x: -1, y: -1, z: -1, bFactor: -1, elem: -1 };
+        let colIndex = 0;
+        for (const line of text.split('\n')) {
+            if (line.startsWith('_atom_site.')) {
+                inAtomSite = true;
+                if (line.includes('group_PDB')) idx.group = colIndex;
+                if (line.includes('label_atom_id')) idx.atomId = colIndex;
+                if (line.includes('label_comp_id')) idx.compId = colIndex;
+                if (line.includes('auth_asym_id')) idx.asymId = colIndex;
+                if (line.includes('auth_seq_id')) idx.authSeqId = colIndex;
+                else if (line.includes('label_seq_id') && idx.authSeqId === -1) idx.seqId = colIndex;
+                if (line.includes('Cartn_x')) idx.x = colIndex;
+                if (line.includes('Cartn_y')) idx.y = colIndex;
+                if (line.includes('Cartn_z')) idx.z = colIndex;
+                if (line.includes('B_iso_or_equiv')) idx.bFactor = colIndex;
+                if (line.includes('type_symbol')) idx.elem = colIndex;
+                colIndex++;
+            } else if (inAtomSite && (line.startsWith('ATOM') || line.startsWith('HETATM'))) {
+                const cols = line.trim().split(/\s+/);
+                const group = idx.group >= 0 ? cols[idx.group] : (line.startsWith('HETATM') ? 'HETATM' : 'ATOM');
+                const atomName = idx.atomId >= 0 ? cols[idx.atomId] : '';
+                const resName = idx.compId >= 0 ? cols[idx.compId] : '';
+                const chain = idx.asymId >= 0 ? cols[idx.asymId] : '';
+                const seqCol = idx.authSeqId >= 0 ? idx.authSeqId : idx.seqId;
+                const resSeq = seqCol >= 0 ? cols[seqCol] : '';
+                const x = parseFloat(idx.x >= 0 ? cols[idx.x] : NaN);
+                const y = parseFloat(idx.y >= 0 ? cols[idx.y] : NaN);
+                const z = parseFloat(idx.z >= 0 ? cols[idx.z] : NaN);
+                if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+                const element = (idx.elem >= 0 ? cols[idx.elem] : '').toUpperCase();
+                if (isHydrogenAtom(element, atomName)) continue;
+                if (MODIFIED_RESIDUE_IGNORE.has(resName)) continue;
+                const bFactorRaw = idx.bFactor >= 0 ? parseFloat(cols[idx.bFactor]) : NaN;
+                const atom = { x, y, z, bFactor: Number.isFinite(bFactorRaw) ? bFactorRaw : null };
+                const iCode = ''; // mmCIF insertion codes are rarely populated; not tracked here
+
+                if (group === 'ATOM') {
+                    addAtom(proteinResidues, `${chain}_${resSeq}${iCode}`, { chain, resSeq, iCode }, atom);
+                } else {
+                    addAtom(hetGroups, `${chain}_${resSeq}${iCode}_${resName}`, { resName, chain, resSeq, iCode }, atom);
+                }
+            } else if (inAtomSite && line.startsWith('#')) {
+                inAtomSite = false;
+            }
+        }
+    }
+
+    return { proteinResidues, hetGroups };
+}
+
+function extractCofactorNeighborhoods(text, ext) {
+    const { proteinResidues, hetGroups } = parseAllAtoms(text, ext);
+
+    const cofactorCandidates = [];
+    hetGroups.forEach((group) => {
+        if (!HETERO_IGNORE_LIST.has(group.resName)) cofactorCandidates.push(group);
+    });
+    if (!cofactorCandidates.length) return { cofactors: [], labelByResSeq: new Map() };
+
+    const proteinList = [...proteinResidues.values()];
+    const bestByResSeq = new Map(); // resSeq(number) -> {cofactorIndex, distance}
+    const cofactors = [];
+    let cofactorIndex = 0;
+
+    function residueDistance(group, res) {
+        let min = Infinity;
+        for (const a of group.atoms) {
+            for (const b of res.atoms) {
+                const d = dist3D(a, b);
+                if (d < min) min = d;
+            }
+        }
+        return min;
+    }
+
+    for (const group of cofactorCandidates) {
+        if (cofactorIndex >= 9) break; // labels only go up to 9
+        cofactorIndex++;
+        const cls = classifyCofactor(group.resName);
+
+        const cofactorBs = group.atoms.map(a => a.bFactor).filter(v => v !== null);
+        const avgCofactorB = cofactorBs.length ? cofactorBs.reduce((a, b) => a + b, 0) / cofactorBs.length : null;
+
+        let candidates = proteinList
+            .map(res => ({ res, distance: residueDistance(group, res) }))
+            .filter(c => c.distance <= cls.maxDist);
+
+        let lowConfidence = false;
+        if (avgCofactorB !== null) {
+            const neighborBs = candidates.flatMap(c => c.res.atoms.map(a => a.bFactor).filter(v => v !== null));
+            const allBs = cofactorBs.concat(neighborBs);
+            const avgAll = allBs.length ? allBs.reduce((a, b) => a + b, 0) / allBs.length : avgCofactorB;
+            if (avgAll >= 70) {
+                const expandedDist = cls.maxDist + 0.5;
+                candidates = proteinList
+                    .map(res => ({ res, distance: residueDistance(group, res) }))
+                    .filter(c => c.distance <= expandedDist);
+            } else {
+                lowConfidence = true; // explicitly do not expand
+            }
+        }
+
+        candidates = candidates.filter(c =>
+            !(c.res.chain === group.chain && c.res.resSeq === group.resSeq && c.res.iCode === group.iCode));
+        candidates.sort((a, b) => a.distance - b.distance);
+
+        if (cls.evenSample && candidates.length > cls.maxResidues) {
+            const mid = Math.ceil(group.atoms.length / 2);
+            const halfA = group.atoms.slice(0, mid), halfB = group.atoms.slice(mid);
+            const nearestHalf = (res) => {
+                let dA = Infinity, dB = Infinity;
+                for (const b of res.atoms) {
+                    for (const a of halfA) dA = Math.min(dA, dist3D(a, b));
+                    for (const a of halfB) dB = Math.min(dB, dist3D(a, b));
+                }
+                return dA <= dB ? 'A' : 'B';
+            };
+            const groupA = candidates.filter(c => nearestHalf(c.res) === 'A');
+            const groupB = candidates.filter(c => nearestHalf(c.res) === 'B');
+            const half = Math.ceil(cls.maxResidues / 2);
+            let balanced = groupA.slice(0, half).concat(groupB.slice(0, cls.maxResidues - Math.min(half, groupA.length)));
+            if (balanced.length < Math.min(cls.maxResidues, candidates.length)) {
+                const chosenKeys = new Set(balanced.map(c => `${c.res.chain}_${c.res.resSeq}${c.res.iCode}`));
+                for (const c of candidates) {
+                    if (balanced.length >= cls.maxResidues) break;
+                    const k = `${c.res.chain}_${c.res.resSeq}${c.res.iCode}`;
+                    if (!chosenKeys.has(k)) { balanced.push(c); chosenKeys.add(k); }
+                }
+            }
+            candidates = balanced.sort((a, b) => a.distance - b.distance);
+        }
+
+        candidates = candidates.slice(0, cls.maxResidues);
+
+        const neighbors = candidates.map(c => ({
+            chain: c.res.chain,
+            resSeq: c.res.resSeq,
+            insCode: c.res.iCode || '',
+            distance: Math.round(c.distance * 100) / 100,
+            role: cls.axialDist !== null ? (c.distance < cls.axialDist ? 'axial' : 'pocket') : 'contact'
+        }));
+        while (neighbors.length < cls.maxResidues) neighbors.push(-1); // sentinel padding
+
+        cofactors.push({
+            index: cofactorIndex, resName: group.resName, category: cls.label,
+            chain: group.chain, resSeq: group.resSeq, insCode: group.iCode || '',
+            lowConfidence, neighbors
+        });
+
+        candidates.forEach(c => {
+            const n = parseInt(c.res.resSeq, 10);
+            if (!Number.isFinite(n)) return;
+            const existing = bestByResSeq.get(n);
+            if (!existing || c.distance < existing.distance) {
+                bestByResSeq.set(n, { cofactorIndex, distance: c.distance });
+            }
+        });
+    }
+
+    const labelByResSeq = new Map();
+    bestByResSeq.forEach((v, resSeq) => labelByResSeq.set(resSeq, v.cofactorIndex));
+    return { cofactors, labelByResSeq };
+}
 
 function parsePDB(text) {
     const residues = {};
@@ -1540,9 +2287,16 @@ async function computeRSA(fileText, residues) {
 
 function parseAndBuildViewer() {
     const rawText = document.getElementById('rawInput').value;
-    if (!rawText.trim()) { alert("Please paste some raw Quick2D data!"); return; }
+    if (!rawText.trim()) { showToast('Please paste some raw Quick2D data first.', 'error'); return; }
 
     const lines = rawText.replace(/\r/g, '').split('\n');
+
+    currentProteinLabel = null;
+    for (const line of lines) {
+        const m = line.match(/^\s*Protein\s*ID\s*:\s*(.+?)\s*$/i);
+        if (m) { currentProteinLabel = m[1]; break; }
+    }
+
     const knownTracks = [
         'SS_PSIPRED', 'SS_SPIDER3', 'SS_PSSPRED4', 'SS_DEEPCNF', 'SS_NETSURFP2',
         'TM_TMHMM', 'TM_PHOBIUS', 'TM_POLYPHOBIUS',
@@ -1597,7 +2351,7 @@ function parseAndBuildViewer() {
         }
     }
 
-    if (!fullAA) { alert("Unable to parse AA_QUERY sequences."); return; }
+    if (!fullAA) { showToast('Unable to parse AA_QUERY sequences - check the pasted text.', 'error'); return; }
 
     const newParsedTracks = { 'AA': fullAA };
     knownTracks.forEach(t => {
@@ -1767,7 +2521,13 @@ function buildTrackRow(key, tracks, totalLength) {
             else if (char === 'C') cellEl.classList.add('cell-C');
             else if (char === 'M') cellEl.classList.add('cell-M');
             else if (char === 'D') cellEl.classList.add('cell-D');
-            else if (char === ' ' || char === '-' || char === '\t') {
+            else if (key.endsWith('_Cofactors') && /^[1-9]$/.test(char)) {
+                const c = COFACTOR_DOT_COLORS[parseInt(char, 10) - 1];
+                cellEl.style.backgroundColor = c;
+                cellEl.style.color = '#fff';
+                cellEl.style.fontWeight = 'bold';
+                cellEl.title = `Residue ${i + 1}: neighbor of cofactor #${char}`;
+            } else if (char === ' ' || char === '-' || char === '\t') {
                 cellEl.classList.add('cell-space'); cellEl.textContent = '-';
             }
         }
@@ -1915,6 +2675,10 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
         const trackData = parsedTracks[key];
         if (!trackData) return;
 
+        // Same baseName's cofactor-neighbor label track, if this file had
+        // any cofactors detected - used to highlight dots below.
+        const cofactorTrack = parsedTracks[key.replace(/_pLDDT$|_RSA$/, '') + '_Cofactors'];
+
         let points = [];
         trackData.forEach((item, i) => {
             if (item && item.val !== undefined && item.val !== null) {
@@ -1944,16 +2708,22 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
         points.forEach(p => {
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
-            circle.setAttribute("r", "3.5");
+
+            const cofactorLabel = cofactorTrack ? cofactorTrack[p.idx] : undefined;
+            const hasCofactor = cofactorLabel && /^[1-9]$/.test(cofactorLabel);
+            const ringColor = hasCofactor ? COFACTOR_DOT_COLORS[parseInt(cofactorLabel, 10) - 1] : '#fff';
+
+            circle.setAttribute("r", hasCofactor ? "5" : "3.5");
             circle.setAttribute("fill", color);
-            circle.setAttribute("stroke", "#fff");
-            circle.setAttribute("stroke-width", "1");
+            circle.setAttribute("stroke", ringColor);
+            circle.setAttribute("stroke-width", hasCofactor ? "2.5" : "1");
             circle.setAttribute("class", `col-${p.idx}`);
             circle.dataset.idx = p.idx;
             circle.dataset.track = key;
 
             const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
-            titleEl.textContent = `${formatTrackLabel(key)} | Residue ${p.idx + 1} (${parsedTracks.AA[p.idx] || ''}): ${p.val.toFixed(2)}`;
+            titleEl.textContent = `${formatTrackLabel(key)} | Residue ${p.idx + 1} (${parsedTracks.AA[p.idx] || ''}): ${p.val.toFixed(2)}` +
+                (hasCofactor ? ` | Near cofactor #${cofactorLabel}` : '');
             circle.appendChild(titleEl);
 
             circle.addEventListener('mousedown', (e) => {
@@ -2113,21 +2883,70 @@ function updateSelectionUI() {
 // is currently selected, regardless of how that selection was made, and see
 // the overlap appended below the existing info rather than replacing it.
 let lastMetricsBaseHTML = 'Select a region or graph point for statistics.';
-let crossRefTrackKey = '';
+let crossRefTrackKey = ''; // a real track key, OR a mass-selection value like "__ALL__pLDDT" (see resolveCrossRefTrackKeys)
 
 function setMetricsBase(html) {
     lastMetricsBaseHTML = html;
     renderMetricsDisplay();
 }
 
+// Resolves the cross-ref dropdown's current value into the list of actual
+// track keys it refers to. A normal track key resolves to itself; the
+// mass-selection values (shape "__ALL__pLDDT", "__APO__RSA",
+// "__TRIMER__pLDDT", etc.) resolve to every matching *_pLDDT or *_RSA
+// track, filtered by that file's scanned apoState/oligomer where relevant.
+// Apo/Holo/oligomer membership is inferred from each track's baseName
+// matching an uploadedStructureFiles entry - tracks with no matching entry
+// (or no apoState/oligomer recorded) are included in "All" but excluded
+// from every other filter.
+function resolveCrossRefTrackKeys(value) {
+    if (!value) return [];
+    if (parsedTracks[value]) return [value];
+
+    const m = value.match(/^__([A-Z]+)__(pLDDT|RSA)$/);
+    if (!m) return [];
+    const [, filter, metric] = m;
+    const suffix = '_' + metric;
+    const allKeys = Object.keys(parsedTracks).filter(k => k.endsWith(suffix));
+    if (filter === 'ALL') return allKeys;
+
+    const fileEntryFor = (key) => {
+        const baseName = key.slice(0, -suffix.length);
+        return uploadedStructureFiles.find(f => f.name.replace(/\.[^/.]+$/, '') === baseName);
+    };
+
+    if (filter === 'APO' || filter === 'HOLO') {
+        return allKeys.filter(key => {
+            const fileEntry = fileEntryFor(key);
+            if (!fileEntry || !fileEntry.apoState) return false;
+            return filter === 'APO' ? fileEntry.apoState.startsWith('Apo') : fileEntry.apoState.startsWith('Holo');
+        });
+    }
+
+    // Oligomer filters (MONOMER, DIMER, TRIMER, ...) - matched against the
+    // same OLIGOMER_NAMES labels scanStructureMetadata's summarizeOligomer()
+    // already produces, so there's one shared definition of each name.
+    const oligomerLabel = OLIGOMER_NAMES.find(name => name && name.toUpperCase() === filter);
+    if (oligomerLabel) {
+        return allKeys.filter(key => {
+            const fileEntry = fileEntryFor(key);
+            if (!fileEntry || !fileEntry.oligomer) return false;
+            return fileEntry.oligomer.startsWith(oligomerLabel);
+        });
+    }
+
+    return [];
+}
+
 function renderMetricsDisplay() {
     const el = document.getElementById('metricsDisplay');
     if (!el) return;
     let html = lastMetricsBaseHTML;
-    if (crossRefTrackKey && parsedTracks[crossRefTrackKey]) {
+    const keys = resolveCrossRefTrackKeys(crossRefTrackKey);
+    if (keys.length) {
         const indices = getSelectedIndices();
         if (indices.length) {
-            const crossHTML = computeCrossReferenceHTML(crossRefTrackKey, indices);
+            const crossHTML = computeCrossReferenceHTMLForKeys(keys, indices);
             if (crossHTML) html += crossHTML;
         }
     }
@@ -2213,6 +3032,48 @@ function computeCrossReferenceHTML(trackKey, indices) {
     return '';
 }
 
+// Wraps computeCrossReferenceHTML for the "All"/"Apo"/"Holo" mass-selections:
+// shows every resolved track's own block individually (unchanged, one call
+// per key), then appends an "Average of N" summary across whichever of
+// those tracks actually had data in the selection - only when N > 1, so a
+// single-model selection looks exactly like the existing single-track path.
+function computeCrossReferenceHTMLForKeys(keys, indices) {
+    if (keys.length === 1) return computeCrossReferenceHTML(keys[0], indices);
+
+    const perTrackHTML = keys.map(k => computeCrossReferenceHTML(k, indices)).filter(Boolean).join('');
+    const avgHTML = computeAverageAcrossKeys(keys, indices);
+    return perTrackHTML + avgHTML;
+}
+
+// Averages each track's own mean over the selection (one vote per model,
+// skipping models with no valid values there) rather than pooling every
+// residue value together, so a selection that happens to cover more
+// residues in one model can't outweigh another model in the average.
+function computeAverageAcrossKeys(keys, indices) {
+    if (!keys.length) return '';
+    const isPlddt = keys[0].endsWith('_pLDDT');
+    const isRsa = keys[0].endsWith('_RSA');
+    if (!isPlddt && !isRsa) return '';
+
+    const perTrackMeans = [];
+    keys.forEach(k => {
+        const trackData = parsedTracks[k];
+        if (!Array.isArray(trackData)) return;
+        let sum = 0, count = 0;
+        indices.forEach(i => {
+            const item = trackData[i];
+            if (item && item.val !== undefined && item.val !== null) { sum += item.val; count++; }
+        });
+        if (count > 0) perTrackMeans.push(sum / count);
+    });
+
+    if (perTrackMeans.length < 2) return ''; // "if there's more than 1"
+
+    const avgOfMeans = perTrackMeans.reduce((a, b) => a + b, 0) / perTrackMeans.length;
+    const label = isPlddt ? 'Mean pLDDT' : 'Mean RSA';
+    return `${CROSSREF_DIVIDER}<strong>Average of ${perTrackMeans.length}</strong> ${isPlddt ? 'pLDDT' : 'RSA'} models:<br>• ${label}: <strong>${avgOfMeans.toFixed(2)}</strong>`;
+}
+
 function onCrossRefChange() {
     crossRefTrackKey = document.getElementById('metricsCrossRef').value;
     renderMetricsDisplay();
@@ -2229,22 +3090,63 @@ function populateCrossRefDropdown() {
     const prevValue = select.value;
 
     const groups = [
-        ['Secondary Structure (SS)', k => k.startsWith('SS_')],
-        ['Coiled-Coil (CC)', k => k.startsWith('CC_')],
-        ['Transmembrane (TM)', k => k.startsWith('TM_')],
-        ['Disorder (DO)', k => k.startsWith('DO_')],
-        ['pLDDT Confidence', k => k.endsWith('_pLDDT')],
-        ['RSA Exposure', k => k.endsWith('_RSA')]
+        ['Secondary Structure (SS)', k => k.startsWith('SS_'), null],
+        ['Coiled-Coil (CC)', k => k.startsWith('CC_'), null],
+        ['Transmembrane (TM)', k => k.startsWith('TM_'), null],
+        ['Disorder (DO)', k => k.startsWith('DO_'), null],
+        ['pLDDT Confidence', k => k.endsWith('_pLDDT'), 'pLDDT'],
+        ['RSA Exposure', k => k.endsWith('_RSA'), 'RSA']
     ];
 
     select.innerHTML = '<option value="">— none —</option>';
     const trackKeys = Object.keys(parsedTracks).filter(k => k !== 'AA');
 
-    groups.forEach(([groupLabel, matches]) => {
+    groups.forEach(([groupLabel, matches, metric]) => {
         const keys = trackKeys.filter(matches);
         if (!keys.length) return;
         const optgroup = document.createElement('optgroup');
         optgroup.label = groupLabel;
+
+        // Mass-selection shortcuts, only for the pLDDT/RSA groups: pick every
+        // model at once ("All"), or split by each file's scanned apo/holo
+        // state (Options > Data modal already computes this per file) -
+        // Apo/Holo only appear when at least one model actually qualifies.
+        if (metric) {
+            const allOpt = document.createElement('option');
+            allOpt.value = `__ALL__${metric}`;
+            allOpt.textContent = `All ${metric} models (${keys.length})`;
+            optgroup.appendChild(allOpt);
+
+            const apoKeys = resolveCrossRefTrackKeys(`__APO__${metric}`);
+            if (apoKeys.length) {
+                const opt = document.createElement('option');
+                opt.value = `__APO__${metric}`;
+                opt.textContent = `Apo ${metric} models (${apoKeys.length})`;
+                optgroup.appendChild(opt);
+            }
+            const holoKeys = resolveCrossRefTrackKeys(`__HOLO__${metric}`);
+            if (holoKeys.length) {
+                const opt = document.createElement('option');
+                opt.value = `__HOLO__${metric}`;
+                opt.textContent = `Holo ${metric} models (${holoKeys.length})`;
+                optgroup.appendChild(opt);
+            }
+
+            // Oligomeric-state shortcuts (Monomer/Dimer/Trimer/...), same
+            // "only show it if something actually matches" rule as Apo/Holo.
+            OLIGOMER_NAMES.forEach(name => {
+                if (!name) return; // skip the empty placeholder at index 0
+                const value = `__${name.toUpperCase()}__${metric}`;
+                const matchKeys = resolveCrossRefTrackKeys(value);
+                if (matchKeys.length) {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = `${name} ${metric} models (${matchKeys.length})`;
+                    optgroup.appendChild(opt);
+                }
+            });
+        }
+
         keys.forEach(key => {
             const opt = document.createElement('option');
             opt.value = key;
@@ -2346,6 +3248,9 @@ function computeMetricsForInterval(startIdx, endIdx) {
     calculateTrackMetrics(sampleKey, startIdx, endIdx);
 }
 
+let lastMetricsTableRows = []; // [{model, metric, mean, pct}] - mirrors exactly what's rendered below, so TSV export can't drift from what's on screen
+let lastMetricsTableRegion = '';
+
 function openMetricsTable() {
     const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
     if (structuralKeys.length === 0) {
@@ -2356,7 +3261,10 @@ function openMetricsTable() {
     const startIdx = selectStart !== null && selectEnd !== null ? Math.min(selectStart, selectEnd) : 0;
     const endIdx = selectStart !== null && selectEnd !== null ? Math.max(selectStart, selectEnd) : parsedTracks.AA.length - 1;
 
-    let html = `<p style="font-size:0.85rem; color:#64748b;">Evaluating Region: <strong>Residues ${startIdx + 1} - ${endIdx + 1}</strong></p>`;
+    lastMetricsTableRegion = `Residues ${startIdx + 1}-${endIdx + 1}`;
+    lastMetricsTableRows = [];
+
+    let html = `<p style="font-size:0.85rem; color:#64748b;">Evaluating Region: <strong>${lastMetricsTableRegion}</strong></p>`;
     html += `<table class="metrics-table"><thead><tr><th>Model / Track</th><th>Metric</th><th>Mean Value</th><th>High Conf (≥70) / Buried (<0.2)</th></tr></thead><tbody>`;
 
     structuralKeys.forEach(key => {
@@ -2374,13 +3282,52 @@ function openMetricsTable() {
         }
         const mean = count > 0 ? (sum / count).toFixed(2) : 'N/A';
         const pct = count > 0 ? ((metricCount / count) * 100).toFixed(1) + '%' : 'N/A';
-        
+
+        lastMetricsTableRows.push({ model: formatTrackLabel(key), metric: isPlddt ? 'pLDDT' : 'RSA', mean, pct });
         html += `<tr><td><strong>${formatTrackLabel(key)}</strong></td><td>${isPlddt ? 'pLDDT' : 'RSA'}</td><td>${mean}</td><td>${pct}</td></tr>`;
     });
 
     html += `</tbody></table>`;
     document.getElementById('modalTableBody').innerHTML = html;
     document.getElementById('metricsModal').style.display = 'flex';
+}
+
+// Exports exactly the rows currently in the table above as a .tsv file -
+// reads from lastMetricsTableRows (populated by openMetricsTable(), not
+// re-derived here) so the export can never disagree with what's on screen.
+function exportMetricsTableTSV() {
+    if (!lastMetricsTableRows.length) {
+        showToast('No metrics table data to export yet - open Metrics Table first.', 'error');
+        return;
+    }
+
+    const header = ['Model / Track', 'Metric', 'Mean Value', 'High Conf (>=70) / Buried (<0.2)'];
+    const lines = [header.join('\t')];
+    lastMetricsTableRows.forEach(row => {
+        lines.push([row.model, row.metric, row.mean, row.pct].join('\t'));
+    });
+    const tsvText = lines.join('\n');
+
+    let blob, url;
+    try {
+        blob = new Blob([tsvText], { type: 'text/tab-separated-values' });
+        url = URL.createObjectURL(blob);
+    } catch (err) {
+        console.error('Failed to build TSV export:', err);
+        showToast('Failed to build the TSV file.', 'error');
+        return;
+    }
+
+    const regionSlug = lastMetricsTableRegion.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `q2dv-metrics_${regionSlug}_${stamp}.tsv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Metrics table exported as TSV.', 'success');
 }
 
 function closeMetricsTable() {
@@ -2414,15 +3361,31 @@ function refreshChimeraxDisplay() {
     const lines = [];
     if (selectionMode === 'row' && activeRowKey && parsedTracks[activeRowKey] && typeof parsedTracks[activeRowKey] === 'string') {
         const trackStr = parsedTracks[activeRowKey];
-        const typesToCheck = activeRowType ? [activeRowType] : TYPE_ORDER;
-        typesToCheck.forEach(t => {
-            if (!TYPE_CX_COLOR[t]) return;
-            const ranges = getTypeRanges(trackStr, t); // 0-indexed [s,e] pairs
+        if (activeRowKey.endsWith('_Cofactors')) {
+            // Cofactor tracks use digits ("1".."9") rather than the SS/TM/DO
+            // H/E/M/D letters TYPE_CX_COLOR knows about, so they don't fit
+            // that per-letter loop - color every cofactor-neighbor residue
+            // Yellow instead of falling through to the "requires categorical
+            // Q2D row selection" message below. getTypeRanges(str, null)
+            // already means "any non-blank char", so this naturally covers
+            // both "whole row" (activeRowType is null) and "one specific
+            // cofactor digit" in a single combined command.
+            const ranges = getTypeRanges(trackStr, activeRowType); // 0-indexed [s,e] pairs
             if (ranges.length) {
                 const oneIndexedRanges = ranges.map(([s, e]) => [s + 1, e + 1]);
-                lines.push(engine.buildCommand('color', target, oneIndexedRanges, TYPE_CX_COLOR[t]));
+                lines.push(engine.buildCommand('color', target, oneIndexedRanges, 'yellow'));
             }
-        });
+        } else {
+            const typesToCheck = activeRowType ? [activeRowType] : TYPE_ORDER;
+            typesToCheck.forEach(t => {
+                if (!TYPE_CX_COLOR[t]) return;
+                const ranges = getTypeRanges(trackStr, t); // 0-indexed [s,e] pairs
+                if (ranges.length) {
+                    const oneIndexedRanges = ranges.map(([s, e]) => [s + 1, e + 1]);
+                    lines.push(engine.buildCommand('color', target, oneIndexedRanges, TYPE_CX_COLOR[t]));
+                }
+            });
+        }
     }
     el.textContent = lines.length ? lines.join('\n') : '# Match Selection requires categorical Q2D row selection';
 }
@@ -2490,6 +3453,7 @@ function gatherPersistableState() {
         savedAt: Date.now(),
         rawInput: document.getElementById('rawInput').value,
         parsedTracks: parsedTracks,
+        currentProteinLabel: currentProteinLabel,
         structureFiles: uploadedStructureFiles,
         graphHighlights: graphHighlights,
         selection: {
@@ -2504,6 +3468,79 @@ function gatherPersistableState() {
             cxColor: document.getElementById('cxColor').value
         }
     };
+}
+
+// --- Portable save file (export/import) ------------------------------------
+// The Data modal's "Raw JSON" export is a display/report format (protein
+// classification, cofactor summaries) - it was never meant to reconstruct a
+// full session, so re-attaching it silently did nothing useful. This is a
+// separate, explicit save format: the same shape gatherPersistableState()
+// already produces for localStorage, plus a `q2dvSave: true` marker and a
+// `formatVersion` so Q2DV can immediately tell "this is one of my full
+// saves" apart from a Data-modal export, an AF3 JSON structure prediction,
+// or an unrelated JSON file, purely by looking at the file's own header -
+// no filename convention or separate "Import" control needed. See the
+// `ext === 'json'` branch in the structure-upload handler for the
+// recognition/routing side of this.
+const SAVE_FORMAT_VERSION = 1;
+
+function exportFullSave() {
+    if (!parsedTracks.AA) {
+        showToast('Nothing to export yet - paste and parse a sequence first.', 'error');
+        return;
+    }
+    const payload = {
+        q2dvSave: true,
+        formatVersion: SAVE_FORMAT_VERSION,
+        appName: 'Quick2D & Structural Annotation Viewer',
+        exportedAt: new Date().toISOString(),
+        ...gatherPersistableState()
+    };
+
+    let blob, url;
+    try {
+        blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        url = URL.createObjectURL(blob);
+    } catch (err) {
+        console.error('Failed to build save file:', err);
+        showToast('Failed to build the save file.', 'error');
+        return;
+    }
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `q2dv-save-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Save file downloaded.', 'success');
+}
+
+// Applies an already-parsed, already-marker-verified save object. Shared by
+// the structure-upload handler's auto-detection (see below) - kept separate
+// from that detection logic so it's easy to call from elsewhere later (e.g.
+// a dedicated "Import" control) without duplicating the restore steps.
+function importSaveFile(saveObj, fileLabel) {
+    if (!saveObj.parsedTracks || !saveObj.parsedTracks.AA) {
+        showToast(`"${fileLabel}" is marked as a Q2DV save but has no sequence data - skipped.`, 'error');
+        return false;
+    }
+    if (saveObj.formatVersion && saveObj.formatVersion > SAVE_FORMAT_VERSION) {
+        showToast(`"${fileLabel}" was saved by a newer version of Q2DV - importing anyway on a best-effort basis.`, 'error');
+    }
+    if (parsedTracks.AA) {
+        const proceed = confirm(
+            `Importing "${fileLabel}" will replace the current session (sequence, structures, selection, and preferences). Continue?`
+        );
+        if (!proceed) return false;
+    }
+
+    applyPersistedState(saveObj);
+    saveStateToStorage();
+    showToast(`Imported save file "${fileLabel}".`, 'success');
+    return true;
 }
 
 function saveStateToStorage() {
@@ -2571,8 +3608,19 @@ function loadStateFromStorage() {
     }
     if (!state || !state.parsedTracks || !state.parsedTracks.AA) return false;
 
+    applyPersistedState(state);
+    return true;
+}
+
+// Restores every piece of app state from a state object of the same shape
+// gatherPersistableState() produces - shared by loadStateFromStorage()
+// (reading from localStorage) and importSaveFile() (reading from an
+// attached .json export) below, so a page-load restore and a manual
+// save-file import behave identically.
+function applyPersistedState(state) {
     document.getElementById('rawInput').value = state.rawInput || '';
     parsedTracks = state.parsedTracks;
+    currentProteinLabel = state.currentProteinLabel || null;
     uploadedStructureFiles = state.structureFiles || [];
     graphHighlights = state.graphHighlights || {};
 
@@ -2611,7 +3659,6 @@ function loadStateFromStorage() {
     }
 
     restoreSelectionVisuals();
-    return true;
 }
 
 function renderCachedDataInfo() {
@@ -2683,6 +3730,100 @@ function closeOptionsModal() {
     document.getElementById('optionsModal').style.display = 'none';
 }
 
+// --- Data modal ------------------------------------------------------------
+// The canonical, ordered "columns + rows" JSON shape for structure-file
+// metadata - the same object backs the rendered table AND the raw-JSON
+// view, so they can never disagree. Adding a new scanned field later is
+// just adding one more entry to `columns` (matching a key already present
+// on each uploadedStructureFiles row, or added to scanStructureMetadata).
+function buildStructureDataJSON() {
+    const trackKeys = Object.keys(parsedTracks).filter(k => k !== 'AA');
+    return {
+        fasta: {
+            proteinId: currentProteinLabel || null,
+            length: parsedTracks.AA ? parsedTracks.AA.length : 0,
+            tracks: {
+                SS: trackKeys.filter(k => k.startsWith('SS_')).length,
+                CC: trackKeys.filter(k => k.startsWith('CC_')).length,
+                TM: trackKeys.filter(k => k.startsWith('TM_')).length,
+                DO: trackKeys.filter(k => k.startsWith('DO_')).length
+            }
+        },
+        structures: {
+            columns: ['name', 'ext', 'size', 'proteinClass', 'apoState', 'oligomer', 'cofactors'],
+            rows: uploadedStructureFiles.map(f => ({
+                name: f.name, ext: f.ext, size: f.size,
+                proteinClass: f.proteinClass || 'Not specified in file',
+                apoState: f.apoState || 'Unknown',
+                oligomer: f.oligomer || 'Unknown',
+                cofactors: f.cofactors || []
+            }))
+        }
+    };
+}
+
+function renderDataModal() {
+    const data = buildStructureDataJSON();
+
+    const fastaEl = document.getElementById('dataFastaSummary');
+    if (!data.fasta.length) {
+        fastaEl.textContent = 'No sequence parsed yet.';
+    } else {
+        const t = data.fasta.tracks;
+        fastaEl.innerHTML =
+            (data.fasta.proteinId ? `Protein ID: <strong>${data.fasta.proteinId}</strong><br>` : '') +
+            `Sequence length: <strong>${data.fasta.length} aa</strong><br>` +
+            `Q2D tracks: SS ${t.SS}, CC ${t.CC}, TM ${t.TM}, DO ${t.DO}`;
+    }
+
+    const tableWrap = document.getElementById('dataStructureTableWrap');
+    if (!data.structures.rows.length) {
+        tableWrap.innerHTML = '<p style="color:#94a3b8; font-size:0.85rem;">No structure files attached yet.</p>';
+    } else {
+        const headerLabels = { name: 'File', ext: 'Type', size: 'Size', proteinClass: 'Protein Class', apoState: 'Apo-State', oligomer: 'Oligomer', cofactors: 'Cofactors' };
+        let html = '<table class="metrics-table" style="width:100%;"><thead><tr>';
+        data.structures.columns.forEach(col => { html += `<th>${headerLabels[col] || col}</th>`; });
+        html += '</tr></thead><tbody>';
+        data.structures.rows.forEach(row => {
+            html += '<tr>';
+            data.structures.columns.forEach(col => {
+                let val = row[col];
+                if (col === 'size') val = (val / 1024).toFixed(1) + ' KB';
+                else if (col === 'ext') val = String(val).toUpperCase();
+                else if (col === 'cofactors') {
+                    // Full per-neighbor distances/roles/padding live in the
+                    // raw JSON below - the table cell is a quick-glance
+                    // summary only (label #, residue name, category, and a
+                    // ⚠ if the AF3 confidence check kept the base radius).
+                    val = val.length
+                        ? val.map(c => `#${c.index} ${c.resName} (${c.category}${c.lowConfidence ? ', ⚠ low conf.' : ''})`).join('; ')
+                        : 'None detected';
+                }
+                html += `<td>${val}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        tableWrap.innerHTML = html;
+    }
+
+    document.getElementById('dataJSONView').textContent = JSON.stringify(data, null, 2);
+}
+
+function openDataModal() {
+    renderDataModal();
+    document.getElementById('dataModal').style.display = 'flex';
+}
+
+function closeDataModal() {
+    document.getElementById('dataModal').style.display = 'none';
+}
+
+function copyDataJSON() {
+    const text = document.getElementById('dataJSONView').textContent;
+    navigator.clipboard.writeText(text).then(() => { alert('Copied JSON to clipboard!'); });
+}
+
 function resetAllData() {
     if (!confirm('This permanently deletes all cached data - parsed sequence, structure files, selection, and preferences - and resets the page. Continue?')) {
         return;
@@ -2691,6 +3832,7 @@ function resetAllData() {
     lastPersistError = null;
 
     parsedTracks = {};
+    currentProteinLabel = null;
     uploadedStructureFiles = [];
     graphHighlights = {};
     selectStart = null; selectEnd = null; selectionMode = 'point';
@@ -2703,6 +3845,7 @@ function resetAllData() {
     document.getElementById('rawInput').value = '';
     document.getElementById('structureUpload').value = '';
     document.getElementById('viewModeSelect').value = 'grid';
+    setDrawerOpen(false);
     populateCommandEngineSelect();
     updateSidebarCommandLabels();
     document.getElementById('chimeraxTarget').value = COMMAND_ENGINES[0].targetDefault;
@@ -2719,6 +3862,7 @@ function resetAllData() {
         '<p style="padding: 20px; color: #94a3b8; text-align: center;">Paste Quick2D output above to start.</p>';
 
     renderCachedDataInfo();
+    renderDataModal();
 }
 
 function copyText(elementId) {
