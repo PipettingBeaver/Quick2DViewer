@@ -427,8 +427,8 @@
         /* Static residue counter (not a label) - visually separated. */
         .position-cells { display: flex; }
         .position-cell {
-            width: 12px;
-            min-width: 12px;
+            width: var(--cellw, 12px);
+            min-width: var(--cellw, 12px);
             height: 24px;
             display: flex;
             align-items: center;
@@ -489,8 +489,8 @@
         
         .track-cells { display: flex; position: relative; }
         .cell {
-            width: 12px;
-            min-width: 12px;
+            width: var(--cellw, 12px);
+            min-width: var(--cellw, 12px);
             height: 24px;
             display: flex;
             align-items: center;
@@ -500,6 +500,14 @@
             box-sizing: border-box;
             user-select: none;
             cursor: col-resize;
+        }
+        /* Single-letter residue glyph (wrapped so the cell's own opacity /
+           background stays fixed while the letter fades with semantic zoom). */
+        .cell-glyph {
+            display: block;
+            pointer-events: none;
+            white-space: nowrap;
+            line-height: 1;
         }
         
         .column-highlight { background-color: #e2e8f0 !important; }
@@ -619,6 +627,48 @@
             border-radius: 2px;
             box-shadow: inset 0 0 2px 1px rgba(0,0,0,0.15);
         }
+        /* Yellow-highlighter rects marking Sequence Search hits on every track
+           row (Grid and Graph-annotation rows); sits above saved-selection
+           overlays but below full-bar labels / tooltip chip. */
+        .seq-search-overlay {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            box-sizing: border-box;
+            background: rgba(250, 204, 21, 0.32);
+            border: 1px dashed rgba(133, 77, 14, 0.55);
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 3;
+        }
+        /* Sequence Search hit rows: numbered "Select" buttons + clickable
+           count that selects all hits at once. */
+        .seq-hit-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 4px;
+            margin-right: 4px;
+            font-size: 0.65rem;
+            font-family: ui-monospace, Consolas, monospace;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background: #fff;
+            color: #1d4ed8;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        .seq-hit-btn:hover { background: #eff6ff; border-color: #93c5fd; }
+        .seq-hit-btn-all {
+            color: #b45309;
+            border-color: #fcd34d;
+            background: #fffbeb;
+            font-weight: 600;
+        }
+        .seq-hit-btn-all:hover { background: #fef3c7; }
+        .seq-hit-row { margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         /* Right-click menu for the save slots. */
         #saveCtxMenu {
             position: fixed;
@@ -1426,26 +1476,61 @@
 
                 <strong style="margin-left:auto;">Scale:</strong>
                 <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
-                    <strong>Alignment Grid Scale</strong><br>
-                    Shrinks the alignment grid (like zooming out of the page) so more of the view fits on screen. 100% is the maximum size; use <strong>−</strong> to make it smaller and <strong>+</strong> to grow it back.
+                    <strong>Horizontal Accordion Zoom</strong><br>
+                    Residue columns stretch/shrink along the x-axis only; track heights stay locked so vertical alignment is always pixel-perfect.<br>
+                    <strong>Low zoom</strong> (under 12px/residue) hides residue letters and shows the tracks as continuous color blocks.<br>
+                    <strong>High zoom</strong> (12px/residue or more) fades the single-letter residue labels in, centered in each column.<br>
+                    Use <strong>− / +</strong>, or hold <strong>Ctrl</strong> while using the <strong>mouse wheel</strong> / <strong>middle button</strong> / <strong>trackpad pinch</strong> to zoom (anchored at your cursor). A plain wheel scroll just scrolls vertically.
                 </span></span>
                 <div class="scale-control" id="scaleControl">
-                    <button type="button" id="scaleDown" title="Shrink the alignment grid">−</button>
+                    <button type="button" id="scaleDown" title="Zoom out: shrink residue columns (x-axis)">−</button>
                     <span class="scale-value" id="scaleValue">100%</span>
-                    <button type="button" id="scaleUp" title="Enlarge the alignment grid">+</button>
+                    <button type="button" id="scaleUp" title="Zoom in: widen residue columns (x-axis)">+</button>
                 </div>
             </div>
 
             <div>
-                <strong>Selected Range:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
-                    <strong>Selected Range</strong><br>
-                    The residue range(s) currently selected - from a manual click-and-drag, or from clicking a track label / type badge to select every matching residue.<br>
-                    Multiple piecewise segments (e.g. from a row/type selection) are listed comma-separated.
-                </span></span>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <strong>Selected Range:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                        <strong>Selected Range</strong><br>
+                        The residue range(s) currently selected - from a manual click-and-drag, or from clicking a track label / type badge to select every matching residue.<br>
+                        Multiple piecewise segments (e.g. from a row/type selection) are listed comma-separated.
+                    </span></span>
+                    <button type="button" id="btnSeqSearch" class="tb-btn tb-btn-secondary" onclick="toggleSeqSearch()"
+                        title="Sequence Search &amp; Conservation Analytics: find exact sequences or regex motifs in the query AA sequence and highlight them across all tracks"
+                        style="margin-left:auto; font-size:0.72rem; padding:3px 8px;">Search</button>
+                </div>
                 <div class="data-box" id="rangeDisplay">No selection active</div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="copy-btn" onclick="clearSelection()" title="Clear selection (Esc)">Clear (Esc)</button>
                     <button class="copy-btn" onclick="invertSelection()" title="Invert selection (Ctrl+I)">Invert (Ctrl+I)</button>
+                </div>
+                <div id="seqSearchPanel" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid #e2e8f0;">
+                    <div style="display:flex; gap:4px; align-items:center;">
+                        <label for="seqSearchInput" style="position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;">Sequence search query</label>
+                        <input id="seqSearchInput" type="text" placeholder="e.g. RGD or N[^P][ST][^P]"
+                            aria-label="Sequence search query (exact sequence or regex pattern)"
+                            style="flex:1; min-width:0; font-family:ui-monospace,Consolas,monospace; font-size:0.72rem; padding:3px 6px; border:1px solid #cbd5e1; border-radius:4px;" />
+                        <button type="button" class="tb-btn tb-btn-primary" onclick="runSeqSearch()"
+                            title="Run the search over the query AA sequence" style="font-size:0.72rem; padding:3px 8px;">Go</button>
+                        <button type="button" class="copy-btn" onclick="clearSeqSearch(true)"
+                            title="Clear search results and the query">Clear</button>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-top:4px; flex-wrap:wrap;">
+                        <label style="display:inline-flex; align-items:center; gap:3px; font-size:0.68rem; color:#334155;">
+                            <input type="checkbox" id="seqSearchRegex" /> Regex</label>
+                        <label style="display:inline-flex; align-items:center; gap:3px; font-size:0.68rem; color:#334155;">
+                            <input type="checkbox" id="seqSearchCase" /> Case-sensitive</label>
+                        <select id="seqSearchPresets" aria-label="Bioinformatics motif presets"
+                            title="Pick a preset motif pattern (search runs immediately)"
+                            style="flex:1; min-width:0; font-size:0.68rem; padding:1px 3px; border:1px solid #cbd5e1; border-radius:4px;">
+                            <option value="">Presets…</option>
+                        </select>
+                    </div>
+                    <div class="data-box" id="seqSearchHint" style="color:#64748b; font-size:0.7rem;">
+                        Matches (exact or regex, highlighted yellow) appear on every track; plain text searches match literal substrings.
+                    </div>
+                    <div class="data-box" id="seqSearchResults" style="color:#334155; font-size:0.7rem; font-family:ui-monospace,Consolas,monospace; white-space:pre-wrap;"></div>
                 </div>
             </div>
 
@@ -1721,10 +1806,14 @@ let additiveDragBase = [];
 let parsedTracks = {};
 let selectionMode = 'point'; 
 let selectionScope = 'full'; // 'full' (column-wise drag) | 'row' (single-row horizontal drag)
-let gridScale = 1.0; // alignment-grid zoom: 1.0 = full size (max), shrinks toward 0.25
-const GRID_SCALE_STEP = 0.05;
-const GRID_SCALE_MIN = 0.25;
-const GRID_SCALE_MAX = 1.0;
+// Horizontal accordion zoom: gridCellW is the residue-column width in px.
+// Only the x-axis scales (residue columns); track/row heights and the 195px
+// label column stay fixed, so vertical alignment across tracks is preserved.
+let gridCellW = 12; // px per residue (100% when it equals CELL_WIDTH_BASE)
+const CELL_WIDTH_BASE = 12;     // the 100% reference width (= old GRAPH_CELL_WIDTH)
+const CELL_WIDTH_MIN = 4;       // smallest residue column (dense heatmap)
+const CELL_WIDTH_MAX = CELL_WIDTH_BASE;  // zoom-in caps at 100% (base width)
+const CELL_ZOOM_STEP = 1.25;    // × step applied by the − / + buttons
 let activeRowKey = null;
 let activeRowType = null; 
 let rowRanges = []; 
@@ -1997,8 +2086,9 @@ function closeHelpModal() {
 // Shared layout constants so annotation rows (label + per-residue cells) and
 // the graph SVGs line up on the same pixel grid: the axis/label column and
 // the residue-cell width must match the .track-label / .cell CSS exactly.
+// The cell width is now live (gridCellW) - GRAPH_CELL_WIDTH remains the base.
 const GRAPH_AXIS_WIDTH = 195;
-const GRAPH_CELL_WIDTH = 12;
+const GRAPH_CELL_WIDTH = CELL_WIDTH_BASE;
 const GRAPH_HEIGHT = 180;
 const GRAPH_TOP_PAD = 15;
 const GRAPH_BOTTOM_PAD = 15;
@@ -4103,7 +4193,7 @@ function getActiveRanges(track) {
 function renderViewer(tracks) {
     const grid = document.getElementById('alignmentGrid');
     grid.innerHTML = ''; 
-    applyGridScale();
+    applyGridZoom();
     const totalLength = tracks.AA ? tracks.AA.length : 0;
     if (totalLength === 0) return;
 
@@ -4114,7 +4204,7 @@ function renderViewer(tracks) {
     if (tracks.AA) {
         const stickyTop = document.createElement('div');
         stickyTop.className = 'sticky-top';
-        if (currentViewMode === 'graph') stickyTop.style.width = (GRAPH_AXIS_WIDTH + totalLength * GRAPH_CELL_WIDTH) + 'px';
+        if (currentViewMode === 'graph') stickyTop.style.width = (GRAPH_AXIS_WIDTH + totalLength * gridCellW) + 'px';
         stickyTop.appendChild(buildPositionMarkerRow(totalLength));
         stickyTop.appendChild(buildTrackRow('AA', tracks, totalLength));
         grid.appendChild(stickyTop);
@@ -4137,7 +4227,7 @@ function renderViewer(tracks) {
         if (annotationKeys.length) {
             const annoWrapper = document.createElement('div');
             annoWrapper.className = 'graph-annotations-wrapper';
-            annoWrapper.style.width = (GRAPH_AXIS_WIDTH + totalLength * GRAPH_CELL_WIDTH) + 'px';
+            annoWrapper.style.width = (GRAPH_AXIS_WIDTH + totalLength * gridCellW) + 'px';
             const firstOfGroup = getFirstOfGroupSet(annotationKeys);
             annotationKeys.forEach(key => annoWrapper.appendChild(buildTrackRow(key, tracks, totalLength, firstOfGroup.has(key))));
             grid.appendChild(annoWrapper);
@@ -4238,12 +4328,17 @@ function buildPositionMarkerRow(totalLength) {
 
     const cellsContainer = document.createElement('div');
     cellsContainer.className = 'position-cells';
+    const op = glyphOpacityFor(gridCellW);
     for (let i = 0; i < totalLength; i++) {
         const cellEl = document.createElement('div');
         cellEl.className = 'position-cell';
         if (i === 0 || (i + 1) % 10 === 0) {
             cellEl.textContent = String(i + 1);
             cellEl.title = `Residue ${i + 1}`;
+            // Residue counter follows the same semantic-zoom fade as the
+            // sequence letters so it never crowds the columns at low zoom.
+            cellEl.style.opacity = String(op);
+            cellEl.style.fontSize = Math.max(6, Math.min(12, gridCellW)) + 'px';
         }
         cellsContainer.appendChild(cellEl);
     }
@@ -4344,27 +4439,42 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
         cellEl.dataset.track = key;
 
         if (typeof dataVal === 'object' && dataVal !== null) {
-            // pLDDT/RSA numeric tracks: the "symbol" is the colored █ glyph, so
+            // pLDDT/RSA numeric tracks: the "symbol" is the colored █ glyph.
             // hide-symbols/full-bar re-map the glyph's color onto the cell
-            // background to keep the color visible without the glyph.
-            if (showGlyphs) cellEl.textContent = '█';
+            // background; during semantic zoom the glyph fades out and the
+            // same color moves onto the background so the row reads as a
+            // continuous heatmap band instead of an empty strip.
+            const glyphOpacity = showGlyphs ? glyphOpacityFor(gridCellW) : 0;
+            const needsHeatmapBg = showGlyphs && glyphOpacity < 1;
             if (dataVal.type === 'plddt') {
                 const v = dataVal.val;
                 const color = v > 90 ? '#0053d6' : (v > 70 ? '#00c1df' : (v > 50 ? '#ffd700' : '#ff7d45'));
-                if (hideSym || fullBar) cellEl.style.backgroundColor = color;
-                else cellEl.style.color = color;
+                if (hideSym || fullBar || needsHeatmapBg) cellEl.style.backgroundColor = color;
+                if (showGlyphs) {
+                    const span = setGlyph(cellEl, '█', gridCellW);
+                    span.style.color = color;
+                }
                 cellEl.title = `Residue ${i+1} pLDDT: ${v.toFixed(1)}`;
             } else if (dataVal.type === 'rsa') {
                 const intensity = 226 - Math.floor(dataVal.val * 211);
                 const color = `rgb(${intensity}, ${intensity}, ${intensity})`;
-                if (hideSym || fullBar) cellEl.style.backgroundColor = color;
-                else cellEl.style.color = color;
+                if (hideSym || fullBar || needsHeatmapBg) cellEl.style.backgroundColor = color;
+                if (showGlyphs) {
+                    const span = setGlyph(cellEl, '█', gridCellW);
+                    span.style.color = color;
+                }
                 cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
             }
         } else {
             const char = dataVal || ' ';
-            if (showGlyphs) cellEl.textContent = char;
-            if (key === 'AA') cellEl.classList.add('cell-AA');
+            if (showGlyphs) setGlyph(cellEl, char, gridCellW);
+            if (key === 'AA') {
+                cellEl.classList.add('cell-AA');
+                // Fall back to a continuous neutral band once the letters
+                // fade below the 12px threshold so the reference row never
+                // disappears into the empty background.
+                if (glyphOpacityFor(gridCellW) < 1) cellEl.style.backgroundColor = '#f1f5f9';
+            }
             else if (char === 'H') cellEl.classList.add('cell-H');
             else if (char === 'P') cellEl.classList.add('cell-P');
             else if (char === 'E') cellEl.classList.add('cell-E');
@@ -4374,22 +4484,21 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
             else if (key.endsWith('_Cofactors') && /^[1-9]$/.test(char)) {
                 const c = COFACTOR_DOT_COLORS[parseInt(char, 10) - 1];
                 cellEl.style.backgroundColor = c;
-                cellEl.style.color = '#fff';
-                cellEl.style.fontWeight = 'bold';
+                const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
+                if (gSpan) { gSpan.style.color = '#fff'; gSpan.style.fontWeight = 'bold'; }
                 cellEl.title = `Residue ${i + 1}: neighbor of cofactor #${char}`;
             } else if (key.startsWith('HH_') && HH_QUALITY_COLORS[char]) {
                 const [bg, fg] = HH_QUALITY_COLORS[char];
                 // Full-bar mode paints every column the strongest-match teal,
                 // making the whole homolog row one solid hit bar.
                 cellEl.style.backgroundColor = fullBar ? '#0891b2' : bg;
-                if (!fullBar) cellEl.style.color = fg;
                 if (aaMode) {
                     let aaChar = aaTrackForRow ? (aaTrackForRow[i] || ' ') : (queryAAFallback ? (queryAAFallback[i] || ' ') : ' ');
                     if (aaChar !== ' ') {
-                        cellEl.textContent = aaChar;
+                        const span = setGlyph(cellEl, aaChar, gridCellW);
+                        if (!fullBar) span.style.color = fg;
                         cellEl.title = `Residue ${i + 1}: homolog AA '${aaChar}' (HHpred match quality '${char}')`;
                     } else {
-                        cellEl.textContent = '';
                         cellEl.title = `Residue ${i + 1}: HHpred match quality '${char}' (uncovered by template)`;
                     }
                 } else {
@@ -4397,7 +4506,10 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 }
             } else if (char === ' ' || char === '-' || char === '\t') {
                 cellEl.classList.add('cell-space');
-                if (showGlyphs) cellEl.textContent = '-';
+                if (showGlyphs) {
+                    const gSpan = cellEl.querySelector('.cell-glyph');
+                    if (gSpan) gSpan.textContent = '-';
+                }
             }
         }
 
@@ -4419,15 +4531,15 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
             const outline = document.createElement('div');
             outline.className = 'tctl-fullbar-outline';
             outline.dataset.rangeIdx = idx;
-            outline.style.left = (r.start * GRAPH_CELL_WIDTH) + 'px';
-            outline.style.width = ((r.end - r.start + 1) * GRAPH_CELL_WIDTH) + 'px';
+            outline.style.left = (r.start * gridCellW) + 'px';
+            outline.style.width = ((r.end - r.start + 1) * gridCellW) + 'px';
             cellsContainer.appendChild(outline);
 
             const overlay = document.createElement('div');
             overlay.className = 'tctl-fullbar-label';
             overlay.dataset.rangeIdx = idx;
-            const rangeWidth = (r.end - r.start + 1) * GRAPH_CELL_WIDTH;
-            overlay.style.left = ((r.start + r.end + 1) / 2 * GRAPH_CELL_WIDTH) + 'px';
+            const rangeWidth = (r.end - r.start + 1) * gridCellW;
+            overlay.style.left = ((r.start + r.end + 1) / 2 * gridCellW) + 'px';
             overlay.style.width = rangeWidth + 'px';
             overlay.textContent = ranges.length > 1 ? `${baseLabel} #${idx + 1}` : baseLabel;
 cellsContainer.appendChild(overlay);
@@ -4446,8 +4558,8 @@ cellsContainer.appendChild(overlay);
         slot.ranges.forEach(([rs, re]) => {
             const ov = document.createElement('div');
             ov.className = 'saved-sel-overlay' + (onOwningRow ? ' saved-sel-overlay-row' : '');
-            ov.style.left = ((rs - 1) * GRAPH_CELL_WIDTH) + 'px';
-            ov.style.width = ((re - rs + 1) * GRAPH_CELL_WIDTH) + 'px';
+            ov.style.left = ((rs - 1) * gridCellW) + 'px';
+            ov.style.width = ((re - rs + 1) * gridCellW) + 'px';
             ov.style.background = SAVE_SLOT_COLORS[s] + '26';
             if (onOwningRow) ov.style.borderColor = SAVE_SLOT_COLORS[s];
             ov.title = `Saved selection ${s + 1}: ` + (rs === re ? `res ${rs}` : `res ${rs}-${re}`);
@@ -4459,13 +4571,28 @@ cellsContainer.appendChild(overlay);
                 const lbl = document.createElement('div');
                 lbl.className = 'saved-sel-label';
                 lbl.textContent = slot.label;
-                lbl.style.left = ((rs + re - 1) / 2 * GRAPH_CELL_WIDTH) + 'px';
-                lbl.style.width = ((re - rs + 1) * GRAPH_CELL_WIDTH) + 'px';
+                lbl.style.left = ((rs + re - 1) / 2 * gridCellW) + 'px';
+                lbl.style.width = ((re - rs + 1) * gridCellW) + 'px';
                 lbl.title = `Saved selection ${s + 1}: ${slot.label}`;
                 cellsContainer.appendChild(lbl);
             }
         });
     });
+
+    // Sequence Search highlights: yellow highlighter rects over every search
+    // hit on this row (drawn on all visible tracks - Grid and Graph-annotation
+    // rows alike, since hidden/filtered tracks never render a row here).
+    if (seqSearchMatches.length) {
+        seqSearchMatches.forEach(mm => {
+            const ov = document.createElement('div');
+            ov.className = 'seq-search-overlay';
+            ov.style.left = ((mm.start - 1) * gridCellW) + 'px';
+            ov.style.width = ((mm.end - mm.start + 1) * gridCellW) + 'px';
+            ov.title = 'Search hit: ' + mm.text +
+                (mm.start === mm.end ? ' (res ' + mm.start + ')' : ' (res ' + mm.start + '-' + mm.end + ')');
+            cellsContainer.appendChild(ov);
+        });
+    }
 
     rowEl.appendChild(cellsContainer);
     return rowEl;
@@ -4537,7 +4664,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     pillsOverlay.appendChild(pillsContainer);
     inner.appendChild(pillsOverlay);
 
-    const cellWidth = GRAPH_CELL_WIDTH;
+    const cellWidth = gridCellW;
     const axisWidth = GRAPH_AXIS_WIDTH; // reserved for y-axis + matches annotation row label width, so data columns start at the same x as the .track-cells above
     const plotWidth = totalLength * cellWidth;
     const width = axisWidth + plotWidth;
@@ -5413,35 +5540,388 @@ function initSelectionScope() {
     renderSelectionScopeToggle();
 }
 
-// Alignment-grid scale: applies CSS zoom to the grid itself (like zooming the
-// page, but scoped to the viewer) so 100% stays the maximum size and smaller
-// values compact the view to show more rows/columns. The inline zoom survives
-// renderViewer()'s innerHTML rebuilds since it lives on #alignmentGrid.
-function applyGridScale() {
+// --- Horizontal accordion zoom -------------------------------------------
+// NOTE: these helpers must be defined before renderViewer() actually runs so
+// buildTrackRow() / buildPositionMarkerRow() can reference glyphOpacityFor()
+// and setGlyph() below. (renderViewer itself is only CALLED after the whole
+// script has evaluated, so function-declaration hoisting already guarantees
+// this, but keeping the block together keeps the dependency obvious.)
+
+// How visible a single-letter residue glyph should be at a given column
+// width: fully hidden at <= 8px, fully visible at >= 12px (CELL_WIDTH_BASE),
+// ramping smoothly in between so zooming across the semantic threshold fades
+// sequence labels in instead of popping them on/off.
+function glyphOpacityFor(w) {
+    if (w >= CELL_WIDTH_BASE) return 1;
+    if (w <= CELL_WIDTH_BASE - 4) return 0;
+    return (w - (CELL_WIDTH_BASE - 4)) / 4;
+}
+
+// Sets a cell's single-letter glyph as a centered span whose opacity follows
+// the semantic-zoom ramp (backgrounds are NOT faded, so heatmap blocks stay
+// solid while letters appear). Returns the span for further styling.
+function setGlyph(cellEl, ch, w) {
+    const span = document.createElement('span');
+    span.className = 'cell-glyph';
+    span.textContent = (ch === null || ch === undefined) ? '' : ch;
+    span.style.opacity = String(glyphOpacityFor(w));
+    span.style.fontSize = Math.max(6, Math.min(12, w)) + 'px';
+    span.style.lineHeight = '1';
+    cellEl.appendChild(span);
+    return span;
+}
+
+// Applies the current gridCellW to the grid's residue columns (CSS custom
+// property so every flex row lays out at the same pixel width) and refreshes
+// the Scale control's label + disabled state.
+function applyGridZoom() {
     const grid = document.getElementById('alignmentGrid');
-    if (grid) grid.style.zoom = String(gridScale);
+    if (grid) grid.style.setProperty('--cellw', gridCellW + 'px');
 
     const val = document.getElementById('scaleValue');
-    if (val) val.textContent = Math.round(gridScale * 100) + '%';
+    if (val) val.textContent = Math.round(gridCellW / CELL_WIDTH_BASE * 100) + '%';
     const down = document.getElementById('scaleDown');
     const up = document.getElementById('scaleUp');
-    if (down) down.disabled = gridScale <= GRID_SCALE_MIN + 1e-9;
-    if (up) up.disabled = gridScale >= GRID_SCALE_MAX - 1e-9;
+    if (down) down.disabled = gridCellW <= CELL_WIDTH_MIN + 1e-9;
+    if (up) up.disabled = gridCellW >= CELL_WIDTH_MAX - 1e-9;
     schedulePersist();
 }
 
-function initGridScale() {
+// Coalesced rebuild used by both the −/+ buttons and wheel/pinch zoom: re-
+// computes the whole grid at a new residue-column width and, when an anchor
+// column is given, restores the anchor residue to the same screen position so
+// zooming stays pinned to the residue under the cursor (or the viewport
+// center for the buttons). Rapid wheel/pinch events are folded into one
+// requestAnimationFrame rebuild, giving smooth continuous zoom.
+let zoomPendingW = null;
+let zoomPendingAnchor = null;
+let zoomPendingX = null;
+let zoomRaf = 0;
+
+// newW: target residue-column width (px). anchorColumn: fractional residue
+// index to keep pinned on screen while zooming. viewportX: the pixel x
+// (within the grid viewport) the anchored residue should stay at - the
+// cursor for wheel/pinch zoom, or null to use the viewport centre (buttons).
+function zoomToGridWidth(newW, anchorColumn, viewportX) {
+    const clamped = Math.min(CELL_WIDTH_MAX, Math.max(CELL_WIDTH_MIN, newW));
+    if (Math.abs(clamped - gridCellW) < 0.05) {
+        applyGridZoom();
+        return;
+    }
+    zoomPendingW = clamped;
+    zoomPendingAnchor = (anchorColumn === undefined || anchorColumn === null) ? null : anchorColumn;
+    zoomPendingX = (viewportX === undefined || viewportX === null) ? null : viewportX;
+    if (zoomRaf) return; // latest values are picked up by the pending frame
+    zoomRaf = requestAnimationFrame(() => {
+        zoomRaf = 0;
+        const targetW = zoomPendingW;
+        const anchor = zoomPendingAnchor;
+        const vpX = zoomPendingX;
+        zoomPendingW = null; zoomPendingAnchor = null; zoomPendingX = null;
+        gridCellW = targetW;
+        renderViewer(parsedTracks); // rebuilds grid + SVG geometry at gridCellW
+        applyGridZoom();
+        if (anchor !== null) {
+            if (vpX !== null) pinGridToAnchor(anchor, vpX);
+            else pinAggregateAnchor(anchor);
+        }
+        schedulePersist();
+    });
+}
+
+// Re-scrolls the grid so content point (labelColumn + anchor*W + W/2) sits at
+// viewportX within the grid viewport. viewportX is the pixel x the anchored
+// residue should keep (cursor offset for wheel zoom, viewport center for the
+// buttons).
+function pinGridToAnchor(anchor, viewportX) {
+    const grid = document.getElementById('alignmentGrid');
+    if (!grid) return;
+    const targetContentX = GRAPH_AXIS_WIDTH + anchor * gridCellW + gridCellW / 2;
+    let sl = targetContentX - viewportX;
+    const maxSl = grid.scrollWidth - grid.clientWidth;
+    grid.scrollLeft = Math.max(0, Math.min(maxSl, sl));
+}
+
+// Centers of viewport helper for the − / + buttons: anchor the residue
+// currently at the middle of the view.
+function pinAggregateAnchor(anchor) {
+    const grid = document.getElementById('alignmentGrid');
+    pinGridToAnchor(anchor, grid ? grid.clientWidth / 2 : 0);
+}
+
+function currentCenterAnchor() {
+    const grid = document.getElementById('alignmentGrid');
+    if (!grid) return null;
+    const vpCenter = grid.clientWidth / 2 + grid.scrollLeft;
+    return (vpCenter - GRAPH_AXIS_WIDTH - gridCellW / 2) / gridCellW;
+}
+
+function initGridZoom() {
     const down = document.getElementById('scaleDown');
     const up = document.getElementById('scaleUp');
     if (down) down.addEventListener('click', () => {
-        gridScale = Math.max(GRID_SCALE_MIN, (Math.round(gridScale / GRID_SCALE_STEP) - 1) * GRID_SCALE_STEP);
-        applyGridScale();
+        zoomToGridWidth(gridCellW / CELL_ZOOM_STEP, currentCenterAnchor(), null);
     });
     if (up) up.addEventListener('click', () => {
-        gridScale = Math.min(GRID_SCALE_MAX, (Math.round(gridScale / GRID_SCALE_STEP) + 1) * GRID_SCALE_STEP);
-        applyGridScale();
+        zoomToGridWidth(gridCellW * CELL_ZOOM_STEP, currentCenterAnchor(), null);
     });
-    applyGridScale();
+
+    // Mouse wheel / trackpad: only Ctrl+wheel zooms (Ctrl+middle-scroll on
+    // Windows, pinch on trackpads arrives as ctrl+wheel). A plain wheel is
+    // left alone so the browser natively scrolls vertically - the grid never
+    // steals scrolling again. Horizontal panning is native too (overflow-x).
+    const grid = document.getElementById('alignmentGrid');
+    if (grid) {
+        grid.addEventListener('wheel', (e) => {
+            if (!e.ctrlKey) return; // leave plain wheel to native vertical scroll
+            e.preventDefault(); // don't let the browser's Ctrl+wheel page-zoom kick in
+            let dy = e.deltaY;
+            if (e.deltaMode === 1) dy *= 16;
+            else if (e.deltaMode === 2) dy *= grid.clientHeight;
+
+            const rect = grid.getBoundingClientRect();
+            const viewportX = e.clientX - rect.left;
+            const anchor = (viewportX + grid.scrollLeft - GRAPH_AXIS_WIDTH - gridCellW / 2) / gridCellW;
+            // Continuous exponential factor so smooth trackpads and pinch
+            // gestures zoom fluidly (not stair-stepped per notch).
+            const newW = gridCellW * Math.exp(-dy * 0.0016);
+            zoomToGridWidth(newW, anchor, viewportX);
+        }, { passive: false });
+    }
+    applyGridZoom();
+}
+
+// --- Sequence Search & Conservation Analytics ------------------------------
+// Easy-to-edit preset table for the Search panel dropdown; add/rename entries
+// here and the dropdown (buildSeqSearchPresets) picks them up.
+const SEQUENCE_SEARCH_PRESETS = [
+    {
+        category: 'PTMs & Modifications',
+        presets: [
+            { name: 'N-Glycosylation', pattern: 'N[^P][ST][^P]', description: 'Asparagine linked: Asn-X-Ser/Thr sequon' },
+            { name: 'PKA Phosphorylation', pattern: '[RK]{2}.[ST]', description: 'Protein Kinase A: basophilic kinase motif' },
+            { name: 'PKC Phosphorylation', pattern: '[ST].[RK]', description: 'Protein Kinase C: basic-flanked phosphosite' },
+            { name: 'CK2 Phosphorylation', pattern: '[ST].{2}[DE]', description: 'Casein Kinase II: acidic-flanked phosphosite' },
+            { name: 'N-Myristoylation', pattern: 'G[^EDRKHP].{2}[STAGCN][^P]', description: 'Fatty acid attachment: N-terminal myristoyl anchor' }
+        ]
+    },
+    {
+        category: 'Localization & Trafficking Signals',
+        presets: [
+            { name: 'Nuclear Localization (NLS)', pattern: '[RK]{4,}', description: 'Monopartite basic cluster (nuclear import)' },
+            { name: 'Nuclear Export (NES)', pattern: '[LIVFM].{2,3}[LIVFM].{2,3}[LIVFM].[LIVFM]', description: 'Leucine-rich export signal (CRM1-dependent)' },
+            { name: 'ER Retention Signal', pattern: '[KRH]DEL$', description: 'C-terminal K/HRDEL retrieval to the ER' },
+            { name: 'Prenylation (CaaX Box)', pattern: 'C[AILM]{2}.$', description: 'C-terminal lipid anchor (farnesyl/geranylgeranyl)' }
+        ]
+    },
+    {
+        category: 'Functional & Binding Motifs',
+        presets: [
+            { name: 'Walker A / P-Loop', pattern: '[AG].{4}GK[ST]', description: 'ATP/GTP nucleotide binding loop' },
+            { name: 'RGD Cell Adhesion', pattern: 'RGD', description: 'Integrin binding site' },
+            { name: 'SH3 Domain Binding', pattern: 'P..P[RK]', description: 'Proline-rich interaction motif (SH3/SH2 ligands)' },
+            { name: 'C2H2 Zinc Finger', pattern: 'C.{2,4}C.{12}H.{3,5}H', description: 'DNA/RNA binding domain (classic zinc coordination)' }
+        ]
+    },
+    {
+        category: 'Biophysical & Compositional Stretches',
+        presets: [
+            { name: 'Poly-Acidic Region', pattern: '[DE]{4,}', description: 'Negatively charged cluster (acidity, ion binding)' },
+            { name: 'Poly-Basic Region', pattern: '[RK]{4,}', description: 'Positively charged cluster (DNA/RNA binding, NLS)' },
+            { name: 'Hydrophobic Core / TM', pattern: '[AILMFWV]{12,}', description: 'Potential membrane span or hydrophobic core' },
+            { name: 'Poly-Glutamine (PolyQ)', pattern: 'Q{5,}', description: 'Disorder / aggregation-prone repeat' }
+        ]
+    }
+];
+
+let seqSearchMatches = [];   // [{ start: 1-based, end: 1-based, text }]
+let seqSearchActive = false;
+
+function toggleSeqSearch() {
+    const panel = document.getElementById('seqSearchPanel');
+    const btn = document.getElementById('btnSeqSearch');
+    const opening = panel.style.display === 'none';
+    panel.style.display = opening ? 'block' : 'none';
+    if (btn) btn.classList.toggle('tb-btn-active', opening);
+    if (opening) {
+        buildSeqSearchPresets();
+        const input = document.getElementById('seqSearchInput');
+        if (input) input.focus();
+    }
+}
+
+function buildSeqSearchPresets() {
+    const sel = document.getElementById('seqSearchPresets');
+    if (!sel || sel.dataset.built) return;
+    sel.dataset.built = '1';
+    sel.innerHTML = '<option value="">Presets…</option>';
+    SEQUENCE_SEARCH_PRESETS.forEach(g => {
+        const og = document.createElement('optgroup');
+        og.label = g.category;
+        g.presets.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.pattern;
+            opt.textContent = p.name;
+            opt.title = p.description;
+            og.appendChild(opt);
+        });
+        sel.appendChild(og);
+    });
+    sel.addEventListener('change', () => {
+        if (!sel.value) return;
+        const input = document.getElementById('seqSearchInput');
+        if (input) { input.value = sel.value; input.focus(); }
+        // Motif presets are regexes: force Regex on so they match as given.
+        const reg = document.getElementById('seqSearchRegex');
+        if (reg && !reg.checked) reg.checked = true;
+        runSeqSearch();
+        // Keep the preset title selected so the user can see which motif is
+        // active; it only returns to "Presets…" once the query is edited.
+    });
+}
+
+function resetSeqSearchPresetSelect() {
+    const sel = document.getElementById('seqSearchPresets');
+    if (sel && sel.selectedIndex !== 0) sel.selectedIndex = 0;
+}
+
+function runSeqSearch() {
+    const input = document.getElementById('seqSearchInput');
+    const resEl = document.getElementById('seqSearchResults');
+    const query = (input ? input.value : '').trim();
+    const aa = (parsedTracks && parsedTracks.AA) ? String(parsedTracks.AA) : '';
+    seqSearchMatches = [];
+    if (!aa || !query) {
+        seqSearchActive = false;
+        if (resEl) resEl.textContent = aa ? '' : 'Load or paste sequence data first.';
+        rerenderSearchOverlays();
+        return;
+    }
+    const wantRegex = document.getElementById('seqSearchRegex').checked;
+    const caseSens = document.getElementById('seqSearchCase').checked;
+    const src = wantRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let re;
+    try {
+        re = new RegExp(src, 'g' + (caseSens ? '' : 'i'));
+    } catch (err) {
+        if (resEl) resEl.textContent = 'Invalid regex: ' + err.message;
+        seqSearchActive = false;
+        rerenderSearchOverlays();
+        return;
+    }
+    let m;
+    while ((m = re.exec(aa)) !== null) {
+        seqSearchMatches.push({ start: m.index + 1, end: m.index + m[0].length, text: m[0] });
+        if (m[0] === '') re.lastIndex++; // don't spin on zero-width matches
+    }
+    seqSearchActive = seqSearchMatches.length > 0;
+    renderSeqSearchResults();
+    rerenderSearchOverlays();
+}
+
+function renderSeqSearchResults() {
+    const resEl = document.getElementById('seqSearchResults');
+    if (!resEl) return;
+    resEl.innerHTML = '';
+    if (!seqSearchActive) return;
+    // Clickable count: selects every hit range at once (piecewise selection).
+    const head = document.createElement('div');
+    const countBtn = document.createElement('button');
+    countBtn.type = 'button';
+    countBtn.className = 'seq-hit-btn seq-hit-btn-all';
+    countBtn.textContent = seqSearchMatches.length + ' hit' + (seqSearchMatches.length > 1 ? 's' : '');
+    countBtn.title = 'Select all ' + seqSearchMatches.length + ' hit range(s)';
+    countBtn.addEventListener('click', () => selectSeqSearchAll());
+    head.appendChild(countBtn);
+    head.appendChild(document.createTextNode(' — click a number to select that hit:'));
+    resEl.appendChild(head);
+    // One numbered Select button + range per hit.
+    seqSearchMatches.forEach((m, idx) => {
+        const row = document.createElement('div');
+        row.className = 'seq-hit-row';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'seq-hit-btn';
+        btn.textContent = String(idx + 1);
+        btn.title = 'Select hit ' + (idx + 1) + ': res ' + (m.start === m.end ? m.start : m.start + '-' + m.end) + ' (' + m.text + ')';
+        btn.addEventListener('click', () => selectSeqSearchHit(m));
+        row.appendChild(btn);
+        const span = document.createElement('span');
+        span.textContent = 'res ' + (m.start === m.end ? m.start : m.start + '-' + m.end) + ' (' + m.text + ')';
+        row.appendChild(span);
+        resEl.appendChild(row);
+    });
+}
+
+// Selects a single search hit as a normal column range (like a manual drag).
+function selectSeqSearchHit(m) {
+    selectSeqSearchRanges([[m.start - 1, m.end - 1]], 'point');
+}
+
+// Selects every hit range at once as a disjoint (piecewise) selection.
+function selectSeqSearchAll() {
+    selectSeqSearchRanges(seqSearchMatches.map(m => [m.start - 1, m.end - 1]), 'disjoint');
+}
+
+function selectSeqSearchRanges(zeroBasedRanges, mode) {
+    const merged = mergeRanges(zeroBasedRanges);
+    if (!merged.length) return;
+    exitRowMode();
+    const grid = document.getElementById('alignmentGrid');
+    if (mode === 'point' && merged.length === 1) {
+        const [s, e] = merged[0];
+        selectionMode = 'point';
+        selectStart = s; selectEnd = e;
+        updateSelectionUI();
+        calculateSelectionMetadata();
+        scrollGridToResidue(grid, s, e);
+    } else {
+        selectionMode = 'row';
+        activeRowKey = null; activeRowType = null;
+        rowRanges = merged;
+        updateSelectionUI();
+        updateManualPiecewiseSelection();
+        scrollGridToResidue(grid, merged[0][0], merged[merged.length - 1][1]);
+    }
+    schedulePersist();
+}
+
+// Horizontally scrolls the grid so the selected residue range is in view.
+function scrollGridToResidue(grid, startIdx, endIdx) {
+    if (!grid || grid.scrollWidth <= grid.clientWidth) return;
+    const x0 = GRAPH_AXIS_WIDTH + startIdx * gridCellW;
+    const x1 = GRAPH_AXIS_WIDTH + (endIdx + 1) * gridCellW;
+    const left = grid.scrollLeft;
+    const right = left + grid.clientWidth;
+    if (x0 < left) grid.scrollLeft = Math.max(0, x0 - 8);
+    else if (x1 > right) grid.scrollLeft = Math.min(grid.scrollWidth - grid.clientWidth, x1 - grid.clientWidth + 8);
+}
+
+function rerenderSearchOverlays() {
+    renderViewer(parsedTracks);
+}
+
+function clearSeqSearch(clearInputToo) {
+    const input = document.getElementById('seqSearchInput');
+    const resEl = document.getElementById('seqSearchResults');
+    seqSearchMatches = [];
+    seqSearchActive = false;
+    if (input && clearInputToo) input.value = '';
+    if (resEl) resEl.innerHTML = '';
+    resetSeqSearchPresetSelect();
+    rerenderSearchOverlays();
+}
+
+function initSeqSearch() {
+    const input = document.getElementById('seqSearchInput');
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); runSeqSearch(); }
+            else if (e.key === 'Escape') { clearSeqSearch(true); }
+        });
+        // Manually editing the query deselects the active preset.
+        input.addEventListener('input', () => resetSeqSearchPresetSelect());
+    }
 }
 
 // --- Quantitative Metrics cross-reference ---------------------------------
@@ -6738,7 +7218,7 @@ function gatherPersistableState() {
         preferences: {
             currentViewMode,
             selectionScope,
-            gridScale,
+            gridCellW,
             commandEngineId,
             chimeraxTarget: document.getElementById('chimeraxTarget').value,
             cxCommand: document.getElementById('cxCommand').value,
@@ -6929,9 +7409,16 @@ function applyPersistedState(state) {
     document.getElementById('viewModeSelect').value = currentViewMode;
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
     renderSelectionScopeToggle();
-    const prefsScale = Number(prefs.gridScale);
-    gridScale = isFinite(prefsScale) ? Math.min(GRID_SCALE_MAX, Math.max(GRID_SCALE_MIN, prefsScale)) : 1.0;
-    applyGridScale();
+    // Restore the horizontal accordion zoom (px/residue). Newer saves store
+    // gridCellW directly; older saves stored gridScale (the old CSS-zoom
+    // factor) which maps linearly onto residue width.
+    const savedW = Number(prefs.gridCellW);
+    const savedLegacy = Number(prefs.gridScale);
+    let restoredW = 12;
+    if (prefs.gridCellW !== undefined && isFinite(savedW)) restoredW = savedW;
+    else if (prefs.gridScale !== undefined && isFinite(savedLegacy)) restoredW = savedLegacy * CELL_WIDTH_BASE;
+    gridCellW = Math.min(CELL_WIDTH_MAX, Math.max(CELL_WIDTH_MIN, restoredW));
+    applyGridZoom();
     commandEngineId = COMMAND_ENGINES.some(e => e.id === prefs.commandEngineId) ? prefs.commandEngineId : 'chimerax';
     populateCommandEngineSelect();
     updateSidebarCommandLabels();
@@ -7176,8 +7663,8 @@ function resetAllData() {
     selectStart = null; selectEnd = null; selectionMode = 'point';
     selectionScope = 'full';
     renderSelectionScopeToggle();
-    gridScale = 1.0;
-    applyGridScale();
+    gridCellW = CELL_WIDTH_BASE;
+    applyGridZoom();
     activeRowKey = null; activeRowType = null; rowRanges = [];
     dragOriginTrackKey = null; crossRefTrackKey = '';
     lastRanges = null;
@@ -7188,6 +7675,13 @@ function resetAllData() {
     closeTctlPopup();
     savedSelections = [null, null, null, null, null];
     renderSavedSelectionsBar();
+    seqSearchMatches = [];
+    seqSearchActive = false;
+    const seqResEl = document.getElementById('seqSearchResults');
+    if (seqResEl) seqResEl.textContent = '';
+    const seqInputEl = document.getElementById('seqSearchInput');
+    if (seqInputEl) seqInputEl.value = '';
+    resetSeqSearchPresetSelect();
 
     document.getElementById('rawInput').value = '';
     document.getElementById('structureUpload').value = '';
@@ -7234,7 +7728,8 @@ updateSidebarCommandLabels();
 applyTypePalette('default'); // fresh-visit default; loadStateFromStorage() overrides it if a saved palette exists
 initSavedSelections();
 initSelectionScope();
-initGridScale();
+initGridZoom();
+initSeqSearch();
 loadStateFromStorage();
 </script>
 
