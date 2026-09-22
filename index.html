@@ -390,6 +390,19 @@
         }
         .app-header { margin-bottom: 0; }
         .app-header p { margin: 0 0 15px; font-size: 0.9rem; color: #64748b; }
+        .app-version {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 1px 7px;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            vertical-align: middle;
+        }
         .box { width: 15px; height: 15px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); }
         
         .alignment-grid {
@@ -1624,7 +1637,7 @@
 
 <div class="container">
     <div class="app-header">
-        <h2>Quick2DViewer - 1D Protein Viewer</h2>
+        <h2>Quick2DViewer - 1D Protein Viewer <span class="app-version" id="appVersion" title="Application version"></span></h2>
     </div>
 
     <div id="toastContainer" aria-live="polite"></div>
@@ -2766,6 +2779,9 @@ document.addEventListener('click', (e) => {
 });
 
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
+// Application version, kept in sync with CHANGELOG.md. Shown next to the
+// header title via #appVersion.
+const APP_VERSION = '0.2.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -2929,6 +2945,24 @@ const CONSERVATION_BANDS = [
 function getConservationBandForScore(v) {
     if (typeof v !== 'number' || isNaN(v)) return null;
     return CONSERVATION_BANDS.find(b => b.test(v)) || null;
+}
+// ConSurf-style 9-color gradient for 3D conservation coloring: nine evenly
+// spaced grades from warm rose (variable) through yellow to deep blue
+// (conserved), extending the 3-band heatmap ramp (rose -> yellow -> blue) so
+// the 3D model reads with the same "blue = conserved" convention. The heatmap
+// row keeps the coarser 3-band CONSERVATION_BANDS; this finer ramp is for the
+// structure coloring only.
+const CONSERVATION_9_GRADIENT = [
+    '#ffc6a0', '#ffcfa1', '#ffd8a2', '#ffe0a2', '#ffe9a3',
+    '#eae3ba', '#d4ded1', '#bed8e8', '#a9d2ff'
+];
+// Maps a 0..1 conservation score to one of the 9 gradient colors (CSS hex),
+// or null when the score is missing/out of range. Score 0 -> variable (rose),
+// 1 -> conserved (blue).
+function getConservationGradientColor(v) {
+    if (typeof v !== 'number' || isNaN(v)) return null;
+    const idx = Math.min(CONSERVATION_9_GRADIENT.length - 1, Math.max(0, Math.floor(v * CONSERVATION_9_GRADIENT.length)));
+    return CONSERVATION_9_GRADIENT[idx];
 }
 // BLOSUM62-compatible amino-acid ordering used for the conservation
 // background distribution and the Needleman-Wunsch pairwise aligner. The
@@ -4959,6 +4993,7 @@ function recomputeConservationScores() {
     const obj = { type: 'conservation', metric: metric, values: scores };
     parsedTracks.CONSERVATION = obj;
     if (typeof updateConservationSection === 'function') updateConservationSection();
+    setP3DConservationDefault();
 }
 
 // --- Options > Conservation Scoring -----------------------------------------
@@ -7945,7 +7980,7 @@ const P3D_RCSB_SIZE_CAP = 100 * 1024 * 1024;                   // don't cache mu
 const P3D_DB_NAME = 'q2dv-3dmol-cache';
 const P3D_DB_STORE = 'scripts';
 const P3D_LOCAL_CACHE_KEY = '_q2dv_3dmol';
-const P3D_BASE_SCHEMES = ['white', 'spectrum', 'chain', 'hydro'];
+const P3D_BASE_SCHEMES = ['white', 'spectrum', 'chain', 'hydro', 'conservation'];
 const P3D_COLOR_HEX = {
     red: '0xff0000', cyan: '0x00ffff', blue: '0x0000ff', green: '0x00ff00',
     purple: '0x800080', orange: '0xffa500', yellow: '0xffff00', white: '0xffffff', gray: '0x808080'
@@ -8461,14 +8496,14 @@ function selectionResidueColors(selRanges) {
 function baseP3DStyle() {
     const scheme = P3D_BASE_SCHEMES[p3dBaseSchemeIdx] || 'white';
     const style = { cartoon: {}, stick: {} };
-    if (scheme === 'white') { style.cartoon.color = P3D_COLOR_HEX.white; style.stick.color = P3D_COLOR_HEX.white; }
+    if (scheme === 'white' || scheme === 'conservation') { style.cartoon.color = P3D_COLOR_HEX.white; style.stick.color = P3D_COLOR_HEX.white; }
     else { style.cartoon.colorscheme = scheme; style.stick.colorscheme = scheme; }
     return style;
 }
 function coloredP3DStyle(colorHex) {
     return { cartoon: { color: colorHex }, stick: { color: colorHex } };
 }
-function applyP3DColoring(resiColors) {
+function applyP3DColoring(resiColors, statusLabel) {
     if (!p3dView) return;
     p3dView.setStyle({}, baseP3DStyle());
     const matched = {};
@@ -8480,7 +8515,7 @@ function applyP3DColoring(resiColors) {
     for (const hex of Object.keys(matched)) p3dView.setStyle({ resi: matched[hex] }, coloredP3DStyle(hex));
     if (nomatch.length) p3dView.setStyle({ resi: nomatch }, coloredP3DStyle(P3D_NO_MATCH_COLOR));
     const nMatched = Object.keys(matched).reduce((a, k) => a + matched[k].length, 0);
-    let msg = p3dModelDisplayName() + ' — ' + nMatched + ' resi colored';
+    let msg = p3dModelDisplayName() + ' — ' + nMatched + ' resi ' + (statusLabel || 'colored');
     if (nomatch.length) msg += ', ' + nomatch.length + ' not matched → blue';
     if (p3dLocked) msg += ' (locked)';
     setP3DStatus(msg);
@@ -8492,6 +8527,13 @@ function updateP3DColoring() {
     if (!p3dViewerOpen || p3dLocked) return;
     refreshP3DModelOptions();
     if (!p3dLoaded || !p3dView || !p3dModel) return;
+    // Conservation mode colors the whole model by per-residue conservation
+    // (independent of the selection), so it takes priority over selection
+    // coloring when it is the active base scheme.
+    if (isP3DConservationMode()) {
+        applyP3DConservationColoring();
+        return;
+    }
     const selRanges = (lastRanges && lastRanges.length) ? lastRanges : null;
     if (!selRanges) {
         p3dView.setStyle({}, baseP3DStyle());
@@ -8501,6 +8543,60 @@ function updateP3DColoring() {
         return;
     }
     applyP3DColoring(selectionResidueColors(selRanges));
+}
+
+// True when the active 3D base scheme is the ConSurf-style conservation
+// coloring (index into P3D_BASE_SCHEMES).
+function isP3DConservationMode() {
+    return (P3D_BASE_SCHEMES[p3dBaseSchemeIdx] || '') === 'conservation';
+}
+
+// True when a CONSERVATION object track with per-residue values is present.
+function hasConservationData() {
+    const c = parsedTracks && parsedTracks.CONSERVATION;
+    return !!(c && Array.isArray(c.values) && c.values.length);
+}
+
+// Builds a query-residue -> 3Dmol-hex map for the whole model from the current
+// conservation scores (1-based residue keys, matching the selection coloring).
+function p3dConservationResidueColors() {
+    const map = new Map();
+    const c = parsedTracks && parsedTracks.CONSERVATION;
+    if (!c || !Array.isArray(c.values)) return map;
+    for (let i = 0; i < c.values.length; i++) {
+        const css = getConservationGradientColor(c.values[i]);
+        if (css) map.set(i + 1, '0x' + css.slice(1));
+    }
+    return map;
+}
+
+// Colors the whole 3D model by conservation when there is data; otherwise
+// falls back to the plain base style with a "no conservation data" note.
+function applyP3DConservationColoring() {
+    if (!p3dView) return;
+    const resiColors = p3dConservationResidueColors();
+    if (!resiColors.size) {
+        p3dView.setStyle({}, baseP3DStyle());
+        setP3DStatus(p3dModelDisplayName() + ' — no conservation data');
+        p3dView.zoomTo();
+        p3dView.render();
+        return;
+    }
+    applyP3DColoring(resiColors, 'conservation-colored');
+}
+
+// Sets conservation as the default 3D base scheme once conservation data
+// exists (and re-colors an open viewer). Called from recomputeConservationScores
+// so importing variants or switching metrics snaps the model to the
+// conservation view.
+function setP3DConservationDefault() {
+    const idx = P3D_BASE_SCHEMES.indexOf('conservation');
+    if (idx < 0) return;
+    if (hasConservationData() && p3dBaseSchemeIdx !== idx) {
+        p3dBaseSchemeIdx = idx;
+        updateP3DToolbar();
+        if (p3dLoaded && p3dView && !p3dLocked) updateP3DColoring();
+    }
 }
 
 // Dragging the floating viewer around the screen via its top bar.
@@ -9615,6 +9711,10 @@ initSavedSelections();
 initSelectionScope();
 initGridZoom();
 initSeqSearch();
+(function initVersionLabel() {
+    const el = document.getElementById('appVersion');
+    if (el) el.textContent = 'v' + APP_VERSION;
+})();
 loadStateFromStorage();
 </script>
 

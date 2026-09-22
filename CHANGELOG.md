@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
+### Added
+
+- **ConSurf-style conservation coloring for the 3D viewer.** "Conservation" is
+  now a base coloring scheme (cycled via the Color button) that paints the whole
+  model by per-residue conservation using a continuous 9-color gradient
+  (rose → yellow → blue, "blue = conserved", matching the heatmap convention).
+  It becomes the default scheme automatically once conservation data exists
+  (variant FASTA imported or metric switched), and recolors on demand.
+- **Version badge** next to the header title, driven by `APP_VERSION`
+  (kept in sync with this changelog).
+
 ## [0.1.0] - 2026-09-22
 
 Initial public version: a single-file, dependency-free HTML/JS/CSS viewer that
