@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-09-22
+
+### Fixed
+
+- UniProt accession fetch: added a one-shot retry and a clearer diagnostic when
+  the request fails at the network layer (Firefox "NetworkError"), pointing to
+  browser tracking protection / extensions / DNS as the likely cause.
+
 ## [0.5.2] - 2026-09-22
 
 ### Fixed
