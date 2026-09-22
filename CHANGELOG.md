@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-22
+
+### Added
+
+- **UniProt annotation offload** (Options → Annotation Offload). Fetch curated
+  residue-level annotations (domains/regions, topology/signal, active/binding
+  sites, PTMs, variants) and render them as rows in the viewer. Two lookup
+  modes: **Accession** (direct `rest.uniprot.org` lookup) and **Sequence**
+  (BLAST-resolves the current sequence first); mode + accession persist.
+
 ## [0.4.0] - 2026-09-22
 
 ### Added

@@ -2030,6 +2030,25 @@
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Annotation Offload (UniProt)</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Pull curated residue-level annotations (domains, topology, active/binding sites, PTMs, variants) from UniProt and show them as rows in the viewer.<br><br>
+                <strong>Accession</strong> looks up a known UniProt accession directly. <strong>Sequence</strong> resolves the current sequence to an accession via BLAST first (may be blocked by the browser's CORS policy - use Accession if it fails). Fetching requires a network connection and nothing is uploaded except the requested sequence/accession.
+            </p>
+            <label for="uniprotModeSelect" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">Lookup Mode</label>
+            <select id="uniprotModeSelect" onchange="onUniprotModeChange()" class="q2dv-select"
+                style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <option value="accession">Accession</option>
+                <option value="sequence">Sequence (BLAST)</option>
+            </select>
+            <label for="uniprotAccessionInput" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin:12px 0 4px;">UniProt Accession</label>
+            <input type="text" id="uniprotAccessionInput" oninput="onUniprotAccessionInput()" placeholder="e.g. P0ABE7"
+                style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            <button onclick="fetchUniProtAnnotations()" style="margin-top: 12px;">⬇ Fetch Annotations</button>
+            <span style="font-size: 0.72rem; color: #94a3b8; margin-left: 8px;" id="uniprotAnnotationStatus"></span>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Save File</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Export the full current session - sequence, attached structures, selection, and preferences - as a portable <code>.json</code> file you can move to another browser or machine. To bring one back in, attach it via the toolbar's <strong>Attach Structure(s) or JSON</strong> button like any other file - Q2DV recognizes it automatically from a marker inside the file, without needing a separate import control.<br><br>
@@ -2326,6 +2345,210 @@ let fastaAlignmentMode = 'auto'; // 'auto' | 'aligned' | 'unaligned'
 // included one (the parser otherwise just skips it) - shown in the Data
 // modal's FASTA summary.
 let currentProteinLabel = null;
+// --- UniProt / InterPro annotation offload (#5) ---------------------------
+// 'accession' looks up a known UniProt accession directly; 'sequence' resolves
+// the current AA sequence to an accession via BLAST first. Selected under
+// Options > Annotation Offload. The mode + accession persist; the fetched
+// feature tracks are rebuilt in-session (they're refetchable on demand).
+let uniprotAnnotationMode = 'accession'; // 'accession' | 'sequence'
+let uniprotAccession = '';               // last-used accession (persisted)
+let uniprotFeatures = null;              // { accession, features: [{type,start,end,description}], fetchedAt }
+let uniprotFeatureTracks = {};           // { 'UP_<cat>': [{start,end,type,description}] } (1-based)
+const UNIPROT_FEATURE_CATEGORIES = [
+    { key: 'UP_Domains', char: 'D', color: '#c7d2fe', label: 'UniProt Domains/Regions',
+      types: ['Domain', 'Family', 'Repeat', 'Region', 'Motif', 'Zinc finger', 'Coiled coil', 'Compositional bias'] },
+    { key: 'UP_Topology', char: 'T', color: '#a5f3fc', label: 'UniProt Topology/Signal',
+      types: ['Transmembrane', 'Intramembrane', 'Topological domain', 'Signal', 'Signal peptide', 'Transit peptide', 'Propeptide'] },
+    { key: 'UP_Sites', char: 'S', color: '#fecaca', label: 'UniProt Sites',
+      types: ['Active site', 'Binding site', 'Site', 'Metal binding', 'DNA binding', 'Calcium binding', 'Zinc binding'] },
+    { key: 'UP_PTMs', char: 'P', color: '#fde68a', label: 'UniProt PTMs',
+      types: ['Modified residue', 'Glycosylation', 'Disulfide bond', 'Cross-link', 'Lipidation', 'Phosphorylation', 'Acetylation', 'Methylation', 'Hydroxylation', 'Palmitoylation', 'Nitrosylation', 'Chromophore', 'Sulfation'] },
+    { key: 'UP_Variants', char: 'V', color: '#bbf7d0', label: 'UniProt Variants',
+      types: ['Natural variant', 'Mutagenesis', 'Sequence conflict', 'Alternative sequence', 'Splicing variant'] }
+];
+const UNIPROT_CATEGORY_BY_KEY = {};
+UNIPROT_FEATURE_CATEGORIES.forEach(c => { UNIPROT_CATEGORY_BY_KEY[c.key] = c; });
+
+function uniprotCategoryForType(type) {
+    for (const c of UNIPROT_FEATURE_CATEGORIES) if (c.types.includes(type)) return c;
+    return null;
+}
+function uniprotCategoryForKey(key) { return UNIPROT_CATEGORY_BY_KEY[key] || null; }
+// Returns the feature covering residue `residueIdx0` (0-based) on a UP_ track,
+// or null. Features are stored 1-based.
+function uniprotFeatureAt(key, residueIdx0) {
+    const list = uniprotFeatureTracks[key];
+    if (!list) return null;
+    const pos = residueIdx0 + 1;
+    for (const f of list) if (pos >= f.start && pos <= f.end) return f;
+    return null;
+}
+
+function setUniProtStatus(msg) {
+    const el = document.getElementById('uniprotAnnotationStatus');
+    if (el) el.textContent = msg || '';
+}
+function uniprotApiBase() { return 'https://rest.uniprot.org/uniprotkb/'; }
+
+// Extracts residue-level features ({type,start,end,description}, 1-based) from
+// a UniProtKB JSON entry. Skips non-residue features (subcellular location,
+// etc.) whose location carries no numeric start/end.
+function parseUniProtFeatures(data) {
+    if (!data || !Array.isArray(data.features)) return [];
+    const out = [];
+    const add = (l, f) => {
+        if (!l || !l.start || !l.end) return;
+        const start = typeof l.start.value === 'number' ? l.start.value : parseInt(l.start.value, 10);
+        const end = typeof l.end.value === 'number' ? l.end.value : parseInt(l.end.value, 10);
+        if (isNaN(start) || isNaN(end)) return;
+        out.push({ type: f.type || 'Feature', start, end, description: f.description || '' });
+    };
+    data.features.forEach(f => {
+        const loc = f.location;
+        if (!loc) return;
+        if (Array.isArray(loc)) loc.forEach(l => add(l, f));
+        else add(loc, f);
+    });
+    return out;
+}
+
+async function fetchUniProtFeaturesByAccession(acc) {
+    setUniProtStatus('Fetching ' + acc + ' from UniProt…');
+    try {
+        const resp = await fetch(uniprotApiBase() + encodeURIComponent(acc) + '.json');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        const features = parseUniProtFeatures(data);
+        if (!features.length) {
+            setUniProtStatus('No residue-level features for ' + acc + '.');
+            showToast('No residue-level features found for ' + acc + '.', 'info');
+            return null;
+        }
+        setUniProtStatus('Loaded ' + features.length + ' features from ' + acc + '.');
+        return features;
+    } catch (err) {
+        setUniProtStatus('Fetch failed: ' + err.message);
+        showToast('Could not fetch UniProt annotations for ' + acc + ' (offline, invalid accession, or network blocked).', 'error');
+        return null;
+    }
+}
+
+// Sequence -> accession via the EBI NCBI-BLAST job API (submit -> poll ->
+// result). No CORS-friendly sequence-similarity endpoint exists on
+// rest.uniprot.org, so this path may be blocked in-browser; it degrades to a
+// clear message pointing at the accession path. Kept so the sequence mode is
+// fully wired end-to-end.
+async function resolveAccessionFromSequence(seq) {
+    setUniProtStatus('Running sequence search (BLAST vs UniProtKB)…');
+    const base = 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/';
+    try {
+        const runResp = await fetch(base + 'run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'email=q2dv@example.com&program=blastp&database=uniprotkb&stype=protein&sequence=' + encodeURIComponent(seq)
+        });
+        if (!runResp.ok) throw new Error('submit HTTP ' + runResp.status);
+        const jobId = (await runResp.text()).trim();
+        if (!jobId) throw new Error('no job id');
+        let status = '';
+        for (let i = 0; i < 40; i++) {
+            await new Promise(r => setTimeout(r, 1500));
+            status = (await (await fetch(base + 'status/' + jobId)).text()).trim();
+            if (status === 'FINISHED') break;
+            if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('BLAST ' + status);
+        }
+        if (status !== 'FINISHED') throw new Error('BLAST timed out');
+        const data = await (await fetch(base + 'result/' + jobId + '/json')).json();
+        const hits = (data && data.hits) || [];
+        const acc = hits.length ? (hits[0].hit_acc || hits[0].hit_id || null) : null;
+        if (!acc) throw new Error('no hit accession');
+        setUniProtStatus('Matched ' + acc + ' (top BLAST hit).');
+        return acc;
+    } catch (err) {
+        setUniProtStatus('Sequence search failed: ' + err.message);
+        showToast('Sequence search failed (may be blocked by the browser/CORS). Paste the UniProt accession instead: Options > Annotation Offload > Accession.', 'error');
+        return null;
+    }
+}
+
+// Main dispatcher for the Options "Fetch annotations" button, honoring the
+// selected mode. On success stores + renders the feature tracks.
+async function fetchUniProtAnnotations() {
+    let acc;
+    if (uniprotAnnotationMode === 'sequence') {
+        const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+        if (!seq) { showToast('Load a sequence first, then try Sequence mode.', 'error'); return; }
+        acc = await resolveAccessionFromSequence(seq);
+        if (!acc) return;
+    } else {
+        acc = ((document.getElementById('uniprotAccessionInput') || {}).value || '').trim();
+        if (!acc) { showToast('Enter a UniProt accession first.', 'error'); return; }
+    }
+    const features = await fetchUniProtFeaturesByAccession(acc);
+    if (!features) return;
+    uniprotAccession = acc;
+    uniprotFeatures = { accession: acc, features, fetchedAt: Date.now() };
+    applyUniProtFeatures();
+}
+
+// Builds the UP_ string tracks from the fetched features and re-renders. Each
+// category becomes one row with a marker char per covered residue; feature
+// metadata is kept in uniprotFeatureTracks for tooltips/colors.
+function applyUniProtFeatures() {
+    const aaLen = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    Object.keys(parsedTracks).forEach(k => { if (k.startsWith('UP_')) delete parsedTracks[k]; });
+    uniprotFeatureTracks = {};
+    if (!aaLen || !uniprotFeatures || !Array.isArray(uniprotFeatures.features)) return;
+    const cats = new Map();
+    uniprotFeatures.features.forEach(f => {
+        const c = uniprotCategoryForType(f.type);
+        if (!c) return;
+        if (!cats.has(c.key)) cats.set(c.key, []);
+        cats.get(c.key).push({ start: f.start, end: f.end, type: f.type, description: f.description || '' });
+    });
+    cats.forEach((list, key) => {
+        const c = UNIPROT_CATEGORY_BY_KEY[key];
+        if (!c) return;
+        const track = new Array(aaLen).fill(' ');
+        list.forEach(f => {
+            const s = Math.max(1, f.start), e = Math.min(aaLen, f.end);
+            for (let i = s; i <= e; i++) track[i - 1] = c.char;
+        });
+        parsedTracks[key] = track.join('');
+        uniprotFeatureTracks[key] = list;
+    });
+    renderViewer(parsedTracks);
+    schedulePersist();
+}
+
+function syncUniProtOptionControls() {
+    const modeEl = document.getElementById('uniprotModeSelect');
+    const accEl = document.getElementById('uniprotAccessionInput');
+    if (modeEl) modeEl.value = uniprotAnnotationMode;
+    if (accEl) accEl.value = uniprotAccession || '';
+    updateUniProtModeVisibility();
+}
+function updateUniProtModeVisibility() {
+    const accEl = document.getElementById('uniprotAccessionInput');
+    const modeEl = document.getElementById('uniprotModeSelect');
+    if (!accEl || !modeEl) return;
+    const isAccession = modeEl.value !== 'sequence';
+    accEl.style.display = isAccession ? '' : 'none';
+    accEl.labels && [].forEach.call(accEl.labels, l => { l.style.display = isAccession ? '' : 'none'; });
+}
+function onUniprotModeChange() {
+    const el = document.getElementById('uniprotModeSelect');
+    if (!el) return;
+    uniprotAnnotationMode = el.value === 'sequence' ? 'sequence' : 'accession';
+    updateUniProtModeVisibility();
+    schedulePersist();
+}
+function onUniprotAccessionInput() {
+    const el = document.getElementById('uniprotAccessionInput');
+    if (el) uniprotAccession = (el.value || '').trim();
+    schedulePersist();
+}
+
 let persistTimer = null;
 let lastPersistError = null;
 
@@ -2801,7 +3024,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -4105,6 +4328,7 @@ function formatTrackLabel(fullKey) {
     }
     if (fullKey === 'CONSERVATION' || fullKey.startsWith('CONS_')) return 'Conservation';
     if (fullKey.startsWith('VAR_')) return 'Variant ' + fullKey.slice(4);
+    if (fullKey.startsWith('UP_')) return 'UniProt ' + fullKey.slice(3).replace(/_/g, ' ');
     const isPlddt = fullKey.endsWith('_pLDDT');
     const isRsa = fullKey.endsWith('_RSA');
     const isCofactors = fullKey.endsWith('_Cofactors');
@@ -4142,12 +4366,13 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('HH_')) return 4;
     if (key.startsWith('VAR_')) return 5;
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 6;
+    if (key.startsWith('UP_')) return 7;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
     // above the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 7;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 8;
-    return 9;
+    if (key.endsWith('_Cofactors')) return 8;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 9;
+    return 10;
 }
 
 function switchViewMode() {
@@ -5365,6 +5590,7 @@ const TRACK_GROUP_LABELS = {
     HH: 'Homologs',
     VAR: 'Variants',
     CONSERVATION: 'Conservation',
+    UP: 'UniProt',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
@@ -5388,6 +5614,7 @@ function getTrackGroup(key) {
     if (key.startsWith('SP_')) return 'SP';
     if (key.startsWith('HH_')) return 'HH';
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 'CONSERVATION';
+    if (key.startsWith('UP_')) return 'UP';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
@@ -5488,7 +5715,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, DO: 3, CC: 4, SP: 5, HH: 6, VAR: 7, CONSERVATION: 8, pLDDT: 9, RSA: 10, Cofactors: 11, other: 99 };
+    const order = { SS: 1, TM: 2, DO: 3, CC: 4, SP: 5, HH: 6, VAR: 7, CONSERVATION: 8, UP: 9, pLDDT: 10, RSA: 11, Cofactors: 12, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -5946,6 +6173,21 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 cellEl.title = varDescLine + (varChar !== ' ' && varChar !== '-'
                     ? (isMismatch ? `Residue ${i + 1}: variant AA '${varChar}' (mismatch vs reference '${refChar}')` : `Residue ${i + 1}: variant AA '${varChar}' (matches reference)`)
                     : `Residue ${i + 1}: variant (no aligned residue)`);
+            }
+            else if (key.startsWith('UP_')) {
+                // UniProt annotation track (Options > Annotation Offload): covered
+                // residues get a category-colored background + marker char, with
+                // the feature type/description in the tooltip.
+                const upCat = uniprotCategoryForKey(key);
+                const feat = uniprotFeatureAt(key, i);
+                if (feat) {
+                    cellEl.style.backgroundColor = upCat ? upCat.color : '#e2e8f0';
+                    const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
+                    if (gSpan) gSpan.style.color = '#1e293b';
+                    cellEl.title = `Residue ${i + 1}: ${feat.type}` + (feat.description ? ` — ${feat.description}` : '');
+                } else {
+                    cellEl.title = `Residue ${i + 1}: (no UniProt feature)`;
+                }
             }
             else if (char === 'H') cellEl.classList.add('cell-H');
             else if (char === 'P') cellEl.classList.add('cell-P');
@@ -9191,6 +9433,8 @@ function gatherPersistableState() {
             conservationMetric,
             conservationIncludeHHR,
             fastaAlignmentMode,
+            uniprotAnnotationMode,
+            uniprotAccession,
             trackControl: {
                 hidden: Object.assign({}, trackControlState.hidden),
                 hideSymbols: Object.assign({}, trackControlState.hideSymbols),
@@ -9562,6 +9806,8 @@ function applyPersistedState(state) {
 
     const prefs = state.preferences || {};
     applyConservationSettings(prefs);
+    uniprotAnnotationMode = (prefs.uniprotAnnotationMode === 'sequence') ? 'sequence' : 'accession';
+    uniprotAccession = (typeof prefs.uniprotAccession === 'string') ? prefs.uniprotAccession : '';
     currentViewMode = prefs.currentViewMode || 'grid';
     document.getElementById('viewModeSelect').value = currentViewMode;
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
@@ -9707,6 +9953,7 @@ function openOptionsModal() {
     renderCachedDataInfo();
     void renderStructureCacheInfo();
     syncConservationOptionControls();
+    syncUniProtOptionControls();
     openModalAsDialog('optionsModal');
 }
 
@@ -9964,6 +10211,14 @@ function resetAllData() {
     updateP3DModelInfo();
     if (p3dView) { try { p3dView.removeAllModels(); } catch (err) {} try { p3dView.render(); } catch (err) {} }
     hhpredHitsInfo = {};
+    keyedVariantsInfo = {};
+    conservationMetric = 'shannon';
+    conservationIncludeHHR = false;
+    fastaAlignmentMode = 'auto';
+    uniprotAnnotationMode = 'accession';
+    uniprotAccession = '';
+    uniprotFeatures = null;
+    uniprotFeatureTracks = {};
     graphHighlights = {};
     selectStart = null; selectEnd = null; selectionMode = 'point';
     selectionScope = 'full';
