@@ -1746,6 +1746,16 @@
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="openHelpModal()">Help</button>
                 <button type="button" id="btnP3D" class="tb-btn tb-btn-secondary" onclick="toggleP3DViewer()"
                     title="Toggle the floating 3D structure viewer">3D</button>
+                <select id="exportSelect" class="q2dv-select sidebar-view-select" onchange="onExportSelect()"
+                    title="Export Q2DV data or the current viewport"
+                    aria-label="Export" style="flex:0 0 auto; width:auto; max-width:90px;">
+                    <option value="">Export ▾</option>
+                    <option value="json">Export Q2DV Data as JSON</option>
+                    <option value="tsv">Export Data as TSV</option>
+                    <option value="csv">Export Data as CSV</option>
+                    <option value="svg">Export Viewport as SVG</option>
+                    <option value="png">Export Viewport as PNG</option>
+                </select>
             </div>
 
             <div class="sel-workspace-header">
@@ -2781,7 +2791,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -7868,27 +7878,23 @@ function computeMetricsForInterval(startIdx, endIdx) {
 let lastMetricsTableRows = []; // [{model, metric, mean, pct}] - mirrors exactly what's rendered below, so TSV export can't drift from what's on screen
 let lastMetricsTableRegion = '';
 
-function openMetricsTable() {
+// Computes the comparative pLDDT/RSA metric rows for the current selection
+// (or the full sequence when nothing is selected). Shared by the Metrics Table
+// modal and the Export menu's TSV/CSV so the two can never disagree.
+function computeMetricsRows() {
     const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
-    if (structuralKeys.length === 0) {
-        alert("Please attach structure files first.");
-        return;
-    }
+    const aaLen = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (structuralKeys.length === 0) return { rows: [], region: '', hasData: false };
 
     const startIdx = selectStart !== null && selectEnd !== null ? Math.min(selectStart, selectEnd) : 0;
-    const endIdx = selectStart !== null && selectEnd !== null ? Math.max(selectStart, selectEnd) : parsedTracks.AA.length - 1;
+    const endIdx = selectStart !== null && selectEnd !== null ? Math.max(selectStart, selectEnd) : aaLen - 1;
 
-    lastMetricsTableRegion = `Residues ${startIdx + 1}-${endIdx + 1}`;
-    lastMetricsTableRows = [];
-
-    let html = `<p style="font-size:0.85rem; color:#64748b;">Evaluating Region: <strong>${lastMetricsTableRegion}</strong></p>`;
-    html += `<table class="metrics-table"><thead><tr><th>Model / Track</th><th>Metric</th><th>Mean Value</th><th>High Conf (≥70) / Buried (<0.2)</th></tr></thead><tbody>`;
-
+    const region = `Residues ${startIdx + 1}-${endIdx + 1}`;
+    const rows = [];
     structuralKeys.forEach(key => {
         const data = parsedTracks[key];
         const isPlddt = key.endsWith('_pLDDT');
         let sum = 0, count = 0, metricCount = 0;
-        
         for (let i = startIdx; i <= endIdx; i++) {
             if (data[i] && data[i].val !== undefined && data[i].val !== null) {
                 sum += data[i].val;
@@ -7899,9 +7905,26 @@ function openMetricsTable() {
         }
         const mean = count > 0 ? (sum / count).toFixed(2) : 'N/A';
         const pct = count > 0 ? ((metricCount / count) * 100).toFixed(1) + '%' : 'N/A';
+        rows.push({ model: formatTrackLabel(key), metric: isPlddt ? 'pLDDT' : 'RSA', mean, pct });
+    });
+    return { rows, region, hasData: true };
+}
 
-        lastMetricsTableRows.push({ model: formatTrackLabel(key), metric: isPlddt ? 'pLDDT' : 'RSA', mean, pct });
-        html += `<tr><td><strong>${formatTrackLabel(key)}</strong></td><td>${isPlddt ? 'pLDDT' : 'RSA'}</td><td>${mean}</td><td>${pct}</td></tr>`;
+function openMetricsTable() {
+    const { rows, region, hasData } = computeMetricsRows();
+    if (!hasData) {
+        alert("Please attach structure files first.");
+        return;
+    }
+
+    lastMetricsTableRegion = region;
+    lastMetricsTableRows = rows;
+
+    let html = `<p style="font-size:0.85rem; color:#64748b;">Evaluating Region: <strong>${region}</strong></p>`;
+    html += `<table class="metrics-table"><thead><tr><th>Model / Track</th><th>Metric</th><th>Mean Value</th><th>High Conf (≥70) / Buried (<0.2)</th></tr></thead><tbody>`;
+
+    rows.forEach(row => {
+        html += `<tr><td><strong>${row.model}</strong></td><td>${row.metric}</td><td>${row.mean}</td><td>${row.pct}</td></tr>`;
     });
 
     html += `</tbody></table>`;
@@ -7909,42 +7932,62 @@ function openMetricsTable() {
     openModalAsDialog('metricsModal');
 }
 
-// Exports exactly the rows currently in the table above as a .tsv file -
-// reads from lastMetricsTableRows (populated by openMetricsTable(), not
-// re-derived here) so the export can never disagree with what's on screen.
+// Exports the metrics data (same rows the Metrics Table shows) as a .tsv file.
+// Recomputes on demand from computeMetricsRows() so the Export menu works
+// without opening the Table modal first.
 function exportMetricsTableTSV() {
-    if (!lastMetricsTableRows.length) {
-        showToast('No metrics table data to export yet - open Metrics Table first.', 'error');
-        return;
-    }
-
-    const header = ['Model / Track', 'Metric', 'Mean Value', 'High Conf (>=70) / Buried (<0.2)'];
-    const lines = [header.join('\t')];
-    lastMetricsTableRows.forEach(row => {
-        lines.push([row.model, row.metric, row.mean, row.pct].join('\t'));
-    });
-    const tsvText = lines.join('\n');
-
-    let blob, url;
-    try {
-        blob = new Blob([tsvText], { type: 'text/tab-separated-values' });
-        url = URL.createObjectURL(blob);
-    } catch (err) {
-        console.error('Failed to build TSV export:', err);
-        showToast('Failed to build the TSV file.', 'error');
-        return;
-    }
-
-    const regionSlug = lastMetricsTableRegion.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    const data = buildMetricsDelimited('\t');
+    if (!data) { showToast('Attach structure files (pLDDT/RSA) to export metrics.', 'error'); return; }
+    const slug = data.region.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    if (downloadTextFile(`q2dv-metrics_${slug}_${stamp}.tsv`, data.text, 'text/tab-separated-values;charset=utf-8')) {
+        showToast('Metrics exported as TSV.', 'success');
+    }
+}
+
+// Same metrics data as a .csv file (fields quoted when they contain the
+// separator, a quote, or a newline).
+function exportMetricsCSV() {
+    const data = buildMetricsDelimited(',');
+    if (!data) { showToast('Attach structure files (pLDDT/RSA) to export metrics.', 'error'); return; }
+    const slug = data.region.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    if (downloadTextFile(`q2dv-metrics_${slug}_${stamp}.csv`, data.text, 'text/csv;charset=utf-8')) {
+        showToast('Metrics exported as CSV.', 'success');
+    }
+}
+
+// Builds the metrics table as a tab- or comma-delimited string. Returns null
+// when there is nothing to export (no structural tracks).
+function buildMetricsDelimited(sep) {
+    const { rows, region, hasData } = computeMetricsRows();
+    if (!hasData) return null;
+    const field = (s) => {
+        s = String(s);
+        if (s.indexOf(sep) !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    };
+    const header = ['Model / Track', 'Metric', 'Mean Value', 'High Conf (>=70) / Buried (<0.2)'];
+    const lines = [header.map(field).join(sep)];
+    rows.forEach(r => lines.push([r.model, r.metric, r.mean, r.pct].map(field).join(sep)));
+    return { text: lines.join('\n'), region };
+}
+
+// Generic text download helper shared by the TSV/CSV/SVG exporters.
+function downloadTextFile(filename, text, mime) {
+    let blob, url;
+    try { blob = new Blob([text], { type: mime }); url = URL.createObjectURL(blob); }
+    catch (err) { console.error('Export failed:', err); showToast('Failed to build the file.', 'error'); return false; }
     const a = document.createElement('a');
     a.href = url;
-    a.download = `q2dv-metrics_${regionSlug}_${stamp}.tsv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('Metrics table exported as TSV.', 'success');
+    return true;
 }
 
 function closeMetricsTable() {
@@ -9198,6 +9241,183 @@ function exportFullSave() {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     showToast('Save file downloaded.', 'success');
+}
+
+// --- Viewport export (SVG / PNG) ------------------------------------------
+// Builds a standalone SVG of the current viewport (grid heatmap OR graph view)
+// with no external dependency: grid/annotation rows are rebuilt by reading the
+// live DOM's computed colors, and graph sections are serialized from their
+// existing inline-styled <svg> nodes.
+
+function escapeXml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+// Maps a computed CSS color to something SVG can paint; returns null for
+// fully-transparent/empty colors (which should not be drawn).
+function svgColor(css) {
+    if (!css) return null;
+    if (css === 'transparent') return null;
+    const m = css.match(/rgba?\(([^)]+)\)/);
+    if (m) {
+        const parts = m[1].split(',').map(x => parseFloat(x));
+        if (parts.length === 4 && parts[3] === 0) return null;
+    }
+    return css;
+}
+
+// Renders one .track-row (grid or graph-annotation) as SVG: the left label
+// plus a colored rect and glyph text per cell.
+function renderRowAsSVG(row, h, y, labelW, cellW) {
+    let out = '';
+    const labelEl = row.querySelector('.track-label');
+    let labelText = '';
+    if (labelEl) {
+        const lt = labelEl.querySelector('.track-label-text');
+        labelText = lt ? (lt.textContent || '') : (labelEl.getAttribute('data-track') || '');
+    }
+    out += `<rect x="0" y="${y}" width="${labelW}" height="${h}" fill="#f8fafc"/>`;
+    out += `<line x1="${labelW}" y1="${y}" x2="${labelW}" y2="${y + h}" stroke="#e2e8f0"/>`;
+    if (labelText) {
+        out += `<text x="8" y="${y + h / 2 + 3.5}" font-size="10" font-weight="bold" fill="#334155">${escapeXml(labelText)}</text>`;
+    }
+    const isPos = row.classList.contains('track-position-row');
+    if (isPos) {
+        Array.from(row.querySelectorAll('.position-cell')).forEach((c, i) => {
+            const t = (c.textContent || '').trim();
+            if (t) {
+                out += `<text x="${labelW + i * cellW + cellW / 2}" y="${y + h / 2 + 3.5}" font-size="${Math.max(6, Math.min(12, cellW))}" text-anchor="middle" fill="#64748b">${escapeXml(t)}</text>`;
+            }
+        });
+    } else {
+        Array.from(row.querySelectorAll('.cell')).forEach(c => {
+            const idx = parseInt(c.getAttribute('data-idx') || '0', 10) || 0;
+            const x = labelW + idx * cellW;
+            const bg = svgColor(getComputedStyle(c).backgroundColor);
+            if (bg) out += `<rect x="${x}" y="${y}" width="${cellW}" height="${h}" fill="${bg}"/>`;
+            const glyph = c.querySelector('.cell-glyph');
+            if (glyph) {
+                const gtext = (glyph.textContent || '').trim();
+                if (gtext) {
+                    const gcolor = svgColor(getComputedStyle(glyph).color) || '#1e293b';
+                    out += `<text x="${x + cellW / 2}" y="${y + h / 2 + 3.5}" font-size="${Math.max(5, cellW - 2)}" text-anchor="middle" fill="${gcolor}">${escapeXml(gtext)}</text>`;
+                }
+            }
+        });
+    }
+    return out;
+}
+
+// Walks #alignmentGrid's children in DOM order, rendering .track-row /
+// .sticky-top rows as SVG and serializing any graph-section <svg> nodes in
+// place, producing one combined SVG that matches the visible viewport.
+function buildViewportSVG() {
+    const grid = document.getElementById('alignmentGrid');
+    if (!grid) return null;
+    const labelW = GRAPH_AXIS_WIDTH;
+    const cellW = gridCellW || CELL_WIDTH_BASE;
+    const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!totalLength) return null;
+    const width = labelW + totalLength * cellW;
+
+    const parts = [];
+    let y = 0;
+    const emitRows = (el) => {
+        Array.from(el.querySelectorAll('.track-row')).forEach(r => {
+            const h = r.offsetHeight || 20;
+            parts.push(renderRowAsSVG(r, h, y, labelW, cellW));
+            y += h;
+        });
+    };
+
+    Array.from(grid.children).forEach(child => {
+        if (child.classList && child.classList.contains('sticky-top')) {
+            emitRows(child);
+        } else if (child.classList && child.classList.contains('track-row')) {
+            const h = child.offsetHeight || 20;
+            parts.push(renderRowAsSVG(child, h, y, labelW, cellW));
+            y += h;
+        } else if (child.classList && child.classList.contains('graph-section-wrapper')) {
+            const svg = child.querySelector('svg');
+            if (svg) {
+                const h = svg.offsetHeight || 200;
+                const clone = svg.cloneNode(true);
+                clone.setAttribute('x', '0');
+                clone.setAttribute('y', String(y));
+                clone.setAttribute('width', String(width));
+                parts.push(new XMLSerializer().serializeToString(clone));
+                y += h;
+            }
+        }
+    });
+
+    if (!parts.length) return null;
+    const height = y;
+    const bg = `<rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"/>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${bg}${parts.join('')}</svg>`;
+}
+
+function exportViewportSVG() {
+    const svg = buildViewportSVG();
+    if (!svg) { showToast('Nothing to export yet - load a sequence first.', 'error'); return; }
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    if (downloadTextFile(`q2dv-viewport_${stamp}.svg`, svg, 'image/svg+xml;charset=utf-8')) {
+        showToast('Viewport exported as SVG.', 'success');
+    }
+}
+
+// Rasterizes buildViewportSVG() to a 2x PNG via a canvas (no dependency).
+function exportViewportPNG() {
+    const svg = buildViewportSVG();
+    if (!svg) { showToast('Nothing to export yet - load a sequence first.', 'error'); return; }
+    let blob, url;
+    try { blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }); url = URL.createObjectURL(blob); }
+    catch (err) { console.error('PNG export failed:', err); showToast('Failed to build the PNG.', 'error'); return; }
+    const img = new Image();
+    img.onload = () => {
+        const w = img.naturalWidth || 1200;
+        const h = img.naturalHeight || 400;
+        const scale = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = w * scale;
+        canvas.height = h * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(pngBlob => {
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const pngUrl = URL.createObjectURL(pngBlob);
+            const a = document.createElement('a');
+            a.href = pngUrl;
+            a.download = `q2dv-viewport_${stamp}.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
+            showToast('Viewport exported as PNG.', 'success');
+        }, 'image/png');
+        URL.revokeObjectURL(url);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); showToast('Failed to render the PNG.', 'error'); };
+    img.src = url;
+}
+
+// Dispatches the Export dropdown selection, then resets the select to its
+// placeholder so the same option can be picked again.
+function onExportSelect() {
+    const sel = document.getElementById('exportSelect');
+    if (!sel) return;
+    const val = sel.value;
+    sel.value = '';
+    switch (val) {
+        case 'json': exportFullSave(); break;
+        case 'tsv': exportMetricsTableTSV(); break;
+        case 'csv': exportMetricsCSV(); break;
+        case 'svg': exportViewportSVG(); break;
+        case 'png': exportViewportPNG(); break;
+        default: break;
+    }
 }
 
 // Applies an already-parsed, already-marker-verified save object. Shared by

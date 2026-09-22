@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-22
+
+### Added
+
+- **Export menu** (top-right of the sidebar). A single "Export ▾" dropdown with:
+  - Export Q2DV Data as JSON (reuses the save-file export)
+  - Export Data as TSV / CSV (pLDDT/RSA metrics, computed on demand over the
+    current selection or the full sequence — no need to open the Table modal)
+  - Export Viewport as SVG / PNG (grid heatmap *and* graph view, dependency-free:
+    rows rebuilt by reading the live DOM's computed colors, graph sections
+    serialized from their inline-styled `<svg>` nodes; PNG rasterized at 2x)
+
 ## [0.2.0] - 2026-09-22
 
 ### Added
