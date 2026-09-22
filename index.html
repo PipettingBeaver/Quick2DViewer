@@ -2362,33 +2362,40 @@ let uniprotAccession = '';               // last-used accession (persisted)
 let uniprotFeatures = null;              // { accession, features: [{type,start,end,description}], fetchedAt }
 let uniprotFeatureTracks = {};           // { 'UP_<cat>': [{start,end,type,description}] } (1-based)
 let uniprotLogEntries = [];              // timestamped debug log for the fetch/BLAST pipeline
-const UNIPROT_FEATURE_CATEGORIES = [
-    { key: 'UP_Domains', char: 'D', color: '#c7d2fe', label: 'UniProt Domains/Regions',
-      types: ['Domain', 'Family', 'Repeat', 'Region', 'Motif', 'Zinc finger', 'Coiled coil', 'Compositional bias'] },
-    { key: 'UP_Topology', char: 'T', color: '#a5f3fc', label: 'UniProt Topology/Signal',
-      types: ['Transmembrane', 'Intramembrane', 'Topological domain', 'Signal', 'Signal peptide', 'Transit peptide', 'Propeptide'] },
-    { key: 'UP_Sites', char: 'S', color: '#fecaca', label: 'UniProt Sites',
-      types: ['Active site', 'Binding site', 'Site', 'Metal binding', 'DNA binding', 'Calcium binding', 'Zinc binding'] },
-    { key: 'UP_PTMs', char: 'P', color: '#fde68a', label: 'UniProt PTMs',
-      types: ['Modified residue', 'Glycosylation', 'Disulfide bond', 'Cross-link', 'Lipidation', 'Phosphorylation', 'Acetylation', 'Methylation', 'Hydroxylation', 'Palmitoylation', 'Nitrosylation', 'Chromophore', 'Sulfation'] },
-    { key: 'UP_Variants', char: 'V', color: '#bbf7d0', label: 'UniProt Variants',
-      types: ['Natural variant', 'Mutagenesis', 'Sequence conflict', 'Alternative sequence', 'Splicing variant'] }
-];
-const UNIPROT_CATEGORY_BY_KEY = {};
-UNIPROT_FEATURE_CATEGORIES.forEach(c => { UNIPROT_CATEGORY_BY_KEY[c.key] = c; });
+const UNIPROT_TYPE_CATEGORIES = {
+    // domains / regions (indigo)
+    'Domain': 'domain', 'Family': 'domain', 'Repeat': 'domain', 'Region': 'domain', 'Motif': 'domain',
+    'Zinc finger': 'domain', 'Coiled coil': 'domain', 'Compositional bias': 'domain',
+    // topology / processing (cyan)
+    'Transmembrane': 'topology', 'Intramembrane': 'topology', 'Topological domain': 'topology',
+    'Signal': 'topology', 'Signal peptide': 'topology', 'Transit peptide': 'topology', 'Propeptide': 'topology',
+    // functional sites (rose)
+    'Active site': 'site', 'Binding site': 'site', 'Site': 'site', 'Metal binding': 'site',
+    'DNA binding': 'site', 'Calcium binding': 'site', 'Zinc binding': 'site', 'Nucleotide binding': 'site',
+    // post-translational modifications (amber)
+    'Modified residue': 'ptm', 'Glycosylation': 'ptm', 'Disulfide bond': 'ptm', 'Cross-link': 'ptm',
+    'Lipidation': 'ptm', 'Phosphorylation': 'ptm', 'Acetylation': 'ptm', 'Methylation': 'ptm',
+    'Hydroxylation': 'ptm', 'Palmitoylation': 'ptm', 'Nitrosylation': 'ptm', 'Chromophore': 'ptm', 'Sulfation': 'ptm',
+    // variation (green)
+    'Natural variant': 'variant', 'Mutagenesis': 'variant', 'Sequence conflict': 'variant',
+    'Alternative sequence': 'variant', 'Splicing variant': 'variant'
+};
+const UNIPROT_CATEGORY_COLORS = { domain: '#c7d2fe', topology: '#a5f3fc', site: '#fecaca', ptm: '#fde68a', variant: '#bbf7d0' };
+const UNIPROT_MARKER = '■';
 
-function uniprotCategoryForType(type) {
-    for (const c of UNIPROT_FEATURE_CATEGORIES) if (c.types.includes(type)) return c;
-    return null;
-}
-function uniprotCategoryForKey(key) { return UNIPROT_CATEGORY_BY_KEY[key] || null; }
+// One track per feature type: 'UP_Transmembrane', 'UP_Signal', 'UP_Disulfide_bond', …
+function uniprotTypeKey(type) { return 'UP_' + String(type).replace(/[^A-Za-z0-9]+/g, '_'); }
+function uniprotCategoryForType(type) { return UNIPROT_TYPE_CATEGORIES[type] || null; }
+// Returns the feature-track metadata ({type, category, color, features}) for a
+// UP_ key, or null.
+function uniprotMetaForKey(key) { return uniprotFeatureTracks[key] || null; }
 // Returns the feature covering residue `residueIdx0` (0-based) on a UP_ track,
 // or null. Features are stored 1-based.
 function uniprotFeatureAt(key, residueIdx0) {
-    const list = uniprotFeatureTracks[key];
-    if (!list) return null;
+    const meta = uniprotFeatureTracks[key];
+    if (!meta || !meta.features) return null;
     const pos = residueIdx0 + 1;
-    for (const f of list) if (pos >= f.start && pos <= f.end) return f;
+    for (const f of meta.features) if (pos >= f.start && pos <= f.end) return f;
     return null;
 }
 
@@ -2599,23 +2606,26 @@ function applyUniProtFeatures() {
     Object.keys(parsedTracks).forEach(k => { if (k.startsWith('UP_')) delete parsedTracks[k]; });
     uniprotFeatureTracks = {};
     if (!aaLen || !uniprotFeatures || !Array.isArray(uniprotFeatures.features)) return;
-    const cats = new Map();
+    // Group the fetched features by their distinct type, so each gets its own
+    // clearly-labelled row (e.g. "Transmembrane", "Signal", "Disulfide bond")
+    // instead of collapsing several types into one ambiguous bucket.
+    const byType = new Map();
     uniprotFeatures.features.forEach(f => {
-        const c = uniprotCategoryForType(f.type);
-        if (!c) return;
-        if (!cats.has(c.key)) cats.set(c.key, []);
-        cats.get(c.key).push({ start: f.start, end: f.end, type: f.type, description: f.description || '' });
+        const cat = uniprotCategoryForType(f.type);
+        if (!cat) return; // unmapped type (Chain, Helix, …) -> skip
+        if (!byType.has(f.type)) byType.set(f.type, []);
+        byType.get(f.type).push({ start: f.start, end: f.end, type: f.type, description: f.description || '' });
     });
-    cats.forEach((list, key) => {
-        const c = UNIPROT_CATEGORY_BY_KEY[key];
-        if (!c) return;
+    byType.forEach((features, type) => {
+        const key = uniprotTypeKey(type);
+        const cat = UNIPROT_TYPE_CATEGORIES[type];
         const track = new Array(aaLen).fill(' ');
-        list.forEach(f => {
+        features.forEach(f => {
             const s = Math.max(1, f.start), e = Math.min(aaLen, f.end);
-            for (let i = s; i <= e; i++) track[i - 1] = c.char;
+            for (let i = s; i <= e; i++) track[i - 1] = UNIPROT_MARKER;
         });
         parsedTracks[key] = track.join('');
-        uniprotFeatureTracks[key] = list;
+        uniprotFeatureTracks[key] = { type, category: cat, color: UNIPROT_CATEGORY_COLORS[cat] || '#e2e8f0', features };
     });
     renderViewer(parsedTracks);
     schedulePersist();
@@ -3124,7 +3134,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.5.5';
+const APP_VERSION = '0.5.6';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -6276,12 +6286,12 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
             }
             else if (key.startsWith('UP_')) {
                 // UniProt annotation track (Options > Annotation Offload): covered
-                // residues get a category-colored background + marker char, with
-                // the feature type/description in the tooltip.
-                const upCat = uniprotCategoryForKey(key);
+                // residues get a category-colored background + marker, with the
+                // feature type/description in the tooltip.
+                const upMeta = uniprotMetaForKey(key);
                 const feat = uniprotFeatureAt(key, i);
                 if (feat) {
-                    cellEl.style.backgroundColor = upCat ? upCat.color : '#e2e8f0';
+                    cellEl.style.backgroundColor = upMeta ? upMeta.color : '#e2e8f0';
                     const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
                     if (gSpan) gSpan.style.color = '#1e293b';
                     cellEl.title = `Residue ${i + 1}: ${feat.type}` + (feat.description ? ` — ${feat.description}` : '');

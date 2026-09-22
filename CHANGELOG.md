@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-09-22
+
+### Changed
+
+- UniProt annotations now render **one row per feature type** (e.g. "Transmembrane",
+  "Signal", "Disulfide bond") instead of collapsing many types into coarse buckets,
+  so distinct features are visually distinguishable and clearly labelled.
+
 ## [0.5.5] - 2026-09-22
 
 ### Added
