@@ -2412,37 +2412,64 @@ function parseUniProtFeatures(data) {
     return out;
 }
 
+// Maps the EBI Proteins API's uppercase feature-type codes onto the same
+// human-readable names used by the rest.uniprot.org parser, so both backends
+// produce identical {type,start,end,description} entries. Unmapped types
+// (CHAIN, etc.) are dropped.
+const EBI_FEATURE_TYPE_MAP = {
+    SIGNAL: 'Signal', PEPTIDE: 'Propeptide', PROPEP: 'Propeptide',
+    TRANSMEM: 'Transmembrane', INTRAMEM: 'Intramembrane', TOPO_DOM: 'Topological domain',
+    DOMAIN: 'Domain', REGION: 'Region', COILED: 'Coiled coil', MOTIF: 'Motif',
+    ZN_FING: 'Zinc finger', COMPBIAS: 'Compositional bias', REPEAT: 'Repeat',
+    ACT_SITE: 'Active site', BINDING: 'Binding site', SITE: 'Site', METAL: 'Metal binding',
+    CA_BIND: 'Calcium binding', DNA_BIND: 'DNA binding', NP_BIND: 'Nucleotide binding',
+    MOD_RES: 'Modified residue', CARBOHYD: 'Glycosylation', DISULFID: 'Disulfide bond',
+    CROSSLNK: 'Cross-link', LIPID: 'Lipidation', VARIANT: 'Natural variant',
+    MUTAGEN: 'Mutagenesis', CONFLICT: 'Sequence conflict'
+};
+function parseUniProtFeaturesEBI(data) {
+    if (!data || !Array.isArray(data.features)) return [];
+    const out = [];
+    data.features.forEach(f => {
+        const type = EBI_FEATURE_TYPE_MAP[f.type] || null;
+        if (!type) return;
+        const start = parseInt(f.begin, 10);
+        const end = parseInt(f.end, 10);
+        if (isNaN(start) || isNaN(end)) return;
+        out.push({ type, start, end, description: f.description || '' });
+    });
+    return out;
+}
+
 async function fetchUniProtFeaturesByAccession(acc) {
     setUniProtStatus('Fetching ' + acc + ' from UniProt…');
-    const url = uniprotApiBase() + encodeURIComponent(acc) + '.json';
-    let resp = null, data = null;
-    try {
-        // Two attempts: transient network/DNS hiccups are common.
-        for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-                resp = await fetch(url);
-                if (resp.ok) break;
-            } catch (e) { if (attempt === 1) throw e; }
-        }
-        if (!resp || !resp.ok) throw new Error('HTTP ' + (resp ? resp.status : 'network'));
-        data = await resp.json();
-        const features = parseUniProtFeatures(data);
-        if (!features.length) {
-            setUniProtStatus('No residue-level features for ' + acc + '.');
-            showToast('No residue-level features found for ' + acc + '.', 'info');
-            return null;
-        }
-        setUniProtStatus('Loaded ' + features.length + ' features from ' + acc + '.');
-        return features;
-    } catch (err) {
-        const m = err && err.message ? err.message : String(err);
-        const netFail = /networkerror|failed to fetch|aborted/i.test(m);
-        setUniProtStatus('Fetch failed: ' + m);
-        showToast(netFail
-            ? 'Could not reach UniProt (network/DNS, or a privacy extension/tracking protection blocked the request). Try opening https://rest.uniprot.org/uniprotkb/' + encodeURIComponent(acc) + '.json in a new tab - if it loads there, it is a browser blocking issue.'
-            : 'Could not fetch UniProt annotations for ' + acc + ' (' + m + ').', 'error');
-        return null;
+    const encoded = encodeURIComponent(acc);
+    // Two backends, tried in order: rest.uniprot.org (canonical) then the EBI
+    // Proteins API on www.ebi.ac.uk. Some networks/browsers can reach one
+    // domain but not the other, so falling back makes annotation offload work
+    // in either case.
+    const endpoints = [
+        { url: uniprotApiBase() + encoded + '.json', parse: parseUniProtFeatures, label: '' },
+        { url: 'https://www.ebi.ac.uk/proteins/api/features/' + encoded + '.json', parse: parseUniProtFeaturesEBI, label: ' (EBI)' }
+    ];
+    let lastError = null;
+    for (const ep of endpoints) {
+        try {
+            const resp = await fetch(ep.url);
+            if (!resp.ok) { lastError = new Error('HTTP ' + resp.status); continue; }
+            const features = ep.parse(await resp.json());
+            if (!features.length) { lastError = new Error('no residue-level features'); continue; }
+            setUniProtStatus('Loaded ' + features.length + ' features from ' + acc + ep.label + '.');
+            return features;
+        } catch (err) { lastError = err; }
     }
+    const m = lastError && lastError.message ? lastError.message : 'network';
+    const netFail = /networkerror|failed to fetch|aborted|no residue/i.test(m);
+    setUniProtStatus('Fetch failed: ' + m);
+    showToast(netFail
+        ? 'Could not reach UniProt (network/DNS, or a privacy extension/tracking protection blocked it). Try https://rest.uniprot.org/uniprotkb/' + encoded + '.json in a new tab - if it loads there, it is a browser blocking issue.'
+        : 'Could not fetch UniProt annotations for ' + acc + ' (' + m + ').', 'error');
+    return null;
 }
 
 // Sequence -> accession via the EBI NCBI-BLAST job API (submit -> poll ->
@@ -3057,7 +3084,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.5.3';
+const APP_VERSION = '0.5.4';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

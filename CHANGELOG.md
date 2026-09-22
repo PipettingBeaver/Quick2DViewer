@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-09-22
+
+### Fixed
+
+- UniProt annotation offload now falls back to the **EBI Proteins API**
+  (`www.ebi.ac.uk/proteins/api/features/{acc}.json`) when `rest.uniprot.org` is
+  unreachable — some networks/browsers can reach one domain but not the other.
+
 ## [0.5.3] - 2026-09-22
 
 ### Fixed
