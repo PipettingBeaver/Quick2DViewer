@@ -2046,6 +2046,13 @@
                 style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
             <button onclick="fetchUniProtAnnotations()" style="margin-top: 12px;">⬇ Fetch Annotations</button>
             <span style="font-size: 0.72rem; color: #94a3b8; margin-left: 8px;" id="uniprotAnnotationStatus"></span>
+            <div style="margin-top: 12px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                    <span style="font-size:0.72rem; font-weight:600; color:#475569;">Debug log</span>
+                    <button class="copy-btn" onclick="copyUniProtLog()" style="font-size:0.7rem; padding:2px 8px;">Copy log</button>
+                </div>
+                <pre id="uniprotAnnotationLog" class="data-box" style="font-size:0.7rem; max-height:160px; overflow:auto; white-space:pre-wrap; margin:0; color:#334155;">(log appears here)</pre>
+            </div>
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
@@ -2354,6 +2361,7 @@ let uniprotAnnotationMode = 'accession'; // 'accession' | 'sequence'
 let uniprotAccession = '';               // last-used accession (persisted)
 let uniprotFeatures = null;              // { accession, features: [{type,start,end,description}], fetchedAt }
 let uniprotFeatureTracks = {};           // { 'UP_<cat>': [{start,end,type,description}] } (1-based)
+let uniprotLogEntries = [];              // timestamped debug log for the fetch/BLAST pipeline
 const UNIPROT_FEATURE_CATEGORIES = [
     { key: 'UP_Domains', char: 'D', color: '#c7d2fe', label: 'UniProt Domains/Regions',
       types: ['Domain', 'Family', 'Repeat', 'Region', 'Motif', 'Zinc finger', 'Coiled coil', 'Compositional bias'] },
@@ -2389,6 +2397,24 @@ function setUniProtStatus(msg) {
     if (el) el.textContent = msg || '';
 }
 function uniprotApiBase() { return 'https://rest.uniprot.org/uniprotkb/'; }
+
+// Appends a timestamped entry to the annotation debug log, mirrors it to the
+// console, and refreshes the visible <pre> if present.
+function uniprotLog(msg) {
+    const stamp = new Date().toISOString().slice(11, 19);
+    uniprotLogEntries.push('[' + stamp + '] ' + msg);
+    try { console.log('[Q2DV UniProt] ' + msg); } catch (e) {}
+    const el = document.getElementById('uniprotAnnotationLog');
+    if (el) el.textContent = uniprotLogEntries.join('\n');
+}
+function copyUniProtLog() {
+    const text = uniprotLogEntries.join('\n') || '(empty log)';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast('Debug log copied.', 'success'), () => showToast('Could not copy the log.', 'error'));
+    } else {
+        showToast('Clipboard unavailable - the log is also printed to the browser console.', 'info');
+    }
+}
 
 // Extracts residue-level features ({type,start,end,description}, 1-based) from
 // a UniProtKB JSON entry. Skips non-residue features (subcellular location,
@@ -2454,14 +2480,17 @@ async function fetchUniProtFeaturesByAccession(acc) {
     ];
     let lastError = null;
     for (const ep of endpoints) {
+        uniprotLog('try ' + ep.url);
         try {
             const resp = await fetch(ep.url);
+            uniprotLog(ep.url + ' -> HTTP ' + resp.status);
             if (!resp.ok) { lastError = new Error('HTTP ' + resp.status); continue; }
             const features = ep.parse(await resp.json());
+            uniprotLog('parsed ' + features.length + ' features');
             if (!features.length) { lastError = new Error('no residue-level features'); continue; }
             setUniProtStatus('Loaded ' + features.length + ' features from ' + acc + ep.label + '.');
             return features;
-        } catch (err) { lastError = err; }
+        } catch (err) { uniprotLog(ep.url + ' threw: ' + (err && err.message ? err.message : err)); lastError = err; }
     }
     const m = lastError && lastError.message ? lastError.message : 'network';
     const netFail = /networkerror|failed to fetch|aborted|no residue/i.test(m);
@@ -2478,7 +2507,6 @@ async function fetchUniProtFeaturesByAccession(acc) {
 // clear message pointing at the accession path. Kept so the sequence mode is
 // fully wired end-to-end.
 async function resolveAccessionFromSequence(seq) {
-    setUniProtStatus('Submitting sequence to BLAST (UniProtKB)…');
     const base = 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/';
     const t0 = Date.now();
     const elapsed = () => Math.round((Date.now() - t0) / 1000);
@@ -2488,52 +2516,64 @@ async function resolveAccessionFromSequence(seq) {
         return fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})).finally(() => clearTimeout(timer));
     };
     const submitBody = 'email=q2dv@example.com&program=blastp&database=uniprotkb&stype=protein&alignments=5&scores=5&exp=1e-3&sequence=' + encodeURIComponent(seq);
-    try {
-        // Submit (with one retry): the EBI job dispatcher can be slow or drop
-        // the first request under load, so don't fail on a single hiccup.
-        let jobId = '', runResp = null;
-        for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
-            try {
-                if (attempt) setUniProtStatus('Re-submitting BLAST job (attempt ' + (attempt + 1) + ')…');
-                runResp = await fetchWithTimeout(base + 'run', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: submitBody
-                }, 90000);
-                if (runResp.ok) jobId = (await runResp.text()).trim();
-            } catch (e) { /* retry below */ }
+    uniprotLog('BLAST sequence mode: seq length ' + seq.length + ', head "' + seq.slice(0, 20) + '"');
+
+    for (let jobAttempt = 0; jobAttempt < 2; jobAttempt++) {
+        if (jobAttempt) { uniprotLog('Retrying whole BLAST job (attempt ' + (jobAttempt + 1) + ')'); setUniProtStatus('Retrying BLAST (attempt ' + (jobAttempt + 1) + ')…'); }
+        else setUniProtStatus('Submitting sequence to BLAST (UniProtKB)…');
+        try {
+            let jobId = '', runResp = null;
+            for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
+                try {
+                    runResp = await fetchWithTimeout(base + 'run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: submitBody
+                    }, 90000);
+                    if (runResp.ok) jobId = (await runResp.text()).trim();
+                    uniprotLog('submit attempt ' + (attempt + 1) + ': HTTP ' + (runResp ? runResp.status : '?') + (jobId ? ' job=' + jobId : ''));
+                } catch (e) { uniprotLog('submit attempt ' + (attempt + 1) + ' threw: ' + (e && e.message ? e.message : e)); }
+            }
+            if (!runResp || !runResp.ok) throw new Error('submit failed' + (runResp ? ' (HTTP ' + runResp.status + ')' : ''));
+            if (!jobId) throw new Error('no job id returned');
+
+            let status = '';
+            let lastLogged = '';
+            for (let i = 0; i < 100; i++) {
+                await new Promise(r => setTimeout(r, 3000));
+                status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 30000)).text()).trim();
+                if (status !== lastLogged) { uniprotLog('poll ' + (i + 1) + ': status=' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
+                if (status === 'FINISHED') break;
+                if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('BLAST ' + status);
+                setUniProtStatus(`BLAST job ${jobId} still running… ${elapsed()}s (${status || 'queued'})`);
+            }
+            if (status !== 'FINISHED') throw new Error('timed out after ' + elapsed() + 's');
+
+            uniprotLog('BLAST FINISHED — fetching result');
+            const data = await (await fetchWithTimeout(base + 'result/' + jobId + '/json', {}, 60000)).json();
+            const hits = (data && data.hits) || [];
+            const acc = hits.length ? (hits[0].hit_acc || hits[0].hit_id || null) : null;
+            uniprotLog('result: ' + hits.length + ' hit(s)' + (acc ? ', top accession ' + acc : ', NO accession'));
+            if (!acc) throw new Error('no hit accession in results');
+            setUniProtStatus('Matched ' + acc + ' (top BLAST hit).');
+            return acc;
+        } catch (err) {
+            const msg = (err && err.name === 'AbortError') ? 'request aborted' : (err && err.message ? err.message : String(err));
+            uniprotLog('BLAST attempt ' + (jobAttempt + 1) + ' failed: ' + msg);
+            if (jobAttempt === 0) continue; // resubmit a fresh job once
+            setUniProtStatus('Sequence search failed: ' + msg);
+            showToast('Sequence search failed (' + msg + '). Copy the debug log below and share it, or paste the UniProt accession directly.', 'error');
+            return null;
         }
-        if (!runResp || !runResp.ok) throw new Error('submit failed' + (runResp ? ' (HTTP ' + runResp.status + ')' : ''));
-        if (!jobId) throw new Error('no job id returned');
-        setUniProtStatus(`BLAST job ${jobId} running… ${elapsed()}s`);
-        let status = '';
-        const maxAttempts = 100; // ~5 min at 3 s/poll
-        for (let i = 0; i < maxAttempts; i++) {
-            await new Promise(r => setTimeout(r, 3000));
-            status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 30000)).text()).trim();
-            if (status === 'FINISHED') break;
-            if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('BLAST ' + status);
-            setUniProtStatus(`BLAST job ${jobId} still running… ${elapsed()}s (${status || 'queued'})`);
-        }
-        if (status !== 'FINISHED') throw new Error('timed out after ' + elapsed() + 's');
-        setUniProtStatus('BLAST finished — fetching top hit…');
-        const data = await (await fetchWithTimeout(base + 'result/' + jobId + '/json', {}, 60000)).json();
-        const hits = (data && data.hits) || [];
-        const acc = hits.length ? (hits[0].hit_acc || hits[0].hit_id || null) : null;
-        if (!acc) throw new Error('no hit accession in results');
-        setUniProtStatus('Matched ' + acc + ' (top BLAST hit).');
-        return acc;
-    } catch (err) {
-        const msg = (err && err.name === 'AbortError') ? 'request aborted' : (err && err.message ? err.message : String(err));
-        setUniProtStatus('Sequence search failed: ' + msg);
-        showToast('Sequence search failed (' + msg + '). You can also paste the UniProt accession directly: Options > Annotation Offload > Accession.', 'error');
-        return null;
     }
+    return null;
 }
 
 // Main dispatcher for the Options "Fetch annotations" button, honoring the
 // selected mode. On success stores + renders the feature tracks.
 async function fetchUniProtAnnotations() {
+    uniprotLogEntries.length = 0;
+    uniprotLog('Annotation fetch started (mode ' + uniprotAnnotationMode + ')');
     let acc;
     if (uniprotAnnotationMode === 'sequence') {
         const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
@@ -3084,7 +3124,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.5.4';
+const APP_VERSION = '0.5.5';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -10279,6 +10319,7 @@ function resetAllData() {
     uniprotAccession = '';
     uniprotFeatures = null;
     uniprotFeatureTracks = {};
+    uniprotLogEntries = [];
     graphHighlights = {};
     selectStart = null; selectEnd = null; selectionMode = 'point';
     selectionScope = 'full';

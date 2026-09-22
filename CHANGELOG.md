@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-09-22
+
+### Added
+
+- **Debug log** for the UniProt annotation pipeline (Options → Annotation Offload):
+  a timestamped, copyable log of every BLAST submit/poll/result step and every
+  feature-fetch attempt, mirrored to the browser console.
+- BLAST sequence mode now retries the whole job once on failure.
+
 ## [0.5.4] - 2026-09-22
 
 ### Fixed
