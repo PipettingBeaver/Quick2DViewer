@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-22
+
+### Fixed
+
+- UniProt **Sequence (BLAST)** mode no longer aborts on slow networks: raised the
+  submit/status/result timeouts (90s/30s/60s), added a one-shot submit retry, and
+  limited BLAST to 5 alignments at `evalue < 1e-3` (the job still takes ~1.5–2 min,
+  which the live progress now reflects).
+
 ## [0.5.1] - 2026-09-22
 
 ### Fixed
