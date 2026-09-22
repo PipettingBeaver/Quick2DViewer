@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-22
+
+### Added
+
+- **Homolog Templates table** in the Data modal. HHpred hits are ranked by a
+  combined template score (probability × identity × query coverage), with
+  identity, coverage, probability, E-value, and structure availability
+  (cached / RCSB-fetchable) per homolog, the top hit highlighted, and a
+  per-row "3D" action to load that homolog into the viewer.
+
 ## [0.3.0] - 2026-09-22
 
 ### Added

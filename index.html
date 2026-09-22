@@ -1072,6 +1072,8 @@
         }
         table.metrics-table th { background: #e2e8f0; color: #0f172a; }
         table.metrics-table tr:hover { background: #f8fafc; }
+        table.metrics-table tr.homolog-best { background: #ecfdf5; }
+        table.metrics-table tr.homolog-best td { border-color: #a7f3d0; }
 
         /* --- Info tooltips ---------------------------------------------- */
         .info-icon {
@@ -2075,6 +2077,14 @@
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Homolog Templates (HHpred)</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Homologs imported from <code>.hhr</code> files, ranked by a <strong>template score</strong> (HHpred probability × identity × query coverage) — the top hit is the best candidate for structural/functional templating. <strong>Structure</strong> shows whether a matching PDB/CIF is already cached or auto-fetchable from RCSB.
+            </p>
+            <div id="dataHomologTableWrap" style="overflow-x: auto;"></div>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Structure Files</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Each PDB/CIF file is scanned on upload for a rough protein classification, apo/holo ligand state, and oligomeric state (chain count). This is best-effort: many files - especially computational models like AlphaFold predictions - simply don't record this information, in which case it's reported as such rather than guessed.
@@ -2791,7 +2801,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9747,6 +9757,99 @@ function structureCacheStatus(f) {
     return cachedStructureTexts[f.name] ? 'cached' : 'missing';
 }
 
+// Computes per-homolog template-quality metrics for the Data modal's "Homolog
+// Templates" table: identity %, query coverage %, HHpred probability, E-value,
+// whether a structure is cached or auto-fetchable, and a combined template
+// score (probability × identity × coverage, 0-100) for ranking.
+function homologTemplateMetrics() {
+    const keys = Object.keys(parsedTracks).filter(k => k.startsWith('HH_'));
+    const queryLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const rows = [];
+    keys.forEach(key => {
+        const info = hhpredHitsInfo[key] || {};
+        const s = info.stats || {};
+        const probab = parseFloat(s.Probab);
+        const ident = parseFloat(s.Identities);
+        const aligned = parseInt(s.Aligned_cols, 10);
+        const coverage = (queryLength && !isNaN(aligned)) ? Math.min(100, (aligned / queryLength) * 100) : null;
+        const pdb = (typeof p3dPdbIdFromHitId === 'function') ? p3dPdbIdFromHitId(info.hitId || '') : null;
+        const cachedFile = (typeof p3dHomologStructureFile === 'function') ? p3dHomologStructureFile(key) : null;
+        const score = (!isNaN(probab) && !isNaN(ident) && coverage != null)
+            ? (probab * ident * coverage) / 10000
+            : null;
+        rows.push({
+            key,
+            rank: info.rank,
+            hitId: info.hitId || key,
+            desc: ((info.hitDesc || '').split(';')[0] || '').trim(),
+            probab: isNaN(probab) ? null : probab,
+            evalue: s['E-value'] || '',
+            ident: isNaN(ident) ? null : ident,
+            coverage,
+            hasPdb: !!pdb,
+            pdbId: pdb ? pdb.pdbId : null,
+            cachedFile: cachedFile || null,
+            score
+        });
+    });
+    rows.sort((a, b) => {
+        const sa = a.score == null ? -1 : a.score;
+        const sb = b.score == null ? -1 : b.score;
+        return sb - sa;
+    });
+    return rows;
+}
+
+// Renders the homolog template table into #dataHomologTableWrap (in the Data
+// modal), sorted by template score with the top hit highlighted.
+function renderHomologTable() {
+    const wrap = document.getElementById('dataHomologTableWrap');
+    if (!wrap) return;
+    const rows = homologTemplateMetrics();
+    if (!rows.length) {
+        wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.85rem;">No homologs imported yet - attach an .hhr file.</p>';
+        return;
+    }
+    let html = '<table class="metrics-table" style="width:100%;"><thead><tr>' +
+        '<th>#</th><th>Homolog</th><th>Probab</th><th>E-value</th><th>Identity</th><th>Coverage</th><th>Structure</th><th>Template score</th><th></th>' +
+        '</tr></thead><tbody>';
+    rows.forEach((r, i) => {
+        const best = i === 0 && r.score != null;
+        let structCell = '—';
+        if (r.cachedFile) structCell = '<span style="color:#15803d;">✓ cached</span>';
+        else if (r.hasPdb) structCell = '<span style="color:#b45309;">PDB ' + structureEscapeHtml(r.pdbId) + '</span>';
+        const scoreCell = r.score == null ? 'N/A' : r.score.toFixed(1) + (best ? ' <span style="color:#15803d;">★ best</span>' : '');
+        html += '<tr' + (best ? ' class="homolog-best"' : '') + '>' +
+            '<td>' + (r.rank != null ? r.rank : '') + '</td>' +
+            '<td><strong>' + structureEscapeHtml(r.hitId) + '</strong>' + (r.desc ? ' — <span style="color:#64748b;">' + structureEscapeHtml(r.desc) + '</span>' : '') + '</td>' +
+            '<td>' + (r.probab == null ? '—' : r.probab.toFixed(1) + '%') + '</td>' +
+            '<td>' + structureEscapeHtml(r.evalue || '—') + '</td>' +
+            '<td>' + (r.ident == null ? '—' : r.ident.toFixed(1) + '%') + '</td>' +
+            '<td>' + (r.coverage == null ? '—' : r.coverage.toFixed(1) + '%') + '</td>' +
+            '<td>' + structCell + '</td>' +
+            '<td>' + scoreCell + '</td>' +
+            '<td><button type="button" class="copy-btn" data-key="' + structureEscapeHtml(r.key) + '" onclick="loadHomologIn3D(this.dataset.key)" title="Load this homolog in the 3D viewer" style="font-size:0.7rem; padding:2px 8px;">3D</button></td>' +
+            '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+// Loads a homolog into the floating 3D viewer (activates its row, opens the
+// viewer, and selects its model) - the per-row action in the Homolog Templates
+// table. Auto-fetches the structure from RCSB when the hitId is a PDB ID.
+async function loadHomologIn3D(key) {
+    if (!key || !hhpredHitsInfo[key]) { showToast('That homolog is not loaded.', 'error'); return; }
+    activeRowKey = key;
+    selectionMode = 'row';
+    await openP3DViewer();
+    const sel = document.getElementById('p3dModelSelect');
+    if (sel) {
+        sel.value = 'homolog:' + key;
+        loadP3DModel(p3dParseModelValue(sel.value));
+    }
+}
+
 function renderDataModal() {
     const data = buildStructureDataJSON();
 
@@ -9820,6 +9923,8 @@ function renderDataModal() {
     }
 
     document.getElementById('dataJSONView').textContent = JSON.stringify(data, null, 2);
+
+    renderHomologTable();
 }
 
 function openDataModal() {
