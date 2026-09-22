@@ -2033,7 +2033,7 @@
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Annotation Offload (UniProt)</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Pull curated residue-level annotations (domains, topology, active/binding sites, PTMs, variants) from UniProt and show them as rows in the viewer.<br><br>
-                <strong>Accession</strong> looks up a known UniProt accession directly. <strong>Sequence</strong> resolves the current sequence to an accession via BLAST first (may be blocked by the browser's CORS policy - use Accession if it fails). Fetching requires a network connection and nothing is uploaded except the requested sequence/accession.
+                <strong>Accession</strong> looks up a known UniProt accession directly. <strong>Sequence</strong> resolves the current sequence to an accession via BLAST first (this can take a minute or two — progress is shown below). Fetching requires a network connection and nothing is uploaded except the requested sequence/accession.
             </p>
             <label for="uniprotModeSelect" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">Lookup Mode</label>
             <select id="uniprotModeSelect" onchange="onUniprotModeChange()" class="q2dv-select"
@@ -2439,34 +2439,46 @@ async function fetchUniProtFeaturesByAccession(acc) {
 // clear message pointing at the accession path. Kept so the sequence mode is
 // fully wired end-to-end.
 async function resolveAccessionFromSequence(seq) {
-    setUniProtStatus('Running sequence search (BLAST vs UniProtKB)…');
+    setUniProtStatus('Submitting sequence to BLAST (UniProtKB)…');
     const base = 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/';
+    const t0 = Date.now();
+    const elapsed = () => Math.round((Date.now() - t0) / 1000);
+    const fetchWithTimeout = (url, opts, ms) => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})).finally(() => clearTimeout(timer));
+    };
     try {
-        const runResp = await fetch(base + 'run', {
+        const runResp = await fetchWithTimeout(base + 'run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'email=q2dv@example.com&program=blastp&database=uniprotkb&stype=protein&sequence=' + encodeURIComponent(seq)
-        });
+        }, 30000);
         if (!runResp.ok) throw new Error('submit HTTP ' + runResp.status);
         const jobId = (await runResp.text()).trim();
-        if (!jobId) throw new Error('no job id');
+        if (!jobId) throw new Error('no job id returned');
+        setUniProtStatus(`BLAST job ${jobId} running… ${elapsed()}s`);
         let status = '';
-        for (let i = 0; i < 40; i++) {
-            await new Promise(r => setTimeout(r, 1500));
-            status = (await (await fetch(base + 'status/' + jobId)).text()).trim();
+        const maxAttempts = 100; // ~5 min at 3 s/poll; UniProtKB BLAST can take a couple of minutes
+        for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 15000)).text()).trim();
             if (status === 'FINISHED') break;
             if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('BLAST ' + status);
+            setUniProtStatus(`BLAST job ${jobId} still running… ${elapsed()}s (${status || 'queued'})`);
         }
-        if (status !== 'FINISHED') throw new Error('BLAST timed out');
-        const data = await (await fetch(base + 'result/' + jobId + '/json')).json();
+        if (status !== 'FINISHED') throw new Error('timed out after ' + elapsed() + 's');
+        setUniProtStatus('BLAST finished — fetching top hit…');
+        const data = await (await fetchWithTimeout(base + 'result/' + jobId + '/json', {}, 30000)).json();
         const hits = (data && data.hits) || [];
         const acc = hits.length ? (hits[0].hit_acc || hits[0].hit_id || null) : null;
-        if (!acc) throw new Error('no hit accession');
+        if (!acc) throw new Error('no hit accession in results');
         setUniProtStatus('Matched ' + acc + ' (top BLAST hit).');
         return acc;
     } catch (err) {
-        setUniProtStatus('Sequence search failed: ' + err.message);
-        showToast('Sequence search failed (may be blocked by the browser/CORS). Paste the UniProt accession instead: Options > Annotation Offload > Accession.', 'error');
+        const msg = (err && err.name === 'AbortError') ? 'request aborted' : (err && err.message ? err.message : String(err));
+        setUniProtStatus('Sequence search failed: ' + msg);
+        showToast('Sequence search failed (' + msg + '). You can also paste the UniProt accession directly: Options > Annotation Offload > Accession.', 'error');
         return null;
     }
 }
@@ -3024,7 +3036,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.5.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

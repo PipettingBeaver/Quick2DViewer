@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-22
+
+### Fixed
+
+- UniProt **Sequence (BLAST)** mode: added live progress (job id + elapsed time +
+  raw status) and per-request timeouts, and extended the polling window from ~1 min
+  to ~5 min so a real UniProtKB BLAST finishes instead of silently timing out.
+  Removed the misleading "blocked by CORS" message (the EBI endpoint supports CORS).
+
 ## [0.5.0] - 2026-09-22
 
 ### Added
