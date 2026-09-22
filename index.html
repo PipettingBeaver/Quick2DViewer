@@ -321,6 +321,28 @@
         .toast-visible { opacity: 1; transform: translateY(0); }
         .toast-success { background: #065f46; }
         .toast-error { background: #991b1b; }
+        .toast-warn { background: #92400e; }
+        .toast-info { background: #1e3a8a; }
+        .toast-dismissible {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            cursor: pointer;
+            padding-right: 10px;
+        }
+        .toast-dismissible > span { flex: 1 1 auto; }
+        .toast-dismissible .toast-close {
+            flex: 0 0 auto;
+            background: none;
+            border: none;
+            color: #fff;
+            opacity: 0.75;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 1px 2px;
+            border-radius: 4px;
+        }
+        .toast-dismissible .toast-close:hover { opacity: 1; background: rgba(255,255,255,0.2); }
         button {
             background-color: #2563eb;
             color: white;
@@ -447,7 +469,7 @@
             font-family: monospace;
             font-size: 0.72rem;
             font-weight: bold;
-            padding-left: 10px;
+            padding-left: 24px;
             color: #475569;
             border-right: 1px solid #e2e8f0;
             background: #f8fafc;
@@ -486,6 +508,7 @@
         .type-badge-C { background-color: var(--q2dv-C-bg); color: var(--q2dv-C-fg); }
         .type-badge-M { background-color: var(--q2dv-M-bg); color: var(--q2dv-M-fg); }
         .type-badge-D { background-color: var(--q2dv-D-bg); color: var(--q2dv-D-fg); }
+        .var-diff-badge { background-color: #fee2e2; color: #b91c1c; font-weight: 700; }
         
         .track-cells { display: flex; position: relative; }
         .cell {
@@ -700,6 +723,72 @@
         /* Non-destructive context-menu action (labeling a saved selection). */
         #saveCtxMenu button.ctx-normal { color: #334155; }
         #saveCtxMenu button.ctx-normal:hover:not(:disabled) { background: #dbeafe; }
+        /* Right-click menu for a single track row: mirrors the Track Control
+           "View as" + "Config" controls for that track and its type. */
+        #trackCtxMenu {
+            position: fixed;
+            z-index: 2004;
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            padding: 4px;
+            min-width: 195px;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+        #trackCtxMenu[hidden] { display: none; }
+        .tctx-header { padding: 3px 8px 2px; }
+        .tctx-title {
+            font-size: 0.74rem;
+            font-weight: 800;
+            color: #1e293b;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tctx-sub {
+            font-size: 0.58rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #94a3b8;
+        }
+        .tctx-section {
+            font-size: 0.56rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #94a3b8;
+            padding: 4px 8px 2px;
+        }
+        .tctx-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #334155;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .tctx-item:hover:not(:disabled) { background: #dbeafe; }
+        .tctx-item:disabled { color: #94a3b8; cursor: default; }
+        .tctx-check {
+            flex-shrink: 0;
+            width: 12px;
+            text-align: center;
+            color: #2563eb;
+            font-weight: 900;
+        }
+        .tctx-divider { border-top: 1px solid #e2e8f0; margin: 4px 0; }
+        .tctx-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         /* Name label drawn over a saved selection's range, styled like the
            Bar-mode row labels (centered, monospace, bold) with a soft chip so
            it stays readable over the faint slot-colored overlay. */
@@ -1049,9 +1138,12 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            position: absolute;
+            left: 5px;
+            top: 50%;
+            transform: translateY(-50%);
             width: 15px;
             height: 15px;
-            margin-right: 4px;
             flex-shrink: 0;
             border-radius: 3px;
             font-size: 0.58rem;
@@ -1131,7 +1223,7 @@
             border-radius: 6px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.25);
             padding: 6px;
-            min-width: 205px;
+            min-width: 265px;
             max-width: 330px;
             max-height: 70vh;
             overflow-y: auto;
@@ -1236,6 +1328,201 @@
             font-weight: 900;
         }
         .tctl-filter-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* --- Track Control master table (Category / View as / Config) ------ */
+        .tctl-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 0 2px 4px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 2px;
+        }
+        .tctl-head-title {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            color: #1e293b;
+            text-transform: uppercase;
+        }
+        .tctl-head-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .tctl-head-btn {
+            font-family: inherit;
+            font-size: 0.62rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border: 1px solid #cbd5e1;
+            border-radius: 3px;
+            background: #f8fafc;
+            color: #334155;
+            cursor: pointer;
+        }
+        .tctl-head-btn:hover { background: #dbeafe; border-color: #93c5fd; }
+        .tctl-head-btn.tctl-on { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .tctl-grid {
+            display: grid;
+            grid-template-columns: 1fr 100px 62px;
+            gap: 6px;
+            align-items: center;
+            padding: 2px 4px;
+        }
+        .tctl-colheader {
+            font-size: 0.6rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #94a3b8;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 2px;
+            padding-bottom: 3px;
+        }
+        .tctl-group-row:hover { background: #f1f5f9; }
+        .tctl-cat-cell {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            min-width: 0;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .tctl-chev {
+            flex-shrink: 0;
+            width: 15px;
+            height: 15px;
+            padding: 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 3px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.6rem;
+            line-height: 1;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tctl-chev:hover { background: #dbeafe; border-color: #93c5fd; }
+        .tctl-chev.tctl-on { background: #eff6ff; border-color: #93c5fd; color: #2563eb; }
+        .tctl-group-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tctl-view-select {
+            font-family: inherit;
+            font-size: 0.66rem;
+            font-weight: 600;
+            color: #0f172a;
+            width: 100%;
+            padding: 2px 4px;
+            border: 1px solid #cbd5e1;
+            border-radius: 3px;
+            background: #fff;
+            cursor: pointer;
+        }
+        .tctl-view-select:hover { border-color: #93c5fd; }
+        .tctl-config-cell {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 3px;
+            min-width: 0;
+        }
+        .tctl-gear {
+            flex-shrink: 0;
+            padding: 0;
+            width: 17px;
+            height: 17px;
+            border: 1px solid #cbd5e1;
+            border-radius: 3px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.72rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .tctl-gear:hover { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+        .tctl-config-hint {
+            font-size: 0.56rem;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tctl-track-row { border-top: 1px solid #f1f5f9; }
+        .tctl-track-row:hover { background: #f8fafc; }
+        .tctl-track-cat { font-weight: 500; color: #475569; padding-left: 16px; }
+        .tctl-track-conn { color: #94a3b8; font-size: 0.64rem; flex-shrink: 0; }
+        .tctl-track-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tctl-hidden-label { color: #94a3b8; text-decoration: line-through; }
+        .tctl-eye {
+            flex-shrink: 0;
+            padding: 0;
+            width: 17px;
+            height: 17px;
+            border: 1px solid #cbd5e1;
+            border-radius: 3px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.6rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .tctl-eye:hover { background: #dbeafe; border-color: #93c5fd; }
+        .tctl-eye.tctl-on { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+        .tctl-track-empty {
+            grid-column: 1 / -1;
+            font-size: 0.66rem;
+            color: #94a3b8;
+            padding: 2px 4px 4px 20px;
+        }
+        /* Config frames inside the master popup. */
+        .tctl-config-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 2px 4px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 2px;
+        }
+        .tctl-config-title { font-size: 0.72rem; font-weight: 800; color: #1e293b; }
+        .tctl-config-body { display: flex; flex-direction: column; gap: 6px; padding: 2px; }
+        .tctl-config-subtitle {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #334155;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 3px;
+        }
+        .tctl-config-label {
+            font-size: 0.66rem;
+            font-weight: 700;
+            color: #475569;
+            margin-top: 2px;
+        }
+        .tctl-config-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #334155;
+            cursor: pointer;
+        }
+        .tctl-config-row input[type="checkbox"] { width: auto; }
+        .tctl-config-note { font-size: 0.66rem; color: #64748b; line-height: 1.4; }
+        .tctl-config-infobox {
+            font-size: 0.68rem;
+            color: #475569;
+            line-height: 1.4;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 5px 6px;
+            background: #f8fafc;
+        }
+        .tctl-config-infobox ul { margin: 5px 0 0 15px; padding: 0; }
+        .tctl-config-divider {
+            border-top: 1px solid #e2e8f0;
+            margin: 4px 0 2px;
+        }
 
         #bandPopover {
             display: none;
@@ -1342,10 +1629,10 @@
 
     <div id="toastContainer" aria-live="polite"></div>
 
-    <input type="file" id="structureUpload" accept=".pdb,.cif,.json,.hhr" multiple style="display: none;">
+    <input type="file" id="structureUpload" accept=".pdb,.cif,.json,.hhr,.fasta,.fa,.faa,.fas" multiple style="display: none;">
 
     <div class="top-toolbar" role="toolbar" aria-label="Data input controls">
-        <span class="tb-hint">Paste a Quick2D output, or attach a Q2DV JSON save to get started. HHR or PDB &amp; CIF files of a protein can be uploaded.</span>
+        <span class="tb-hint">Paste a Quick2D output, or attach a Q2DV JSON save to get started. Variant FASTA, HHR or PDB &amp; CIF files of a protein can be uploaded for MSA.</span>
         <div class="toolbar-group toolbar-group-input">
             <button type="button" class="tb-btn tb-btn-primary" onclick="document.getElementById('structureUpload').click()">
                 <svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -1625,6 +1912,7 @@
 <div id="bandPopover"></div>
 <div id="tctlPopover"></div>
 <div id="saveCtxMenu" hidden></div>
+<div id="trackCtxMenu" hidden></div>
 <div class="modal-overlay" id="saveLabelModal" role="dialog" aria-modal="true" aria-labelledby="saveLabelModalTitle">
     <div class="modal-content" style="width: 380px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
@@ -1692,10 +1980,36 @@
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Conservation Scoring</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                How the CONSERVATION row is computed (1 = fully conserved, 0 = fully divergent) from the variant FASTA sequences uploaded via Attach, and how those sequences are aligned onto the reference AA sequence. Changes apply to the heatmap row immediately and are saved with the session.
+            </p>
+            <label for="conservationMetricSelect" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">Conservation Metric</label>
+            <select id="conservationMetricSelect" onchange="onConservationMetricChange()" class="q2dv-select"
+                style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <option value="shannon">Shannon entropy (information content)</option>
+                <option value="jsd">Jensen-Shannon divergence (vs natural background)</option>
+                <option value="wukabat">Wu-Kabat variability (20-residue scale)</option>
+            </select>
+            <label for="fastaAlignmentModeSelect" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin:12px 0 4px;">Variant FASTA Alignment</label>
+            <select id="fastaAlignmentModeSelect" onchange="onFastaAlignmentModeChange()" class="q2dv-select"
+                style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <option value="auto">Auto - keep reference-length rows as-is, realign the rest</option>
+                <option value="aligned">Already aligned - keep every row verbatim</option>
+                <option value="unaligned">Always realign onto the reference (Needleman-Wunsch / BLOSUM62)</option>
+            </select>
+            <label for="conservationIncludeHHRCheck" style="display:flex; align-items:center; gap:8px; font-size:0.8rem; font-weight:600; color:#475569; margin-top:12px; cursor:pointer;">
+                <input type="checkbox" id="conservationIncludeHHRCheck" onchange="onConservationIncludeHHRChange()" style="width:auto;">
+                Include HHR homolog sequences in the tallies
+            </label>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Save File</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Export the full current session - sequence, attached structures, selection, and preferences - as a portable <code>.json</code> file you can move to another browser or machine. To bring one back in, attach it via the toolbar's <strong>Attach Structure(s) or JSON</strong> button like any other file - Q2DV recognizes it automatically from a marker inside the file, without needing a separate import control.<br><br>
-                <span style="color: #94a3b8;">This is a different, restorable format from the Data modal's "Raw JSON" export, which is a read-only report and can't be re-imported.</span>
+                <span style="color: #94a3b8;">This is a different, restorable format from the Data modal's "Raw JSON" export, which is a read-only report and can't be re-imported.<br><br>
+                The save stays small because it never embeds the raw PDB/CIF text - it only references locally-attached files by hash. On the machine that created it, 3D models come right back from that device's structure cache; on another machine, Data &gt; Structure Files lists which files need re-attaching (or use Find to locate them in a folder).</span>
             </p>
             <button onclick="exportFullSave()">⬇ Export Save (.json)</button>
         </div>
@@ -1704,11 +2018,22 @@
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Cached Data</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Your pasted Quick2D text, the pLDDT/RSA data derived from attached structure files, current selection, and view preferences are saved automatically in this browser (via <code>localStorage</code>) so they survive a page refresh or reopening this tab later. Nothing is uploaded anywhere - it never leaves your device.<br><br>
-                <span style="color: #94a3b8;">Note: the raw structure file text itself isn't cached (only its derived confidence/exposure values, plus its name for reference) to keep the cache well under the browser's storage limit - re-attach a file after a refresh only if you need its original text again.</span>
+                <span style="color: #94a3b8;">Note: this session cache does NOT include the raw structure file text - that lives in the separate, device-local structure cache below, so "Reset Data" (which clears this session cache) won't delete your cached PDB/CIF copies.</span>
             </p>
             <div id="cachedDataInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">No cached data yet.</div>
             <button onclick="resetAllData()" style="background: #dc2626; margin-top: 10px;">Reset Data</button>
-            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px;">Permanently clears everything above and resets the page.</span>
+            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px;">Clears the cached session data above and resets the page - cached PDB/CIF copies below are left intact.</span>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Local Structure Cache (this device)</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Raw PDB/CIF text you've attached is cached on this device (via <code>IndexedDB</code>) so 3D models reappear instantly after a refresh or a save re-import - never re-uploading the same file twice. It never leaves this device and is <strong>not</strong> embedded in exported saves, so a save taken to another machine will ask for its local files there (Data &gt; Structure Files &gt; Find to locate them). Old copies no longer referenced by the current session are automatically evicted, oldest-first, beyond the 100&nbsp;MB soft cap.<br><br>
+                <span style="color: #94a3b8;">Clearing this is separate from "Reset Data" above - use it only when you want to free up space without touching the data you have loaded.</span>
+            </p>
+            <div id="structureCacheInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">Loading…</div>
+            <button onclick="clearStructureCache()" style="background: #dc2626; margin-top: 10px;">Clear Structure Cache</button>
+            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px;">Permanently deletes cached PDB/CIF copies on this device.</span>
         </div>
     </div>
 </div>
@@ -1731,6 +2056,7 @@
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Each PDB/CIF file is scanned on upload for a rough protein classification, apo/holo ligand state, and oligomeric state (chain count). This is best-effort: many files - especially computational models like AlphaFold predictions - simply don't record this information, in which case it's reported as such rather than guessed.
             </p>
+            <div id="dataStructureCacheNotice" style="display:none; margin-bottom: 10px; padding: 8px 10px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; font-size: 0.8rem; color: #92400e; line-height: 1.5;"></div>
             <div id="dataStructureTableWrap" style="overflow-x: auto;">
                 <p style="color: #94a3b8; font-size: 0.85rem;">No structure files attached yet.</p>
             </div>
@@ -1841,6 +2167,16 @@ let cachedStructureTexts = {}; // fileName -> raw PDB/CIF text (in-session cache
 let p3dStructureMeta = {};   // fileName -> { residueSet, residueChains } for residue->atom matching
 let p3dRemotePending = false; // one RCSB fetch at a time (guard against re-entry)
 
+// --- Local structure-file cache state -------------------------------------
+// The IndexedDB structure cache (see the persistence section) keeps raw
+// PDB/CIF text on THIS device so 3D models reappear after a refresh without
+// re-uploading. These two map the current session onto that cache:
+//   cachedStructureIndex[fileName]  -> { hash, ext, size }   cached copy on disk
+//   missingStructureRefs           -> [{ fileName, hash|null, ext }] referenced
+//                                     by the session but absent from the cache
+let cachedStructureIndex = {}; // fileName -> { hash, ext, size }
+let missingStructureRefs = []; // structure files referenced but not in the cache
+
 let currentViewMode = 'grid'; // 'grid' or 'graph'
 window.addEventListener('mouseup', handleMouseUp);
 
@@ -1937,6 +2273,22 @@ let uploadedStructureFiles = []; // [{name, ext, size}] - metadata only, see not
 // build that row's info tooltip on demand since each hit's info is unique
 // (unlike PLDDT/RSA/COFACTOR, which share one static tooltip per metric).
 let hhpredHitsInfo = {};
+// Variant FASTA alignment rows. After import each sequence is aligned to the
+// AA reference (verbatim when already reference-length in 'aligned' mode,
+// otherwise Needleman-Wunsch/BLOSUM62) and stored as an aligned string with
+// '-'-gaps matching the AA track's index space, plus the raw text/name so the
+// Data modal and Options can show origin info. Track key: "VAR_<idx>_<name>".
+let keyedVariantsInfo = {}; // { variantKey: { aligned, raw, name } }
+// Per-column conservation scoring for the CONSERVATION object track (details
+// in the Options > Conservation Scoring section). Greg at 2-state, Wu-Kabat.)
+let conservationMetric = 'shannon'; // 'shannon' | 'jsd' | 'wukabat'
+// Include HHR homolog sequences in the per-column conservation tallies when
+// a metric is (re)computed. Default OFF.
+let conservationIncludeHHR = false;
+// How pasted/imported variant FASTA is aligned onto the AA reference:
+// 'auto' (already reference-length rows are kept verbatim, others are
+// realigned), 'aligned' (all rows verbatim), or 'unaligned' (always realign).
+let fastaAlignmentMode = 'auto'; // 'auto' | 'aligned' | 'unaligned'
 // Free-text "Protein ID: ..." header line, if the pasted Quick2D block
 // included one (the parser otherwise just skips it) - shown in the Data
 // modal's FASTA summary.
@@ -1948,19 +2300,41 @@ let lastPersistError = null;
 // Lightweight, non-blocking feedback (vs. alert()) for actions like the
 // clipboard paste flow below. aria-live="polite" on the container means
 // screen readers announce new toasts without needing focus to move.
-function showToast(message, type) {
+function showToast(message, type, options) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
+    const opts = options || {};
+    const dismissible = !!opts.dismissible; // stays until the user clicks it
     const toast = document.createElement('div');
-    toast.className = 'toast' + (type ? ' toast-' + type : '');
+    toast.className = 'toast' + (type ? ' toast-' + type : '') + (dismissible ? ' toast-dismissible' : '');
     toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
-    toast.textContent = message;
-    container.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add('toast-visible'));
-    setTimeout(() => {
+    const dismiss = () => {
         toast.classList.remove('toast-visible');
         setTimeout(() => toast.remove(), 300);
-    }, 3500);
+    };
+    if (dismissible) {
+        const msg = document.createElement('span');
+        msg.textContent = message;
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'toast-close';
+        closeBtn.setAttribute('type', 'button');
+        closeBtn.setAttribute('aria-label', 'Dismiss');
+        closeBtn.textContent = '\u00d7';
+        closeBtn.addEventListener('click', dismiss);
+        toast.appendChild(msg);
+        toast.appendChild(closeBtn);
+        toast.addEventListener('click', dismiss);
+    } else {
+        toast.textContent = message;
+    }
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('toast-visible'));
+    if (!dismissible) {
+        setTimeout(() => {
+            toast.classList.remove('toast-visible');
+            setTimeout(() => toast.remove(), 300);
+        }, 3500);
+    }
 }
 
 // --- Raw-input drawer ------------------------------------------------------
@@ -2227,6 +2601,10 @@ function getPredictorInfo(trackKey) {
     if (trackKey.endsWith('_RSA')) return PREDICTOR_INFO.RSA;
     if (trackKey.endsWith('_Cofactors')) return PREDICTOR_INFO.COFACTOR;
     if (trackKey.startsWith('HH_')) return buildHomologPredictorInfo(trackKey);
+    // Variant and conservation rows are not structure predictors: suppress the
+    // synthesized fallback so their "Structural Prediction" ℹ tooltip is never
+    // shown - those rows build their own tooltips (FASTA header/conservation).
+    if (trackKey.startsWith('VAR_') || trackKey === 'CONSERVATION' || trackKey.startsWith('CONS_')) return null;
     // Fallback: synthesise a minimal entry so the info icon still appears.
     const name = trackKey.replace(/^[A-Z]+_/, '').replace(/_/g, ' ');
     return { name, category: getPredictorCategoryFromPrefix(trackKey), description: '', useCase: '', citation: '' };
@@ -2536,10 +2914,73 @@ const RSA_BANDS = [
     { label: '0.2-0.5', test: v => v >= 0.2 && v < 0.5 },
     { label: '0.5-1.0', test: v => v >= 0.5 && v <= 1.0 }
 ];
+// Conservation scores are 0..1 where 1 = a perfectly conserved column, so
+// the heatmap mirroring the pLDDT/RSA convention is kept simple: three
+// tercile bands from "variable" (teal/orange, rightmost) to "conserved"
+// (deep blue, leftmost). Numeric-badge text is per band label.
+const CONSERVATION_BANDS = [
+    { label: '0.0-0.33', test: v => v >= 0.0 && v < 0.33, bg: '#ffc6a0', fg: '#7c2d12' },
+    { label: '0.33-0.66', test: v => v >= 0.33 && v < 0.66, bg: '#ffe9a3', fg: '#713f12' },
+    { label: '0.66-1.0', test: v => v >= 0.66 && v <= 1.0, bg: '#a9d2ff', fg: '#1e3a8a' }
+];
+// Returns the CONSERVATION_BANDS entry for a 0..1 conservation score (or null
+// when the score is missing/out of range). Colors mirror the pLDDT 'low = warm,
+// high = deep blue' heatmap so conserved columns read blue.
+function getConservationBandForScore(v) {
+    if (typeof v !== 'number' || isNaN(v)) return null;
+    return CONSERVATION_BANDS.find(b => b.test(v)) || null;
+}
+// BLOSUM62-compatible amino-acid ordering used for the conservation
+// background distribution and the Needleman-Wunsch pairwise aligner. The
+// same AA order, alphabet, background, and BLOSUM62 matrix back both the
+// JSD-vs-background conservation metric and the variant FASTA aligner, so
+// "aligned" means the same thing in every metric and every track.
+const AA_ALPHABET_ORDER = 'ARNDCQEGHILKMFPSTWYV';
+const AMINO_ACID_BG_FREQUENCIES = {
+    'A': 0.078, 'R': 0.051, 'N': 0.045, 'D': 0.054, 'C': 0.025,
+    'Q': 0.034, 'E': 0.054, 'G': 0.074, 'H': 0.026, 'I': 0.068,
+    'L': 0.099, 'K': 0.058, 'M': 0.025, 'F': 0.047, 'P': 0.039,
+    'S': 0.057, 'T': 0.051, 'W': 0.013, 'Y': 0.032, 'V': 0.073
+};
+// Henikoff & Henikoff BLOSUM62 in the AA_ALPHABET_ORDER above (row/col:
+// A R N D C Q E G H I L K M F P S T W Y V). Used for the Smith-Waterman /
+// Needleman-Wunsch variant-FASTA aligner and as the background model for
+// the JSD conservation metric.
+const BLOSUM62_MATRIX = [
+    //      A   R   N   D   C   Q   E   G   H   I   L   K   M   F   P   S   T   W   Y   V
+    /*A*/ [  4, -1, -2, -2,  0, -1, -1,  0, -2, -1, -1, -1, -1, -2, -1,  1,  0, -3, -2,  0],
+    /*R*/ [ -1,  5,  0, -2, -3,  1,  0, -2,  0, -3, -2,  2, -1, -3, -2, -1, -1, -3, -2, -3],
+    /*N*/ [ -2,  0,  6,  1, -3,  0,  0,  0,  1, -3, -3,  0, -2, -3, -2,  1,  0, -4, -2, -3],
+    /*D*/ [ -2, -2,  1,  6, -3,  0,  2, -1, -1, -3, -4, -1, -3, -3, -1,  0, -1, -4, -3, -3],
+    /*C*/ [  0, -3, -3, -3,  9, -3, -4, -3, -3, -1, -1, -3, -1, -2, -3, -1, -1, -2, -2, -1],
+    /*Q*/ [ -1,  1,  0,  0, -3,  5,  2, -2,  0, -3, -2,  1,  0, -3, -1,  0, -1, -2, -1, -2],
+    /*E*/ [ -1,  0,  0,  2, -4,  2,  5, -2,  0, -3, -3,  1, -2, -3, -1,  0, -1, -3, -2, -2],
+    /*G*/ [  0, -2,  0, -1, -3, -2, -2,  6, -2, -4, -4, -2, -3, -3, -2,  0, -2, -2, -3, -3],
+    /*H*/ [ -2,  0,  1, -1, -3,  0,  0, -2,  8, -3, -3, -1, -2, -1, -2, -1, -2, -2,  2, -3],
+    /*I*/ [ -1, -3, -3, -3, -1, -3, -3, -4, -3,  4,  2, -3,  1,  0, -3, -2, -1, -3, -1,  3],
+    /*L*/ [ -1, -2, -3, -4, -1, -2, -3, -4, -3,  2,  4, -2,  2,  0, -3, -2, -1, -2, -1,  1],
+    /*K*/ [ -1,  2,  0, -1, -3,  1,  1, -2, -1, -3, -2,  5, -1, -3, -1,  0, -1, -3, -2, -2],
+    /*M*/ [ -1, -1, -2, -3, -1,  0, -2, -3, -2,  1,  2, -1,  5,  0, -2, -1, -1, -1, -1,  1],
+    /*F*/ [ -2, -3, -3, -3, -2, -3, -3, -3, -1,  0,  0, -3,  0,  6, -4, -2, -2,  1,  3, -1],
+    /*P*/ [ -1, -2, -2, -1, -3, -1, -1, -2, -2, -3, -3, -1, -2, -4,  7, -1, -1, -4, -3, -2],
+    /*S*/ [  1, -1,  1,  0, -1,  0,  0,  0, -1, -2, -2,  0, -1, -2, -1,  4,  1, -3, -2, -2],
+    /*T*/ [  0, -1,  0, -1, -1, -1, -1, -2, -2, -1, -1, -1, -1, -2, -1,  1,  5, -2, -2,  0],
+    /*W*/ [ -3, -3, -4, -4, -2, -2, -3, -2, -2, -3, -2, -3, -1,  1, -4, -3, -2, 11,  2, -3],
+    /*Y*/ [ -2, -2, -2, -3, -2, -1, -2, -3,  2, -1, -1, -2, -1,  3, -3, -2, -2,  2,  7, -1],
+    /*V*/ [  0, -3, -3, -3, -1, -2, -2, -3, -3,  3,  1, -2,  1, -1, -2, -2,  0, -3, -1,  4]
+];
+function blosum62Score(a, b) {
+    if (a === b) return 4; // fallback for nonstandard letters
+    const ia = AA_ALPHABET_ORDER.indexOf(a);
+    const ib = AA_ALPHABET_ORDER.indexOf(b);
+    if (ia < 0 || ib < 0) return -1;
+    return BLOSUM62_MATRIX[ia][ib];
+}
 
 function getBandsForTrackKey(trackKey) {
     if (trackKey.endsWith('_pLDDT')) return PLDDT_BANDS;
     if (trackKey.endsWith('_RSA')) return RSA_BANDS;
+    if (trackKey === 'CONSERVATION' || trackKey.startsWith('CONS_')) return CONSERVATION_BANDS;
     return null;
 }
 
@@ -2686,6 +3127,9 @@ document.addEventListener('click', (e) => {
 let openTctlPopupFor = null; // 'master' or a group key like 'SS'
 let tctlFilterOpen = false; // when true, the group popup shows its track Filter list
 let tctlMasterFilterGroup = null; // type whose Filter list is expanded inside the master Track Control menu
+let tctlExpandedGroups = {}; // group keys whose per-track list is expanded in the master menu (session-only)
+let tctlConfigGroup = null;  // group whose Config frame is open inside the master menu (null = list view)
+let tctlAnchorEl = null;     // element the open popup is anchored to (used to reposition after rebuilds)
 
 function mkEl(tag, cls, text) {
     const el = document.createElement(tag);
@@ -2698,6 +3142,9 @@ function closeTctlPopup() {
     openTctlPopupFor = null;
     tctlFilterOpen = false;
     tctlMasterFilterGroup = null;
+    tctlExpandedGroups = {};
+    tctlConfigGroup = null;
+    tctlAnchorEl = null;
     const pop = document.getElementById('tctlPopover');
     if (pop) pop.classList.remove('open');
 }
@@ -2717,78 +3164,355 @@ function positionTctlPopup(anchorEl) {
     pop.style.top = top + 'px';
 }
 
-// Re-render popup + viewer after any Track Control state change. The popup
-// rebuild is deferred to the next tick so a click that just fired inside the
-// popover still bubbles up to the document-level close handler WHILE the
+// Rebuilds just the open Track Control popup (used for UI-only changes like
+// expanding a type or opening its Config frame, where no viewer change or
+// save is needed). Rebuilt on the next tick so a click that just fired inside
+// the popover still bubbles up to the document-level close handler WHILE the
 // clicked node is still attached - rebuild it synchronously and the node gets
 // detached mid-event, making closest('#tctlPopover') come back null and the
 // popup closes immediately after every option click.
-function tctlAfterChange() {
-    schedulePersist();
-    renderViewer(parsedTracks);
+function tctlRefreshPopup() {
     setTimeout(() => {
         if (!openTctlPopupFor) return;
         buildTctlContent();
         const anchor = openTctlPopupFor === 'master'
-            ? document.getElementById('btnTrackControl')
+            ? ((tctlAnchorEl && tctlAnchorEl.isConnected) ? tctlAnchorEl : document.getElementById('btnTrackControl'))
             : document.querySelector('.tctl-chevron[data-tctl-group="' + openTctlPopupFor + '"]');
         if (anchor) positionTctlPopup(anchor);
         else positionTctlPopup(document.getElementById('btnTrackControl'));
     }, 0);
 }
 
-function buildTctlGroupRow(g) {
-    const row = mkEl('div', 'tctl-row');
-    const label = mkEl('div', 'tctl-row-label', trackGroupLabel(g));
-    const countEl = mkEl('span', 'tctl-row-count', `(${getTctlGroupCount(g)})`);
-    label.appendChild(countEl);
-    row.appendChild(label);
+// Re-render popup + viewer after any Track Control state change.
+function tctlAfterChange() {
+    schedulePersist();
+    renderViewer(parsedTracks);
+    tctlRefreshPopup();
+}
 
-    const actions = mkEl('div', 'tctl-row-actions');
+// Short caption shown beside a type's Config gear describing what it controls.
+function groupConfigHint(g) {
+    if (g === 'HH') return 'Conservation';
+    if (g === 'CONSERVATION') return 'Entropy/PID';
+    if (g === 'pLDDT') return 'Cutoffs';
+    return '';
+}
 
-    const hideMini = mkEl('button', 'tctl-mini' + (isTrackGroupHidden(g) ? ' tctl-on' : ''), isTrackGroupHidden(g) ? 'Show' : 'Hide');
-    hideMini.title = `${isTrackGroupHidden(g) ? 'Show' : 'Hide'} all ${trackGroupLabel(g)} tracks`;
-    hideMini.addEventListener('click', () => {
-        trackControlState.hidden[g] = !trackControlState.hidden[g];
+// "View as" selector for a whole type group. Options: Glyphs / No letters /
+// Bar / AA (homologs only) / Hidden. Selecting calls setGroupView(), which
+// collapses the old independent hide-symbols / full-bar / AA / hidden flags
+// into one authoritative view mode per group.
+function buildGroupViewSelect(g) {
+    const sel = mkEl('select', 'tctl-view-select');
+    const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
+    if (g === 'HH') opts.push(['aa', 'AA']);
+    opts.push(['hidden', 'Hidden']);
+    opts.forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = t;
+        sel.appendChild(o);
+    });
+    const cur = getEffectiveGroupView(g);
+    sel.value = opts.some(([v]) => v === cur) ? cur : 'glyphs';
+    sel.title = 'View this type as glyphs, a full bar, amino-acid letters (homologs), or hidden';
+    sel.addEventListener('change', () => {
+        setGroupView(g, sel.value);
         tctlAfterChange();
     });
-    actions.appendChild(hideMini);
+    return sel;
+}
 
-    const symMini = mkEl('button', 'tctl-mini' + (isGroupGlyphNonDefault(g) ? ' tctl-on' : ''), glyphButtonLabel(g));
-    symMini.title = g === 'HH'
-        ? 'Cycle the letter style for this type: match-quality symbols → amino-acid sequence → none (the per-residue colors stay)'
-        : 'Hide/show the residue letters/glyphs (the colors stay)';
-    symMini.addEventListener('click', () => {
-        toggleGroupGlyphs(g);
+// Per-track "View as" selector. "Auto" clears any override and follows the
+// type group's view; the other options pin just this one track to a view.
+function buildTrackViewSelect(key, g) {
+    const sel = mkEl('select', 'tctl-view-select');
+    const auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = 'Auto';
+    auto.title = 'Follow the type-group view';
+    sel.appendChild(auto);
+    const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
+    if (g === 'HH') opts.push(['aa', 'AA']);
+    opts.forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = t;
+        sel.appendChild(o);
+    });
+    sel.value = getTrackViewOverride(key) || '';
+    sel.title = 'Pin this track to a view mode ("Auto" follows the type group)';
+    sel.addEventListener('change', () => {
+        if (sel.value === '') delete trackControlState.viewOverride[key];
+        else trackControlState.viewOverride[key] = sel.value;
         tctlAfterChange();
     });
-    actions.appendChild(symMini);
+    return sel;
+}
 
-    const barMini = mkEl('button', 'tctl-mini' + (isTrackGroupFullBar(g) ? ' tctl-on' : ''), isTrackGroupFullBar(g) ? 'Bar on' : 'Bar');
-    barMini.title = g === 'HH'
-        ? 'Render every homolog as a solid full bar with its name centered (HHpred-style)'
-        : 'Full-bar display: per-residue colors with the type label centered';
-    barMini.addEventListener('click', () => {
-        trackControlState.fullBar[g] = !trackControlState.fullBar[g];
-        if (trackControlState.fullBar[g]) {
-            trackControlState.hideSymbols[g] = false;
-            trackControlState.aaSeq[g] = false;
-        }
-        tctlAfterChange();
+// Config gear for one type group, with the short "(hint)" of what it configures.
+function buildConfigGear(g) {
+    const cell = mkEl('div', 'tctl-config-cell');
+    const gear = mkEl('button', 'tctl-gear', '⚙');
+    const hintText = groupConfigHint(g);
+    gear.title = 'Config for ' + trackGroupLabel(g) + (hintText ? ' — ' + hintText : '');
+    gear.addEventListener('click', () => {
+        tctlConfigGroup = g;
+        tctlRefreshPopup();
     });
-    actions.appendChild(barMini);
+    cell.appendChild(gear);
+    if (hintText) cell.appendChild(mkEl('span', 'tctl-config-hint', '(' + hintText + ')'));
+    return cell;
+}
 
-    const filterCount = getTrackFilterCount(g);
-    const filterMini = mkEl('button', 'tctl-mini' + (tctlMasterFilterGroup === g ? ' tctl-on' : ''), filterCount ? `Filter (${filterCount})` : 'Filter');
-    filterMini.title = `Expand a list to show or hide individual ${trackGroupLabel(g)} tracks`;
-    filterMini.addEventListener('click', () => {
-        tctlMasterFilterGroup = (tctlMasterFilterGroup === g) ? null : g;
-        tctlAfterChange();
+// One type-group row in the master menu: chevron + name + count, its "View as"
+// selector, and its Config gear. Expanding the chevron reveals one row per
+// individual track (own View-as selector + visibility toggle).
+function buildTctlMasterGroupRow(g, expanded) {
+    const row = mkEl('div', 'tctl-grid tctl-group-row');
+    const cat = mkEl('div', 'tctl-cat-cell');
+    const chev = mkEl('button', 'tctl-chev' + (expanded ? ' tctl-on' : ''), expanded ? '▾' : '▸');
+    chev.title = (expanded ? 'Collapse' : 'Expand') + ' individual ' + trackGroupLabel(g) + ' tracks';
+    chev.setAttribute('role', 'button');
+    chev.tabIndex = 0;
+    chev.addEventListener('click', () => {
+        tctlExpandedGroups[g] = !tctlExpandedGroups[g];
+        tctlRefreshPopup();
     });
-    actions.appendChild(filterMini);
+    cat.appendChild(chev);
+    cat.appendChild(mkEl('span', 'tctl-group-label', trackGroupLabel(g)));
+    cat.appendChild(mkEl('span', 'tctl-row-count', '(' + getTctlGroupCount(g) + ')'));
+    row.appendChild(cat);
 
-    row.appendChild(actions);
+    const vcell = mkEl('div', 'tctl-view-cell');
+    vcell.appendChild(buildGroupViewSelect(g));
+    row.appendChild(vcell);
+
+    row.appendChild(buildConfigGear(g));
     return row;
+}
+
+// One expanded per-track row: indented tree connector + name, its own "View
+// as" selector, and an eye toggle for that single track's visibility.
+function buildTctlMasterTrackRow(g, key, isLast) {
+    const row = mkEl('div', 'tctl-grid tctl-track-row');
+    const cat = mkEl('div', 'tctl-cat-cell tctl-track-cat');
+    cat.appendChild(mkEl('span', 'tctl-track-conn', isLast ? '└─' : '├─'));
+    const label = mkEl('span', 'tctl-track-label' + (isTrackFiltered(key) ? ' tctl-hidden-label' : ''), formatTrackLabel(key));
+    label.title = key;
+    cat.appendChild(label);
+    row.appendChild(cat);
+
+    const vcell = mkEl('div', 'tctl-view-cell');
+    vcell.appendChild(buildTrackViewSelect(key, g));
+    row.appendChild(vcell);
+
+    const ccell = mkEl('div', 'tctl-config-cell');
+    const hidden = isTrackFiltered(key);
+    const eye = mkEl('button', 'tctl-eye' + (hidden ? ' tctl-on' : ''), hidden ? '◉' : '○');
+    eye.title = hidden ? 'Show ' + formatTrackLabel(key) + ' again' : 'Hide ' + formatTrackLabel(key) + ' from view';
+    eye.addEventListener('click', () => {
+        if (isTrackFiltered(key)) delete trackControlState.filtered[key];
+        else trackControlState.filtered[key] = true;
+        tctlAfterChange();
+    });
+    ccell.appendChild(eye);
+    row.appendChild(ccell);
+    return row;
+}
+
+// The master list view: header bar (TRACK CONTROLS + Hide All + Reset), the
+// table header row (Category / View as / Config), then one row per type group.
+// Expanding a group's chevron inserts the per-track rows right under it.
+function buildTctlMasterList(pop) {
+    const groups = getTctlGroupsInOrder();
+
+    const head = mkEl('div', 'tctl-head');
+    head.appendChild(mkEl('div', 'tctl-head-title', 'Track Controls'));
+    const actions = mkEl('div', 'tctl-head-actions');
+    const anyHidden = groups.some(isTrackGroupHidden);
+    const hideAll = mkEl('button', 'tctl-head-btn' + (anyHidden ? ' tctl-on' : ''), anyHidden ? 'Show All' : 'Hide All');
+    hideAll.title = anyHidden ? 'Show every type again' : 'Hide every type from view';
+    hideAll.addEventListener('click', () => {
+        if (anyHidden) trackControlState.hidden = {};
+        else groups.forEach(g => { trackControlState.hidden[g] = true; });
+        tctlAfterChange();
+    });
+    actions.appendChild(hideAll);
+    const resetBtn = mkEl('button', 'tctl-head-btn', 'Reset');
+    resetBtn.title = 'Reset every type, track, and view setting to its default';
+    resetBtn.addEventListener('click', () => {
+        trackControlState = getDefaultTrackControlState();
+        if (trackControlState.viewOverride) trackControlState.viewOverride = {};
+        trackControlState.filtered = {};
+        tctlExpandedGroups = {};
+        tctlConfigGroup = null;
+        tctlAfterChange();
+    });
+    actions.appendChild(resetBtn);
+    head.appendChild(actions);
+    pop.appendChild(head);
+
+    const colh = mkEl('div', 'tctl-grid tctl-colheader');
+    colh.appendChild(mkEl('div', 'tctl-cat-cell', 'Category'));
+    colh.appendChild(mkEl('div', 'tctl-view-cell', 'View as'));
+    colh.appendChild(mkEl('div', 'tctl-config-cell', 'Config'));
+    pop.appendChild(colh);
+
+    if (!groups.length) {
+        pop.appendChild(mkEl('div', 'tctl-row-count', 'No typed tracks loaded yet.'));
+        return;
+    }
+
+    groups.forEach(g => {
+        const expanded = !!tctlExpandedGroups[g];
+        pop.appendChild(buildTctlMasterGroupRow(g, expanded));
+        if (!expanded) return;
+        const keys = getGroupTrackKeys(g);
+        keys.forEach((key, i) => pop.appendChild(buildTctlMasterTrackRow(g, key, i === keys.length - 1)));
+        if (!keys.length) {
+            pop.appendChild(mkEl('div', 'tctl-grid tctl-track-row tctl-track-empty', 'No individual tracks for this type.'));
+        }
+    });
+}
+
+// Conservation Scoring config, shared by the Homolog (HH) and Conservation
+// type groups. `withColors` adds the "Cons. colors" recolor toggle (HH only).
+function buildConservationConfigFrame(withColors, title) {
+    const wrap = mkEl('div', 'tctl-config-body');
+    wrap.appendChild(mkEl('div', 'tctl-config-subtitle', title));
+
+    wrap.appendChild(mkEl('label', 'tctl-config-label', 'Conservation Metric'));
+    const metricSel = mkEl('select', 'q2dv-select tctl-view-select');
+    [['shannon', 'Shannon entropy (information content)'], ['jsd', 'Jensen-Shannon divergence (vs natural background)'], ['wukabat', 'Wu-Kabat variability (20-residue scale)']].forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = t;
+        metricSel.appendChild(o);
+    });
+    metricSel.value = conservationMetric;
+    metricSel.addEventListener('change', () => {
+        if (!CONSERVATION_METRICS.includes(metricSel.value)) return;
+        conservationMetric = metricSel.value;
+        refreshConservationAfterOptionChange();
+    });
+    wrap.appendChild(metricSel);
+
+    wrap.appendChild(mkEl('label', 'tctl-config-label', 'Variant FASTA Alignment'));
+    const modeSel = mkEl('select', 'q2dv-select tctl-view-select');
+    [['auto', 'Auto - keep reference-length rows, realign the rest'], ['aligned', 'Already aligned - keep every row verbatim'], ['unaligned', 'Always realign onto the reference (Needleman-Wunsch / BLOSUM62)']].forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = t;
+        modeSel.appendChild(o);
+    });
+    modeSel.value = fastaAlignmentMode;
+    modeSel.addEventListener('change', () => {
+        if (!FASTA_ALIGNMENT_MODES.includes(modeSel.value)) return;
+        fastaAlignmentMode = modeSel.value;
+        const changed = realignAllVariants();
+        refreshConservationAfterOptionChange();
+        if (changed) showToast('Re-aligned ' + changed + ' variant sequence' + (changed === 1 ? '' : 's') + ' using the new alignment mode.', 'success');
+    });
+    wrap.appendChild(modeSel);
+
+    const hhrLabel = mkEl('label', 'tctl-config-label tctl-config-row');
+    const hhrChk = document.createElement('input');
+    hhrChk.type = 'checkbox';
+    hhrChk.checked = !!conservationIncludeHHR;
+    hhrLabel.appendChild(hhrChk);
+    hhrLabel.appendChild(document.createTextNode('Include HHR homolog sequences in the tallies'));
+    hhrChk.addEventListener('change', () => {
+        conservationIncludeHHR = !!hhrChk.checked;
+        refreshConservationAfterOptionChange();
+    });
+    wrap.appendChild(hhrLabel);
+
+    if (withColors) {
+        wrap.appendChild(mkEl('div', 'tctl-config-divider'));
+        const colorLabel = mkEl('label', 'tctl-config-label tctl-config-row');
+        const colorChk = document.createElement('input');
+        colorChk.type = 'checkbox';
+        colorChk.checked = !!isTrackGroupConsColored('HH');
+        colorLabel.appendChild(colorChk);
+        colorLabel.appendChild(document.createTextNode('Recolor homolog AA letters by conservation score (Cons. colors)'));
+        colorChk.addEventListener('change', () => {
+            trackControlState.consColor.HH = !!colorChk.checked;
+            if (trackControlState.consColor.HH) {
+                trackControlState.hideSymbols.HH = false;
+                trackControlState.fullBar.HH = false;
+                trackControlState.aaSeq.HH = false;
+            }
+            tctlAfterChange();
+        });
+        wrap.appendChild(colorLabel);
+        wrap.appendChild(mkEl('div', 'tctl-config-note', 'When on, homolog rows show their amino-acid letters colored by the per-column conservation band above instead of the HHpred match-quality colors.'));
+    }
+    return wrap;
+}
+
+// pLDDT "Cutoffs": the confidence bands behind the pLDDT row/graph colors,
+// shown read-only (the cutoffs are the metric's published thresholds).
+function buildPlddtConfigFrame() {
+    const wrap = mkEl('div', 'tctl-config-body');
+    wrap.appendChild(mkEl('div', 'tctl-config-subtitle', 'pLDDT Color Cutoffs'));
+    wrap.appendChild(mkEl('div', 'tctl-config-note', 'Confidence bands used to color the pLDDT row and graph:'));
+    const info = PREDICTOR_INFO.PLDDT;
+    const box = mkEl('div', 'tctl-config-infobox');
+    box.innerHTML = buildPredictorTooltipHTML(info);
+    wrap.appendChild(box);
+    return wrap;
+}
+
+// Generic Config for types without dedicated settings: a short predictor
+// summary per track (same curated metadata as the label "ⓘ" tooltips).
+function buildPredictorInfoConfigFrame(g) {
+    const wrap = mkEl('div', 'tctl-config-body');
+    wrap.appendChild(mkEl('div', 'tctl-config-subtitle', 'Predictor / track info'));
+    const keys = getGroupTrackKeys(g);
+    if (!keys.length) {
+        wrap.appendChild(mkEl('div', 'tctl-config-note', 'No tracks loaded for this type.'));
+        return wrap;
+    }
+    keys.forEach(key => {
+        const box = mkEl('div', 'tctl-config-infobox');
+        if (key.startsWith('VAR_')) {
+            box.innerHTML = buildPredictorTooltipHTML({
+                name: formatTrackLabel(key),
+                category: 'Variant FASTA',
+                description: getVariantDescription(key) || 'Aligned variant sequence (no FASTA header description captured).',
+                bands: [], useCase: '', citation: ''
+            });
+        } else if (key === 'CONSERVATION' || key.startsWith('CONS_')) {
+            box.innerHTML = buildPredictorTooltipHTML({
+                name: 'Conservation',
+                category: conservationMetric,
+                description: 'Per-residue conservation (1 = fully conserved, 0 = fully divergent) computed from the imported variant FASTA sequences and the chosen metric.',
+                bands: [], useCase: '', citation: ''
+            });
+        } else {
+            box.innerHTML = buildPredictorTooltipHTML(getPredictorInfo(key));
+        }
+        box.title = key;
+        wrap.appendChild(box);
+    });
+    return wrap;
+}
+
+// The Config frame for one type group, opened from the master list's gear.
+function buildTctlConfigFrame(pop, g) {
+    const head = mkEl('div', 'tctl-config-head');
+    const back = mkEl('button', 'tctl-btn', '← Track Control');
+    back.title = 'Back to the Track Control list';
+    back.addEventListener('click', () => { tctlConfigGroup = null; tctlRefreshPopup(); });
+    head.appendChild(back);
+    head.appendChild(mkEl('div', 'tctl-config-title', trackGroupLabel(g) + ' Config'));
+    pop.appendChild(head);
+
+    if (g === 'HH') pop.appendChild(buildConservationConfigFrame(true, 'Conservation Scoring'));
+    else if (g === 'CONSERVATION') pop.appendChild(buildConservationConfigFrame(false, 'Entropy / PID'));
+    else if (g === 'pLDDT') pop.appendChild(buildPlddtConfigFrame());
+    else pop.appendChild(buildPredictorInfoConfigFrame(g));
 }
 
 function buildTctlContent() {
@@ -2797,24 +3521,12 @@ function buildTctlContent() {
     pop.innerHTML = '';
 
     if (openTctlPopupFor === 'master') {
-        pop.appendChild(mkEl('div', 'tctl-title', 'Track Control'));
-        const groups = getTctlGroupsInOrder();
-        const anyHidden = groups.some(isTrackGroupHidden);
-        const masterBtn = mkEl('button', 'tctl-btn tctl-on', anyHidden ? 'Show all' : 'Minimize all');
-        masterBtn.title = anyHidden ? 'Show every type group again' : 'Hide every type group from view';
-        masterBtn.addEventListener('click', () => {
-            if (anyHidden) trackControlState.hidden = {};
-            else groups.forEach(g => { trackControlState.hidden[g] = true; });
-            tctlAfterChange();
-        });
-        pop.appendChild(masterBtn);
-        if (!groups.length) {
-            pop.appendChild(mkEl('div', 'tctl-row-count', 'No typed tracks loaded yet.'));
+        if (tctlConfigGroup && getTctlGroupsInOrder().includes(tctlConfigGroup)) {
+            buildTctlConfigFrame(pop, tctlConfigGroup);
+        } else {
+            tctlConfigGroup = null;
+            buildTctlMasterList(pop);
         }
-        groups.forEach(g => {
-            pop.appendChild(buildTctlGroupRow(g));
-            if (tctlMasterFilterGroup === g) pop.appendChild(buildTctlFilterSection(g));
-        });
     } else if (openTctlPopupFor) {
         const g = openTctlPopupFor;
         pop.appendChild(mkEl('div', 'tctl-title', `Track Control: ${trackGroupLabel(g)}`));
@@ -2858,10 +3570,26 @@ function buildTctlContent() {
             if (trackControlState.fullBar[g]) {
                 trackControlState.hideSymbols[g] = false;
                 trackControlState.aaSeq[g] = false;
+                trackControlState.consColor[g] = false;
             }
             tctlAfterChange();
         });
         pop.appendChild(barBtn);
+
+        if (g === 'HH') {
+            const consBtn = mkEl('button', 'tctl-btn' + (isTrackGroupConsColored('HH') ? ' tctl-on' : ''), isTrackGroupConsColored('HH') ? 'Cons. colors on' : 'Cons. colors off');
+            consBtn.title = "Recolor each homolog's amino-acid letters by the per-column conservation score (metric set under Options > Conservation Scoring) instead of the HHpred match-quality colors";
+            consBtn.addEventListener('click', () => {
+                trackControlState.consColor[g] = !trackControlState.consColor[g];
+                if (trackControlState.consColor[g]) {
+                    trackControlState.hideSymbols[g] = false;
+                    trackControlState.fullBar[g] = false;
+                    trackControlState.aaSeq[g] = false;
+                }
+                tctlAfterChange();
+            });
+            pop.appendChild(consBtn);
+        }
 
         const filterCount = getTrackFilterCount(g);
         const filterBtn = mkEl('button', 'tctl-btn' + (tctlFilterOpen ? ' tctl-on' : ''), 'Filter' + (filterCount ? ` (${filterCount})` : ''));
@@ -2929,6 +3657,8 @@ function openTrackControlPopup(anchorEl) {
     openTctlPopupFor = 'master';
     tctlFilterOpen = false;
     tctlMasterFilterGroup = null;
+    tctlConfigGroup = null;
+    tctlAnchorEl = anchorEl;
     buildTctlContent();
     pop.classList.add('open');
     positionTctlPopup(anchorEl);
@@ -2942,6 +3672,27 @@ function openTrackGroupPopup(groupKey, anchorEl) {
     openTctlPopupFor = groupKey;
     tctlFilterOpen = false;
     tctlMasterFilterGroup = null;
+    tctlConfigGroup = null;
+    tctlAnchorEl = anchorEl;
+    buildTctlContent();
+    pop.classList.add('open');
+    positionTctlPopup(anchorEl);
+}
+
+// Opens the master Track Control popup jumped straight to one type's Config
+// frame. Used by the per-track right-click menu's "Config…" item so the menu
+// mirrors the Track Control UI for that type; anchored to `anchorEl` so the
+// popup appears by the track that was right-clicked.
+function openTrackConfigPopup(group, anchorEl) {
+    const pop = document.getElementById('tctlPopover');
+    if (!pop) return;
+    closeBandPopover();
+    openTctlPopupFor = 'master';
+    tctlFilterOpen = false;
+    tctlMasterFilterGroup = null;
+    tctlExpandedGroups = {};
+    tctlConfigGroup = group;
+    tctlAnchorEl = anchorEl;
     buildTctlContent();
     pop.classList.add('open');
     positionTctlPopup(anchorEl);
@@ -2952,6 +3703,131 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest('#tctlPopover') && !e.target.closest('.tctl-chevron') && e.target.id !== 'btnTrackControl') {
         closeTctlPopup();
     }
+});
+
+// --- Per-track right-click menu -------------------------------------------
+// Right-clicking a sidebar/graph row opens this menu, which mirrors the Track
+// Control UI for the clicked track: a "View as" radio list scoped to this
+// track (per-track override), the same list scoped to the whole type, and a
+// "Config…" shortcut into the type's Config frame. State changes route through
+// the normal Track Control pipeline (tctlAfterChange) so persistence + the
+// viewer stay in sync with the menu.
+let trackCtxKey = null;
+
+function addTrackCtxItem(menu, label, check) {
+    const btn = mkEl('button', 'tctx-item');
+    btn.appendChild(mkEl('span', 'tctx-check', check || ''));
+    btn.appendChild(mkEl('span', 'tctx-label', label));
+    menu.appendChild(btn);
+    return btn;
+}
+
+function addTrackCtxRadios(menu, options, current, onPick) {
+    options.forEach(([value, label]) => {
+        const btn = addTrackCtxItem(menu, label, current === value ? '✓' : '');
+        btn.dataset.value = value;
+        btn.addEventListener('click', () => onPick(value));
+    });
+}
+
+function trackViewOptions(group) {
+    const opts = [['', 'Auto (follow type)'], ['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
+    if (group === 'HH') opts.push(['aa', 'AA letters']);
+    return opts;
+}
+
+function groupViewOptions(group) {
+    const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
+    if (group === 'HH') opts.push(['aa', 'AA letters']);
+    opts.push(['hidden', 'Hidden']);
+    return opts;
+}
+
+function trackCtxAnchorEl(key) {
+    return document.querySelector('.track-label[data-track="' + key + '"]') ||
+        document.getElementById('btnTrackControl');
+}
+
+function openTrackCtxMenu(key, clientX, clientY) {
+    const menu = document.getElementById('trackCtxMenu');
+    if (!menu) return;
+    closeTctlPopup();
+    closeSaveCtxMenu();
+    if (!trackControlState.viewOverride) trackControlState.viewOverride = {};
+    if (!trackControlState.filtered) trackControlState.filtered = {};
+    trackCtxKey = key;
+    menu.innerHTML = '';
+    const group = getTrackGroup(key);
+    const groupLabel = trackGroupLabel(group);
+
+    const header = mkEl('div', 'tctx-header');
+    header.appendChild(mkEl('div', 'tctx-title', formatTrackLabel(key)));
+    header.appendChild(mkEl('div', 'tctx-sub', groupLabel));
+    menu.appendChild(header);
+
+    menu.appendChild(mkEl('div', 'tctx-divider'));
+    menu.appendChild(mkEl('div', 'tctx-section', 'This track (View as)'));
+    addTrackCtxRadios(menu, trackViewOptions(group), getTrackViewOverride(key) || '', (value) => {
+        if (value === '') delete trackControlState.viewOverride[key];
+        else trackControlState.viewOverride[key] = value;
+        closeTrackCtxMenu();
+        tctlAfterChange();
+    });
+    const hiddenItem = addTrackCtxItem(menu, isTrackFiltered(key) ? 'Show this track' : 'Hide this track', isTrackFiltered(key) ? '✓' : '');
+    hiddenItem.addEventListener('click', () => {
+        if (isTrackFiltered(key)) delete trackControlState.filtered[key];
+        else trackControlState.filtered[key] = true;
+        closeTrackCtxMenu();
+        tctlAfterChange();
+    });
+
+    menu.appendChild(mkEl('div', 'tctx-divider'));
+    menu.appendChild(mkEl('div', 'tctx-section', 'All ' + groupLabel + ' (View as)'));
+    addTrackCtxRadios(menu, groupViewOptions(group), getEffectiveGroupView(group), (value) => {
+        setGroupView(group, value);
+        closeTrackCtxMenu();
+        tctlAfterChange();
+    });
+
+    menu.appendChild(mkEl('div', 'tctx-divider'));
+    const configItem = addTrackCtxItem(menu, 'Config…', '');
+    configItem.addEventListener('click', () => {
+        const anchor = trackCtxAnchorEl(key);
+        closeTrackCtxMenu();
+        openTrackConfigPopup(group, anchor);
+    });
+    const tctlItem = addTrackCtxItem(menu, 'Track Control…', '');
+    tctlItem.addEventListener('click', () => {
+        const anchor = trackCtxAnchorEl(key);
+        closeTrackCtxMenu();
+        openTrackControlPopup(anchor);
+    });
+
+    menu.hidden = false;
+    const width = menu.offsetWidth || 200;
+    const height = menu.offsetHeight || 240;
+    let left = clientX;
+    let top = clientY;
+    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+    if (top + height > window.innerHeight - 8) top = window.innerHeight - height - 8;
+    menu.style.left = Math.max(4, left) + 'px';
+    menu.style.top = Math.max(4, top) + 'px';
+}
+
+function closeTrackCtxMenu() {
+    const menu = document.getElementById('trackCtxMenu');
+    if (menu) menu.hidden = true;
+    trackCtxKey = null;
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#trackCtxMenu')) closeTrackCtxMenu();
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeTrackCtxMenu();
+});
+document.addEventListener('contextmenu', (e) => {
+    if (!e.target.closest('#trackCtxMenu') && !e.target.closest('.track-row')) closeTrackCtxMenu();
 });
 
 // Selects every residue in `trackKey` falling inside `band`, using the same
@@ -3119,6 +3995,51 @@ function selectAminoAcids(letters, label) {
     calculateRowSelectionMetadata('AA', label);
 }
 
+// Variant match/mismatch ranges: contiguous 0-based columns where the given
+// VAR_ track's aligned residue differs from the AA reference (gaps and
+// uncovered columns are never mismatches).
+function getVariantMismatchRanges(key) {
+    const seq = (typeof getVariantAATrack === 'function') ? getVariantAATrack(key) : '';
+    const ref = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const runs = [];
+    let start = null;
+    for (let i = 0; i < ref.length; i++) {
+        const vc = seq[i], rc = ref[i];
+        const isMismatch = vc && rc && vc !== ' ' && vc !== '-' && rc !== ' ' && vc !== rc;
+        if (isMismatch && start === null) start = i;
+        else if (!isMismatch && start !== null) { runs.push([start, i - 1]); start = null; }
+    }
+    if (start !== null) runs.push([start, ref.length - 1]);
+    return runs;
+}
+
+// The "≠" badge on a variant row: row-scoped selection of every column where
+// this variant differs from the reference. Toggling the same badge again
+// clears the selection (mirrors selectAminoAcids' behavior).
+function selectVariantMismatches(key) {
+    if (selectionMode === 'row' && activeRowKey === key && activeRowType === '\u2260') {
+        exitRowMode(); selectStart = null; selectEnd = null; updateSelectionUI();
+        document.getElementById('rangeDisplay').textContent = 'No selection active';
+        document.getElementById('fastaDisplay').textContent = '-';
+        updateHomologFastaSection();
+        if (typeof updateVariantFastaSection === 'function') updateVariantFastaSection();
+        setMetricsBase('Select a region or graph point for statistics.');
+        lastRanges = null; refreshChimeraxDisplay();
+        return;
+    }
+    const ranges = getVariantMismatchRanges(key);
+    if (!ranges.length) { showToast('No mismatches vs the reference for this variant.', 'error'); return; }
+    selectionMode = 'row'; activeRowKey = key; activeRowType = '\u2260';
+    selectStart = null; selectEnd = null;
+    rowRanges = ranges;
+    document.querySelectorAll('.track-label').forEach(l => l.classList.toggle('active-row', l.dataset.track === key));
+    document.querySelectorAll('.type-badge').forEach(b => b.classList.remove('active-badge'));
+    const badge = document.querySelector('.var-diff-badge[data-track="' + key + '"]');
+    if (badge) badge.classList.add('active-badge');
+    updateSelectionUI();
+    calculateRowSelectionMetadata(key, '\u2260');
+}
+
 // Format Track Labels to: [Prefix]_[State/Model]_[Metric]
 function formatTrackLabel(fullKey) {
     if (fullKey === 'AA' || fullKey.startsWith('SS_') || fullKey.startsWith('TM_') || fullKey.startsWith('DO_')) {
@@ -3128,6 +4049,8 @@ function formatTrackLabel(fullKey) {
         const m = fullKey.match(/^HH_(\d+)_(.+)$/);
         return m ? `Homolog #${parseInt(m[1], 10)}: ${m[2]}` : fullKey;
     }
+    if (fullKey === 'CONSERVATION' || fullKey.startsWith('CONS_')) return 'Conservation';
+    if (fullKey.startsWith('VAR_')) return 'Variant ' + fullKey.slice(4);
     const isPlddt = fullKey.endsWith('_pLDDT');
     const isRsa = fullKey.endsWith('_RSA');
     const isCofactors = fullKey.endsWith('_Cofactors');
@@ -3163,12 +4086,14 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('TM_')) return 2;
     if (key.startsWith('DO_')) return 3;
     if (key.startsWith('HH_')) return 4;
-    // Cofactors rank just below HH/above pLDDT-RSA so Heatmap rows line up
-    // with Graph view, where cofactor tracks render as annotation rows above
-    // the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 5;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 6;
-    return 7;
+    if (key.startsWith('VAR_')) return 5;
+    if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 6;
+    // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
+    // up with Graph view, where structural tracks render as annotation rows
+    // above the pLDDT/RSA graph sections.
+    if (key.endsWith('_Cofactors')) return 7;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 8;
+    return 9;
 }
 
 function switchViewMode() {
@@ -3223,6 +4148,7 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
         return;
     }
 
+    const cachePromises = []; // device structure-cache writes, awaited before persisting below
     for (const file of remainingFiles) {
         try {
             const text = await file.text();
@@ -3235,6 +4161,18 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             if (ext === 'pdb' || ext === 'cif') {
                 cachedStructureTexts[file.name] = text;
                 p3dStructureMeta[file.name] = buildP3DStructureMeta(file.name);
+                // Also store the raw text in the device-local IndexedDB
+                // structure cache (failures surface in the Options > Local
+                // Structure Cache panel) so a later refresh or save-import on
+                // this machine can rehydrate 3D without asking for the file
+                // again. Awaiting them below ensures the fileName -> hash
+                // registry is persisted before the session's first save.
+                cachePromises.push(cacheStructureText(file.name, ext, text));
+            }
+
+            if (ext === 'fasta' || ext === 'fa' || ext === 'faa' || ext === 'fas') {
+                importVariantFastaFile(text, file.name);
+                continue; // variant FASTA alignment tracks are handled separately - nothing below (pLDDT/RSA/cofactor) applies
             }
 
             if (ext === 'hhr') {
@@ -3293,15 +4231,14 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             }
 
             // Only cache lightweight metadata here (name/ext/size) for the
-            // Cached Data listing - NOT the raw file text. The derived
-            // pLDDT/RSA arrays above are already what gets restored on
-            // reload; raw multi-model PDB/CIF text is never read again
-            // after this point, and was previously stored redundantly
-            // alongside those arrays - easily pushing the total cached
-            // payload past localStorage's ~5MB quota after just a handful
-            // of files, silently failing every save after that (including
-            // ones for data that WOULD have fit). Re-uploading the same
-            // filename replaces its entry rather than duplicating it.
+            // Cached Data listing - the raw file text is handled by the
+            // IndexedDB structure cache above, NOT by localStorage. The
+            // derived pLDDT/RSA arrays are what get restored on reload;
+            // complete structure text is kept machine-locally in IndexedDB
+            // (hashed, deduplicated, soft-capped) so 3D can rehydrate without
+            // re-uploading - keeping the localStorage payload (~5MB quota)
+            // small. Re-uploading the same filename replaces its entry rather
+            // than duplicating it.
             uploadedStructureFiles = uploadedStructureFiles.filter(f => f.name !== file.name);
             uploadedStructureFiles.push({
                 name: file.name, ext, size: text.length,
@@ -3317,6 +4254,7 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
     restoreSelectionVisuals(); // renderViewer just rebuilt the DOM from scratch - reapply any active-row/type-badge/s-badge highlighting (from an earlier save import in this same batch, or a pre-existing selection) instead of silently dropping it
     if (p3dViewerOpen) { refreshP3DModelOptions(); updateP3DColoring(); }
     event.target.value = '';
+    await Promise.allSettled(cachePromises);
     saveStateToStorage();
     if (lastPersistError) {
         alert(
@@ -3839,6 +4777,315 @@ function buildHomologPredictorInfo(trackKey) {
     };
 }
 
+// ============ Variant FASTA import + per-column conservation engine ============
+// (Step 3 core block. Mirrors the homolog fasta/AATrack plumbing shape; all
+// helpers the UI already owns (blosum62Score, AMINO_ACID_BG_FREQUENCIES,
+// buildSBadge, updateHomologFastaSection, schedulePersist, showToast) are
+// reused as-is so this stays one continuous, dependency-light core engine.)
+
+function parseVariantFasta(text) {
+    const records = [];
+    let current = null;
+    for (let rawLine of text.replace(/\r/g, '').split('\n')) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith(';') || line.startsWith('#')) continue;
+        if (line.startsWith('>')) {
+            const header = line.slice(1).trim();
+            // `name` = first token (stable track key); `desc` = the full
+            // verbatim header, kept so variant tooltips can surface the
+            // original FASTA description.
+            current = { name: (header.split(/\s+/)[0] || 'variant' + (records.length + 1)), raw: '', desc: header };
+            records.push(current);
+        } else if (current) {
+            current.raw += line.replace(/\s+/g, '');
+        }
+    }
+    return records.filter(r => r.raw.length > 0);
+}
+
+// Needleman-Wunsch global alignment of `query` against the AA reference
+// (parsedTracks.AA) using BLOSUM62 substitution scores plus affine gaps
+// (open -11, extend -1). Returns an aligned string with '-' for positions
+// the variant doesn't cover and the variant's letters elsewhere, so it lines
+// up 1:1 with the shared residue grid. Handles the case of an equal-length
+// raw FASTA (auto-aligned passthrough: verbatim if mode auto/aligned).
+function alignVariantToReference(query) {
+    const ref = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!ref) return query;
+    const N = ref.length, M = query.length;
+    if (N === M && (fastaAlignmentMode === 'aligned' || fastaAlignmentMode === 'auto')) return query;
+    if (M === 0) return '-'.repeat(N);
+    const gapOpen = -11, gapExtend = -1;
+    const NEG = -1e9;
+    const Mtx = Array.from({ length: N + 1 }, () => new Array(M + 1).fill(0));
+    const Ix = Array.from({ length: N + 1 }, () => new Array(M + 1).fill(NEG));
+    const Iy = Array.from({ length: N + 1 }, () => new Array(M + 1).fill(NEG));
+    const trace = Array.from({ length: N + 1 }, () => new Array(M + 1).fill('M'));
+    for (let i = 1; i <= N; i++) { Ix[i][0] = gapOpen + (i - 1) * gapExtend; Mtx[i][0] = Ix[i][0]; trace[i][0] = 'U'; }
+    for (let j = 1; j <= M; j++) { Iy[0][j] = gapOpen + (j - 1) * gapExtend; Mtx[0][j] = Iy[0][j]; trace[0][j] = 'L'; }
+    for (let i = 1; i <= N; i++) {
+        for (let j = 1; j <= M; j++) {
+            const s = typeof blosum62Score === 'function' ? blosum62Score(ref[i - 1], query[j - 1]) : (ref[i - 1] === query[j - 1] ? 4 : -1);
+            const diag = Mtx[i - 1][j - 1] + s;
+            const up = Math.max(Mtx[i - 1][j] + gapOpen, Ix[i - 1][j] + gapExtend);
+            const left = Math.max(Mtx[i][j - 1] + gapOpen, Iy[i][j - 1] + gapExtend);
+            const best = Math.max(diag, up, left);
+            Mtx[i][j] = best;
+            Ix[i][j] = up; Iy[i][j] = left;
+            trace[i][j] = best === diag ? 'D' : (best === up ? 'U' : 'L');
+        }
+    }
+    let out = '', i = N, j = M;
+    while (i > 0 || j > 0) {
+        // D = ref i-1 paired with query j-1 -> emit the VARIANT letter (not
+        //     the reference one, or mutations never reach the grid/conservation).
+        // U = reference residue has no query partner (gap in the variant) -> '-'.
+        // L = query residue is an insertion vs the reference -> no grid column.
+        if (i > 0 && j > 0 && trace[i][j] === 'D') { out = query[j - 1] + out; i--; j--; }
+        else if (i > 0 && (j === 0 || trace[i][j] === 'U')) { out = '-' + out; i--; }
+        else if (j > 0) { j--; }
+        else break;
+    }
+    return out;
+}
+
+// Entry point wired in Step 1's structure-upload FASTA branch
+// (importVariantFastaFile(text, file.name)).
+function importVariantFastaFile(text, fileName) {
+    let records;
+    try {
+        records = parseVariantFasta(text);
+    } catch (err) {
+        showToast(`Could not parse "${fileName}" as a variant FASTA file.`, 'error');
+        return;
+    }
+    if (!records.length) { showToast(`"${fileName}" doesn't look like a valid FASTA file (no sequences found).`, 'error'); return; }
+    keyedVariantsInfo = keyedVariantsInfo || {};
+    records.forEach(rec => {
+        const aligned = alignVariantToReference(rec.raw);
+        keyedVariantsInfo[rec.name] = { aligned, raw: rec.raw, file: fileName, desc: rec.desc || '' };
+    });
+    if (typeof keyedVariantsInfo.version !== 'undefined') delete keyedVariantsInfo.version;
+    // Register one VAR_ track per variant (aligned to the reference grid);
+    // recomputeConservationScores() reads the just-populated keyedVariantsInfo
+    // and writes the CONSERVATION object track (values + metric).
+    recomputeConservationScores();
+    Object.keys(keyedVariantsInfo).forEach(vname => {
+        const v = keyedVariantsInfo[vname];
+        if (v && typeof v.aligned === 'string') parsedTracks['VAR_' + vname] = v.aligned;
+    });
+    if (typeof updateVariantFastaSection === 'function') updateVariantFastaSection();
+    if (typeof schedulePersist === 'function') schedulePersist();
+    showToast(`Imported ${records.length} variant sequence${records.length > 1 ? 's' : ''} from "${fileName}".`, 'success');
+    if (typeof renderViewer === 'function') renderViewer(parsedTracks);
+}
+
+// Per-column conservation over all aligned variant strings. Skips columns with
+// fewer than 2 present letters (treated as gaps). Returns the selectable
+// metric array (shannon|jsd|wukabat), 0..1 with 1 = fully conserved.
+function computeConservationScores(aligneds, metric) {
+    const width = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!width || !Array.isArray(aligneds) || !aligneds.length) return new Array(width).fill(0);
+    const rows = aligneds.filter(s => typeof s === 'string');
+    const out = new Array(width).fill(0);
+    const aaOrder = (typeof AA_ALPHABET_ORDER === 'string' && AA_ALPHABET_ORDER) ? AA_ALPHABET_ORDER : 'ARNDCQEGHILKMFPSTWYV';
+    for (let c = 0; c < width; c++) {
+        const counts = {};
+        let present = 0;
+        rows.forEach(r => {
+            const ch = r[c];
+            if (ch === undefined || ch === '-' || ch === ' ' || ch === '.' || ch === '~') return;
+            counts[ch] = (counts[ch] || 0) + 1; present++;
+        });
+        if (present < 2) { out[c] = 0; continue; }
+        const letters = Object.keys(counts);
+        if (metric === 'shannon') {
+            let H = 0;
+            letters.forEach(k => { const p = counts[k] / present; if (p > 0) H -= p * Math.log2(p); });
+            const Hmax = Math.log2(Math.min(letters.length, present));
+            out[c] = Hmax > 0 ? Math.max(0, Math.min(1, 1 - H / Hmax)) : 1;
+        } else if (metric === 'jsd') {
+            const bg = (typeof AMINO_ACID_BG_FREQUENCIES === 'object' && AMINO_ACID_BG_FREQUENCIES) ? AMINO_ACID_BG_FREQUENCIES : {};
+            const bgTotal = Object.keys(bg).reduce((s, k) => s + (bg[k] || 0), 0) || 1;
+            let kl = 0, klRev = 0;
+            letters.forEach(k => { const p = counts[k] / present; const q = (bg[k] || 0.0001) / bgTotal; if (p > 0) kl += p * Math.log2(p / q); });
+            aaOrder.split('').forEach(a => {
+                const q = (bg[a] || 0.0001) / bgTotal; const p = counts[a] ? counts[a] / present : 0.0001;
+                klRev += q * Math.log2(q / p);
+            });
+            const jsd = 0.5 * kl + 0.5 * klRev;
+            out[c] = Math.max(0, Math.min(1, 1 - jsd));
+        } else {
+            const maxFreq = Math.max.apply(null, letters.map(k => counts[k]));
+            const variability = (letters.length / present) / (maxFreq / present);
+            out[c] = Math.max(0, Math.min(1, 1 - (variability / 20)));
+        }
+    }
+    return out;
+}
+
+// Gathers every aligned string that participates in conservation: variant
+// VAR_ tracks plus (when conservationIncludeHHR is on) each homolog's AA
+// track, so user homologs fold into the per-column scores just like variant
+// FASTA sequences do.
+function getConservationAlignedSequences() {
+    const seqs = [];
+    Object.keys(keyedVariantsInfo || {}).forEach(name => {
+        const v = keyedVariantsInfo[name];
+        if (v && typeof v.aligned === 'string') seqs.push(v.aligned);
+    });
+    if (conservationIncludeHHR && typeof getHomologAATrack === 'function') {
+        Object.keys(hhpredHitsInfo || {}).forEach(k => {
+            const aa = getHomologAATrack(k);
+            if (typeof aa === 'string' && aa.length) seqs.push(aa);
+        });
+    }
+    return seqs;
+}
+
+// Recomputes the CONSERVATION object track from the current variant set and
+// the active metric; deletes the track entirely when there is nothing to
+// score so the row never lingers as an empty band. Also refreshes the
+// conservation badge/label section if present.
+function recomputeConservationScores() {
+    const metric = (typeof conservationMetric === 'string' && conservationMetric) ? conservationMetric : 'shannon';
+    const seqs = getConservationAlignedSequences();
+    const scores = computeConservationScores(seqs, metric);
+    const width = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!width || !scores.length) {
+        if (parsedTracks) delete parsedTracks.CONSERVATION;
+        return;
+    }
+    const obj = { type: 'conservation', metric: metric, values: scores };
+    parsedTracks.CONSERVATION = obj;
+    if (typeof updateConservationSection === 'function') updateConservationSection();
+}
+
+// --- Options > Conservation Scoring -----------------------------------------
+// The three settings backing the CONSERVATION row (metric, whether HHR
+// homologs participate, and how variant FASTA is aligned onto the reference).
+// Applied immediately on change and persisted with the session.
+
+const CONSERVATION_METRICS = ['shannon', 'jsd', 'wukabat'];
+const FASTA_ALIGNMENT_MODES = ['auto', 'aligned', 'unaligned'];
+
+function syncConservationOptionControls() {
+    const metricEl = document.getElementById('conservationMetricSelect');
+    const modeEl = document.getElementById('fastaAlignmentModeSelect');
+    const hhrEl = document.getElementById('conservationIncludeHHRCheck');
+    if (metricEl) metricEl.value = conservationMetric;
+    if (modeEl) modeEl.value = fastaAlignmentMode;
+    if (hhrEl) hhrEl.checked = !!conservationIncludeHHR;
+}
+
+// Re-aligns every imported variant against the reference using the current
+// fastaAlignmentMode, updating both the stored aligned string and the VAR_
+// tracks (so an option change takes effect on already-imported sequences).
+function realignAllVariants() {
+    const info = keyedVariantsInfo || {};
+    let changed = 0;
+    Object.keys(info).forEach(name => {
+        const v = info[name];
+        if (!v || typeof v.raw !== 'string' || !v.raw.length) return;
+        const aligned = alignVariantToReference(v.raw);
+        if (aligned !== v.aligned) { v.aligned = aligned; changed++; }
+        if (typeof aligned === 'string') parsedTracks['VAR_' + name] = aligned;
+    });
+    return changed;
+}
+
+function refreshConservationAfterOptionChange() {
+    recomputeConservationScores();
+    if (typeof renderViewer === 'function') renderViewer(parsedTracks);
+    if (typeof schedulePersist === 'function') schedulePersist();
+}
+
+function onConservationMetricChange() {
+    const el = document.getElementById('conservationMetricSelect');
+    if (!el || !CONSERVATION_METRICS.includes(el.value)) return;
+    conservationMetric = el.value;
+    refreshConservationAfterOptionChange();
+}
+
+function onConservationIncludeHHRChange() {
+    const el = document.getElementById('conservationIncludeHHRCheck');
+    if (!el) return;
+    conservationIncludeHHR = !!el.checked;
+    refreshConservationAfterOptionChange();
+}
+
+function onFastaAlignmentModeChange() {
+    const el = document.getElementById('fastaAlignmentModeSelect');
+    if (!el || !FASTA_ALIGNMENT_MODES.includes(el.value)) return;
+    fastaAlignmentMode = el.value;
+    const changed = realignAllVariants();
+    refreshConservationAfterOptionChange();
+    if (changed) showToast(`Re-aligned ${changed} variant sequence${changed === 1 ? '' : 's'} using the new alignment mode.`, 'success');
+}
+
+// Restores the three conservation settings from a persisted/saved state
+// (shared by loadStateFromStorage and importSaveFile).
+function applyConservationSettings(prefs) {
+    conservationMetric = CONSERVATION_METRICS.includes(prefs.conservationMetric) ? prefs.conservationMetric : 'shannon';
+    conservationIncludeHHR = !!prefs.conservationIncludeHHR;
+    fastaAlignmentMode = FASTA_ALIGNMENT_MODES.includes(prefs.fastaAlignmentMode) ? prefs.fastaAlignmentMode : 'auto';
+}
+
+// Mirror of getHomologAATrack for VAR_ rows: returns that variant's aligned
+// string (gap-aligned to the reference grid) or falls back to the reference.
+function getVariantAATrack(trackKey) {
+    // Track keys are VAR_<name> but keyedVariantsInfo is keyed by the bare
+    // FASTA header name - strip the prefix before looking up the variant.
+    const name = trackKey.startsWith('VAR_') ? trackKey.slice(4) : trackKey;
+    const info = keyedVariantsInfo ? keyedVariantsInfo[name] : null;
+    if (info && typeof info.aligned === 'string') return info.aligned;
+    // Old save-files carried the aligned string directly on the VAR_ track;
+    // fall back to the reference sequence only if neither exists.
+    if (parsedTracks && typeof parsedTracks[trackKey] === 'string') return parsedTracks[trackKey];
+    return (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+}
+
+// FASTA header/description for a VAR_ track: the full '>' line (verbatim)
+// captured at import, or '' when it wasn't parsed/present.
+function getVariantDescription(trackKey) {
+    const name = trackKey.startsWith('VAR_') ? trackKey.slice(4) : trackKey;
+    const info = keyedVariantsInfo ? keyedVariantsInfo[name] : null;
+    return (info && typeof info.desc === 'string') ? info.desc : '';
+}
+
+// Mirror of updateHomologFastaSection: shows the currently-selected variant's
+// aligned sequence in the FASTA-segment panel so it can be copied.
+function updateVariantFastaSection() {
+    const section = document.getElementById('variantFastaSection');
+    const label = document.getElementById('variantFastaLabel');
+    const display = document.getElementById('variantFastaDisplay');
+    const btn = document.getElementById('copyVariantTrackBtn');
+    if (!section || !label || !display || !btn) return;
+    const isVariant = typeof activeRowKey === 'string' && activeRowKey.startsWith('VAR_');
+    if (isVariant && keyedVariantsInfo && keyedVariantsInfo[activeRowKey]) {
+        const aa = getVariantAATrack(activeRowKey);
+        const ranges = (typeof rowRanges === 'object' && rowRanges) ? rowRanges : [];
+        const segs = (Array.isArray(ranges) && ranges.length)
+            ? ranges.map(([s, e]) => aa.substring(s, e + 1))
+            : [aa];
+        const textToCopy = segs.join(',');
+        display.textContent = textToCopy;
+        label.textContent = `Variant sequence (${(typeof formatTrackLabel === 'function') ? formatTrackLabel(activeRowKey) : activeRowKey}):`;
+        section.style.display = 'block';
+        btn.disabled = false;
+        btn.onclick = () => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy).then(() => showToast('Variant sequence copied to clipboard.', 'success'));
+            } else {
+                showToast('Clipboard access is not available in this browser.', 'error');
+            }
+        };
+    } else {
+        section.style.display = 'none';
+        btn.disabled = true;
+    }
+}
+
 function importHHpredFile(text, fileName) {
     let parsed;
     try {
@@ -4061,18 +5308,20 @@ const TRACK_GROUP_LABELS = {
     CC: 'Coiled-Coil',
     SP: 'Signal Peptide',
     HH: 'Homologs',
+    VAR: 'Variants',
+    CONSERVATION: 'Conservation',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
     other: 'Other'
 };
-let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {} };
+let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {}, consColor: {}, viewOverride: {} };
 
 // Fresh-install / cleared-cache default: Transmembrane and Homolog rows start
 // in "Bar" (fullBar) mode so new users see labeled bars instead of letters.
 // Persisted preferences override this when loading a previous session.
 function getDefaultTrackControlState() {
-    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true, HH: true }, filtered: {}, aaSeq: {} };
+    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true, HH: true }, filtered: {}, aaSeq: {}, consColor: {}, viewOverride: {} };
 }
 
 function getTrackGroup(key) {
@@ -4083,6 +5332,8 @@ function getTrackGroup(key) {
     if (key.startsWith('CC_')) return 'CC';
     if (key.startsWith('SP_')) return 'SP';
     if (key.startsWith('HH_')) return 'HH';
+    if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 'CONSERVATION';
+    if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
     if (key.endsWith('_Cofactors')) return 'Cofactors';
@@ -4095,6 +5346,40 @@ function isTrackGroupFullBar(g) { return !!trackControlState.fullBar[g]; }
 // Homolog glyph mode: instead of the HHpred match-quality symbols, the row
 // renders the template's amino-acid letters in the same per-column colors.
 function isTrackGroupAASeq(g) { return !!trackControlState.aaSeq[g]; }
+// Homolog "conservation colors" mode: like AA mode (letters shown) but the
+// letters are colored by the per-column conservation score instead of the
+// HHpred match-quality colors. Independent of the glyph cycle.
+function isTrackGroupConsColored(g) { return !!trackControlState.consColor[g]; }
+// Per-track "View as" override: when present it pins one track to a view mode
+// regardless of its type group; absent means "follow the group".
+function getTrackViewOverride(key) {
+    return (trackControlState.viewOverride && trackControlState.viewOverride[key]) || null;
+}
+// The authoritative view mode for a whole type group, derived from the old
+// independent flags: hidden > bar > AA > no-letters > glyphs.
+function getEffectiveGroupView(g) {
+    if (isTrackGroupHidden(g)) return 'hidden';
+    if (isTrackGroupFullBar(g)) return 'bar';
+    if (isTrackGroupAASeq(g)) return 'aa';
+    if (isTrackGroupSymbolsHidden(g)) return 'noletters';
+    return 'glyphs';
+}
+// Inverse of getEffectiveGroupView: sets one authoritative view mode for a
+// group, clearing the other mutually-exclusive flags.
+function setGroupView(g, v) {
+    if (v === 'hidden') { trackControlState.hidden[g] = true; return; }
+    trackControlState.hidden[g] = false;
+    trackControlState.fullBar[g] = (v === 'bar');
+    trackControlState.aaSeq[g] = (v === 'aa');
+    trackControlState.hideSymbols[g] = (v === 'noletters');
+    if (v === 'bar') trackControlState.consColor[g] = false;
+}
+// Group view is non-default when the type isn't in plain glyph mode, or any
+// of its tracks carry a per-track override / hidden filter.
+function isGroupViewNonDefault(g) {
+    if (getEffectiveGroupView(g) !== 'glyphs' && getEffectiveGroupView(g) !== 'hidden') return true;
+    return getGroupTrackKeys(g).some(k => !!getTrackViewOverride(k) || isTrackFiltered(k));
+}
 
 // The single "Glyphs" button used by both the master-menu mini and the group
 // popup. For non-Homolog groups it is the usual two-state symbols/hidden
@@ -4148,7 +5433,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, DO: 3, CC: 4, SP: 5, HH: 6, pLDDT: 7, RSA: 8, Cofactors: 9, other: 99 };
+    const order = { SS: 1, TM: 2, DO: 3, CC: 4, SP: 5, HH: 6, VAR: 7, CONSERVATION: 8, pLDDT: 9, RSA: 10, Cofactors: 11, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -4173,6 +5458,10 @@ function getHomologDisplayName(key) {
 // Numeric tracks (pLDDT/RSA object arrays) always have every column populated,
 // which collapses to a single full-length range.
 function getActiveRanges(track) {
+    // CONSERVATION (and any future CONS_*) tracks are stored as
+    // { type:'conservation', ...values } objects - unwrap to the numeric
+    // values array so full-bar labels compute over the residue grid.
+    if (track && !Array.isArray(track) && Array.isArray(track.values)) track = track.values;
     const ranges = [];
     let start = -1;
     for (let i = 0; i < track.length; i++) {
@@ -4217,7 +5506,7 @@ function renderViewer(tracks) {
         // AA itself is already rendered in the pinned header above, so it is
         // skipped here to avoid a duplicate row.
         const annotationKeys = Object.keys(tracks)
-            .filter(k => typeof tracks[k] === 'string')
+            .filter(k => typeof tracks[k] === 'string' || k === 'CONSERVATION' || k.startsWith('CONS_'))
             .sort((a, b) => {
                 const orderA = getTrackCategoryOrder(a), orderB = getTrackCategoryOrder(b);
                 return orderA !== orderB ? orderA - orderB : a.localeCompare(b);
@@ -4301,7 +5590,7 @@ function buildPositionMarkerRow(totalLength) {
     tctlBtn.id = 'btnTrackControl';
     tctlBtn.className = 'tctl-marker-btn';
     tctlBtn.textContent = 'Track Control';
-    tctlBtn.title = 'Show/hide track types, hide symbols, and switch types to a full-bar display';
+    tctlBtn.title = 'Track Controls: per-type View as (Glyphs / Bar / AA / hidden), per-track overrides, and type Config (conservation scoring, cutoffs)';
     tctlBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         openTrackControlPopup(tctlBtn);
@@ -4365,9 +5654,11 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     // Track Control chevron: shown on the first visible track of each type
     // group and opens that group's popup (hide / symbols / full-bar).
     const group = getTrackGroup(key);
+    // Per-track "View as" override (if any) wins over the type-group mode.
+    const viewOvr = getTrackViewOverride(key);
     if (isGroupFirst) {
         const chevron = document.createElement('span');
-        chevron.className = 'tctl-chevron' + ((isTrackGroupSymbolsHidden(group) || isTrackGroupFullBar(group)) ? ' state-on' : '');
+        chevron.className = 'tctl-chevron' + (isGroupViewNonDefault(group) ? ' state-on' : '');
         chevron.textContent = '▶';
         chevron.title = `Track Control: ${trackGroupLabel(group)}`;
         chevron.setAttribute('role', 'button');
@@ -4383,11 +5674,37 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     const labelText = document.createElement('span');
     labelText.className = 'track-label-text';
     labelText.textContent = formatTrackLabel(key);
-    labelText.title = key;
+    // FASTA header description for variant rows, shown via the row label
+    // tooltip so the original sequence metadata stays accessible.
+    const varDesc = key.startsWith('VAR_') ? getVariantDescription(key) : '';
+    labelText.title = key + (varDesc ? '\n' + varDesc : '');
     labelEl.appendChild(labelText);
 
     const predictorInfo = getPredictorInfo(key);
-    if (predictorInfo) {
+    if (key.startsWith('VAR_')) {
+        // The ℹ tooltip is where users look for a row's provenance: surface
+        // the imported FASTA header description here, falling back to a plain
+        // note when the header carried no description.
+        labelEl.appendChild(buildInfoIcon(buildPredictorTooltipHTML({
+            name: formatTrackLabel(key),
+            category: 'Variant FASTA',
+            description: varDesc || 'Aligned variant sequence (no FASTA header description captured).',
+            bands: [],
+            useCase: '',
+            citation: ''
+        }), false));
+    } else if (key === 'CONSERVATION' || key.startsWith('CONS_')) {
+        const consMetric = (tracks && tracks[key] && tracks[key].metric) || conservationMetric || 'shannon';
+        const numVar = Object.keys(keyedVariantsInfo || {}).length;
+        labelEl.appendChild(buildInfoIcon(buildPredictorTooltipHTML({
+            name: 'Conservation',
+            category: 'Per-column divergence over ' + numVar + ' variant sequence' + (numVar === 1 ? '' : 's'),
+            description: `Scores computed with the "${consMetric}" metric: 1 = fully conserved, 0 = fully divergent.`,
+            bands: [],
+            useCase: '',
+            citation: ''
+        }), false));
+    } else if (predictorInfo) {
         labelEl.appendChild(buildInfoIcon(buildPredictorTooltipHTML(predictorInfo), !!(predictorInfo.bands && predictorInfo.bands.length)));
     } else if (key === 'AA') {
         labelEl.appendChild(buildInfoIcon('<strong>AA</strong><br>The amino acid sequence for the input FASTA / Quick2D data.'));
@@ -4395,7 +5712,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
 
     if (key === 'AA') {
         labelEl.appendChild(buildRBadge());
-    } else if (typeof tracks[key] === 'string') {
+    } else if (typeof tracks[key] === 'string' && tracks[key].length && !key.startsWith('VAR_') && key !== 'CONSERVATION' && !key.startsWith('CONS_')) {
         const presentTypes = TYPE_ORDER.filter(t => tracks[key].includes(t));
         if (presentTypes.length) {
             const badgesEl = document.createElement('span');
@@ -4412,6 +5729,20 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
             });
             labelEl.appendChild(badgesEl);
         }
+    } else if (key.startsWith('VAR_')) {
+        // Variant rows get a match/mismatch selector instead of the SS/type
+        // badges: the meaningful "filter" for a variant is where it differs
+        // from the reference AA sequence, not secondary-structure categories.
+        const diffBtn = document.createElement('span');
+        diffBtn.className = 'type-badge var-diff-badge';
+        diffBtn.dataset.track = key;
+        diffBtn.textContent = '\u2260';
+        diffBtn.title = 'Select residues where this variant differs from the reference AA sequence';
+        diffBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectVariantMismatches(key);
+        });
+        labelEl.appendChild(diffBtn);
     } else if (Array.isArray(tracks[key]) && getBandsForTrackKey(key)) {
         labelEl.appendChild(buildSBadge(key));
     }
@@ -4420,16 +5751,44 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     const cellsContainer = document.createElement('div');
     cellsContainer.className = 'track-cells';
 
-    const hideSym = isTrackGroupSymbolsHidden(group);
-    const fullBar = isTrackGroupFullBar(group);
+    const hideSym = viewOvr ? (viewOvr === 'noletters') : isTrackGroupSymbolsHidden(group);
+    const fullBar = viewOvr ? (viewOvr === 'bar') : isTrackGroupFullBar(group);
     const showGlyphs = !hideSym && !fullBar;
     // Homolog "AA sequence" glyph mode: render the template's amino-acid
     // letters in the per-column match-quality colors. When an import already
     // captured the template sequence use it verbatim (gaps stay blank);
     // otherwise (older saves / non-.hhr homologs) fall back to the query AA.
-    const aaMode = group === 'HH' && isTrackGroupAASeq('HH');
-    const aaTrackForRow = aaMode ? (hhpredHitsInfo[key] && hhpredHitsInfo[key].aaTrack) || null : null;
-    const queryAAFallback = aaMode && !aaTrackForRow && typeof tracks.AA === 'string' ? tracks.AA : null;
+    const aaMode = group === 'HH' && !fullBar && (viewOvr ? (viewOvr === 'aa') : isTrackGroupAASeq('HH'));
+    // Conservation-colors mode forces the AA letters too, but colored by the
+    // per-column conservation band instead of HHpred match-quality.
+    const consColorMode = group === 'HH' && !fullBar && isTrackGroupConsColored('HH');
+    const showHHAA = aaMode || consColorMode;
+    const aaTrackForRow = showHHAA ? (hhpredHitsInfo[key] && hhpredHitsInfo[key].aaTrack) || null : null;
+    const queryAAFallback = showHHAA && !aaTrackForRow && typeof tracks.AA === 'string' ? tracks.AA : null;
+    // Conservation scores used by the CONSERVATION row: prefer the cached
+    // object track (values array) built by recomputeConservationScores(),
+    // recomputing only when it's missing or stale (e.g. old string-form saves).
+    let conservationScoresForRow = null;
+    if (key === 'CONSERVATION' || key.startsWith('CONS_')) {
+        const consObj = tracks[key];
+        if (consObj && typeof consObj === 'object' && !Array.isArray(consObj) && Array.isArray(consObj.values) && consObj.values.length === totalLength) {
+            conservationScoresForRow = consObj.values;
+        } else {
+            conservationScoresForRow = computeConservationScores(getConservationAlignedSequences(), conservationMetric);
+        }
+    }
+    // Per-column conservation scores for homolog rows in "Cons. colors" mode.
+    // Prefer the cached CONSERVATION values when present and correctly sized,
+    // else recompute - same contract as the CONSERVATION row itself.
+    let conservationScoresForHH = null;
+    if (consColorMode) {
+        const consObj = tracks.CONSERVATION;
+        if (consObj && typeof consObj === 'object' && !Array.isArray(consObj) && Array.isArray(consObj.values) && consObj.values.length === totalLength) {
+            conservationScoresForHH = consObj.values;
+        } else {
+            conservationScoresForHH = computeConservationScores(getConservationAlignedSequences(), conservationMetric);
+        }
+    }
 
     for (let i = 0; i < totalLength; i++) {
         const cellEl = document.createElement('div');
@@ -4467,6 +5826,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
             }
         } else {
             const char = dataVal || ' ';
+            const fg = '#1e293b'; // neutral glyph fg for variant/conservation rows
             if (showGlyphs) setGlyph(cellEl, char, gridCellW);
             if (key === 'AA') {
                 cellEl.classList.add('cell-AA');
@@ -4474,6 +5834,63 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 // fade below the 12px threshold so the reference row never
                 // disappears into the empty background.
                 if (glyphOpacityFor(gridCellW) < 1) cellEl.style.backgroundColor = '#f1f5f9';
+            }
+            else if (key === 'CONSERVATION' || key.startsWith('CONS_')) {
+                // Per-column conservation heatmap row: shade each cell by its
+                // score band, then overlay the residue letter when glyphs are
+                // shown (scores come from the cached CONSERVATION object track,
+                // computed once by recomputeConservationScores()).
+                const cVal = (conservationScoresForRow && conservationScoresForRow.length > i) ? conservationScoresForRow[i] : null;
+                const band = (typeof getConservationBandForScore === 'function' && cVal != null) ? getConservationBandForScore(cVal) : null;
+                if (band && band.bg) cellEl.style.backgroundColor = band.bg;
+                if (showGlyphs) {
+                    const consSeqs = getConservationAlignedSequences();
+                    const consChar = (Array.isArray(consSeqs) && consSeqs.length && typeof consSeqs[0] === 'string') ? (consSeqs[0][i] || ' ') : ' ';
+                    if (consChar !== ' ' && consChar !== '-') {
+                        const priorGlyph = cellEl.querySelector('.cell-glyph');
+                        if (priorGlyph) priorGlyph.remove();
+                        const span = setGlyph(cellEl, consChar, gridCellW);
+                        if (!fullBar) span.style.color = (band && band.fg) ? band.fg : fg;
+                    } else {
+                        cellEl.classList.add('cell-space');
+                        const gSpan = cellEl.querySelector('.cell-glyph');
+                        if (gSpan) gSpan.textContent = '-';
+                    }
+                }
+                cellEl.title = `Residue ${i + 1}: conservation ${cVal != null ? cVal.toFixed(3) : 'n/a'} (${conservationMetric})`;
+            } else if (key.startsWith('VAR_')) {
+                // Variant residue letter for this row, aligned 1:1 to the
+                // reference residue grid - letters, '-' or blank when the
+                // variant doesn't cover the column; no quality glyph. Per-cell
+                // match/mismatch shading (vs the AA reference) keeps the row
+                // meaningful when glyphs are hidden: mismatch = rose, match =
+                // faint slate, gap = unshaded. Full-bar paints covered columns
+                // as a solid bar.
+                const varSeq = getVariantAATrack(key);
+                const varChar = (typeof varSeq === 'string') ? (varSeq[i] || ' ') : ' ';
+                const refChar = (tracks && typeof tracks.AA === 'string') ? (tracks.AA[i] || ' ') : ' ';
+                const isMismatch = varChar !== ' ' && varChar !== '-' && refChar !== ' ' && varChar !== refChar;
+                if (fullBar) {
+                    if (varChar !== ' ' && varChar !== '-') cellEl.style.backgroundColor = '#94a3b8';
+                } else {
+                    cellEl.style.backgroundColor = varChar === ' ' || varChar === '-' ? '' : (isMismatch ? '#fecaca' : '#f1f5f9');
+                }
+                if (showGlyphs) {
+                    if (varChar !== ' ' && varChar !== '-') {
+                        const priorGlyph = cellEl.querySelector('.cell-glyph');
+                        if (priorGlyph) priorGlyph.remove();
+                        const span = setGlyph(cellEl, varChar, gridCellW);
+                        if (!fullBar) span.style.color = isMismatch ? '#b91c1c' : fg;
+                    } else {
+                        cellEl.classList.add('cell-space');
+                        const gSpan = cellEl.querySelector('.cell-glyph');
+                        if (gSpan) gSpan.textContent = '-';
+                    }
+                }
+                const varDescLine = varDesc ? formatTrackLabel(key) + ' \u2014 ' + varDesc + '\n' : '';
+                cellEl.title = varDescLine + (varChar !== ' ' && varChar !== '-'
+                    ? (isMismatch ? `Residue ${i + 1}: variant AA '${varChar}' (mismatch vs reference '${refChar}')` : `Residue ${i + 1}: variant AA '${varChar}' (matches reference)`)
+                    : `Residue ${i + 1}: variant (no aligned residue)`);
             }
             else if (char === 'H') cellEl.classList.add('cell-H');
             else if (char === 'P') cellEl.classList.add('cell-P');
@@ -4489,22 +5906,36 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 cellEl.title = `Residue ${i + 1}: neighbor of cofactor #${char}`;
             } else if (key.startsWith('HH_') && HH_QUALITY_COLORS[char]) {
                 const [bg, fg] = HH_QUALITY_COLORS[char];
-                // Full-bar mode paints every column the strongest-match teal,
+                // Conservation-colors mode: swap the per-column match-quality
+                // colors for the conservation band colors (heatmap letters).
+                const consForCell = consColorMode ? ((conservationScoresForHH && conservationScoresForHH.length > i) ? conservationScoresForHH[i] : null) : null;
+                const band = (consColorMode && consForCell != null && typeof getConservationBandForScore === 'function') ? getConservationBandForScore(consForCell) : null;
+                // Full-bar paints every covered column the strongest-match teal,
                 // making the whole homolog row one solid hit bar.
-                cellEl.style.backgroundColor = fullBar ? '#0891b2' : bg;
-                if (aaMode) {
+                cellEl.style.backgroundColor = fullBar ? '#0891b2' : (band ? band.bg : bg);
+                if (showHHAA) {
+                    // The pre-loop glyph pass laid the per-column match-quality
+                    // glyph (e.g. '.') into every string cell, so clear it here:
+                    // AA display shows only the bare residue letter, never the
+                    // quality char appended beside it, i.e. 'R' not '.R'.
+                    const priorGlyph = cellEl.querySelector('.cell-glyph');
+                    if (priorGlyph) priorGlyph.remove();
                     let aaChar = aaTrackForRow ? (aaTrackForRow[i] || ' ') : (queryAAFallback ? (queryAAFallback[i] || ' ') : ' ');
                     if (aaChar !== ' ') {
                         const span = setGlyph(cellEl, aaChar, gridCellW);
-                        if (!fullBar) span.style.color = fg;
-                        cellEl.title = `Residue ${i + 1}: homolog AA '${aaChar}' (HHpred match quality '${char}')`;
+                        if (!fullBar) span.style.color = (band && band.fg) ? band.fg : fg;
+                        cellEl.title = consColorMode
+                            ? `Residue ${i + 1}: homolog AA '${aaChar}' (conservation ${consForCell != null ? consForCell.toFixed(3) : 'n/a'}, ${conservationMetric})`
+                            : `Residue ${i + 1}: homolog AA '${aaChar}' (HHpred match quality '${char}')`;
                     } else {
-                        cellEl.title = `Residue ${i + 1}: HHpred match quality '${char}' (uncovered by template)`;
+                        cellEl.title = consColorMode
+                            ? `Residue ${i + 1}: conservation ${consForCell != null ? consForCell.toFixed(3) : 'n/a'} (${conservationMetric})`
+                            : `Residue ${i + 1}: HHpred match quality '${char}' (uncovered by template)`;
                     }
                 } else {
                     cellEl.title = `Residue ${i + 1}: HHpred match quality '${char}'`;
                 }
-            } else if (char === ' ' || char === '-' || char === '\t') {
+} else if (char === ' ' || char === '-' || char === '\t') {
                 cellEl.classList.add('cell-space');
                 if (showGlyphs) {
                     const gSpan = cellEl.querySelector('.cell-glyph');
@@ -4595,6 +6026,16 @@ cellsContainer.appendChild(overlay);
     }
 
     rowEl.appendChild(cellsContainer);
+
+    // Right-click anywhere on the row opens the per-track Track Control menu
+    // (View as + Config), mirroring the master Track Control UI. The reference
+    // AA row opts out so right-click there keeps its normal behaviour.
+    if (key !== 'AA') {
+        rowEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            openTrackCtxMenu(key, e.clientX, e.clientY);
+        });
+    }
     return rowEl;
 }
 // Create Overlaid Graph Section with interactive toggle pills, a y-axis, and
@@ -7187,6 +8628,376 @@ function onTypePaletteChange() {
     schedulePersist();
 }
 
+// --- Local structure-file cache (this device, IndexedDB) -------------------
+// Raw PDB/CIF text is NOT embedded in save files or localStorage - it lives
+// in this device-local IndexedDB store, keyed by content hash, so:
+//   • re-opening the page / re-importing a save on the SAME machine can
+//     rehydrate 3D models instantly without re-uploading,
+//   • re-uploading a file you've cached before is deduplicated by hash,
+//   • exported saves stay small and portable - they only carry metadata
+//     (structureReferences: fileName -> { hash, ext, size }),
+//   • Reset Data (the session cache) never touches this store - it has its
+//     own clear control in Options, so you can switch between loaded datasets
+//     without losing your cached PDB/CIF copies.
+// Entries unreferenced by the current session are evicted oldest-first when
+// the total exceeds the soft cap below.
+const STRUCTURE_CACHE_DB = 'q2dv-structure-cache';
+const STRUCTURE_CACHE_STORE = 'structures';
+const STRUCTURE_CACHE_SOFT_CAP = 100 * 1024 * 1024; // 100 MB soft cap for this device
+let structureCacheDB = null;
+
+function structureCacheOpenDB() {
+    return new Promise((resolve, reject) => {
+        if (structureCacheDB) return resolve(structureCacheDB);
+        if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'));
+        const req = indexedDB.open(STRUCTURE_CACHE_DB, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(STRUCTURE_CACHE_STORE)) {
+                db.createObjectStore(STRUCTURE_CACHE_STORE, { keyPath: 'hash' });
+            }
+        };
+        req.onsuccess = () => { structureCacheDB = req.result; resolve(req.result); };
+        req.onerror = () => reject(req.error || new Error('Failed to open structure cache'));
+    });
+}
+function structureCacheGet(hash) {
+    return structureCacheOpenDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(STRUCTURE_CACHE_STORE, 'readonly');
+        const req = tx.objectStore(STRUCTURE_CACHE_STORE).get(hash);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error || new Error('Failed to read structure cache'));
+    }));
+}
+function structureCachePut(entry) {
+    const now = Date.now();
+    const e = Object.assign({}, entry, { savedAt: now, lastUsed: now });
+    return structureCacheOpenDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(STRUCTURE_CACHE_STORE, 'readwrite');
+        tx.objectStore(STRUCTURE_CACHE_STORE).put(e);
+        tx.oncomplete = () => resolve(e);
+        tx.onerror = () => reject(tx.error || new Error('Failed to write structure cache'));
+        tx.onabort = () => reject(tx.error || new Error('Failed to write structure cache'));
+    }));
+}
+function structureCacheAll() {
+    return structureCacheOpenDB().then(db => new Promise((resolve, reject) => {
+        const req = db.transaction(STRUCTURE_CACHE_STORE, 'readonly').objectStore(STRUCTURE_CACHE_STORE).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error || new Error('Failed to list structure cache'));
+    }));
+}
+function structureCacheDelete(hash) {
+    return structureCacheOpenDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(STRUCTURE_CACHE_STORE, 'readwrite');
+        tx.objectStore(STRUCTURE_CACHE_STORE).delete(hash);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('Failed to delete from structure cache'));
+        tx.onabort = () => reject(tx.error || new Error('Failed to delete from structure cache'));
+    }));
+}
+function structureCacheClear() {
+    return structureCacheOpenDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(STRUCTURE_CACHE_STORE, 'readwrite');
+        tx.objectStore(STRUCTURE_CACHE_STORE).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('Failed to clear structure cache'));
+        tx.onabort = () => reject(tx.error || new Error('Failed to clear structure cache'));
+    }));
+}
+// Cache key for a structure's raw text: SHA-256 when available (crypto.subtle
+// works on file:// in modern browsers), with a deterministic FNV-1a fallback
+// for unusual contexts - it only keys/deduplicates the cache, not security.
+function structureHash(text) {
+    const str = String(text);
+    if (crypto && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+        return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
+            .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''))
+            .catch(() => structureHashFnv(str));
+    }
+    return Promise.resolve(structureHashFnv(str));
+}
+function structureHashFnv(str) {
+    let h1 = 0x811c9dc5, h2 = 0x1b873593;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        h1 = (Math.imul(h1 ^ c, 16777619)) >>> 0;
+        h2 = (Math.imul(h2 ^ c, 2246822519)) >>> 0;
+    }
+    return 'fnv-' + h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+function structureFmtBytes(n) {
+    if (!n) return '0 KB';
+    if (n < 1024) return n + ' B';
+    const kb = n / 1024;
+    if (kb < 1024) return kb.toFixed(1) + ' KB';
+    return (kb / 1024).toFixed(1) + ' MB';
+}
+// Writes an uploaded PDB/CIF's raw text into the local cache and records the
+// fileName -> hash mapping for the current session. Fire-and-forget from the
+// upload handler; failures only surface in the Options cache panel.
+async function cacheStructureText(fileName, ext, text) {
+    let hash;
+    try { hash = await structureHash(text); } catch (err) { return; }
+    cachedStructureIndex[fileName] = { hash, ext, size: text.length };
+    try {
+        await structureCachePut({ hash, name: fileName, ext, text, size: text.length });
+    } catch (err) {
+        console.error('Structure cache write failed:', err);
+        return;
+    }
+    await enforceStructureCacheCap();
+    const optsModal = document.getElementById('optionsModal');
+    if (optsModal && optsModal.style.display === 'flex') {
+        renderStructureCacheInfo();
+        renderCachedDataInfo();
+    }
+}
+// Enforces the soft cap: warns when exceeded, and evicts unreferenced entries
+// (oldest first) to get back under it. Structures the current session still
+// references are never evicted automatically.
+async function enforceStructureCacheCap() {
+    let all;
+    try { all = await structureCacheAll(); } catch (err) { return; }
+    const total = all.reduce((s, e) => s + (e.size || 0), 0);
+    if (total <= STRUCTURE_CACHE_SOFT_CAP) return;
+    const referenced = new Set(Object.keys(cachedStructureIndex).map(fn => cachedStructureIndex[fn].hash));
+    const evictable = all.filter(e => !referenced.has(e.hash))
+        .sort((a, b) => (a.lastUsed || 0) - (b.lastUsed || 0));
+    let remaining = total, evicted = 0;
+    for (const e of evictable) {
+        if (remaining <= STRUCTURE_CACHE_SOFT_CAP) break;
+        try { await structureCacheDelete(e.hash); evicted++; remaining -= (e.size || 0); } catch (err) {}
+    }
+    if (evicted) {
+        showToast('Structure cache exceeded the ' + structureFmtBytes(STRUCTURE_CACHE_SOFT_CAP) +
+            ' soft cap - evicted ' + evicted + ' unreferenced cached structure(s).', 'info');
+    } else {
+        showToast('Structure cache is over the ' + structureFmtBytes(STRUCTURE_CACHE_SOFT_CAP) +
+            ' soft cap and every cached structure is referenced by the current session - clear the Local Structure Cache in Options to free space.', 'error');
+    }
+}
+// The portable-save / localStorage reference map: fileName -> { hash, ext,
+// size } for every attached PDB/CIF that has a cached copy, and null for a
+// PDB/CIF with no cached copy (so an import knows it must be re-attached or
+// found locally). JSON/AF3 files carry no coordinates, so they're omitted.
+function buildStructureReferences() {
+    const refs = {};
+    uploadedStructureFiles.forEach(f => {
+        const ext = f.ext || structExt(f.name);
+        if (ext !== 'pdb' && ext !== 'cif') return;
+        const idx = cachedStructureIndex[f.name];
+        refs[f.name] = idx ? { hash: idx.hash, ext: idx.ext || ext, size: idx.size } : null;
+    });
+    return refs;
+}
+
+function structureEscapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// Options > Local Structure Cache summary: count, total size vs the soft cap,
+// newest-first list with per-file "forget" buttons, all driven by this device's
+// structure cache - independent of the current session's data.
+async function renderStructureCacheInfo() {
+    const el = document.getElementById('structureCacheInfo');
+    if (!el) return;
+    let all = [];
+    try { all = await structureCacheAll(); } catch (err) {
+        el.textContent = 'This browser does not support IndexedDB, so no structure cache is available here.';
+        return;
+    }
+    const total = all.reduce((s, e) => s + (e.size || 0), 0);
+    const capStr = structureFmtBytes(STRUCTURE_CACHE_SOFT_CAP);
+    if (!all.length) {
+        el.textContent = 'No PDB/CIF structure files cached on this device yet - attach one and its text is stored here automatically for instant 3D restores.';
+        return;
+    }
+    const over = total > STRUCTURE_CACHE_SOFT_CAP;
+    let html = '<div style="font-weight:600; margin-bottom:6px;">Structures cached on this device: ' + all.length +
+        (all.length === 1 ? ' structure file' : ' structure files') + ' · ' + structureFmtBytes(total) +
+        (over ? ' · <span style="color:#b45309;">over the ' + capStr + ' soft cap</span>' : '') + '</div>';
+    all.slice().sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0)).forEach((e, i) => {
+        const usedStr = e.lastUsed ? new Date(e.lastUsed).toLocaleString() : 'unknown time';
+        html += '<div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:4px;">' +
+            '<span style="overflow-wrap:anywhere;">' + structureEscapeHtml(e.name) +
+            ' <span style="color:#64748b;">(' + structureFmtBytes(e.size) + ', last used ' + structureEscapeHtml(usedStr) + ')</span></span>' +
+            '<button type="button" onclick="deleteStructureCacheEntry(\'' + structureEscapeHtml(e.hash) + '\')" style="flex-shrink:0; padding:1px 8px; font-size:0.72rem;">forget</button></div>';
+    });
+    el.innerHTML = html;
+}
+async function deleteStructureCacheEntry(hash) {
+    if (!hash) return;
+    if (!confirm('Remove this cached structure from this device?')) return;
+    try { await structureCacheDelete(hash); } catch (err) { console.error(err); }
+    missingStructureRefs = missingStructureRefs.filter(m => m.hash !== hash);
+    showToast('Removed from the structure cache.', 'success');
+    renderStructureCacheInfo();
+    renderCachedDataInfo();
+}
+async function clearStructureCache() {
+    if (!confirm('This permanently deletes ALL cached PDB/CIF copies on this device. Structures in the current session stay usable, but after a refresh or a save re-import they would need re-attaching (or Find in Data). Continue?')) return;
+    try { await structureCacheClear(); } catch (err) { console.error(err); }
+    missingStructureRefs = missingStructureRefs.map(m => ({ fileName: m.fileName, hash: null, ext: m.ext }));
+    renderStructureCacheInfo();
+    renderCachedDataInfo();
+    showToast('Structure cache cleared.', 'success');
+}
+// Re-hydrates the current session's attached PDB/CIF files from the local
+// cache by hash. Called after any applyPersistedState() (page load from
+// localStorage, or a save-file import). Files that can't be resolved are
+// recorded in missingStructureRefs so the Data modal can list them and offer
+// the "Find" flow; a toast summarizes what couldn't be restored.
+async function rehydrateStructuresFromCache() {
+    const pending = [], immediateMissing = [];
+    for (const f of uploadedStructureFiles) {
+        const ext = f.ext || structExt(f.name);
+        if (ext !== 'pdb' && ext !== 'cif') continue;
+        if (cachedStructureTexts[f.name]) continue; // already live this session
+        const ref = cachedStructureIndex[f.name];
+        if (ref && ref.hash) pending.push({ fileName: f.name, ext, ref });
+        else immediateMissing.push({ fileName: f.name, hash: null, ext });
+    }
+    const found = [], missing = immediateMissing.slice();
+    for (const p of pending) {
+        let entry = null;
+        try { entry = await structureCacheGet(p.ref.hash); } catch (err) {}
+        if (entry && entry.text) {
+            cachedStructureTexts[p.fileName] = entry.text;
+            p3dStructureMeta[p.fileName] = buildP3DStructureMeta(p.fileName);
+            found.push(p.fileName);
+            try {
+                await structureCachePut({ hash: p.ref.hash, name: p.fileName, ext: p.ext, text: entry.text, size: p.ref.size || entry.size });
+            } catch (err) {}
+        } else {
+            missing.push({ fileName: p.fileName, hash: p.ref.hash, ext: p.ext });
+        }
+    }
+    missingStructureRefs = missing;
+    if (found.length) {
+        refreshP3DModelOptions();
+        if (p3dViewerOpen) {
+            const sel = document.getElementById('p3dModelSelect');
+            if (sel && sel.value) loadP3DModel(p3dParseModelValue(sel.value));
+        }
+        const dataModal = document.getElementById('dataModal');
+        if (dataModal && dataModal.style.display === 'flex') renderDataModal();
+        const optsModal = document.getElementById('optionsModal');
+        if (optsModal && optsModal.style.display === 'flex') renderStructureCacheInfo();
+    }
+    if (missing.length) {
+        const shown = missing.slice(0, 3).map(m => '"' + m.fileName + '"').join(', ');
+        const more = missing.length > 3 ? ' and ' + (missing.length - 3) + ' more' : '';
+        showToast(missing.length + ' structure file' + (missing.length === 1 ? '' : 's') + ' (' + shown + more +
+            ') referenced by this data ' + (missing.length === 1 ? 'isn' : 'aren') +
+            't in this device\'s cache - re-attach them or use Data > Structure Files > Find to restore 3D models.', 'warn', { dismissible: true });
+    }
+}
+// "Find" flow for missing structures (e.g. moved to a new machine): scan a
+// chosen folder for files whose names match the referenced structure files
+// (typical for locally-run AF3 outputs), verify them by content hash when one
+// is recorded, and wire any hits back into the session + cache.
+async function findMissingStructuresLocally() {
+    if (!missingStructureRefs.length) {
+        showToast('No missing structure files to find - every referenced structure is available from this device\'s cache.', 'info');
+        return;
+    }
+    const wanted = missingStructureRefs.slice();
+    const nameToWanted = new Map();
+    wanted.forEach(w => nameToWanted.set(w.fileName.toLowerCase(), w));
+
+    if (window.showDirectoryPicker) {
+        let dir;
+        try {
+            dir = await window.showDirectoryPicker({ mode: 'read' });
+        } catch (err) {
+            if (err && err.name === 'AbortError') return; // user cancelled the picker
+            fallbackStructureLocator(wanted); // picker unavailable/denied - use a plain file picker
+            return;
+        }
+        const found = [];
+        try {
+            for await (const [entryName, handle] of dir.entries()) {
+                if (!handle || handle.kind !== 'file') continue;
+                const match = nameToWanted.get(entryName.toLowerCase());
+                if (match) found.push({ handle, fileName: match.fileName, expectedHash: match.hash || null });
+            }
+        } catch (err) {
+            console.error('Folder scan failed:', err);
+            fallbackStructureLocator(wanted);
+            return;
+        }
+        if (found.length) {
+            await attachStructureFilesFromLocal(found);
+        } else {
+            showToast('No files matching the referenced structure names were found in that folder.', 'warn');
+        }
+        return;
+    }
+    fallbackStructureLocator(wanted);
+}
+// Fallback for browsers without the File System Access API (Firefox, Safari):
+// a plain multiple-file picker, matched against the missing names by filename.
+function fallbackStructureLocator(wanted) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdb,.cif';
+    input.multiple = true;
+    input.onchange = async () => {
+        const wantedByName = new Map();
+        wanted.forEach(w => wantedByName.set(w.fileName.toLowerCase(), w));
+        const found = [];
+        for (const file of input.files) {
+            const match = wantedByName.get(file.name.toLowerCase());
+            if (match) found.push({ file, fileName: match.fileName, expectedHash: match.hash || null });
+        }
+        await attachStructureFilesFromLocal(found);
+    };
+    input.click();
+}
+// Wires locally-found structure files back into the session (3D + cache) after
+// hashing. Derived pLDDT/RSA data already lives in the imported save, so it is
+// intentionally NOT recomputed - only the raw text for 3D is restored.
+async function attachStructureFilesFromLocal(foundItems) {
+    let attached = 0;
+    for (const item of foundItems) {
+        let file = item.file || null;
+        if (!file && item.handle) { try { file = await item.handle.getFile(); } catch (err) { continue; } }
+        if (!file) continue;
+        let text;
+        try { text = await file.text(); } catch (err) { showToast('Could not read "' + file.name + '".', 'error'); continue; }
+        const ext = structExt(file.name);
+        if (ext !== 'pdb' && ext !== 'cif') continue;
+        const hash = await structureHash(text);
+        const fileName = item.fileName || file.name;
+        if (item.expectedHash && item.expectedHash !== hash) {
+            showToast('"' + fileName + '" matches a referenced structure by name but differs in content (a newer version?) - attached anyway for 3D; its saved pLDDT/RSA data is unchanged.', 'warn');
+        }
+        cachedStructureTexts[fileName] = text;
+        p3dStructureMeta[fileName] = buildP3DStructureMeta(fileName);
+        cachedStructureIndex[fileName] = { hash, ext, size: text.length };
+        missingStructureRefs = missingStructureRefs.filter(m => m.fileName !== fileName);
+        try {
+            await structureCachePut({ hash, name: fileName, ext, text, size: text.length });
+        } catch (err) { console.error('Structure cache write failed:', err); }
+        if (!uploadedStructureFiles.some(u => u.name === fileName)) {
+            uploadedStructureFiles.push({ name: fileName, ext, size: text.length, ...scanStructureMetadata(text, ext), cofactors: [] });
+        }
+        attached++;
+    }
+    await enforceStructureCacheCap();
+    refreshP3DModelOptions();
+    renderDataModal();
+    if (p3dViewerOpen && p3dModel) {
+        const sel = document.getElementById('p3dModelSelect');
+        if (sel && sel.value) loadP3DModel(p3dParseModelValue(sel.value));
+    }
+    saveStateToStorage();
+    showToast(
+        attached ? 'Attached ' + attached + ' structure file' + (attached === 1 ? '' : 's') + ' found locally.' : 'No matching structure files were found.',
+        attached ? 'success' : 'warn'
+    );
+}
+
 // --- Client-side persistence (Options > Cached Data) ----------------------
 // Everything needed to reconstruct the page - parsed Q2D tracks (which
 // already include any attached structure files' derived pLDDT/RSA data),
@@ -7209,7 +9020,9 @@ function gatherPersistableState() {
         parsedTracks: parsedTracks,
         currentProteinLabel: currentProteinLabel,
         structureFiles: uploadedStructureFiles,
+        structureReferences: buildStructureReferences(),
         hhpredHitsInfo: hhpredHitsInfo,
+        keyedVariantsInfo: keyedVariantsInfo,
         graphHighlights: graphHighlights,
         selection: {
             selectStart, selectEnd, selectionMode, activeRowKey, activeRowType,
@@ -7226,12 +9039,17 @@ function gatherPersistableState() {
             importCollapsed: document.body.classList.contains('import-collapsed'),
             legendHidden: !document.getElementById('mainLegend') ? false : document.getElementById('mainLegend').hidden,
             typePalette: document.getElementById('typePaletteSelect') ? document.getElementById('typePaletteSelect').value : 'default',
+            conservationMetric,
+            conservationIncludeHHR,
+            fastaAlignmentMode,
             trackControl: {
                 hidden: Object.assign({}, trackControlState.hidden),
                 hideSymbols: Object.assign({}, trackControlState.hideSymbols),
                 fullBar: Object.assign({}, trackControlState.fullBar),
                 filtered: Object.assign({}, trackControlState.filtered),
-                aaSeq: Object.assign({}, trackControlState.aaSeq)
+                aaSeq: Object.assign({}, trackControlState.aaSeq),
+                consColor: Object.assign({}, trackControlState.consColor),
+                viewOverride: Object.assign({}, trackControlState.viewOverride)
             },
             savedSelections: savedSelections.map(slot => slot ? { ranges: slot.ranges.map(r => [r[0], r[1]]), row: slot.row || null, label: slot.label || null } : null)
         }
@@ -7391,7 +9209,19 @@ function applyPersistedState(state) {
     parsedTracks = state.parsedTracks;
     currentProteinLabel = state.currentProteinLabel || null;
     uploadedStructureFiles = state.structureFiles || [];
+    // Seed the fileName -> hash map from this state's structure references so
+    // rehydrateStructuresFromCache() below can pull raw text from the device
+    // cache (rely on the current explicit format first; older saves may carry
+    // it under the legacy name).
+    cachedStructureIndex = {};
+    missingStructureRefs = [];
+    const refsObj = state.structureReferences || state.structureCacheIndex || {};
+    Object.keys(refsObj).forEach(fn => {
+        const r = refsObj[fn];
+        if (r && r.hash) cachedStructureIndex[fn] = { hash: r.hash, ext: r.ext, size: r.size };
+    });
     hhpredHitsInfo = state.hhpredHitsInfo || {};
+    keyedVariantsInfo = state.keyedVariantsInfo || {};
     graphHighlights = state.graphHighlights || {};
 
     const sel = state.selection || {};
@@ -7405,6 +9235,7 @@ function applyPersistedState(state) {
     lastRanges = sel.lastRanges || null;
 
     const prefs = state.preferences || {};
+    applyConservationSettings(prefs);
     currentViewMode = prefs.currentViewMode || 'grid';
     document.getElementById('viewModeSelect').value = currentViewMode;
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
@@ -7450,7 +9281,9 @@ function applyPersistedState(state) {
             hideSymbols: (tc && tc.hideSymbols) || {},
             fullBar: (tc && tc.fullBar) || {},
             filtered: (tc && tc.filtered) || {},
-            aaSeq: (tc && tc.aaSeq) || {}
+            aaSeq: (tc && tc.aaSeq) || {},
+            consColor: (tc && tc.consColor) || {},
+            viewOverride: (tc && tc.viewOverride) || {}
         };
     } else {
         trackControlState = getDefaultTrackControlState();
@@ -7477,6 +9310,11 @@ function applyPersistedState(state) {
     }
 
     restoreSelectionVisuals();
+    // Asynchronously re-hydrate any attached PDB/CIF files from this device's
+    // structure cache (by hash) so 3D models work without re-uploading. This
+    // is non-blocking - the session is fully usable while it resolves, and a
+    // toast + Data-modal notice report anything it couldn't find.
+    void rehydrateStructuresFromCache();
 }
 
 function renderCachedDataInfo() {
@@ -7541,6 +9379,8 @@ function renderCachedDataInfo() {
 
 function openOptionsModal() {
     renderCachedDataInfo();
+    void renderStructureCacheInfo();
+    syncConservationOptionControls();
     openModalAsDialog('optionsModal');
 }
 
@@ -7568,9 +9408,10 @@ function buildStructureDataJSON() {
             }
         },
         structures: {
-            columns: ['name', 'ext', 'size', 'proteinClass', 'apoState', 'oligomer', 'cofactors'],
+            columns: ['name', 'ext', 'size', 'cacheStatus', 'proteinClass', 'apoState', 'oligomer', 'cofactors'],
             rows: uploadedStructureFiles.map(f => ({
                 name: f.name, ext: f.ext, size: f.size,
+                cacheStatus: structureCacheStatus(f),
                 proteinClass: f.proteinClass || 'Not specified in file',
                 apoState: f.apoState || 'Unknown',
                 oligomer: f.oligomer || 'Unknown',
@@ -7578,6 +9419,16 @@ function buildStructureDataJSON() {
             }))
         }
     };
+}
+// Per-file cache status for the Data modal / Raw JSON report:
+//   'cached'  -> raw text is available locally (this session and/or the cache)
+//   'missing' -> a PDB/CIF whose raw text is NOT available locally (re-attach
+//                or use Find to restore its 3D model)
+//   ''        -> not a PDB/CIF (JSON/AF3 carries no coordinates; hhr etc.)
+function structureCacheStatus(f) {
+    const ext = f.ext || structExt(f.name);
+    if (ext !== 'pdb' && ext !== 'cif') return '';
+    return cachedStructureTexts[f.name] ? 'cached' : 'missing';
 }
 
 function renderDataModal() {
@@ -7598,8 +9449,11 @@ function renderDataModal() {
     if (!data.structures.rows.length) {
         tableWrap.innerHTML = '<p style="color:#94a3b8; font-size:0.85rem;">No structure files attached yet.</p>';
     } else {
-        const headerLabels = { name: 'File', ext: 'Type', size: 'Size', proteinClass: 'Protein Class', apoState: 'Apo-State', oligomer: 'Oligomer', cofactors: 'Cofactors' };
-        let html = '<table class="metrics-table" style="width:100%;"><thead><tr>';
+        const headerLabels = { name: 'File', ext: 'Type', size: 'Size', cacheStatus: 'Cache', proteinClass: 'Protein Class', apoState: 'Apo-State', oligomer: 'Oligomer', cofactors: 'Cofactors' };
+        const cached = data.structures.rows.filter(r => r.cacheStatus === 'cached').length;
+        const missing = data.structures.rows.filter(r => r.cacheStatus === 'missing').length;
+        let html = `<p style="color:#94a3b8; font-size:0.8rem; margin:0 0 8px;">Structure files attached: <strong>${data.structures.rows.length}</strong> &middot; cached locally on this device: <strong>${cached}</strong> &middot; not found in this device's cache: <strong>${missing}</strong></p>`;
+        html += '<table class="metrics-table" style="width:100%;"><thead><tr>';
         data.structures.columns.forEach(col => { html += `<th>${headerLabels[col] || col}</th>`; });
         html += '</tr></thead><tbody>';
         data.structures.rows.forEach(row => {
@@ -7608,6 +9462,11 @@ function renderDataModal() {
                 let val = row[col];
                 if (col === 'size') val = (val / 1024).toFixed(1) + ' KB';
                 else if (col === 'ext') val = String(val).toUpperCase();
+                else if (col === 'cacheStatus') {
+                    if (val === 'cached') val = '<span style="color:#15803d;">✓ cached locally</span>';
+                    else if (val === 'missing') val = '<span style="color:#b45309;">✗ re-attach / Find</span>';
+                    else val = '—';
+                }
                 else if (col === 'cofactors') {
                     // Full per-neighbor distances/roles/padding live in the
                     // raw JSON below - the table cell is a quick-glance
@@ -7623,6 +9482,25 @@ function renderDataModal() {
         });
         html += '</tbody></table>';
         tableWrap.innerHTML = html;
+    }
+
+    // Amber notice + "Find" flow for structure files referenced by this data
+    // that aren't in this device's cache (e.g. a save imported on another
+    // machine). Find scans a folder for matching filenames or falls back to a
+    // plain file picker, then verifies by content hash when one is recorded.
+    const noticeEl = document.getElementById('dataStructureCacheNotice');
+    if (noticeEl) {
+        const missing = missingStructureRefs || [];
+        if (missing.length) {
+            const names = missing.map(m => '<code style="background:#fef3c7; padding:0 3px; border-radius:3px;">' + structureEscapeHtml(m.fileName) + '</code>');
+            noticeEl.innerHTML = `<strong>${missing.length} structure file${missing.length === 1 ? '' : 's'} in this data ${missing.length === 1 ? 'isn' : 'aren'}t in this device's cache</strong> (${names.join(', ')}), so ${missing.length === 1 ? 'its 3D model is' : 'their 3D models are'} unavailable here. They were local files on the machine this data was saved from - re-attach them, or search a folder that contains them (typical for locally-run AlphaFold outputs):<br><br>` +
+                '<button type="button" onclick="findMissingStructuresLocally()" style="font-size:0.8rem; padding:4px 12px;">🔍 Find matching structures…</button>' +
+                ' <span style="font-size:0.75rem; color:#92400e;">scans a folder for files with these names; saved pLDDT/RSA data is unaffected.</span>';
+            noticeEl.style.display = '';
+        } else {
+            noticeEl.style.display = 'none';
+            noticeEl.innerHTML = '';
+        }
     }
 
     document.getElementById('dataJSONView').textContent = JSON.stringify(data, null, 2);
@@ -7654,6 +9532,12 @@ function resetAllData() {
     uploadedStructureFiles = [];
     cachedStructureTexts = {};
     p3dStructureMeta = {};
+    // Reset-only the current session's mapping into the device structure cache
+    // - the cached PDB/CIF copies THEMSELVES (IndexedDB) are deliberately left
+    // intact so switching between loaded datasets never loses them. They only
+    // get removed through the separate "Clear Structure Cache" control.
+    cachedStructureIndex = {};
+    missingStructureRefs = [];
     p3dRemotePending = false;
     p3dModel = null;
     updateP3DModelInfo();
@@ -7709,6 +9593,7 @@ function resetAllData() {
         '<p style="padding: 20px; color: #94a3b8; text-align: center;">Paste Quick2D output above to start.</p>';
 
     renderCachedDataInfo();
+    renderStructureCacheInfo();
     renderDataModal();
 }
 
