@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-23
+
+### Added
+
+- **In-app Changelog.** The version badge next to the title is now clickable and
+  opens a modal rendering `CHANGELOG.md` (fetched from the same folder; with a
+  direct-link fallback when opened as a standalone file).
+
 ## [0.9.2] - 2026-09-23
 
 ### Fixed

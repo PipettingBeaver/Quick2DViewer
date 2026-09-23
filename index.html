@@ -470,7 +470,18 @@
             font-weight: 600;
             letter-spacing: 0.03em;
             vertical-align: middle;
+            font-family: inherit;
+            cursor: pointer;
         }
+        .app-version:hover { background: #e2e8f0; color: #334155; }
+        /* Changelog modal rendering. */
+        #changelogBody h3.cl-ver { font-size: 0.95rem; color: #0f172a; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+        #changelogBody h3.cl-ver:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+        #changelogBody h4.cl-cat { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin: 8px 0 4px; }
+        #changelogBody ul { margin: 4px 0 8px; padding-left: 20px; }
+        #changelogBody li { font-size: 0.8rem; color: #334155; line-height: 1.5; margin-bottom: 3px; }
+        #changelogBody p { font-size: 0.8rem; color: #334155; line-height: 1.5; margin: 4px 0; }
+        #changelogBody code { background: #f1f5f9; padding: 0 3px; border-radius: 3px; font-size: 0.75rem; }
         .box { width: 15px; height: 15px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); }
         
         .alignment-grid {
@@ -1731,7 +1742,7 @@
 
 <div class="container">
     <div class="app-header">
-        <h2>Quick2DViewer - 1D Protein Viewer <span class="app-version" id="appVersion" title="Application version"></span></h2>
+        <h2>Quick2DViewer - 1D Protein Viewer <button type="button" class="app-version" id="appVersion" title="View the changelog" onclick="openChangelogModal()"></button></h2>
         <div class="app-header-tools menubar" role="menubar" aria-label="Main menu">
             <div class="menubar-item">
                 <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
@@ -2350,6 +2361,17 @@
                 In the meantime, every ⓘ icon throughout the page (legend, row labels, sidebar fields) explains that specific piece in place.
             </p>
         </div>
+    </div>
+</div>
+
+<!-- Changelog Modal -->
+<div class="modal-overlay" id="changelogModal" role="dialog" aria-modal="true" aria-labelledby="changelogModalTitle">
+    <div class="modal-content" style="width: 680px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="changelogModalTitle" style="margin: 0; color: #0f172a;">Changelog</h3>
+            <button onclick="closeChangelogModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <div id="changelogBody" style="margin-top: 14px;">Loading…</div>
     </div>
 </div>
 
@@ -3396,6 +3418,52 @@ function closeHelpModal() {
     closeModalAsDialog('helpModal');
 }
 
+// --- Changelog modal (click the version badge) ----------------------------
+let changelogLoaded = false;
+function closeChangelogModal() { closeModalAsDialog('changelogModal'); }
+function openChangelogModal() {
+    openModalAsDialog('changelogModal');
+    const body = document.getElementById('changelogBody');
+    if (!body || changelogLoaded) return;
+    body.textContent = 'Loading changelog…';
+    fetch('CHANGELOG.md').then(resp => {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.text();
+    }).then(md => {
+        body.innerHTML = renderChangelogMarkdown(md);
+        changelogLoaded = true;
+    }).catch(() => {
+        body.innerHTML = '<p style="color:#64748b; font-size:0.85rem;">Could not load <code>CHANGELOG.md</code> ' +
+            '(it ships alongside this file on GitHub Pages). <a href="CHANGELOG.md" target="_blank" rel="noopener">Open it directly</a>.</p>';
+    });
+}
+// Minimal Markdown renderer for the changelog (headings, lists, bold, code, links).
+function renderChangelogMarkdown(md) {
+    const inline = (s) => structureEscapeHtml(s)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    const lines = String(md || '').split('\n');
+    let html = '', inList = false;
+    const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+    lines.forEach(line => {
+        const t = line.trim();
+        if (!t) { closeList(); return; }
+        if (t.startsWith('# ')) { closeList(); return; } // doc title
+        if (t.startsWith('## ')) { closeList(); html += '<h3 class="cl-ver">' + inline(t.slice(3)) + '</h3>'; return; }
+        if (t.startsWith('### ')) { closeList(); html += '<h4 class="cl-cat">' + inline(t.slice(4)) + '</h4>'; return; }
+        if (/^-\s+/.test(t)) {
+            if (!inList) { html += '<ul>'; inList = true; }
+            html += '<li>' + inline(t.replace(/^-\s+/, '')) + '</li>';
+            return;
+        }
+        closeList();
+        html += '<p>' + inline(t) + '</p>';
+    });
+    closeList();
+    return html;
+}
+
 // Shared layout constants so annotation rows (label + per-residue cells) and
 // the graph SVGs line up on the same pixel grid: the axis/label column and
 // the residue-cell width must match the .track-label / .cell CSS exactly.
@@ -3752,7 +3820,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.9.2';
+const APP_VERSION = '0.10.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
