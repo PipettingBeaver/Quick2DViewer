@@ -87,6 +87,17 @@
         }
         .sidebar-view-select { font-size: 0.72rem; padding: 4px 6px; flex: 1; min-width: 70px; }
         .sidebar-toolbar .tb-btn { font-size: 0.7rem; padding: 4px 7px; }
+        .graph-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .graph-toggle input { width: auto; margin: 0; }
         #btnP3D.tb-btn-active { background: #2563eb; color: #fff; border-color: #1d4ed8; }
         /* Floating 3D structure viewer (Py3Dmol) */
         .p3d-viewer {
@@ -1784,11 +1795,13 @@
 
         <div class="sidebar" role="region" aria-label="Selection Workspace">
             <div class="sidebar-toolbar" role="toolbar" aria-label="View and data input controls">
-                <select id="viewModeSelect" class="q2dv-select sidebar-view-select" onchange="switchViewMode()"
-                    title="Switch between the residue heatmap grid and the overlaid structure-score graphs">
-                    <option value="grid">Heatmap View</option>
-                    <option value="graph">Graph View</option>
-                </select>
+                <span style="font-size:0.68rem; font-weight:700; color:#64748b; white-space:nowrap;">Graph view</span>
+                <label class="graph-toggle" title="Render all pLDDT tracks as an overlaid graph instead of heatmap rows">
+                    <input type="checkbox" id="graphPlddtCheck" onchange="onGraphModeChange()"> pLDDT
+                </label>
+                <label class="graph-toggle" title="Render all RSA tracks as an overlaid graph instead of heatmap rows">
+                    <input type="checkbox" id="graphRsaCheck" onchange="onGraphModeChange()"> RSA
+                </label>
                 <button type="button" id="btnShowImport" class="tb-btn tb-btn-primary btn-show-import" onclick="toggleImportGroup()"
                     title="Show the import controls (Attach, Paste Quick2D, Load Sample, show raw text)">
                     Import
@@ -2314,7 +2327,7 @@ let p3dRemotePending = false; // one RCSB fetch at a time (guard against re-entr
 let cachedStructureIndex = {}; // fileName -> { hash, ext, size }
 let missingStructureRefs = []; // structure files referenced but not in the cache
 
-let currentViewMode = 'grid'; // 'grid' or 'graph'
+let graphMode = { pLDDT: false, RSA: false }; // per-type graph view: pLDDT and/or RSA rendered as overlaid graphs instead of heatmap rows
 window.addEventListener('mouseup', handleMouseUp);
 
 // --- Modal dialog helpers ---------------------------------------------------
@@ -3777,10 +3790,10 @@ function toggleBandPopover(anchorEl, trackKey) {
     title.textContent = formatTrackLabel(trackKey);
     popover.appendChild(title);
 
-    // Graph mode: "Solo" isolates one pLDDT/RSA track from its type peers.
-    // The button label is updated in place (no popover rebuild) so clicking it
-    // never closes the menu.
-    if (currentViewMode === 'graph') {
+    // Graph mode (per-type): "Solo" isolates one pLDDT/RSA track from its type
+    // peers. The button label is updated in place (no popover rebuild) so
+    // clicking it never closes the menu.
+    if (trackKey.endsWith('_pLDDT') ? graphMode.pLDDT : graphMode.RSA) {
         const typeName = trackKey.endsWith('_pLDDT') ? 'pLDDT' : 'RSA';
         const soloBtn = document.createElement('button');
         soloBtn.className = 'band-solo-btn';
@@ -4818,10 +4831,19 @@ function getTrackCategoryOrder(key) {
     return 11;
 }
 
-function switchViewMode() {
-    currentViewMode = document.getElementById('viewModeSelect').value;
+function onGraphModeChange() {
+    graphMode.pLDDT = !!document.getElementById('graphPlddtCheck').checked;
+    graphMode.RSA = !!document.getElementById('graphRsaCheck').checked;
     renderViewer(parsedTracks);
     schedulePersist();
+}
+
+// Mirrors graphMode into the two checkboxes (used on load/reset).
+function syncGraphModeControls() {
+    const p = document.getElementById('graphPlddtCheck');
+    const r = document.getElementById('graphRsaCheck');
+    if (p) p.checked = !!graphMode.pLDDT;
+    if (r) r.checked = !!graphMode.RSA;
 }
 
 // Structure File Upload Handler
@@ -6213,74 +6235,43 @@ function renderViewer(tracks) {
     const totalLength = tracks.AA ? tracks.AA.length : 0;
     if (totalLength === 0) return;
 
-    // The AA sequence line (with the residue-position markers centered above
-    // it) is pinned to the top of the scrollable viewer. It's built first
-    // into its own sticky block rather than with the other rows, so it stays
-    // "always on top" and follows vertical scrolling in both view modes.
+    const anyGraph = graphMode.pLDDT || graphMode.RSA;
+
+    // The AA sequence line (with the residue-position markers) is pinned to the
+    // top of the scrollable viewer so it stays visible while scrolling.
     if (tracks.AA) {
         const stickyTop = document.createElement('div');
         stickyTop.className = 'sticky-top';
-        if (currentViewMode === 'graph') stickyTop.style.width = (GRAPH_AXIS_WIDTH + totalLength * gridCellW) + 'px';
+        if (anyGraph) stickyTop.style.width = (GRAPH_AXIS_WIDTH + totalLength * gridCellW) + 'px';
         stickyTop.appendChild(buildPositionMarkerRow(totalLength));
         stickyTop.appendChild(buildTrackRow('AA', tracks, totalLength));
         grid.appendChild(stickyTop);
     }
 
-    if (currentViewMode === 'graph') {
-        // Q2D annotation tracks (AA/SS/TM/DO - anything still stored as a plain
-        // string) render as the same heatmap rows used in Grid mode, so residue
-        // columns line up pixel-for-pixel with the graphs plotted underneath.
-        // AA itself is already rendered in the pinned header above, so it is
-        // skipped here to avoid a duplicate row.
-        const annotationKeys = Object.keys(tracks)
-            .filter(k => typeof tracks[k] === 'string' || k === 'CONSERVATION' || k.startsWith('CONS_'))
-            .sort((a, b) => {
-                const orderA = getTrackCategoryOrder(a), orderB = getTrackCategoryOrder(b);
-                return orderA !== orderB ? orderA - orderB : a.localeCompare(b);
-            })
-            .filter(k => k !== 'AA' && !isTrackGroupHidden(getTrackGroup(k)) && !isTrackFiltered(k));
-
-        if (annotationKeys.length) {
-            const annoWrapper = document.createElement('div');
-            annoWrapper.className = 'graph-annotations-wrapper';
-            annoWrapper.style.width = (GRAPH_AXIS_WIDTH + totalLength * gridCellW) + 'px';
-            const firstOfGroup = getFirstOfGroupSet(annotationKeys);
-            annotationKeys.forEach(key => annoWrapper.appendChild(buildTrackRow(key, tracks, totalLength, firstOfGroup.has(key))));
-            grid.appendChild(annoWrapper);
-        }
-
-        const plddtKeys = Object.keys(tracks).filter(k => k.endsWith('_pLDDT') && !isTrackGroupHidden('pLDDT') && !isTrackFiltered(k));
-        const rsaKeys = Object.keys(tracks).filter(k => k.endsWith('_RSA') && !isTrackGroupHidden('RSA') && !isTrackFiltered(k));
-
-        if (plddtKeys.length > 0) {
-            grid.appendChild(createOverlayGraphSection("pLDDT Confidence", plddtKeys, totalLength, true));
-        }
-        if (rsaKeys.length > 0) {
-            grid.appendChild(createOverlayGraphSection("Relative Solvent Accessibility (RSA)", rsaKeys, totalLength, false));
-        }
-        if (plddtKeys.length === 0 && rsaKeys.length === 0) {
-            const msg = document.createElement('p');
-            msg.style.cssText = 'padding: 20px; color: #94a3b8; text-align: center;';
-            msg.textContent = 'No PDB/JSON structural model files attached yet. Please upload files to view overlaid graphs.';
-            grid.appendChild(msg);
-        }
-        updateSelectionUI();
-        return;
-    }
-
-    // Heatmap Grid View Mode
+    // Every track renders as a heatmap row EXCEPT pLDDT/RSA tracks whose type
+    // is in graph mode (those become overlaid graph sections appended below),
+    // so "graph vs heatmap" is a per-type choice rather than a global mode.
     const trackKeys = Object.keys(tracks).sort((a, b) => {
-        const orderA = getTrackCategoryOrder(a);
-        const orderB = getTrackCategoryOrder(b);
-        if (orderA !== orderB) return orderA - orderB;
-        return a.localeCompare(b);
+        const orderA = getTrackCategoryOrder(a), orderB = getTrackCategoryOrder(b);
+        return orderA !== orderB ? orderA - orderB : a.localeCompare(b);
     }).filter(k => !isTrackGroupHidden(getTrackGroup(k)) && !isTrackFiltered(k));
 
     const firstOfGroup = getFirstOfGroupSet(trackKeys);
+    const graphPlddtKeys = [], graphRsaKeys = [];
     trackKeys.forEach(key => {
-        if (key === 'AA') return; // AA already rendered in the pinned header
+        if (key === 'AA') return; // already rendered in the pinned header
+        if (key.endsWith('_pLDDT') && graphMode.pLDDT) { graphPlddtKeys.push(key); return; }
+        if (key.endsWith('_RSA') && graphMode.RSA) { graphRsaKeys.push(key); return; }
         grid.appendChild(buildTrackRow(key, tracks, totalLength, firstOfGroup.has(key)));
     });
+
+    if (graphPlddtKeys.length) {
+        grid.appendChild(createOverlayGraphSection("pLDDT Confidence", graphPlddtKeys, totalLength, true));
+    }
+    if (graphRsaKeys.length) {
+        grid.appendChild(createOverlayGraphSection("Relative Solvent Accessibility (RSA)", graphRsaKeys, totalLength, false));
+    }
+
     updateSelectionUI();
 }
 
@@ -9877,7 +9868,7 @@ function gatherPersistableState() {
             rowRanges, dragOriginTrackKey, crossRefTrackKey, lastRanges
         },
         preferences: {
-            currentViewMode,
+            graphMode: { pLDDT: graphMode.pLDDT, RSA: graphMode.RSA },
             selectionScope,
             gridCellW,
             commandEngineId,
@@ -10265,8 +10256,18 @@ function applyPersistedState(state) {
     applyConservationSettings(prefs);
     uniprotAnnotationMode = (prefs.uniprotAnnotationMode === 'sequence' || prefs.uniprotAnnotationMode === 'search') ? prefs.uniprotAnnotationMode : 'accession';
     uniprotAccession = (typeof prefs.uniprotAccession === 'string') ? prefs.uniprotAccession : '';
-    currentViewMode = prefs.currentViewMode || 'grid';
-    document.getElementById('viewModeSelect').value = currentViewMode;
+    // Per-type graph view (legacy saves carried a global currentViewMode).
+    if (prefs.graphMode && typeof prefs.graphMode === 'object') {
+        graphMode.pLDDT = !!prefs.graphMode.pLDDT;
+        graphMode.RSA = !!prefs.graphMode.RSA;
+    } else if (prefs.currentViewMode === 'graph') {
+        graphMode.pLDDT = true;
+        graphMode.RSA = true;
+    } else {
+        graphMode.pLDDT = false;
+        graphMode.RSA = false;
+    }
+    syncGraphModeControls();
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
     renderSelectionScopeToggle();
     // Restore the horizontal accordion zoom (px/residue). Newer saves store
@@ -10393,7 +10394,7 @@ function renderCachedDataInfo() {
     if (state.selection && (state.selection.selectStart !== null || (state.selection.rowRanges && state.selection.rowRanges.length))) {
         lines.push('Selection: saved');
     }
-    lines.push(`View mode: ${(state.preferences && state.preferences.currentViewMode) || 'grid'}`);
+    lines.push(`Graph view: pLDDT=${graphMode.pLDDT ? 'on' : 'off'}, RSA=${graphMode.RSA ? 'on' : 'off'}`);
     const cachedEngineId = state.preferences && state.preferences.commandEngineId;
     const cachedEngine = COMMAND_ENGINES.find(e => e.id === cachedEngineId) || COMMAND_ENGINES[0];
     lines.push(`Command engine: ${cachedEngine.label}`);
@@ -10700,7 +10701,8 @@ function resetAllData() {
     activeRowKey = null; activeRowType = null; rowRanges = [];
     dragOriginTrackKey = null; crossRefTrackKey = '';
     lastRanges = null;
-    currentViewMode = 'grid';
+    graphMode = { pLDDT: false, RSA: false };
+    syncGraphModeControls();
     commandEngineId = 'chimerax';
     applyTypePalette('default');
     trackControlState = getDefaultTrackControlState();
@@ -10717,7 +10719,6 @@ function resetAllData() {
 
     document.getElementById('rawInput').value = '';
     document.getElementById('structureUpload').value = '';
-    document.getElementById('viewModeSelect').value = 'grid';
     setDrawerOpen(false);
     document.body.classList.remove('import-collapsed');
     const legendEl = document.getElementById('mainLegend');
