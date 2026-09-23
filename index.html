@@ -1067,6 +1067,30 @@
             overflow-y: auto;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
+        /* Options modal tab bar (Appearance / Data Sources / Workflow / Storage). */
+        .options-tabs {
+            display: flex;
+            gap: 4px;
+            margin-top: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .options-tab {
+            flex: 1;
+            text-align: center;
+            padding: 6px 4px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #64748b;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            cursor: pointer;
+        }
+        .options-tab:hover { color: #334155; background: #f1f5f9; }
+        .options-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+        .options-tab-panel[hidden] { display: none; }
         table.metrics-table {
             width: 100%;
             border-collapse: collapse;
@@ -1987,6 +2011,14 @@
             <button onclick="closeOptionsModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
         </div>
 
+        <div class="options-tabs" role="tablist" aria-label="Options categories">
+            <button type="button" class="options-tab active" data-tab="appearance" onclick="switchOptionsTab('appearance')">Appearance</button>
+            <button type="button" class="options-tab" data-tab="data" onclick="switchOptionsTab('data')">Data Sources</button>
+            <button type="button" class="options-tab" data-tab="workflow" onclick="switchOptionsTab('workflow')">Workflow</button>
+            <button type="button" class="options-tab" data-tab="storage" onclick="switchOptionsTab('storage')">Storage</button>
+        </div>
+
+        <div class="options-tab-panel" id="opt-tab-workflow" hidden>
         <div style="margin-top: 18px;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Command Engine</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
@@ -1997,7 +2029,9 @@
                 style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
             </select>
         </div>
+        </div>
 
+        <div class="options-tab-panel" id="opt-tab-appearance">
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Annotation Colors</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
@@ -2011,7 +2045,9 @@
                 <option value="high-contrast">High contrast</option>
             </select>
         </div>
+        </div>
 
+        <div class="options-tab-panel" id="opt-tab-data" hidden>
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Conservation Scoring</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
@@ -2090,7 +2126,9 @@
             <button onclick="clearTopologySources()" style="margin-top: 8px; margin-left: 6px; background: #64748b;">Clear</button>
             <div id="topologySourceList" style="margin-top: 10px;"></div>
         </div>
+        </div>
 
+        <div class="options-tab-panel" id="opt-tab-storage" hidden>
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Save File</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
@@ -2121,6 +2159,7 @@
             <div id="structureCacheInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">Loading…</div>
             <button onclick="clearStructureCache()" style="background: #dc2626; margin-top: 10px;">Clear Structure Cache</button>
             <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px;">Permanently deletes cached PDB/CIF copies on this device.</span>
+        </div>
         </div>
     </div>
 </div>
@@ -10370,11 +10409,23 @@ function openOptionsModal() {
     syncConservationOptionControls();
     syncUniProtOptionControls();
     renderTopologySourceList();
+    switchOptionsTab('appearance');
     openModalAsDialog('optionsModal');
 }
 
 function closeOptionsModal() {
     closeModalAsDialog('optionsModal');
+}
+
+// Switches the Options modal between its category tabs (Appearance / Data
+// Sources / Workflow / Storage).
+function switchOptionsTab(name) {
+    document.querySelectorAll('#optionsModal .options-tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === name);
+    });
+    document.querySelectorAll('#optionsModal .options-tab-panel').forEach(p => {
+        p.hidden = (p.id !== 'opt-tab-' + name);
+    });
 }
 
 // --- Data modal ------------------------------------------------------------
