@@ -2072,6 +2072,18 @@
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Topology (membrane)</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Paste the output of a topology predictor (TMHMM segments like <code>inside 1 11</code> / <code>TMhelix 12 30</code>, or a DeepTMHMM JSON) to add it as a per-residue inside / TM-helix / outside track. Add two or more sources to also get a majority-vote <strong>Consensus</strong> track.
+            </p>
+            <textarea id="topologyPasteInput" placeholder="inside        1   11&#10;TMhelix      12   30&#10;outside      31   45&#10;…"
+                style="width: 100%; box-sizing: border-box; min-height: 80px; padding: 6px; font-family: monospace; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 4px;"></textarea>
+            <button onclick="addTopologySource(document.getElementById('topologyPasteInput').value)" style="margin-top: 8px;">➕ Add Topology Source</button>
+            <button onclick="clearTopologySources()" style="margin-top: 8px; margin-left: 6px; background: #64748b;">Clear</button>
+            <div id="topologySourceList" style="margin-top: 10px;"></div>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Save File</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Export the full current session - sequence, attached structures, selection, and preferences - as a portable <code>.json</code> file you can move to another browser or machine. To bring one back in, attach it via the toolbar's <strong>Attach Structure(s) or JSON</strong> button like any other file - Q2DV recognizes it automatically from a marker inside the file, without needing a separate import control.<br><br>
@@ -2760,6 +2772,126 @@ function onUniprotAccessionInput() {
     schedulePersist();
 }
 
+// --- Topology (membrane) consensus bar (#2) -------------------------------
+// Users paste/import topology predictor output (TMHMM segments, DeepTMHMM JSON,
+// etc.); each source becomes a per-residue inside/outside/TM-helix track, plus
+// a majority-vote "Consensus" track when two or more sources are loaded.
+let topologySources = []; // [{ name, state }] — state is a per-residue char string (i/M/o/S/space)
+const TOPOLOGY_STATE_COLORS = { i: '#bfdbfe', o: '#bbf7d0', M: '#e98cd3', S: '#fde68a' };
+const TOPOLOGY_STATE_LABELS = { i: 'Inside', o: 'Outside', M: 'TM helix', S: 'Signal peptide' };
+
+function normalizeTopologyState(word) {
+    const w = String(word || '').toLowerCase().trim();
+    if (w === 'inside' || w === 'i' || w === 'in' || w === 'cytoplasmic') return 'i';
+    if (w === 'outside' || w === 'o' || w === 'out' || w === 'extracellular' || w === 'lumenal') return 'o';
+    if (w === 'tmhelix' || w === 'tm' || w === 'm' || w === 'transmembrane' || w === 'membrane' || w === 'helical') return 'M';
+    if (w === 'signal' || w === 's' || w === 'signalpeptide' || w === 'signal_peptide') return 'S';
+    return null;
+}
+function padTopologyState(state, totalLength) {
+    if (!totalLength || state.length >= totalLength) return totalLength ? state.slice(0, totalLength) : state;
+    return state + ' '.repeat(totalLength - state.length);
+}
+
+// Parses topology text into { name, state }. Accepts (a) TMHMM-style segment
+// lines "inside 1 11" / "TMhelix 12 30" (blank/#/> lines skipped), or (b) a
+// DeepTMHMM results JSON with a predicted_topology string (i/M/o/S).
+function parseTopologyText(text, totalLength) {
+    if (!text) return null;
+    const trimmed = text.trim();
+    if (trimmed[0] === '{' || trimmed[0] === '[') {
+        try {
+            const obj = JSON.parse(trimmed);
+            const pred = obj.predicted_topology || obj.topology || null;
+            if (typeof pred === 'string' && pred.length) {
+                const state = Array.from(pred).map(ch => {
+                    const c = ch.toLowerCase();
+                    return c === 'm' ? 'M' : (c === 'i' ? 'i' : (c === 'o' ? 'o' : (c === 's' ? 'S' : ' ')));
+                }).join('');
+                return { name: 'Topology', state: padTopologyState(state, totalLength) };
+            }
+        } catch (e) {}
+        return null;
+    }
+    const segments = [];
+    for (const line of text.split('\n')) {
+        const t = line.trim();
+        if (!t || t[0] === '#' || t[0] === '>') continue;
+        const m = t.match(/^([A-Za-z_]+)\s+(\d+)\s+(\d+)/);
+        if (!m) continue;
+        const state = normalizeTopologyState(m[1]);
+        const start = parseInt(m[2], 10), end = parseInt(m[3], 10);
+        if (!state || isNaN(start) || isNaN(end)) continue;
+        segments.push({ state, start, end });
+    }
+    if (!segments.length) return null;
+    const maxEnd = segments.reduce((mx, s) => Math.max(mx, s.end), 0);
+    const len = Math.max(totalLength || 0, maxEnd);
+    const arr = new Array(len).fill(' ');
+    segments.forEach(s => { for (let i = s.start; i <= s.end && i <= len; i++) arr[i - 1] = s.state; });
+    return { name: 'Topology', state: arr.join('') };
+}
+
+// Rebuilds the TP_ string tracks (one per source + a consensus when >=2) from
+// topologySources, aligned to the reference AA length.
+function applyTopologySources() {
+    const aaLen = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    Object.keys(parsedTracks).forEach(k => { if (k.startsWith('TP_')) delete parsedTracks[k]; });
+    if (!aaLen) { renderViewer(parsedTracks); return; }
+    const sources = topologySources.map(s => ({ name: s.name, state: padTopologyState(s.state || '', aaLen) }));
+    sources.forEach(s => {
+        parsedTracks['TP_' + s.name.replace(/[^A-Za-z0-9]+/g, '_')] = s.state;
+    });
+    if (sources.length >= 2) {
+        const consensus = new Array(aaLen).fill(' ');
+        for (let i = 0; i < aaLen; i++) {
+            const votes = {};
+            sources.forEach(s => { const c = s.state[i]; if (c && c !== ' ') votes[c] = (votes[c] || 0) + 1; });
+            const entries = Object.keys(votes).sort((a, b) => votes[b] - votes[a]);
+            if (entries.length && (entries.length === 1 || votes[entries[0]] > votes[entries[1]])) consensus[i] = entries[0];
+        }
+        parsedTracks['TP_Consensus'] = consensus.join('');
+    }
+    renderViewer(parsedTracks);
+    schedulePersist();
+}
+
+// Adds a topology source from pasted text (named "Topology N" unless given).
+function addTopologySource(text, name) {
+    const aaLen = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const parsed = parseTopologyText(text, aaLen);
+    if (!parsed) { showToast('Could not parse topology text (expected TMHMM/Phobius segments or a DeepTMHMM JSON).', 'error'); return false; }
+    topologySources.push({ name: name || ('Topology ' + (topologySources.length + 1)), state: parsed.state });
+    applyTopologySources();
+    renderTopologySourceList();
+    return true;
+}
+function removeTopologySource(index) {
+    if (index < 0 || index >= topologySources.length) return;
+    topologySources.splice(index, 1);
+    applyTopologySources();
+    renderTopologySourceList();
+}
+function clearTopologySources() {
+    topologySources = [];
+    applyTopologySources();
+    renderTopologySourceList();
+}
+function renderTopologySourceList() {
+    const wrap = document.getElementById('topologySourceList');
+    if (!wrap) return;
+    if (!topologySources.length) { wrap.innerHTML = '<span style="color:#94a3b8; font-size:0.75rem;">No topology sources added.</span>'; return; }
+    let html = '<div style="display:flex; flex-direction:column; gap:4px;">';
+    topologySources.forEach((s, i) => {
+        const tmCount = (s.state.match(/M/g) || []).length;
+        html += '<div style="display:flex; align-items:center; gap:6px; font-size:0.75rem;">' +
+            '<span style="flex:1;">' + structureEscapeHtml(s.name) + ' — ' + tmCount + ' TM helix/TM-helix segments</span>' +
+            '<button type="button" class="copy-btn" onclick="removeTopologySource(' + i + ')" style="padding:1px 8px;">remove</button></div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+}
+
 let persistTimer = null;
 let lastPersistError = null;
 
@@ -3235,7 +3367,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.6.1';
+const APP_VERSION = '0.7.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -4540,6 +4672,10 @@ function formatTrackLabel(fullKey) {
     if (fullKey === 'CONSERVATION' || fullKey.startsWith('CONS_')) return 'Conservation';
     if (fullKey.startsWith('VAR_')) return 'Variant ' + fullKey.slice(4);
     if (fullKey.startsWith('UP_')) return 'UniProt ' + fullKey.slice(3).replace(/_/g, ' ');
+    if (fullKey.startsWith('TP_')) {
+        const label = fullKey.slice(3).replace(/_/g, ' ');
+        return /^topology\b/i.test(label) ? label : 'Topology ' + label;
+    }
     const isPlddt = fullKey.endsWith('_pLDDT');
     const isRsa = fullKey.endsWith('_RSA');
     const isCofactors = fullKey.endsWith('_Cofactors');
@@ -4573,17 +4709,18 @@ function getTrackCategoryOrder(key) {
     if (key === 'AA') return 0;
     if (key.startsWith('SS_')) return 1;
     if (key.startsWith('TM_')) return 2;
-    if (key.startsWith('DO_')) return 3;
-    if (key.startsWith('HH_')) return 4;
-    if (key.startsWith('VAR_')) return 5;
-    if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 6;
-    if (key.startsWith('UP_')) return 7;
+    if (key.startsWith('TP_')) return 3;
+    if (key.startsWith('DO_')) return 4;
+    if (key.startsWith('HH_')) return 5;
+    if (key.startsWith('VAR_')) return 6;
+    if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 7;
+    if (key.startsWith('UP_')) return 8;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
     // above the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 8;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 9;
-    return 10;
+    if (key.endsWith('_Cofactors')) return 9;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 10;
+    return 11;
 }
 
 function switchViewMode() {
@@ -5802,6 +5939,7 @@ const TRACK_GROUP_LABELS = {
     VAR: 'Variants',
     CONSERVATION: 'Conservation',
     UP: 'UniProt',
+    TP: 'Topology',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
@@ -5826,6 +5964,7 @@ function getTrackGroup(key) {
     if (key.startsWith('HH_')) return 'HH';
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 'CONSERVATION';
     if (key.startsWith('UP_')) return 'UP';
+    if (key.startsWith('TP_')) return 'TP';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
@@ -5926,7 +6065,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, DO: 3, CC: 4, SP: 5, HH: 6, VAR: 7, CONSERVATION: 8, UP: 9, pLDDT: 10, RSA: 11, Cofactors: 12, other: 99 };
+    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HH: 7, VAR: 8, CONSERVATION: 9, UP: 10, pLDDT: 11, RSA: 12, Cofactors: 13, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -6398,6 +6537,18 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     cellEl.title = `Residue ${i + 1}: ${feat.type}` + (feat.description ? ` — ${feat.description}` : '');
                 } else {
                     cellEl.title = `Residue ${i + 1}: (no UniProt feature)`;
+                }
+            }
+            else if (key.startsWith('TP_')) {
+                // Topology track: per-residue inside/outside/TM-helix state.
+                const color = TOPOLOGY_STATE_COLORS[char] || '';
+                if (color) {
+                    cellEl.style.backgroundColor = color;
+                    const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
+                    if (gSpan) gSpan.style.color = '#1e293b';
+                    cellEl.title = `Residue ${i + 1}: ${TOPOLOGY_STATE_LABELS[char] || char}`;
+                } else {
+                    cellEl.title = `Residue ${i + 1}: (no topology assignment)`;
                 }
             }
             else if (char === 'H') cellEl.classList.add('cell-H');
@@ -10165,6 +10316,7 @@ function openOptionsModal() {
     void renderStructureCacheInfo();
     syncConservationOptionControls();
     syncUniProtOptionControls();
+    renderTopologySourceList();
     openModalAsDialog('optionsModal');
 }
 
@@ -10431,6 +10583,7 @@ function resetAllData() {
     uniprotFeatures = null;
     uniprotFeatureTracks = {};
     uniprotLogEntries = [];
+    topologySources = [];
     graphHighlights = {};
     selectStart = null; selectEnd = null; selectionMode = 'point';
     selectionScope = 'full';

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-23
+
+### Added
+
+- **Topology (membrane) consensus bar.** Paste TMHMM-style segments or a DeepTMHMM
+  JSON to add per-residue inside / TM-helix / outside tracks (Options → Topology);
+  two or more sources produce a majority-vote **Consensus** track. Each state is
+  colored distinctly and grouped under "Topology" in Track Control.
+
 ## [0.6.1] - 2026-09-23
 
 ### Changed
