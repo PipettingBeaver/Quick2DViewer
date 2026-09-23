@@ -2600,7 +2600,20 @@ function setUniProtStatus(msg) {
     const el = document.getElementById('uniprotAnnotationStatus');
     if (el) el.textContent = msg || '';
 }
-function uniprotApiBase() { return 'https://rest.uniprot.org/uniprotkb/'; }
+// All external service endpoints in one place (single source of truth).
+// CORS-verified 2026-09: UniProt REST/EBI, EBI Job Dispatcher, RCSB, PDBe,
+// Foldseek and ESMFold are browser-callable; MPI Toolkit is not (403).
+const SERVICE_URLS = {
+    uniprotRest: 'https://rest.uniprot.org/uniprotkb/',
+    uniprotEbiFeatures: 'https://www.ebi.ac.uk/proteins/api/features/',
+    uniprotEbiSearch: 'https://www.ebi.ac.uk/proteins/api/proteins',
+    ebiNcbiblast: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/',
+    ebiHmmer: 'https://www.ebi.ac.uk/Tools/services/rest/hmmer3/',   // hmmscan/phmmer/jackhmmer (planned)
+    foldseek: 'https://search.foldseek.com/api/',                    // planned
+    esmfold: 'https://api.esmatlas.com/foldSequence/v1/pdb/',        // planned
+    rcsbDownload: 'https://files.rcsb.org/download/',
+};
+function uniprotApiBase() { return SERVICE_URLS.uniprotRest; }
 
 // Appends a timestamped entry to the annotation debug log, mirrors it to the
 // console, and refreshes the visible <pre> if present.
@@ -2691,7 +2704,7 @@ async function fetchUniProtFeaturesByAccession(acc) {
     // in either case.
     const endpoints = [
         { url: uniprotApiBase() + encoded + '.json', parse: parseUniProtFeatures, label: '' },
-        { url: 'https://www.ebi.ac.uk/proteins/api/features/' + encoded + '.json', parse: parseUniProtFeaturesEBI, label: ' (EBI)' }
+        { url: SERVICE_URLS.uniprotEbiFeatures + encoded + '.json', parse: parseUniProtFeaturesEBI, label: ' (EBI)' }
     ];
     let lastError = null;
     for (const ep of endpoints) {
@@ -2723,7 +2736,7 @@ async function fetchUniProtFeaturesByAccession(acc) {
 // clear message pointing at the accession path. Kept so the sequence mode is
 // fully wired end-to-end.
 async function resolveAccessionFromSequence(seq) {
-    const base = 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/';
+    const base = SERVICE_URLS.ebiNcbiblast;
     const t0 = Date.now();
     const elapsed = () => Math.round((Date.now() - t0) / 1000);
     const fetchWithTimeout = (url, opts, ms) => {
@@ -2812,7 +2825,7 @@ async function useUniProtAccession(acc) {
 // find candidate accessions. Returns [{accession, name, gene, organism, protein}]
 // or null on a network failure, or [] when there are no matches.
 async function uniprotSearchEntries(field, query) {
-    const url = 'https://www.ebi.ac.uk/proteins/api/proteins?' + new URLSearchParams({ size: '20', [field]: query }).toString();
+    const url = SERVICE_URLS.uniprotEbiSearch + '?' + new URLSearchParams({ size: '20', [field]: query }).toString();
     uniprotLog('search: ' + url);
     try {
         const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
@@ -3620,18 +3633,18 @@ function buildPredictorTooltipHTML(info) {
         return '<span class="tool-name">No details added yet.</span>';
     }
     let html = '';
-    if (info.name) html += `<strong>${info.name}</strong>`;
-    if (info.category) html += ` <span style="opacity:0.75;">(${info.category})</span>`;
-    if (info.description) html += `<br>${info.description}`;
+    if (info.name) html += `<strong>${structureEscapeHtml(info.name)}</strong>`;
+    if (info.category) html += ` <span style="opacity:0.75;">(${structureEscapeHtml(info.category)})</span>`;
+    if (info.description) html += `<br>${structureEscapeHtml(info.description)}`;
     if (info.bands && info.bands.length) {
         html += '<ul style="margin:6px 0 0 16px; padding:0;">';
         info.bands.forEach(b => {
-            html += `<li style="margin-bottom:3px;"><strong>${b.range}:</strong> ${b.desc}</li>`;
+            html += `<li style="margin-bottom:3px;"><strong>${structureEscapeHtml(b.range)}:</strong> ${structureEscapeHtml(b.desc)}</li>`;
         });
         html += '</ul>';
     }
-    if (info.useCase) html += `<br><br><strong>Use case:</strong> ${info.useCase}`;
-    if (info.citation) html += `<br><strong>Citation:</strong> ${info.citation}`;
+    if (info.useCase) html += `<br><br><strong>Use case:</strong> ${structureEscapeHtml(info.useCase)}`;
+    if (info.citation) html += `<br><strong>Citation:</strong> ${structureEscapeHtml(info.citation)}`;
     return html;
 }
 
@@ -3818,7 +3831,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.10.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -8606,10 +8619,10 @@ function computeCrossReferenceHTML(trackKey, indices) {
             }
         });
         if (count === 0) {
-            return `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong>: no quantitative values in selection.`;
+            return `${CROSSREF_DIVIDER}Cross-ref <strong>${structureEscapeHtml(label)}</strong>: no quantitative values in selection.`;
         }
         const mean = sum / count;
-        let html = `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong> (n=${count}):<br>`;
+        let html = `${CROSSREF_DIVIDER}Cross-ref <strong>${structureEscapeHtml(label)}</strong> (n=${count}):<br>`;
         if (isPlddt) {
             html += `• Mean pLDDT: <strong>${mean.toFixed(2)}</strong><br>• Confident (≥70): <strong>${((highConf / count) * 100).toFixed(1)}%</strong>`;
         } else if (isRsa) {
@@ -8630,13 +8643,13 @@ function computeCrossReferenceHTML(trackKey, indices) {
         });
         const n = indices.length;
         if (annotated === 0) {
-            return `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong>: no annotated residues in selection.`;
+            return `${CROSSREF_DIVIDER}Cross-ref <strong>${structureEscapeHtml(label)}</strong>: no annotated residues in selection.`;
         }
         const rows = Object.entries(counts)
             .sort((a, b) => b[1] - a[1])
             .map(([t, c]) => `• ${t}: <strong>${c}</strong> (${((c / n) * 100).toFixed(1)}%)`)
             .join('<br>');
-        return `${CROSSREF_DIVIDER}Cross-ref <strong>${label}</strong> (of ${n}aa selected):<br>${rows}`;
+        return `${CROSSREF_DIVIDER}Cross-ref <strong>${structureEscapeHtml(label)}</strong> (of ${n}aa selected):<br>${rows}`;
     }
 
     return '';
@@ -8681,7 +8694,7 @@ function computeAverageAcrossKeys(keys, indices) {
 
     const avgOfMeans = perTrackMeans.reduce((a, b) => a + b, 0) / perTrackMeans.length;
     const label = isPlddt ? 'Mean pLDDT' : 'Mean RSA';
-    return `${CROSSREF_DIVIDER}<strong>Average of ${perTrackMeans.length}</strong> ${isPlddt ? 'pLDDT' : 'RSA'} models:<br>• ${label}: <strong>${avgOfMeans.toFixed(2)}</strong>`;
+    return `${CROSSREF_DIVIDER}<strong>Average of ${perTrackMeans.length}</strong> ${isPlddt ? 'pLDDT' : 'RSA'} models:<br>• ${structureEscapeHtml(label)}: <strong>${avgOfMeans.toFixed(2)}</strong>`;
 }
 
 function onCrossRefChange() {
@@ -8853,7 +8866,7 @@ function calculateSelectionMetadata() {
 function calculateRowSelectionMetadata(trackKey, typeChar) {
     const rowLabel = typeChar === null ? formatTrackLabel(trackKey) : `${formatTrackLabel(trackKey)} (${typeChar})`;
     if (!rowRanges.length) {
-        document.getElementById('rangeDisplay').innerHTML = `<strong>${rowLabel}</strong>: no matching entries`;
+        document.getElementById('rangeDisplay').innerHTML = `<strong>${structureEscapeHtml(rowLabel)}</strong>: no matching entries`;
         document.getElementById('fastaDisplay').textContent = '-';
         updateHomologFastaSection();
         setMetricsBase('No matching residues found.');
@@ -8867,12 +8880,12 @@ function calculateRowSelectionMetadata(trackKey, typeChar) {
         totalLength += (endIdx - startIdx + 1);
     });
 
-    document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${rowLabel}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
+    document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${structureEscapeHtml(rowLabel)}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
     document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
     lastRanges = rowRanges.map(([s, e]) => [s + 1, e + 1]);
     
     updateHomologFastaSection();
-    setMetricsBase(`Active Filter: <strong>${rowLabel}</strong><br>Segments: ${rowRanges.length} | Span: ${totalLength} residues`);
+    setMetricsBase(`Active Filter: <strong>${structureEscapeHtml(rowLabel)}</strong><br>Segments: ${rowRanges.length} | Span: ${totalLength} residues`);
     refreshChimeraxDisplay();
 }
 
@@ -8900,7 +8913,7 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
     }
 
     const mean = sum / count;
-    let html = `Model: <strong>${formatTrackLabel(trackKey)}</strong><br>`;
+    let html = `Model: <strong>${structureEscapeHtml(formatTrackLabel(trackKey))}</strong><br>`;
     if (isPlddt) {
         const pctHigh = ((highConf / count) * 100).toFixed(1);
         html += `• Mean pLDDT: <strong>${mean.toFixed(2)}</strong><br>• Confident (≥70): <strong>${pctHigh}%</strong>`;
@@ -8972,7 +8985,7 @@ function openMetricsTable() {
     html += `<table class="metrics-table"><thead><tr><th>Model / Track</th><th>Metric</th><th>Mean Value</th><th>High Conf (≥70) / Buried (<0.2)</th></tr></thead><tbody>`;
 
     rows.forEach(row => {
-        html += `<tr><td><strong>${row.model}</strong></td><td>${row.metric}</td><td>${row.mean}</td><td>${row.pct}</td></tr>`;
+        html += `<tr><td><strong>${structureEscapeHtml(row.model)}</strong></td><td>${row.metric}</td><td>${row.mean}</td><td>${row.pct}</td></tr>`;
     });
 
     html += `</tbody></table>`;
@@ -9066,7 +9079,7 @@ const P3D_CDN_URLS = [
     'https://cdn.jsdelivr.net/npm/3dmol@2.4.0/build/3Dmol-min.js',
     'https://3Dmol.org/build/3Dmol-min.js'
 ];
-const P3D_RCSB_BASE_URL = 'https://files.rcsb.org/download/'; // sends Access-Control-Allow-Origin: *
+const P3D_RCSB_BASE_URL = SERVICE_URLS.rcsbDownload; // sends Access-Control-Allow-Origin: *
 const P3D_RCSB_SIZE_CAP = 100 * 1024 * 1024;                   // don't cache multi-hundred-MB deposits
 const P3D_DB_NAME = 'q2dv-3dmol-cache';
 const P3D_DB_STORE = 'scripts';
@@ -10942,9 +10955,10 @@ function renderDataModal() {
                     // summary only (label #, residue name, category, and a
                     // ⚠ if the AF3 confidence check kept the base radius).
                     val = val.length
-                        ? val.map(c => `#${c.index} ${c.resName} (${c.category}${c.lowConfidence ? ', ⚠ low conf.' : ''})`).join('; ')
+                        ? val.map(c => `#${c.index} ${structureEscapeHtml(c.resName)} (${structureEscapeHtml(c.category)}${c.lowConfidence ? ', ⚠ low conf.' : ''})`).join('; ')
                         : 'None detected';
                 }
+                else { val = structureEscapeHtml(val); } // name / proteinClass / apoState / oligomer (file-derived)
                 html += `<td>${val}</td>`;
             });
             html += '</tr>';

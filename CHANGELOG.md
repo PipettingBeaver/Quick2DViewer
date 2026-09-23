@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-23
+
+### Changed (housekeeping)
+
+- Committed a headless test harness (`npm test` → `tests/run.js`) covering app load,
+  version↔changelog sync, every track-row type, conservation, UniProt/topology
+  parsing, homolog template scoring, exports, changelog rendering, and escaping.
+- Replaced blocking `alert()`/`confirm()` with toasts + a confirm modal (also makes
+  the app automation-friendly).
+- Escaped track/file-derived text in tooltips and tables (cross-ref labels, metrics
+  table, structure table, predictor tooltips).
+- Centralized external service endpoints in `SERVICE_URLS` (with the CORS-verified
+  entries for Foldseek / ESMFold / EBI HMMER noted for the upcoming integrations).
+- Removed dead code/CSS left over from the UI restructures.
+
 ## [0.10.0] - 2026-09-23
 
 ### Added
