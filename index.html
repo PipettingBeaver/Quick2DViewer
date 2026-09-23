@@ -396,8 +396,10 @@
             border: 1px solid #cbd5e1;
             box-shadow: none;
         }
-        .app-header { margin-bottom: 0; }
+        .app-header { margin-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .app-header p { margin: 0 0 15px; font-size: 0.9rem; color: #64748b; }
+        .app-header-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .app-header-tools .tb-btn { font-size: 0.72rem; padding: 4px 9px; }
         .app-version {
             display: inline-block;
             margin-left: 8px;
@@ -1672,6 +1674,22 @@
 <div class="container">
     <div class="app-header">
         <h2>Quick2DViewer - 1D Protein Viewer <span class="app-version" id="appVersion" title="Application version"></span></h2>
+        <div class="app-header-tools">
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openOptionsModal()">Options</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openDataModal()">Data</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openHelpModal()">Help</button>
+            <button type="button" id="btnP3D" class="tb-btn tb-btn-secondary" onclick="toggleP3DViewer()"
+                title="Toggle the floating 3D structure viewer">3D</button>
+            <select id="exportSelect" class="q2dv-select" onchange="onExportSelect()"
+                title="Export Q2DV data or the current viewport" aria-label="Export" style="font-size:0.72rem; padding:3px 6px;">
+                <option value="">Export ▾</option>
+                <option value="json">Export Q2DV Data as JSON</option>
+                <option value="tsv">Export Data as TSV</option>
+                <option value="csv">Export Data as CSV</option>
+                <option value="svg">Export Viewport as SVG</option>
+                <option value="png">Export Viewport as PNG</option>
+            </select>
+        </div>
     </div>
 
     <div id="toastContainer" aria-live="polite"></div>
@@ -1765,7 +1783,7 @@
         </div>
 
         <div class="sidebar" role="region" aria-label="Selection Workspace">
-            <div class="sidebar-toolbar" role="toolbar" aria-label="View and dialog controls">
+            <div class="sidebar-toolbar" role="toolbar" aria-label="View and data input controls">
                 <select id="viewModeSelect" class="q2dv-select sidebar-view-select" onchange="switchViewMode()"
                     title="Switch between the residue heatmap grid and the overlaid structure-score graphs">
                     <option value="grid">Heatmap View</option>
@@ -1775,21 +1793,6 @@
                     title="Show the import controls (Attach, Paste Quick2D, Load Sample, show raw text)">
                     Import
                 </button>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="openOptionsModal()">Options</button>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="openDataModal()">Data</button>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="openHelpModal()">Help</button>
-                <button type="button" id="btnP3D" class="tb-btn tb-btn-secondary" onclick="toggleP3DViewer()"
-                    title="Toggle the floating 3D structure viewer">3D</button>
-                <select id="exportSelect" class="q2dv-select sidebar-view-select" onchange="onExportSelect()"
-                    title="Export Q2DV data or the current viewport"
-                    aria-label="Export" style="flex:0 0 auto; width:auto; max-width:90px;">
-                    <option value="">Export ▾</option>
-                    <option value="json">Export Q2DV Data as JSON</option>
-                    <option value="tsv">Export Data as TSV</option>
-                    <option value="csv">Export Data as CSV</option>
-                    <option value="svg">Export Viewport as SVG</option>
-                    <option value="png">Export Viewport as PNG</option>
-                </select>
             </div>
 
             <div class="sel-workspace-header">
