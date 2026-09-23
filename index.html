@@ -438,6 +438,25 @@
         .app-header { margin-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .app-header p { margin: 0 0 15px; font-size: 0.9rem; color: #64748b; }
         .app-header-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        /* Top menu bar (File / View / Data / Export / Help). */
+        .menubar { gap: 2px; }
+        .menubar-item { position: relative; }
+        .menubar-btn {
+            font-size: 0.75rem; font-weight: 600; padding: 5px 10px; background: transparent;
+            color: #334155; border: none; border-radius: 4px; cursor: pointer;
+        }
+        .menubar-btn:hover { background: #e2e8f0; }
+        .menubar-menu {
+            position: absolute; top: 100%; left: 0; z-index: 1200; background: #fff;
+            border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+            padding: 4px; min-width: 185px; display: flex; flex-direction: column;
+        }
+        .menubar-menu[hidden] { display: none; }
+        .menubar-menu button {
+            text-align: left; font-size: 0.75rem; font-weight: 600; color: #334155;
+            background: transparent; border: none; border-radius: 4px; padding: 5px 8px; cursor: pointer;
+        }
+        .menubar-menu button:hover { background: #dbeafe; }
         .app-header-tools .tb-btn { font-size: 0.72rem; padding: 4px 9px; }
         .app-version {
             display: inline-block;
@@ -1713,21 +1732,44 @@
 <div class="container">
     <div class="app-header">
         <h2>Quick2DViewer - 1D Protein Viewer <span class="app-version" id="appVersion" title="Application version"></span></h2>
-        <div class="app-header-tools">
-            <button type="button" class="tb-btn tb-btn-secondary" onclick="openOptionsModal()">Options</button>
-            <button type="button" class="tb-btn tb-btn-secondary" onclick="openDataModal()">Data</button>
-            <button type="button" class="tb-btn tb-btn-secondary" onclick="openHelpModal()">Help</button>
-            <button type="button" id="btnP3D" class="tb-btn tb-btn-secondary" onclick="toggleP3DViewer()"
-                title="Toggle the floating 3D structure viewer">3D</button>
-            <select id="exportSelect" class="q2dv-select" onchange="onExportSelect()"
-                title="Export Q2DV data or the current viewport" aria-label="Export" style="font-size:0.72rem; padding:3px 6px;">
-                <option value="">Export ▾</option>
-                <option value="json">Export Q2DV Data as JSON</option>
-                <option value="tsv">Export Data as TSV</option>
-                <option value="csv">Export Data as CSV</option>
-                <option value="svg">Export Viewport as SVG</option>
-                <option value="png">Export Viewport as PNG</option>
-            </select>
+        <div class="app-header-tools menubar" role="menubar" aria-label="Main menu">
+            <div class="menubar-item">
+                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
+                <div class="menubar-menu" id="menubar-file" hidden>
+                    <button type="button" onclick="menuBarAction('input')">Input Data…</button>
+                    <button type="button" onclick="menuBarAction('save')">Export Save (.json)</button>
+                    <button type="button" onclick="menuBarAction('reset')">Reset Data</button>
+                </div>
+            </div>
+            <div class="menubar-item">
+                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('view', this)">View ▾</button>
+                <div class="menubar-menu" id="menubar-view" hidden>
+                    <button type="button" onclick="menuBarAction('graphPlddt')">Toggle pLDDT graph</button>
+                    <button type="button" onclick="menuBarAction('graphRsa')">Toggle RSA graph</button>
+                    <button type="button" onclick="menuBarAction('legend')">Show / Hide Legend</button>
+                    <button type="button" onclick="menuBarAction('p3d')">Toggle 3D Viewer</button>
+                </div>
+            </div>
+            <div class="menubar-item">
+                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('data', this)">Data ▾</button>
+                <div class="menubar-menu" id="menubar-data" hidden>
+                    <button type="button" onclick="menuBarAction('data')">Data &amp; Structures…</button>
+                    <button type="button" onclick="menuBarAction('options')">Options…</button>
+                </div>
+            </div>
+            <div class="menubar-item">
+                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('export', this)">Export ▾</button>
+                <div class="menubar-menu" id="menubar-export" hidden>
+                    <button type="button" onclick="menuBarAction('json')">Q2DV Data as JSON</button>
+                    <button type="button" onclick="menuBarAction('tsv')">Data as TSV</button>
+                    <button type="button" onclick="menuBarAction('csv')">Data as CSV</button>
+                    <button type="button" onclick="menuBarAction('svg')">Viewport as SVG</button>
+                    <button type="button" onclick="menuBarAction('png')">Viewport as PNG</button>
+                </div>
+            </div>
+            <div class="menubar-item">
+                <button type="button" class="menubar-btn" onclick="menuBarAction('help')">Help</button>
+            </div>
         </div>
     </div>
 
@@ -3227,6 +3269,42 @@ function refreshTrackManagerIfVisible() {
     if (panel && !panel.hidden) renderTrackManager();
 }
 
+// --- Top menu bar (File / View / Data / Export / Help) --------------------
+function closeMenuBarMenus() {
+    document.querySelectorAll('.menubar-menu').forEach(m => { m.hidden = true; });
+}
+function toggleMenuBarMenu(name) {
+    const menu = document.getElementById('menubar-' + name);
+    if (!menu) return;
+    const willOpen = menu.hidden;
+    closeMenuBarMenus();
+    menu.hidden = !willOpen;
+}
+function menuBarAction(action) {
+    closeMenuBarMenus();
+    switch (action) {
+        case 'input': openInputDataModal(); break;
+        case 'save': exportFullSave(); break;
+        case 'reset': resetAllData(); break;
+        case 'graphPlddt': { const c = document.getElementById('graphPlddtCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
+        case 'graphRsa': { const c = document.getElementById('graphRsaCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
+        case 'legend': toggleLegend(); break;
+        case 'p3d': toggleP3DViewer(); break;
+        case 'data': openDataModal(); break;
+        case 'options': openOptionsModal(); break;
+        case 'json': exportFullSave(); break;
+        case 'tsv': exportMetricsTableTSV(); break;
+        case 'csv': exportMetricsCSV(); break;
+        case 'svg': exportViewportSVG(); break;
+        case 'png': exportViewportPNG(); break;
+        case 'help': openHelpModal(); break;
+        default: break;
+    }
+}
+document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('.menubar-item')) closeMenuBarMenus();
+});
+
 // --- Collapsible legend (T4) ----------------------------------------------
 // Hides/shows the legend block with a small toggle button. Independent of
 // the Top-UI collapse above (which hides the whole legend + toggle row).
@@ -3672,7 +3750,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.9.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

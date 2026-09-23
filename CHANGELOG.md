@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-23
+
+### Changed (UI restructure, Level B)
+
+- **Tabbed sidebar**: Selection / Tracks / Workflow panels.
+  - **Tracks** tab: a JalView-style track manager — one row per type (with a
+    show/hide eye) and an indented row per individual track, sharing the Track
+    Control visibility state.
+  - **Workflow** tab: holds the collapsible External Workflow (command generator).
+- **Top menu bar** (File / View / Data / Export / Help) replaces the header buttons.
+
 ## [0.8.0] - 2026-09-23
 
 ### Changed (UI restructure, Level A)
