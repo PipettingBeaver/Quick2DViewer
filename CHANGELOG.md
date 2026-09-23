@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-23
+
+### Changed
+
+- **Homolog tracks renamed `HH_` → `HL_`** (generic "Homolog"), with a `source`
+  field on `homologHitsInfo` so HHpred / Foldseek / HMMER homologs can coexist and
+  be tagged by origin.
+- **Track provenance (`trackMeta`).** Every track now reports its source
+  (Quick2D / HHpred / UniProt / Topology / Conservation / Structure / Variant
+  FASTA), shown in the residue hover tooltip, the Tracks manager, and the Homolog
+  Templates table. `trackMeta` holds overrides for sources not inferable from the key.
+
 ## [0.10.1] - 2026-09-23
 
 ### Changed (housekeeping)

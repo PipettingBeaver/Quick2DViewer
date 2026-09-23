@@ -93,6 +93,16 @@ const changelogTop = (CHANGELOG.match(/^## \[(\d+\.\d+\.\d+)\]/m) || [])[1];
 assert(changelogTop === ctxRun('APP_VERSION'), `APP_VERSION (${ctxRun('APP_VERSION')}) matches CHANGELOG top release (${changelogTop})`);
 assert(ctxRun(`typeof renderViewer === 'function' && typeof buildTrackRow === 'function'`), 'core render functions present');
 
+section('track provenance (trackMeta)');
+assert(ctxRun(`getTrackSource('SS_PSIPRED')`) === 'Quick2D', 'Quick2D source derived from prefix');
+assert(ctxRun(`getTrackSource('UP_Sites')`) === 'UniProt', 'UniProt source');
+assert(ctxRun(`getTrackSource('TP_Consensus')`) === 'Topology', 'Topology source');
+assert(ctxRun(`getTrackSource('M_pLDDT')`) === 'Structure', 'structure source');
+ctxRun(`homologHitsInfo['HL_09_src'] = { source: 'Foldseek' };`);
+assert(ctxRun(`getTrackSource('HL_09_src')`) === 'Foldseek', 'homolog source read from homologHitsInfo');
+ctxRun(`setTrackMeta('SS_PSIPRED', { source: 'Custom' });`);
+assert(ctxRun(`getTrackSource('SS_PSIPRED')`) === 'Custom', 'trackMeta override wins over derived source');
+
 section('core: track rows render for every track type');
 const R = 'MKTAYIAKQRQISFVKSHFSRQDILQDILDLWIYHTQGYFP'.slice(0, 37);
 ctxRun(`parsedTracks = { AA: ${JSON.stringify(R)},

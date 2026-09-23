@@ -3245,7 +3245,7 @@ function renderTrackManager() {
             const vis = !isTrackFiltered(k);
             html += '<div class="tm-track">' +
                 '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
-                '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) + '</span>' +
+                '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) + ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
                 '</div>';
         });
         html += '</div>';
@@ -3799,7 +3799,7 @@ function showCellTooltip(cell, clientX, clientY) {
     const swatch = (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
         ? '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + bg + ';border:1px solid rgba(0,0,0,0.25);margin-right:6px;vertical-align:middle;"></span>'
         : '';
-    const track = cell.dataset.track ? '<strong>' + structureEscapeHtml(formatTrackLabel(cell.dataset.track)) + '</strong><br>' : '';
+    const track = cell.dataset.track ? '<strong>' + structureEscapeHtml(formatTrackLabel(cell.dataset.track)) + '</strong> <span style="opacity:0.7;">[' + structureEscapeHtml(getTrackSource(cell.dataset.track)) + ']</span><br>' : '';
     tooltipEl.innerHTML = swatch + track + structureEscapeHtml(title).replace(/\n/g, '<br>');
     tooltipEl.classList.remove('wide', 'pinned');
     tooltipEl.style.display = 'block';
@@ -3831,7 +3831,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.10.1';
+const APP_VERSION = '0.11.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -6448,6 +6448,29 @@ function getTrackGroup(key) {
     return 'other';
 }
 function trackGroupLabel(group) { return TRACK_GROUP_LABELS[group] || group; }
+
+// --- Track provenance (trackMeta) -----------------------------------------
+// Every track can report where it came from. Most sources are derivable from
+// the key prefix; trackMeta holds overrides / extra metadata for tracks whose
+// source can't be inferred (e.g. Foldseek vs HHpred homologs, or an
+// ESMFold-predicted structure vs an attached AlphaFold model).
+let trackMeta = {};
+function setTrackMeta(key, meta) { trackMeta[key] = Object.assign({}, trackMeta[key], meta); }
+function getTrackMeta(key) { return trackMeta[key] || null; }
+function getTrackSource(key) {
+    if (!key) return '';
+    const meta = trackMeta[key];
+    if (meta && meta.source) return meta.source;
+    if (key === 'AA') return 'Input';
+    if (key.startsWith('HL_')) { const h = homologHitsInfo[key]; return (h && h.source) || 'Homolog'; }
+    if (key.startsWith('SS_') || key.startsWith('TM_') || key.startsWith('DO_') || key.startsWith('CC_') || key.startsWith('SP_')) return 'Quick2D';
+    if (key.startsWith('VAR_')) return 'Variant FASTA';
+    if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 'Conservation';
+    if (key.startsWith('UP_')) return 'UniProt';
+    if (key.startsWith('TP_')) return 'Topology';
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA') || key.endsWith('_Cofactors')) return 'Structure';
+    return 'Other';
+}
 function isTrackGroupHidden(g) { return !!trackControlState.hidden[g]; }
 function isTrackGroupSymbolsHidden(g) { return !!trackControlState.hideSymbols[g]; }
 function isTrackGroupFullBar(g) { return !!trackControlState.fullBar[g]; }
@@ -10844,6 +10867,7 @@ function homologTemplateMetrics() {
             key,
             rank: info.rank,
             hitId: info.hitId || key,
+            source: info.source || 'HHpred',
             desc: ((info.hitDesc || '').split(';')[0] || '').trim(),
             probab: isNaN(probab) ? null : probab,
             evalue: s['E-value'] || '',
@@ -10884,7 +10908,7 @@ function renderHomologTable() {
         const scoreCell = r.score == null ? 'N/A' : r.score.toFixed(1) + (best ? ' <span style="color:#15803d;">★ best</span>' : '');
         html += '<tr' + (best ? ' class="homolog-best"' : '') + '>' +
             '<td>' + (r.rank != null ? r.rank : '') + '</td>' +
-            '<td><strong>' + structureEscapeHtml(r.hitId) + '</strong>' + (r.desc ? ' — <span style="color:#64748b;">' + structureEscapeHtml(r.desc) + '</span>' : '') + '</td>' +
+            '<td><strong>' + structureEscapeHtml(r.hitId) + '</strong> <span style="color:#94a3b8; font-size:0.72rem;">[' + structureEscapeHtml(r.source) + ']</span>' + (r.desc ? ' — <span style="color:#64748b;">' + structureEscapeHtml(r.desc) + '</span>' : '') + '</td>' +
             '<td>' + (r.probab == null ? '—' : r.probab.toFixed(1) + '%') + '</td>' +
             '<td>' + structureEscapeHtml(r.evalue || '—') + '</td>' +
             '<td>' + (r.ident == null ? '—' : r.ident.toFixed(1) + '%') + '</td>' +
