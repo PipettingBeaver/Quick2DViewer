@@ -46,18 +46,6 @@
         }
 
         /* --- Top action toolbar ------------------------------------------ */
-        .top-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 10px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            box-sizing: border-box;
-        }
         .toolbar-group {
             display: flex;
             align-items: center;
@@ -66,11 +54,6 @@
             flex-wrap: wrap;
         }
         .toolbar-group-view { margin-left: auto; }
-        .tb-hint {
-            flex: 1 1 100%;
-            font-size: 0.8rem;
-            color: #64748b;
-        }
         /* Compact view/dialog controls that live at the top of the sidebar
            (above Selection Workspace): the View Mode selector plus the
            Options / Data / Help buttons formerly in the top toolbar (B group). */
@@ -85,7 +68,6 @@
             border-radius: 8px;
             margin-bottom: 12px;
         }
-        .sidebar-view-select { font-size: 0.72rem; padding: 4px 6px; flex: 1; min-width: 70px; }
         .sidebar-toolbar .tb-btn { font-size: 0.7rem; padding: 4px 7px; }
         .graph-toggle {
             display: inline-flex;
@@ -126,7 +108,6 @@
             border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;
         }
         .tm-eye:hover { background: #e2e8f0; }
-        #btnP3D.tb-btn-active { background: #2563eb; color: #fff; border-color: #1d4ed8; }
         /* Floating 3D structure viewer (Py3Dmol) */
         .p3d-viewer {
             position: fixed;
@@ -420,21 +401,6 @@
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .legend-item .info-icon { margin-left: 2px; }
 
-        /* --- Import-group collapse ---------------------------------------- */
-        /* The top toolbar holds just the data-input controls (the "Import"
-           group). "Hide Import" collapses the whole toolbar and the single
-           "Import" button re-appears in the sidebar toolbar, so no space is
-           wasted until the user needs to load/paste data again. */
-        body.import-collapsed .top-toolbar { display: none; }
-        /* "Import" is a permanent sidebar button: primary (blue) while the
-           import group is collapsed, greyed out while the group is open. */
-        .btn-show-import { display: inline-flex; }
-        body:not(.import-collapsed) .btn-show-import {
-            background: #e2e8f0;
-            color: #475569;
-            border: 1px solid #cbd5e1;
-            box-shadow: none;
-        }
         .app-header { margin-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .app-header p { margin: 0 0 15px; font-size: 0.9rem; color: #64748b; }
         .app-header-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -1032,11 +998,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-        }
-        .graph-annotations-wrapper {
-            border-bottom: 2px solid #cbd5e1;
-            margin-bottom: 6px;
-            padding-bottom: 4px;
         }
         .graph-svg {
             display: block;
@@ -1698,7 +1659,6 @@
                 box-sizing: border-box;
             }
             .app-header,
-            .top-toolbar,
             .raw-input-drawer,
             .legend {
                 flex-shrink: 0;
@@ -3171,11 +3131,6 @@ function toggleRawInputDrawer() {
 // collapses the whole toolbar away. The single "Import" button that swaps
 // it back lives in the sidebar toolbar (next to View mode). The state is
 // persisted so it survives a page refresh.
-function toggleImportGroup() {
-    document.body.classList.toggle('import-collapsed');
-    schedulePersist();
-}
-
 // --- Input Data panel -----------------------------------------------------
 // The unified import + data summary + characterization workflow checklist,
 // replacing the old always-visible top import toolbar.
@@ -10268,7 +10223,6 @@ function gatherPersistableState() {
             chimeraxTarget: document.getElementById('chimeraxTarget').value,
             cxCommand: document.getElementById('cxCommand').value,
             cxColor: document.getElementById('cxColor').value,
-            importCollapsed: document.body.classList.contains('import-collapsed'),
             legendHidden: !document.getElementById('mainLegend') ? false : document.getElementById('mainLegend').hidden,
             typePalette: document.getElementById('typePaletteSelect') ? document.getElementById('typePaletteSelect').value : 'default',
             conservationMetric,
@@ -10500,21 +10454,6 @@ function exportViewportPNG() {
 
 // Dispatches the Export dropdown selection, then resets the select to its
 // placeholder so the same option can be picked again.
-function onExportSelect() {
-    const sel = document.getElementById('exportSelect');
-    if (!sel) return;
-    const val = sel.value;
-    sel.value = '';
-    switch (val) {
-        case 'json': exportFullSave(); break;
-        case 'tsv': exportMetricsTableTSV(); break;
-        case 'csv': exportMetricsCSV(); break;
-        case 'svg': exportViewportSVG(); break;
-        case 'png': exportViewportPNG(); break;
-        default: break;
-    }
-}
-
 // Applies an already-parsed, already-marker-verified save object. Shared by
 // the structure-upload handler's auto-detection (see below) - kept separate
 // from that detection logic so it's easy to call from elsewhere later (e.g.
@@ -10686,7 +10625,6 @@ function applyPersistedState(state) {
     applyTypePalette(prefs.typePalette || 'default');
 
     // Restore the import-group collapse and legend-hidden states.
-    if (prefs.importCollapsed) document.body.classList.add('import-collapsed');
     const legendEl = document.getElementById('mainLegend');
     const legendBtn = document.getElementById('btnToggleLegend');
     if (legendEl && prefs.legendHidden) {
@@ -11114,7 +11052,6 @@ async function resetAllData() {
     document.getElementById('rawInput').value = '';
     document.getElementById('structureUpload').value = '';
     setDrawerOpen(false);
-    document.body.classList.remove('import-collapsed');
     const legendEl = document.getElementById('mainLegend');
     const legendBtn = document.getElementById('btnToggleLegend');
     if (legendEl) legendEl.hidden = false;
