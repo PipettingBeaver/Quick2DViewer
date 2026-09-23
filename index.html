@@ -1707,34 +1707,53 @@
 
     <input type="file" id="structureUpload" accept=".pdb,.cif,.json,.hhr,.fasta,.fa,.faa,.fas" multiple style="display: none;">
 
-    <div class="top-toolbar" role="toolbar" aria-label="Data input controls">
-        <span class="tb-hint">Paste a Quick2D output, or attach a Q2DV JSON save to get started. Variant FASTA, HHR or PDB &amp; CIF files of a protein can be uploaded for MSA.</span>
-        <div class="toolbar-group toolbar-group-input">
-            <button type="button" class="tb-btn tb-btn-primary" onclick="document.getElementById('structureUpload').click()">
-                <svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                Attach Structure(s) or JSON
-            </button>
-            <button type="button" class="tb-btn tb-btn-primary" onclick="handlePasteFromClipboard()">
-                <svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
-                Paste Quick2D from Clipboard
-            </button>
-            <button type="button" class="tb-btn tb-btn-secondary" onclick="loadSampleData()">Load Sample Data</button>
-            <button type="button" id="btnToggleDrawer" class="tb-btn tb-btn-text"
-                aria-expanded="false" aria-controls="rawInputDrawer" onclick="toggleRawInputDrawer()">
-                Show raw text ▾
-            </button>
-            <button type="button" id="btnHideImport" class="tb-btn tb-btn-secondary" onclick="toggleImportGroup()"
-                title="Hide the import controls until needed (shown again via the Import button in the sidebar)">
-                Hide Import
-            </button>
-        </div>
-    </div>
+    <div class="modal-overlay" id="inputDataModal" role="dialog" aria-modal="true" aria-labelledby="inputDataModalTitle">
+        <div class="modal-content" style="width: 640px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                <h3 id="inputDataModalTitle" style="margin: 0; color: #0f172a;">Input Data</h3>
+                <button onclick="closeInputDataModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+            </div>
 
-    <div id="rawInputDrawer" class="raw-input-drawer" hidden>
-        <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..." aria-label="Raw Quick2D text input"></textarea>
-        <div class="drawer-actions">
-            <button type="button" class="tb-btn tb-btn-primary" onclick="confirmDrawerParse()">Confirm &amp; Parse</button>
-            <button type="button" class="tb-btn tb-btn-secondary" onclick="cancelRawInputDrawer()">Cancel</button>
+            <div style="margin-top: 16px;">
+                <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Import</h4>
+                <div class="toolbar-group toolbar-group-input" style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button type="button" class="tb-btn tb-btn-primary" onclick="document.getElementById('structureUpload').click()">
+                        Attach Structure(s) or JSON
+                    </button>
+                    <button type="button" class="tb-btn tb-btn-primary" onclick="handlePasteFromClipboard()">
+                        Paste Quick2D
+                    </button>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="loadSampleData()">Load Sample Data</button>
+                    <button type="button" id="btnToggleDrawer" class="tb-btn tb-btn-text"
+                        aria-expanded="false" aria-controls="rawInputDrawer" onclick="toggleRawInputDrawer()">
+                        Show raw text ▾
+                    </button>
+                </div>
+                <div id="rawInputDrawer" class="raw-input-drawer" hidden style="margin-top: 8px;">
+                    <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..." aria-label="Raw Quick2D text input"></textarea>
+                    <div class="drawer-actions">
+                        <button type="button" class="tb-btn tb-btn-primary" onclick="confirmDrawerParse()">Confirm &amp; Parse</button>
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="cancelRawInputDrawer()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <h4 style="margin:0; color: #0f172a; font-size: 0.95rem;">Loaded Data</h4>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="autoLookupAccession()"
+                        style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
+                </div>
+                <div id="inputDataSummary" class="data-box" style="font-size:0.78rem; white-space:pre-wrap; line-height:1.5;">No data loaded yet.</div>
+            </div>
+
+            <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
+                <h4 style="margin: 0 0 4px; color: #0f172a; font-size: 0.95rem;">Characterization Workflow</h4>
+                <p style="font-size: 0.78rem; color: #64748b; margin: 0 0 8px; line-height: 1.4;">
+                    Suggested steps for characterizing a protein, checked off as you load the corresponding data.
+                </p>
+                <div id="workflowChecklist"></div>
+            </div>
         </div>
     </div>
 
@@ -1802,9 +1821,9 @@
                 <label class="graph-toggle" title="Render all RSA tracks as an overlaid graph instead of heatmap rows">
                     <input type="checkbox" id="graphRsaCheck" onchange="onGraphModeChange()"> RSA
                 </label>
-                <button type="button" id="btnShowImport" class="tb-btn tb-btn-primary btn-show-import" onclick="toggleImportGroup()"
-                    title="Show the import controls (Attach, Paste Quick2D, Load Sample, show raw text)">
-                    Import
+                <button type="button" id="btnShowImport" class="tb-btn tb-btn-primary btn-show-import" onclick="openInputDataModal()"
+                    title="Open the Input Data panel (import, loaded-data summary, and characterization workflow)">
+                    Input Data
                 </button>
             </div>
 
@@ -3028,6 +3047,77 @@ function toggleRawInputDrawer() {
 function toggleImportGroup() {
     document.body.classList.toggle('import-collapsed');
     schedulePersist();
+}
+
+// --- Input Data panel -----------------------------------------------------
+// The unified import + data summary + characterization workflow checklist,
+// replacing the old always-visible top import toolbar.
+const WORKFLOW_STEPS = [
+    { title: 'Load sequence', desc: 'Paste Quick2D output or attach a FASTA/sequence.', check: () => !!parsedTracks.AA },
+    { title: 'SS / disorder / TM predictions', desc: 'Quick2D secondary structure, disorder, and transmembrane tracks.', check: () => Object.keys(parsedTracks).some(k => /^(SS_|TM_|DO_|CC_|SP_)/.test(k)) },
+    { title: 'Homologs (HHpred)', desc: 'Run HHpred (toolkit.tuebingen.mpg.de) and attach the .hhr for homolog tracks + templates.', check: () => Object.keys(parsedTracks).some(k => k.startsWith('HH_')) },
+    { title: 'Structural models', desc: 'Attach AlphaFold/PDB/CIF for pLDDT, RSA, cofactors, and 3D.', check: () => (uploadedStructureFiles && uploadedStructureFiles.length > 0) || Object.keys(parsedTracks).some(k => k.endsWith('_pLDDT') || k.endsWith('_RSA')) },
+    { title: 'Conservation', desc: 'Attach a variant FASTA (or homologs) to compute per-residue conservation.', check: () => !!parsedTracks.CONSERVATION },
+    { title: 'Curated annotations', desc: 'Domains, PTMs, variants, and topology from UniProt.', check: () => !!uniprotFeatures },
+    { title: 'Membrane topology', desc: 'Paste TMHMM/Phobius/DeepTMHMM for a consensus topology bar.', check: () => topologySources.length > 0 },
+    { title: '3D visualization', desc: 'Generate ChimeraX/PyMOL/VMD commands for a selection.', check: () => false }
+];
+
+function renderInputDataModal() {
+    const sum = document.getElementById('inputDataSummary');
+    if (sum) {
+        if (!parsedTracks.AA) {
+            sum.textContent = 'No data loaded yet. Paste Quick2D output or attach files above.';
+        } else {
+            const count = (p) => Object.keys(parsedTracks).filter(k => p(k)).length;
+            const lines = ['Sequence length: ' + parsedTracks.AA.length + ' aa' + (currentProteinLabel ? ' · ' + currentProteinLabel : '')];
+            if (count(k => k.startsWith('SS_'))) lines.push('Secondary structure: ' + count(k => k.startsWith('SS_')) + ' track(s)');
+            if (count(k => k.startsWith('TM_'))) lines.push('Transmembrane: ' + count(k => k.startsWith('TM_')) + ' track(s)');
+            if (count(k => k.startsWith('DO_'))) lines.push('Disorder: ' + count(k => k.startsWith('DO_')) + ' track(s)');
+            if (count(k => k.startsWith('HH_'))) lines.push('Homologs: ' + count(k => k.startsWith('HH_')) + ' hit(s)');
+            if (count(k => k.startsWith('VAR_'))) lines.push('Variants: ' + count(k => k.startsWith('VAR_')) + ' sequence(s)');
+            const nStr = count(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
+            if (nStr) lines.push('Structural models: ' + nStr + ' track(s)');
+            if (uniprotFeatures) lines.push('UniProt: ' + uniprotFeatures.accession);
+            if (topologySources.length) lines.push('Topology: ' + topologySources.length + ' source(s)');
+            sum.textContent = lines.join('\n');
+        }
+    }
+    const wl = document.getElementById('workflowChecklist');
+    if (wl) {
+        let html = '';
+        WORKFLOW_STEPS.forEach(s => {
+            const done = s.check();
+            html += '<div style="display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:0.78rem;">' +
+                '<span style="flex-shrink:0; width:16px; text-align:center; color:' + (done ? '#15803d' : '#cbd5e1') + '; font-weight:700;">' + (done ? '✓' : '○') + '</span>' +
+                '<span><strong style="color:' + (done ? '#334155' : '#64748b') + ';">' + s.title + '</strong> — ' + s.desc + '</span></div>';
+        });
+        wl.innerHTML = html;
+    }
+}
+function openInputDataModal() {
+    renderInputDataModal();
+    openModalAsDialog('inputDataModal');
+}
+function closeInputDataModal() {
+    closeModalAsDialog('inputDataModal');
+}
+// Quick "identify my protein" shortcut: re-fetch a known accession, or jump to
+// Options > Data Sources with the protein ID pre-filled for the UniProt Search.
+function autoLookupAccession() {
+    if (uniprotAccession) {
+        closeInputDataModal();
+        useUniProtAccession(uniprotAccession);
+        return;
+    }
+    closeInputDataModal();
+    openOptionsModal();
+    switchOptionsTab('data');
+    if (currentProteinLabel) {
+        const inp = document.getElementById('uniprotSearchInput');
+        if (inp) inp.value = currentProteinLabel;
+    }
+    showToast('Use "Search" (name/gene/organism) or "Sequence (BLAST)" to find the UniProt accession.', 'info');
 }
 
 // --- Collapsible legend (T4) ----------------------------------------------
