@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-23
+
+### Changed (UI restructure, Level A)
+
+- **Legend** is now a floating, click-through overlay in the viewer (with a
+  reactive per-residue hover tooltip showing track name, color, and annotation).
+- **Options** modal split into tabs: Appearance / Data Sources / Workflow / Storage.
+- **Tool buttons** (Options/Data/Help/3D/Export) moved to a slim app-header toolbar.
+- **Per-type graph view**: pLDDT and RSA each have their own graph/heatmap toggle
+  (replaces the global Heatmap/Graph mode).
+- **Unified Input Data panel** (replaces the import toolbar): import, a loaded-data
+  summary, an auto-lookup shortcut, and a characterization workflow checklist.
+- **External Workflow** section in the sidebar (collapsible) now holds the
+  ChimeraX/PyMOL/VMD command generator.
+
 ## [0.7.0] - 2026-09-23
 
 ### Added

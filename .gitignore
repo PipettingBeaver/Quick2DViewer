@@ -3,3 +3,6 @@ POTENTIAL_CHANGES.md
 
 # Bulky TerC structure/model data (CIF/PDB/save files) — excluded from the repo
 TerC/
+
+# Local UI backups — not part of the public repo
+backups/

@@ -98,6 +98,13 @@
             white-space: nowrap;
         }
         .graph-toggle input { width: auto; margin: 0; }
+        /* Collapsible "External Workflow" section in the sidebar (command generator). */
+        .workflow-section { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; background: #f8fafc; }
+        .workflow-section summary { cursor: pointer; font-size: 0.85rem; font-weight: 700; color: #0f172a; list-style: none; user-select: none; }
+        .workflow-section summary::-webkit-details-marker { display: none; }
+        .workflow-section summary::after { content: ' ▾'; color: #94a3b8; font-size: 0.7rem; }
+        .workflow-section:not([open]) summary::after { content: ' ▸'; }
+        .workflow-section[open] summary { margin-bottom: 8px; }
         #btnP3D.tb-btn-active { background: #2563eb; color: #fff; border-color: #1d4ed8; }
         /* Floating 3D structure viewer (Py3Dmol) */
         .p3d-viewer {
@@ -1954,6 +1961,8 @@
                 <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a region or graph point for statistics.</div>
             </div>
 
+            <details class="workflow-section">
+                <summary>External Workflow</summary>
             <div>
                 <strong id="cmdTargetLabel">ChimeraX Target:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
                     <strong>Command Target</strong><br>
@@ -1996,6 +2005,7 @@
             <div style="font-size: 0.72rem; color: #94a3b8; margin-top: -8px;">
                 Change engine (ChimeraX / PyMOL / VMD) in <a href="#" onclick="openOptionsModal(); return false;" style="color: #2563eb;">Options</a>.
             </div>
+            </details>
         </div>
     </div>
 </div>
@@ -3565,7 +3575,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.8.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
