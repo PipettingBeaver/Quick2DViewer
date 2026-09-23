@@ -361,14 +361,22 @@
         .legend {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 10px 15px;
-            margin: 15px 0;
-            padding: 10px;
-            background: #f1f5f9;
-            border-radius: 6px;
-            font-size: 0.85rem;
+            gap: 8px 15px;
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+            z-index: 850;
+            max-width: 640px;
+            padding: 10px 12px;
+            background: rgba(248, 250, 252, 0.94);
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+            font-size: 0.82rem;
             align-items: center;
+            pointer-events: none; /* click-through: floats over the viewer without blocking it */
         }
+        .legend .info-icon { pointer-events: auto; }
         .legend[hidden] { display: none; }
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .legend-item .info-icon { margin-left: 2px; }
@@ -3362,6 +3370,51 @@ document.addEventListener('click', (e) => {
     } else if (!e.target.closest('#globalTooltip')) {
         hideTooltip();
     }
+});
+
+// --- Reactive residue-cell tooltip --------------------------------------
+// Cells already carry rich `title` text, but the native tooltip is slow and
+// unstyled. On hover we show that text in the shared #globalTooltip (with the
+// track name + the cell's own color swatch) and suppress the native title for
+// the duration so only one tooltip appears. The tooltip is click-through.
+function showCellTooltip(cell, clientX, clientY) {
+    const tooltipEl = document.getElementById('globalTooltip');
+    if (!tooltipEl || pinnedIcon) return;
+    let title = cell.getAttribute('title');
+    if (title == null && cell.dataset.origTitle) title = cell.dataset.origTitle;
+    if (!title) return;
+    if (!cell.dataset.origTitle) { cell.dataset.origTitle = title; cell.removeAttribute('title'); }
+    const bg = getComputedStyle(cell).backgroundColor;
+    const swatch = (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
+        ? '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + bg + ';border:1px solid rgba(0,0,0,0.25);margin-right:6px;vertical-align:middle;"></span>'
+        : '';
+    const track = cell.dataset.track ? '<strong>' + structureEscapeHtml(formatTrackLabel(cell.dataset.track)) + '</strong><br>' : '';
+    tooltipEl.innerHTML = swatch + track + structureEscapeHtml(title).replace(/\n/g, '<br>');
+    tooltipEl.classList.remove('wide', 'pinned');
+    tooltipEl.style.display = 'block';
+    tooltipEl.style.transform = 'none';
+    tooltipEl.style.pointerEvents = 'none';
+    const w = tooltipEl.offsetWidth || 240, h = tooltipEl.offsetHeight || 80;
+    let left = clientX + 14, top = clientY + 14;
+    if (left + w > window.innerWidth - 10) left = clientX - w - 14;
+    if (top + h > window.innerHeight - 10) top = clientY - h - 14;
+    tooltipEl.style.left = Math.max(10, left) + 'px';
+    tooltipEl.style.top = Math.max(10, top) + 'px';
+}
+function restoreCellTitle(cell) {
+    if (cell && cell.dataset.origTitle) { cell.setAttribute('title', cell.dataset.origTitle); delete cell.dataset.origTitle; }
+}
+document.addEventListener('mouseover', (e) => {
+    if (pinnedIcon) return;
+    const cell = e.target.closest ? e.target.closest('.cell, .position-cell') : null;
+    if (cell) showCellTooltip(cell, e.clientX, e.clientY);
+});
+document.addEventListener('mouseout', (e) => {
+    const cell = e.target.closest ? e.target.closest('.cell, .position-cell') : null;
+    if (!cell) return;
+    if (e.relatedTarget && cell.contains(e.relatedTarget)) return;
+    restoreCellTitle(cell);
+    hideTooltip();
 });
 
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
