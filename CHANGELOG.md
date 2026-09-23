@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-09-23
+
+### Fixed
+
+- Removed the redundant "Input Data" button from the sidebar toolbar (the same
+  panel is reachable from File → Input Data).
+- Workflow checklist / summary now refresh from both upload-handler paths
+  (structure batch and save-only), so they update live during a batch import.
+
 ## [0.9.1] - 2026-09-23
 
 ### Fixed
