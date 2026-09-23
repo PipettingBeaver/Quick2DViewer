@@ -470,7 +470,9 @@
             align-items: center;
             height: 24px;
         }
-        .track-row:hover { background-color: #f8fafc; }
+        .track-row:hover { background-color: #f1f5f9; }
+        /* Subtle separator between track types (inset shadow = layout-neutral). */
+        .track-row.track-group-first { box-shadow: inset 0 1px 0 #e2e8f0; }
         /* Pinned top block: residue-position markers + the AA sequence line.
            The whole block sticks to the top of the viewer's scroll container
            so the sequence stays visible while scrolling vertically through the
@@ -539,8 +541,9 @@
             z-index: 10;
             cursor: pointer;
             user-select: none;
+            transition: background 0.12s ease, color 0.12s ease;
         }
-        .track-label:hover { background: #e2e8f0; }
+        .track-label:hover { background: #eef2f7; }
         .track-label.active-row { background: #2563eb; color: #fff; }
         .track-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
         .type-badges { display: flex; gap: 3px; margin-left: 6px; flex-shrink: 0; }
@@ -1158,6 +1161,10 @@
             background: #f8fafc;
         }
         .info-icon:hover, .info-icon:focus { color: #2563eb; background: #eff6ff; border-color: #93c5fd; outline: none; }
+        /* Row-label info icons read lighter than the legend/sidebar ones: just
+           the glyph until the row is hovered. */
+        .track-label .info-icon { background: transparent; border-color: transparent; color: #94a3b8; }
+        .track-label:hover .info-icon { border-color: #cbd5e1; background: #fff; color: #64748b; }
         .track-label.active-row .info-icon { color: rgba(255,255,255,0.85); background: transparent; border-color: rgba(255,255,255,0.5); }
         .track-label.active-row .info-icon:hover { color: #fff; }
         /* Real tooltip content lives here as a hidden template; it's cloned
@@ -1218,25 +1225,28 @@
             align-items: center;
             justify-content: center;
             position: absolute;
-            left: 5px;
+            left: 3px;
             top: 50%;
             transform: translateY(-50%);
-            width: 15px;
-            height: 15px;
+            width: 17px;
+            height: 17px;
             flex-shrink: 0;
-            border-radius: 3px;
-            font-size: 0.58rem;
+            border-radius: 4px;
+            font-size: 0.55rem;
             font-weight: bold;
             line-height: 1;
             cursor: pointer;
-            background: #e2e8f0;
-            color: #334155;
-            border: 1px solid rgba(0,0,0,0.15);
+            background: transparent;
+            color: #94a3b8;
+            border: none;
             user-select: none;
+            transition: background 0.12s ease, color 0.12s ease;
         }
-        .tctl-chevron:hover { background: #cbd5e1; }
-        .tctl-chevron.state-on { background: #2563eb; color: #fff; border-color: #2563eb; }
-        .track-label.active-row .tctl-chevron { background: rgba(255,255,255,0.85); }
+        .track-label:hover .tctl-chevron { color: #475569; }
+        .tctl-chevron:hover { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+        .tctl-chevron.state-on { color: #2563eb; }
+        .track-label.active-row .tctl-chevron { color: rgba(255,255,255,0.9); }
+        .track-label.active-row .tctl-chevron:hover { background: rgba(255,255,255,0.2); color: #fff; }
 
         /* Track Control button in the residue-position row (above AA). */
         .tctl-marker-btn {
@@ -4122,7 +4132,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.13.0';
+const APP_VERSION = '0.13.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -7015,7 +7025,7 @@ function buildPositionMarkerRow(totalLength) {
 // only, rendered above the overlaid graphs for visual cross-reference).
 function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     const rowEl = document.createElement('div');
-    rowEl.className = 'track-row';
+    rowEl.className = 'track-row' + (isGroupFirst ? ' track-group-first' : '');
 
     const labelEl = document.createElement('div');
     labelEl.className = 'track-label';

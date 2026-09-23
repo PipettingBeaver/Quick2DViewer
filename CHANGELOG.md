@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-23
+
+### Changed (UI polish)
+
+- **Track-row / sidebar cleanup.** The per-type `tctl-chevron` is now a ghost caret
+  (no heavy box or border): muted by default, darkens on row hover, blue accent when
+  the type's view is non-default (`state-on`), and white on the active row. Row labels
+  and info icons are lighter (the ⓘ shows just the glyph until the row is hovered),
+  rows get subtler hover tints + transitions, and a layout-neutral separator line marks
+  the first row of each track type.
+
 ## [0.13.0] - 2026-09-23
 
 ### Added
