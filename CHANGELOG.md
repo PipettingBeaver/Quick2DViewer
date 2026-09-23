@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-23
+
+### Changed
+
+- UniProt load status now reports a per-type breakdown (e.g. "9 Transmembrane")
+  instead of just "9 features".
+
 ## [0.6.0] - 2026-09-22
 
 ### Added

@@ -2490,6 +2490,17 @@ function parseUniProtFeaturesEBI(data) {
     return out;
 }
 
+// Human-readable breakdown of a feature list for the status line, e.g.
+// "9 Transmembrane" or "2 Transmembrane, 1 Signal, 3 Disulfide bond".
+function summarizeUniProtFeatures(features) {
+    const counts = {};
+    (features || []).forEach(f => { counts[f.type] = (counts[f.type] || 0) + 1; });
+    return Object.keys(counts)
+        .sort((a, b) => counts[b] - counts[a])
+        .map(t => counts[t] + ' ' + t)
+        .join(', ') || '0 features';
+}
+
 async function fetchUniProtFeaturesByAccession(acc) {
     setUniProtStatus('Fetching ' + acc + ' from UniProt…');
     const encoded = encodeURIComponent(acc);
@@ -2509,9 +2520,10 @@ async function fetchUniProtFeaturesByAccession(acc) {
             uniprotLog(ep.url + ' -> HTTP ' + resp.status);
             if (!resp.ok) { lastError = new Error('HTTP ' + resp.status); continue; }
             const features = ep.parse(await resp.json());
-            uniprotLog('parsed ' + features.length + ' features');
+            const summary = summarizeUniProtFeatures(features);
+            uniprotLog('parsed ' + features.length + ' features: ' + summary);
             if (!features.length) { lastError = new Error('no residue-level features'); continue; }
-            setUniProtStatus('Loaded ' + features.length + ' features from ' + acc + ep.label + '.');
+            setUniProtStatus('Loaded ' + acc + ep.label + ': ' + summary);
             return features;
         } catch (err) { uniprotLog(ep.url + ' threw: ' + (err && err.message ? err.message : err)); lastError = err; }
     }
@@ -3223,7 +3235,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
