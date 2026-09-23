@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-22
+
+### Added
+
+- UniProt annotation offload gains a **Search** lookup mode: find an accession by
+  gene / protein / organism name (via the EBI Proteins API, fast) and pick one
+  from the results to load its annotations — no need to know the accession or
+  run a slow BLAST.
+
 ## [0.5.7] - 2026-09-22
 
 ### Fixed

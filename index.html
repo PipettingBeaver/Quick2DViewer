@@ -2033,17 +2033,33 @@
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Annotation Offload (UniProt)</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Pull curated residue-level annotations (domains, topology, active/binding sites, PTMs, variants) from UniProt and show them as rows in the viewer.<br><br>
-                <strong>Accession</strong> looks up a known UniProt accession directly. <strong>Sequence</strong> resolves the current sequence to an accession via BLAST first (this can take a minute or two — progress is shown below). Fetching requires a network connection and nothing is uploaded except the requested sequence/accession.
+                <strong>Accession</strong> looks up a known UniProt accession directly. <strong>Search</strong> finds an accession by gene, protein, or organism name first (fast). <strong>Sequence</strong> resolves the current sequence to an accession via BLAST (slow, ~5 min). Fetching requires a network connection and nothing is uploaded except the requested term/sequence/accession.
             </p>
             <label for="uniprotModeSelect" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">Lookup Mode</label>
             <select id="uniprotModeSelect" onchange="onUniprotModeChange()" class="q2dv-select"
                 style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
                 <option value="accession">Accession</option>
+                <option value="search">Search (name / gene / organism)</option>
                 <option value="sequence">Sequence (BLAST)</option>
             </select>
-            <label for="uniprotAccessionInput" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin:12px 0 4px;">UniProt Accession</label>
-            <input type="text" id="uniprotAccessionInput" oninput="onUniprotAccessionInput()" placeholder="e.g. P0ABE7"
-                style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            <div id="uniprotAccessionWrap" style="margin-top: 12px;">
+                <label for="uniprotAccessionInput" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">UniProt Accession</label>
+                <input type="text" id="uniprotAccessionInput" oninput="onUniprotAccessionInput()" placeholder="e.g. P0ABE7"
+                    style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <div id="uniprotSearchControls" style="display:none; margin-top: 12px;">
+                <label for="uniprotSearchField" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">Search Field</label>
+                <select id="uniprotSearchField" class="q2dv-select"
+                    style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    <option value="gene">Gene name</option>
+                    <option value="protein">Protein name</option>
+                    <option value="organism">Organism</option>
+                </select>
+                <label for="uniprotSearchInput" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin:10px 0 4px;">Search Term</label>
+                <input type="text" id="uniprotSearchInput" placeholder="e.g. terC or tellurium or Escherichia coli"
+                    style="width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <div id="uniprotSearchResults" style="margin-top: 8px;"></div>
+            </div>
             <button onclick="fetchUniProtAnnotations()" style="margin-top: 12px;">⬇ Fetch Annotations</button>
             <span style="font-size: 0.72rem; color: #94a3b8; margin-left: 8px;" id="uniprotAnnotationStatus"></span>
             <div style="margin-top: 12px;">
@@ -2586,24 +2602,88 @@ async function resolveAccessionFromSequence(seq) {
 
 // Main dispatcher for the Options "Fetch annotations" button, honoring the
 // selected mode. On success stores + renders the feature tracks.
-async function fetchUniProtAnnotations() {
-    uniprotLogEntries.length = 0;
-    uniprotLog('Annotation fetch started (mode ' + uniprotAnnotationMode + ')');
-    let acc;
-    if (uniprotAnnotationMode === 'sequence') {
-        const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
-        if (!seq) { showToast('Load a sequence first, then try Sequence mode.', 'error'); return; }
-        acc = await resolveAccessionFromSequence(seq);
-        if (!acc) return;
-    } else {
-        acc = ((document.getElementById('uniprotAccessionInput') || {}).value || '').trim();
-        if (!acc) { showToast('Enter a UniProt accession first.', 'error'); return; }
-    }
+// Fetches features for a specific accession and applies them as tracks. Shared
+// by the Accession mode, the Sequence mode's resolved accession, and a picked
+// Search result.
+async function useUniProtAccession(acc) {
+    uniprotLog('using accession ' + acc);
     const features = await fetchUniProtFeaturesByAccession(acc);
     if (!features) return;
     uniprotAccession = acc;
     uniprotFeatures = { accession: acc, features, fetchedAt: Date.now() };
     applyUniProtFeatures();
+    schedulePersist();
+}
+
+// Text search against the EBI Proteins API (gene / protein / organism name) to
+// find candidate accessions. Returns [{accession, name, gene, organism, protein}]
+// or null on a network failure, or [] when there are no matches.
+async function uniprotSearchEntries(field, query) {
+    const url = 'https://www.ebi.ac.uk/proteins/api/proteins?' + new URLSearchParams({ size: '20', [field]: query }).toString();
+    uniprotLog('search: ' + url);
+    try {
+        const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!resp.ok) { uniprotLog('search -> HTTP ' + resp.status); return null; }
+        const list = await resp.json();
+        if (!Array.isArray(list)) { uniprotLog('search -> unexpected payload'); return null; }
+        return list.map(p => {
+            const gene = (p.gene && p.gene[0] && p.gene[0].name) ? p.gene[0].name.value : '';
+            const organism = (p.organism && p.organism.names && p.organism.names[0]) ? p.organism.names[0].value : '';
+            const protein = (p.protein && p.protein.recommendedName && p.protein.recommendedName.fullName) ? p.protein.recommendedName.fullName.value : '';
+            return { accession: p.accession, name: p.name || '', gene, organism, protein };
+        });
+    } catch (err) {
+        uniprotLog('search threw: ' + (err && err.message ? err.message : err));
+        return null;
+    }
+}
+
+// Renders clickable search results; clicking one fetches its annotations.
+function renderUniProtSearchResults(results, query) {
+    const wrap = document.getElementById('uniprotSearchResults');
+    if (!wrap) return;
+    if (results === null) {
+        wrap.innerHTML = '<p style="color:#b91c1c; font-size:0.78rem;">Search failed (network).</p>';
+        setUniProtStatus('Search failed');
+        return;
+    }
+    if (!results.length) {
+        wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.78rem;">No matches for "' + structureEscapeHtml(query) + '".</p>';
+        setUniProtStatus('No matches');
+        return;
+    }
+    setUniProtStatus('Found ' + results.length + ' match(es) — pick one to load its annotations.');
+    let html = '<div style="display:flex; flex-direction:column; gap:4px;">';
+    results.forEach(r => {
+        const detail = [r.protein, r.gene ? 'gene ' + r.gene : '', r.organism].filter(Boolean).join(' · ');
+        html += '<button type="button" class="copy-btn" data-acc="' + structureEscapeHtml(r.accession) + '" onclick="useUniProtAccession(this.dataset.acc)" ' +
+            'title="' + structureEscapeHtml(detail) + '" style="text-align:left; font-size:0.75rem; padding:5px 8px;">' +
+            '<strong>' + structureEscapeHtml(r.accession) + '</strong> — ' + structureEscapeHtml(detail) + '</button>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+}
+
+async function fetchUniProtAnnotations() {
+    uniprotLogEntries.length = 0;
+    uniprotLog('Annotation fetch started (mode ' + uniprotAnnotationMode + ')');
+    if (uniprotAnnotationMode === 'sequence') {
+        const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+        if (!seq) { showToast('Load a sequence first, then try Sequence mode.', 'error'); return; }
+        const acc = await resolveAccessionFromSequence(seq);
+        if (!acc) return;
+        await useUniProtAccession(acc);
+    } else if (uniprotAnnotationMode === 'search') {
+        const field = (document.getElementById('uniprotSearchField') || {}).value || 'gene';
+        const q = ((document.getElementById('uniprotSearchInput') || {}).value || '').trim();
+        if (!q) { showToast('Enter a search term first.', 'error'); return; }
+        const results = await uniprotSearchEntries(field, q);
+        renderUniProtSearchResults(results, q);
+    } else {
+        const acc = ((document.getElementById('uniprotAccessionInput') || {}).value || '').trim();
+        if (!acc) { showToast('Enter a UniProt accession first.', 'error'); return; }
+        await useUniProtAccession(acc);
+    }
 }
 
 // Builds the UP_ string tracks from the fetched features and re-renders. Each
@@ -2647,17 +2727,18 @@ function syncUniProtOptionControls() {
     updateUniProtModeVisibility();
 }
 function updateUniProtModeVisibility() {
-    const accEl = document.getElementById('uniprotAccessionInput');
     const modeEl = document.getElementById('uniprotModeSelect');
-    if (!accEl || !modeEl) return;
-    const isAccession = modeEl.value !== 'sequence';
-    accEl.style.display = isAccession ? '' : 'none';
-    accEl.labels && [].forEach.call(accEl.labels, l => { l.style.display = isAccession ? '' : 'none'; });
+    const accWrap = document.getElementById('uniprotAccessionWrap');
+    const searchCtl = document.getElementById('uniprotSearchControls');
+    if (!modeEl) return;
+    const mode = modeEl.value;
+    if (accWrap) accWrap.style.display = (mode === 'accession') ? '' : 'none';
+    if (searchCtl) searchCtl.style.display = (mode === 'search') ? '' : 'none';
 }
 function onUniprotModeChange() {
     const el = document.getElementById('uniprotModeSelect');
     if (!el) return;
-    uniprotAnnotationMode = el.value === 'sequence' ? 'sequence' : 'accession';
+    uniprotAnnotationMode = (el.value === 'sequence' || el.value === 'search') ? el.value : 'accession';
     updateUniProtModeVisibility();
     schedulePersist();
 }
@@ -3142,7 +3223,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.5.7';
+const APP_VERSION = '0.6.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9924,7 +10005,7 @@ function applyPersistedState(state) {
 
     const prefs = state.preferences || {};
     applyConservationSettings(prefs);
-    uniprotAnnotationMode = (prefs.uniprotAnnotationMode === 'sequence') ? 'sequence' : 'accession';
+    uniprotAnnotationMode = (prefs.uniprotAnnotationMode === 'sequence' || prefs.uniprotAnnotationMode === 'search') ? prefs.uniprotAnnotationMode : 'accession';
     uniprotAccession = (typeof prefs.uniprotAccession === 'string') ? prefs.uniprotAccession : '';
     currentViewMode = prefs.currentViewMode || 'grid';
     document.getElementById('viewModeSelect').value = currentViewMode;
