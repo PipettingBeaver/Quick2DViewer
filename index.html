@@ -2528,7 +2528,7 @@ let uploadedStructureFiles = []; // [{name, ext, size}] - metadata only, see not
 // summary stats) - keyed by the track key (e.g. "HH_01_9UMG_F"), used to
 // build that row's info tooltip on demand since each hit's info is unique
 // (unlike PLDDT/RSA/COFACTOR, which share one static tooltip per metric).
-let hhpredHitsInfo = {};
+let homologHitsInfo = {};
 // Variant FASTA alignment rows. After import each sequence is aligned to the
 // AA reference (verbatim when already reference-length in 'aligned' mode,
 // otherwise Needleman-Wunsch/BLOSUM62) and stored as an aligned string with
@@ -3150,7 +3150,7 @@ function toggleRawInputDrawer() {
 const WORKFLOW_STEPS = [
     { title: 'Load sequence', desc: 'Paste Quick2D output or attach a FASTA/sequence.', check: () => !!parsedTracks.AA },
     { title: 'SS / disorder / TM predictions', desc: 'Quick2D secondary structure, disorder, and transmembrane tracks.', check: () => Object.keys(parsedTracks).some(k => /^(SS_|TM_|DO_|CC_|SP_)/.test(k)) },
-    { title: 'Homologs (HHpred)', desc: 'Run HHpred (toolkit.tuebingen.mpg.de) and attach the .hhr for homolog tracks + templates.', check: () => Object.keys(parsedTracks).some(k => k.startsWith('HH_')) },
+    { title: 'Homologs (HHpred)', desc: 'Run HHpred (toolkit.tuebingen.mpg.de) and attach the .hhr for homolog tracks + templates.', check: () => Object.keys(parsedTracks).some(k => k.startsWith('HL_')) },
     { title: 'Structural models', desc: 'Attach AlphaFold/PDB/CIF for pLDDT, RSA, cofactors, and 3D.', check: () => (uploadedStructureFiles && uploadedStructureFiles.length > 0) || Object.keys(parsedTracks).some(k => k.endsWith('_pLDDT') || k.endsWith('_RSA')) },
     { title: 'Conservation', desc: 'Attach a variant FASTA (or homologs) to compute per-residue conservation.', check: () => !!parsedTracks.CONSERVATION },
     { title: 'Curated annotations', desc: 'Domains, PTMs, variants, and topology from UniProt.', check: () => !!uniprotFeatures },
@@ -3169,7 +3169,7 @@ function renderInputDataModal() {
             if (count(k => k.startsWith('SS_'))) lines.push('Secondary structure: ' + count(k => k.startsWith('SS_')) + ' track(s)');
             if (count(k => k.startsWith('TM_'))) lines.push('Transmembrane: ' + count(k => k.startsWith('TM_')) + ' track(s)');
             if (count(k => k.startsWith('DO_'))) lines.push('Disorder: ' + count(k => k.startsWith('DO_')) + ' track(s)');
-            if (count(k => k.startsWith('HH_'))) lines.push('Homologs: ' + count(k => k.startsWith('HH_')) + ' hit(s)');
+            if (count(k => k.startsWith('HL_'))) lines.push('Homologs: ' + count(k => k.startsWith('HL_')) + ' hit(s)');
             if (count(k => k.startsWith('VAR_'))) lines.push('Variants: ' + count(k => k.startsWith('VAR_')) + ' sequence(s)');
             const nStr = count(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
             if (nStr) lines.push('Structural models: ' + nStr + ' track(s)');
@@ -3618,7 +3618,7 @@ function getPredictorInfo(trackKey) {
     if (trackKey.endsWith('_pLDDT')) return PREDICTOR_INFO.PLDDT;
     if (trackKey.endsWith('_RSA')) return PREDICTOR_INFO.RSA;
     if (trackKey.endsWith('_Cofactors')) return PREDICTOR_INFO.COFACTOR;
-    if (trackKey.startsWith('HH_')) return buildHomologPredictorInfo(trackKey);
+    if (trackKey.startsWith('HL_')) return buildHomologPredictorInfo(trackKey);
     // Variant and conservation rows are not structure predictors: suppress the
     // synthesized fallback so their "Structural Prediction" ℹ tooltip is never
     // shown - those rows build their own tooltips (FASTA header/conservation).
@@ -4276,7 +4276,7 @@ function tctlAfterChange() {
 
 // Short caption shown beside a type's Config gear describing what it controls.
 function groupConfigHint(g) {
-    if (g === 'HH') return 'Conservation';
+    if (g === 'HL') return 'Conservation';
     if (g === 'CONSERVATION') return 'Entropy/PID';
     if (g === 'pLDDT') return 'Cutoffs';
     return '';
@@ -4289,7 +4289,7 @@ function groupConfigHint(g) {
 function buildGroupViewSelect(g) {
     const sel = mkEl('select', 'tctl-view-select');
     const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
-    if (g === 'HH') opts.push(['aa', 'AA']);
+    if (g === 'HL') opts.push(['aa', 'AA']);
     opts.push(['hidden', 'Hidden']);
     opts.forEach(([v, t]) => {
         const o = document.createElement('option');
@@ -4317,7 +4317,7 @@ function buildTrackViewSelect(key, g) {
     auto.title = 'Follow the type-group view';
     sel.appendChild(auto);
     const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
-    if (g === 'HH') opts.push(['aa', 'AA']);
+    if (g === 'HL') opts.push(['aa', 'AA']);
     opts.forEach(([v, t]) => {
         const o = document.createElement('option');
         o.value = v;
@@ -4517,7 +4517,7 @@ function buildConservationConfigFrame(withColors, title) {
         const colorLabel = mkEl('label', 'tctl-config-label tctl-config-row');
         const colorChk = document.createElement('input');
         colorChk.type = 'checkbox';
-        colorChk.checked = !!isTrackGroupConsColored('HH');
+        colorChk.checked = !!isTrackGroupConsColored('HL');
         colorLabel.appendChild(colorChk);
         colorLabel.appendChild(document.createTextNode('Recolor homolog AA letters by conservation score (Cons. colors)'));
         colorChk.addEventListener('change', () => {
@@ -4593,7 +4593,7 @@ function buildTctlConfigFrame(pop, g) {
     head.appendChild(mkEl('div', 'tctl-config-title', trackGroupLabel(g) + ' Config'));
     pop.appendChild(head);
 
-    if (g === 'HH') pop.appendChild(buildConservationConfigFrame(true, 'Conservation Scoring'));
+    if (g === 'HL') pop.appendChild(buildConservationConfigFrame(true, 'Conservation Scoring'));
     else if (g === 'CONSERVATION') pop.appendChild(buildConservationConfigFrame(false, 'Entropy / PID'));
     else if (g === 'pLDDT') pop.appendChild(buildPlddtConfigFrame());
     else pop.appendChild(buildPredictorInfoConfigFrame(g));
@@ -4636,7 +4636,7 @@ function buildTctlContent() {
         pop.appendChild(hideBtn);
 
         const symBtn = mkEl('button', 'tctl-btn' + (isGroupGlyphNonDefault(g) ? ' tctl-on' : ''), glyphButtonLabel(g));
-        symBtn.title = g === 'HH'
+        symBtn.title = g === 'HL'
             ? 'Cycle the letter style for this type: match-quality symbols → amino-acid sequence → none (the per-residue colors stay)'
             : 'Keep the per-residue colors but remove the letters/glyphs (or restore them)';
         symBtn.addEventListener('click', () => {
@@ -4646,7 +4646,7 @@ function buildTctlContent() {
         pop.appendChild(symBtn);
 
         const barBtn = mkEl('button', 'tctl-btn' + (isTrackGroupFullBar(g) ? ' tctl-on' : ''), isTrackGroupFullBar(g) ? 'Letters per column' : 'Full-bar (toggle type)');
-        barBtn.title = g === 'HH'
+        barBtn.title = g === 'HL'
             ? "Render every homolog as a solid bar with the hit's centered name (like HHpred's web view)"
             : 'Fill the row with per-residue colors and center the type label';
         barBtn.addEventListener('click', () => {
@@ -4660,8 +4660,8 @@ function buildTctlContent() {
         });
         pop.appendChild(barBtn);
 
-        if (g === 'HH') {
-            const consBtn = mkEl('button', 'tctl-btn' + (isTrackGroupConsColored('HH') ? ' tctl-on' : ''), isTrackGroupConsColored('HH') ? 'Cons. colors on' : 'Cons. colors off');
+        if (g === 'HL') {
+            const consBtn = mkEl('button', 'tctl-btn' + (isTrackGroupConsColored('HL') ? ' tctl-on' : ''), isTrackGroupConsColored('HL') ? 'Cons. colors on' : 'Cons. colors off');
             consBtn.title = "Recolor each homolog's amino-acid letters by the per-column conservation score (metric set under Options > Conservation Scoring) instead of the HHpred match-quality colors";
             consBtn.addEventListener('click', () => {
                 trackControlState.consColor[g] = !trackControlState.consColor[g];
@@ -4816,13 +4816,13 @@ function addTrackCtxRadios(menu, options, current, onPick) {
 
 function trackViewOptions(group) {
     const opts = [['', 'Auto (follow type)'], ['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
-    if (group === 'HH') opts.push(['aa', 'AA letters']);
+    if (group === 'HL') opts.push(['aa', 'AA letters']);
     return opts;
 }
 
 function groupViewOptions(group) {
     const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
-    if (group === 'HH') opts.push(['aa', 'AA letters']);
+    if (group === 'HL') opts.push(['aa', 'AA letters']);
     opts.push(['hidden', 'Hidden']);
     return opts;
 }
@@ -5129,8 +5129,8 @@ function formatTrackLabel(fullKey) {
     if (fullKey === 'AA' || fullKey.startsWith('SS_') || fullKey.startsWith('TM_') || fullKey.startsWith('DO_')) {
         return fullKey;
     }
-    if (fullKey.startsWith('HH_')) {
-        const m = fullKey.match(/^HH_(\d+)_(.+)$/);
+    if (fullKey.startsWith('HL_')) {
+        const m = fullKey.match(/^HL_(\d+)_(.+)$/);
         return m ? `Homolog #${parseInt(m[1], 10)}: ${m[2]}` : fullKey;
     }
     if (fullKey === 'CONSERVATION' || fullKey.startsWith('CONS_')) return 'Conservation';
@@ -5175,7 +5175,7 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('TM_')) return 2;
     if (key.startsWith('TP_')) return 3;
     if (key.startsWith('DO_')) return 4;
-    if (key.startsWith('HH_')) return 5;
+    if (key.startsWith('HL_')) return 5;
     if (key.startsWith('VAR_')) return 6;
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 7;
     if (key.startsWith('UP_')) return 8;
@@ -5862,7 +5862,7 @@ function buildHomologTrackString(hit, queryLength) {
 }
 
 function buildHomologPredictorInfo(trackKey) {
-    const hit = hhpredHitsInfo[trackKey];
+    const hit = homologHitsInfo[trackKey];
     if (!hit) return null;
     const s = hit.stats || {};
     const orgMatch = (hit.hitDesc || '').match(/\{[^}]*\}/);
@@ -6038,7 +6038,7 @@ function getConservationAlignedSequences() {
         if (v && typeof v.aligned === 'string') seqs.push(v.aligned);
     });
     if (conservationIncludeHHR && typeof getHomologAATrack === 'function') {
-        Object.keys(hhpredHitsInfo || {}).forEach(k => {
+        Object.keys(homologHitsInfo || {}).forEach(k => {
             const aa = getHomologAATrack(k);
             if (typeof aa === 'string' && aa.length) seqs.push(aa);
         });
@@ -6217,18 +6217,18 @@ function importHHpredFile(text, fileName) {
     // the highest existing HH_ key prefix, so it also skips any gaps.
     let startRank = 0;
     Object.keys(parsedTracks).forEach(k => {
-        const m = k.match(/^HH_(\d+)_/);
+        const m = k.match(/^HL_(\d+)_/);
         if (m) startRank = Math.max(startRank, parseInt(m[1], 10));
     });
 
     const hitsToImport = parsed.hits.slice(0, HH_HIT_CAP);
     hitsToImport.forEach((hit, i) => {
         const rank = startRank + i + 1;
-        const trackKey = `HH_${String(rank).padStart(2, '0')}_${hit.hitId}`;
+        const trackKey = `HL_${String(rank).padStart(2, '0')}_${hit.hitId}`;
         const built = buildHomologTrackString(hit, parsedTracks.AA.length);
         parsedTracks[trackKey] = built.track;
         graphHighlights[trackKey] = true;
-        hhpredHitsInfo[trackKey] = { rank, hitId: hit.hitId, hitDesc: hit.hitDesc, stats: hit.stats, aaTrack: built.aaTrack };
+        homologHitsInfo[trackKey] = { rank, hitId: hit.hitId, hitDesc: hit.hitDesc, stats: hit.stats, aaTrack: built.aaTrack, source: 'HHpred' };
     });
 
     if (parsed.hits.length > HH_HIT_CAP) {
@@ -6411,7 +6411,7 @@ const TRACK_GROUP_LABELS = {
     DO: 'Disorder & Access.',
     CC: 'Coiled-Coil',
     SP: 'Signal Peptide',
-    HH: 'Homologs',
+    HL: 'Homologs',
     VAR: 'Variants',
     CONSERVATION: 'Conservation',
     UP: 'UniProt',
@@ -6437,7 +6437,7 @@ function getTrackGroup(key) {
     if (key.startsWith('DO_')) return 'DO';
     if (key.startsWith('CC_')) return 'CC';
     if (key.startsWith('SP_')) return 'SP';
-    if (key.startsWith('HH_')) return 'HH';
+    if (key.startsWith('HL_')) return 'HL';
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 'CONSERVATION';
     if (key.startsWith('UP_')) return 'UP';
     if (key.startsWith('TP_')) return 'TP';
@@ -6499,7 +6499,7 @@ function glyphButtonLabel(g) {
     return isTrackGroupSymbolsHidden(g) ? 'Glyphs off' : 'Glyphs';
 }
 function toggleGroupGlyphs(g) {
-    if (g === 'HH') {
+    if (g === 'HL') {
         if (isTrackGroupAASeq(g)) {                  // AA letters -> hidden
             trackControlState.aaSeq[g] = false;
             trackControlState.hideSymbols[g] = true;
@@ -6541,7 +6541,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HH: 7, VAR: 8, CONSERVATION: 9, UP: 10, pLDDT: 11, RSA: 12, Cofactors: 13, other: 99 };
+    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, pLDDT: 11, RSA: 12, Cofactors: 13, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -6554,9 +6554,9 @@ function getTctlGroupCount(group) {
     return Object.keys(parsedTracks).filter(k => getTrackGroup(k) === group).length;
 }
 function getHomologDisplayName(key) {
-    const m = key.match(/^HH_\d+_(.+)$/);
+    const m = key.match(/^HL_\d+_(.+)$/);
     if (m) return m[1].replace(/_/g, ' ');
-    const hit = hhpredHitsInfo[key];
+    const hit = homologHitsInfo[key];
     return hit ? hit.hitId : formatTrackLabel(key);
 }
 
@@ -6837,12 +6837,12 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     // letters in the per-column match-quality colors. When an import already
     // captured the template sequence use it verbatim (gaps stay blank);
     // otherwise (older saves / non-.hhr homologs) fall back to the query AA.
-    const aaMode = group === 'HH' && !fullBar && (viewOvr ? (viewOvr === 'aa') : isTrackGroupAASeq('HH'));
+    const aaMode = group === 'HL' && !fullBar && (viewOvr ? (viewOvr === 'aa') : isTrackGroupAASeq('HL'));
     // Conservation-colors mode forces the AA letters too, but colored by the
     // per-column conservation band instead of HHpred match-quality.
-    const consColorMode = group === 'HH' && !fullBar && isTrackGroupConsColored('HH');
+    const consColorMode = group === 'HL' && !fullBar && isTrackGroupConsColored('HL');
     const showHHAA = aaMode || consColorMode;
-    const aaTrackForRow = showHHAA ? (hhpredHitsInfo[key] && hhpredHitsInfo[key].aaTrack) || null : null;
+    const aaTrackForRow = showHHAA ? (homologHitsInfo[key] && homologHitsInfo[key].aaTrack) || null : null;
     const queryAAFallback = showHHAA && !aaTrackForRow && typeof tracks.AA === 'string' ? tracks.AA : null;
     // Conservation scores used by the CONSERVATION row: prefer the cached
     // object track (values array) built by recomputeConservationScores(),
@@ -7010,7 +7010,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
                 if (gSpan) { gSpan.style.color = '#fff'; gSpan.style.fontWeight = 'bold'; }
                 cellEl.title = `Residue ${i + 1}: neighbor of cofactor #${char}`;
-            } else if (key.startsWith('HH_') && HH_QUALITY_COLORS[char]) {
+            } else if (key.startsWith('HL_') && HH_QUALITY_COLORS[char]) {
                 const [bg, fg] = HH_QUALITY_COLORS[char];
                 // Conservation-colors mode: swap the per-column match-quality
                 // colors for the conservation band colors (heatmap letters).
@@ -7061,7 +7061,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     if (fullBar) {
         cellsContainer.classList.add('tctl-fullbar');
         const ranges = getActiveRanges(tracks[key]);
-        const baseLabel = group === 'HH' ? getHomologDisplayName(key) : trackGroupLabel(group);
+        const baseLabel = group === 'HL' ? getHomologDisplayName(key) : trackGroupLabel(group);
         ranges.forEach((r, idx) => {
             // Outline: one contiguous rectangle per active residue segment,
             // wrapping the block so vertically-adjacent bars stay distinct.
@@ -8809,7 +8809,7 @@ function populateCrossRefDropdown() {
 // selected ranges. Old saves / non-.hhr homolog rows have no aaTrack, so they
 // fall back to the query AA so the box still shows something meaningful.
 function getHomologAATrack(trackKey) {
-    const info = hhpredHitsInfo[trackKey];
+    const info = homologHitsInfo[trackKey];
     if (info && info.aaTrack) return info.aaTrack;
     return typeof parsedTracks.AA === 'string' ? parsedTracks.AA : '';
 }
@@ -8820,7 +8820,7 @@ function getHomologAATrack(trackKey) {
 function updateHomologFastaSection() {
     const section = document.getElementById('homologFastaSection');
     const btn = document.getElementById('copyTrackBtn');
-    const isHomologSelected = selectionMode === 'row' && activeRowKey && activeRowKey.startsWith('HH_') && rowRanges.length;
+    const isHomologSelected = selectionMode === 'row' && activeRowKey && activeRowKey.startsWith('HL_') && rowRanges.length;
     if (isHomologSelected) {
         const aa = getHomologAATrack(activeRowKey);
         const segments = rowRanges.map(([s, e]) => aa.substring(s, e + 1));
@@ -9324,7 +9324,7 @@ function buildP3DStructureMeta(fileName) {
     return { residueSet, residueChains };
 }
 function p3dHomologStructureFile(hhKey) {
-    const info = hhpredHitsInfo[hhKey];
+    const info = homologHitsInfo[hhKey];
     if (!info || !info.hitId) return null;
     const norm = s => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
     const target = norm(info.hitId);
@@ -9365,7 +9365,7 @@ async function fetchP3DStructureFromRCSB(pdbId) {
 // into the in-session cache (so it behaves exactly like an attached file, and
 // shows up in the Model dropdown), then reloads the viewer model.
 async function p3dRemoteFetchForHomolog(hhKey) {
-    const info = hhpredHitsInfo[hhKey];
+    const info = homologHitsInfo[hhKey];
     if (!info || !info.hitId) return;
     const parsed = p3dPdbIdFromHitId(info.hitId);
     if (!parsed) {
@@ -9414,12 +9414,12 @@ async function p3dRemoteFetchForHomolog(hhKey) {
     }
 }
 function p3dHomologLabel(key) {
-    const info = hhpredHitsInfo[key];
+    const info = homologHitsInfo[key];
     return 'Homolog: ' + (info && info.hitId ? info.hitId : formatTrackLabel(key)) + (info && info.rank ? ' (#' + info.rank + ')' : '');
 }
 function p3dHomologOptions() {
     const opts = [];
-    if (activeRowKey && activeRowKey.startsWith('HH_') && parsedTracks[activeRowKey]) {
+    if (activeRowKey && activeRowKey.startsWith('HL_') && parsedTracks[activeRowKey]) {
         opts.push({ value: 'homolog:' + activeRowKey, label: p3dHomologLabel(activeRowKey) });
     }
     return opts;
@@ -9473,7 +9473,7 @@ function p3dExternalRef(model) {
     let id = null;
     if (!model) return null;
     if (model.kind === 'homolog') {
-        const info = hhpredHitsInfo[model.key];
+        const info = homologHitsInfo[model.key];
         id = (info && info.hitId) ? info.hitId : null;
     } else {
         id = structBaseName(model.fileName || '');
@@ -9493,7 +9493,7 @@ function p3dExternalRef(model) {
 function p3dModelDescription(model) {
     if (!model) return '';
     if (model.kind === 'homolog') {
-        const info = hhpredHitsInfo[model.key];
+        const info = homologHitsInfo[model.key];
         if (info && info.hitDesc) return info.hitDesc;
         return (info && info.hitId) ? 'Homolog ' + info.hitId : 'Homolog';
     }
@@ -9560,7 +9560,7 @@ function p3dpyMolTargetChains() {
 function p3dResidueInModel(resi) {
     if (!p3dModel) return false;
     if (p3dModel.kind === 'homolog') {
-        const info = hhpredHitsInfo[p3dModel.key];
+        const info = homologHitsInfo[p3dModel.key];
         const aa = (info && info.aaTrack) ? info.aaTrack : (typeof parsedTracks.AA === 'string' ? parsedTracks.AA : '');
         const ch = aa[resi - 1];
         return !!(ch && ch !== ' ' && ch !== '-' && ch !== '~');
@@ -9586,7 +9586,7 @@ function selectionResidueColors(selRanges) {
     if (selectionMode === 'row' && activeRowKey && parsedTracks[activeRowKey] && typeof parsedTracks[activeRowKey] === 'string') {
         const trackStr = parsedTracks[activeRowKey];
         const isCofactor = activeRowKey.endsWith('_Cofactors');
-        const isHomolog = activeRowKey.startsWith('HH_');
+        const isHomolog = activeRowKey.startsWith('HL_');
         colorFor = (r) => {
             const ch = trackStr[r - 1];
             if (isCofactor) return (ch && ch !== ' ') ? P3D_COLOR_HEX.yellow : P3D_COLOR_HEX.red;
@@ -10221,7 +10221,7 @@ function gatherPersistableState() {
         currentProteinLabel: currentProteinLabel,
         structureFiles: uploadedStructureFiles,
         structureReferences: buildStructureReferences(),
-        hhpredHitsInfo: hhpredHitsInfo,
+        homologHitsInfo: homologHitsInfo,
         keyedVariantsInfo: keyedVariantsInfo,
         graphHighlights: graphHighlights,
         selection: {
@@ -10584,7 +10584,7 @@ function applyPersistedState(state) {
         const r = refsObj[fn];
         if (r && r.hash) cachedStructureIndex[fn] = { hash: r.hash, ext: r.ext, size: r.size };
     });
-    hhpredHitsInfo = state.hhpredHitsInfo || {};
+    homologHitsInfo = state.homologHitsInfo || {};
     keyedVariantsInfo = state.keyedVariantsInfo || {};
     graphHighlights = state.graphHighlights || {};
 
@@ -10825,11 +10825,11 @@ function structureCacheStatus(f) {
 // whether a structure is cached or auto-fetchable, and a combined template
 // score (probability × identity × coverage, 0-100) for ranking.
 function homologTemplateMetrics() {
-    const keys = Object.keys(parsedTracks).filter(k => k.startsWith('HH_'));
+    const keys = Object.keys(parsedTracks).filter(k => k.startsWith('HL_'));
     const queryLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     const rows = [];
     keys.forEach(key => {
-        const info = hhpredHitsInfo[key] || {};
+        const info = homologHitsInfo[key] || {};
         const s = info.stats || {};
         const probab = parseFloat(s.Probab);
         const ident = parseFloat(s.Identities);
@@ -10902,7 +10902,7 @@ function renderHomologTable() {
 // viewer, and selects its model) - the per-row action in the Homolog Templates
 // table. Auto-fetches the structure from RCSB when the hitId is a PDB ID.
 async function loadHomologIn3D(key) {
-    if (!key || !hhpredHitsInfo[key]) { showToast('That homolog is not loaded.', 'error'); return; }
+    if (!key || !homologHitsInfo[key]) { showToast('That homolog is not loaded.', 'error'); return; }
     activeRowKey = key;
     selectionMode = 'row';
     await openP3DViewer();
@@ -11027,7 +11027,7 @@ async function resetAllData() {
     p3dModel = null;
     updateP3DModelInfo();
     if (p3dView) { try { p3dView.removeAllModels(); } catch (err) {} try { p3dView.render(); } catch (err) {} }
-    hhpredHitsInfo = {};
+    homologHitsInfo = {};
     keyedVariantsInfo = {};
     conservationMetric = 'shannon';
     conservationIncludeHHR = false;
