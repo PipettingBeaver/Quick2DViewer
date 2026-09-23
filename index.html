@@ -1879,7 +1879,7 @@
     <div class="grid-layout" role="main">
         <div class="alignment-grid" id="alignmentGrid" tabindex="0" role="application"
             aria-label="Protein viewer. Use Left/Right arrow keys to move the selection, Shift+arrows to extend it, Home/End to jump to the start or end, and Enter to pin the row under the selection.">
-            <p style="padding: 20px; color: #94a3b8; text-align: center;">Paste Quick2D output above to start.</p>
+            <p style="padding: 20px; color: #94a3b8; text-align: center;">No data loaded. Add input data under File to use Quick2DViewer.</p>
         </div>
 
         <div class="sidebar" role="region" aria-label="Selection Workspace">
@@ -3268,6 +3268,12 @@ function refreshTrackManagerIfVisible() {
     const panel = document.getElementById('side-panel-tracks');
     if (panel && !panel.hidden) renderTrackManager();
 }
+// Refreshes the Input Data modal's summary + workflow checklist when data
+// changes while the modal is open (e.g. a batch import from its own buttons).
+function refreshInputDataModalIfVisible() {
+    const modal = document.getElementById('inputDataModal');
+    if (modal && modal.style.display === 'flex') renderInputDataModal();
+}
 
 // --- Top menu bar (File / View / Data / Export / Help) --------------------
 function closeMenuBarMenus() {
@@ -3750,7 +3756,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.9.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -6549,6 +6555,7 @@ function renderViewer(tracks) {
 
     updateSelectionUI();
     refreshTrackManagerIfVisible();
+    refreshInputDataModalIfVisible();
 }
 
 // Which key in a given (already-sorted) key list opens the Track Control
@@ -11015,7 +11022,7 @@ function resetAllData() {
     document.getElementById('metricsCrossRef').innerHTML = '<option value="">— none —</option>';
 
     document.getElementById('alignmentGrid').innerHTML =
-        '<p style="padding: 20px; color: #94a3b8; text-align: center;">Paste Quick2D output above to start.</p>';
+        '<p style="padding: 20px; color: #94a3b8; text-align: center;">No data loaded. Add input data under File to use Quick2DViewer.</p>';
 
     renderCachedDataInfo();
     renderStructureCacheInfo();

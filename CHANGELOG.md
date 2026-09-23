@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-23
+
+### Fixed
+
+- Empty-viewer message now points to File → Input Data.
+- The Input Data workflow checklist + summary now refresh live while the modal
+  is open during a batch import (previously only on open).
+
 ## [0.9.0] - 2026-09-23
 
 ### Changed (UI restructure, Level B)
