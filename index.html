@@ -1710,6 +1710,7 @@
                     <button type="button" onclick="menuBarAction('input')">Input Data…</button>
                     <button type="button" onclick="menuBarAction('save')">Export Save (.json)</button>
                     <button type="button" onclick="menuBarAction('reset')">Reset Data</button>
+                    <button type="button" id="menuExternalServices" onclick="menuBarAction('toggleExternal')">External services: OFF</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -1780,12 +1781,17 @@
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:6px; flex-wrap:wrap;">
                     <h4 style="margin:0; color: #0f172a; font-size: 0.95rem;">Loaded Data</h4>
-                    <button type="button" class="tb-btn tb-btn-secondary" onclick="autoLookupAccession()"
-                        style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
+                    <span style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="autoLookupAccession()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Predict a 3D structure for the current sequence with ESMFold (≤400 aa) and attach it">Predict structure (ESMFold)</button>
+                    </span>
                 </div>
                 <div id="inputDataSummary" class="data-box" style="font-size:0.78rem; white-space:pre-wrap; line-height:1.5;">No data loaded yet.</div>
+                <div id="esmfoldStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -2603,17 +2609,229 @@ function setUniProtStatus(msg) {
 // All external service endpoints in one place (single source of truth).
 // CORS-verified 2026-09: UniProt REST/EBI, EBI Job Dispatcher, RCSB, PDBe,
 // Foldseek and ESMFold are browser-callable; MPI Toolkit is not (403).
-const SERVICE_URLS = {
-    uniprotRest: 'https://rest.uniprot.org/uniprotkb/',
-    uniprotEbiFeatures: 'https://www.ebi.ac.uk/proteins/api/features/',
-    uniprotEbiSearch: 'https://www.ebi.ac.uk/proteins/api/proteins',
-    ebiNcbiblast: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/',
-    ebiHmmer: 'https://www.ebi.ac.uk/Tools/services/rest/hmmer3/',   // hmmscan/phmmer/jackhmmer (planned)
-    foldseek: 'https://search.foldseek.com/api/',                    // planned
-    esmfold: 'https://api.esmatlas.com/foldSequence/v1/pdb/',        // planned
-    rcsbDownload: 'https://files.rcsb.org/download/',
+// --- External service registry (EDIT HERE to fix/replace endpoints) --------
+// Capabilities map to an ORDERED provider list; when a capability runs, its
+// providers are tried in order until one succeeds. So if provider A is down or
+// moves, reorder/disable it here and provider B takes over - no code changes.
+// Each provider names an `adapter` (wire protocol) + endpoint + params.
+// `enabled: false` skips a provider. All listed providers are CORS-callable
+// (verified 2026-09); MPI Toolkit is not (needs the clipboard wizard).
+const SERVICE_REGISTRY = {
+    version: 1,
+    capabilities: {
+        annotation: {
+            label: 'Curated annotations',
+            providers: [
+                { id: 'uniprot_rest', label: 'UniProt (rest.uniprot.org)', adapter: 'uniprotRest',
+                  url: 'https://rest.uniprot.org/uniprotkb/', enabled: true },
+                { id: 'ebi_proteins', label: 'EBI Proteins API', adapter: 'ebiFeatures',
+                  url: 'https://www.ebi.ac.uk/proteins/api/features/', enabled: true },
+            ],
+        },
+        text_search: {
+            label: 'UniProt text search',
+            providers: [
+                { id: 'ebi_proteins_search', label: 'EBI Proteins search', adapter: 'ebiSearch',
+                  url: 'https://www.ebi.ac.uk/proteins/api/proteins', enabled: true },
+            ],
+        },
+        sequence_search: {
+            label: 'Sequence similarity (BLAST)',
+            providers: [
+                { id: 'ebi_ncbiblast', label: 'EBI NCBI-BLAST', adapter: 'ebiJob',
+                  url: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/',
+                  params: { program: 'blastp', database: 'uniprotkb', stype: 'protein', alignments: '5', scores: '5', exp: '1e-3' },
+                  enabled: true },
+            ],
+        },
+        fold: {
+            label: 'Structure prediction',
+            providers: [
+                { id: 'esmfold', label: 'ESMFold (ESM Atlas)', adapter: 'esmfold',
+                  url: 'https://api.esmatlas.com/foldSequence/v1/pdb/', maxLength: 400, enabled: true },
+            ],
+        },
+        structure_search: {
+            label: 'Structural homology (Foldseek)',
+            providers: [
+                { id: 'foldseek', label: 'Foldseek', adapter: 'foldseek',
+                  url: 'https://search.foldseek.com/api/', enabled: false }, // planned
+            ],
+        },
+        domain_scan: {
+            label: 'Domain architecture (HMMER hmmscan)',
+            providers: [
+                { id: 'ebi_hmmer', label: 'EBI HMMER', adapter: 'ebiJob',
+                  url: 'https://www.ebi.ac.uk/Tools/services/rest/hmmer3/',
+                  params: { program: 'hmmscan', database: 'pfam' }, enabled: false }, // planned
+            ],
+        },
+    },
 };
-function uniprotApiBase() { return SERVICE_URLS.uniprotRest; }
+const SERVICE_URLS = { rcsbDownload: 'https://files.rcsb.org/download/' };
+
+// fetch() with an AbortController timeout (shared by the adapters).
+function fetchWithTimeout(url, opts, ms) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})).finally(() => clearTimeout(timer));
+}
+
+// --- Service adapters (wire protocols) ------------------------------------
+// Each returns a normalized value or throws (so runCapability can fall through).
+const SERVICE_ADAPTERS = {
+    // GET {acc}.json -> UniProtKB features
+    async uniprotRest(provider, args) {
+        const resp = await fetch(provider.url + encodeURIComponent(args.accession) + '.json');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const features = parseUniProtFeatures(await resp.json());
+        if (!features.length) throw new Error('no residue-level features');
+        return features;
+    },
+    // GET {acc}.json -> EBI Proteins features
+    async ebiFeatures(provider, args) {
+        const resp = await fetch(provider.url + encodeURIComponent(args.accession) + '.json');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const features = parseUniProtFeaturesEBI(await resp.json());
+        if (!features.length) throw new Error('no residue-level features');
+        return features;
+    },
+    // GET ?size&field=query -> normalized [{accession,name,gene,organism,protein}]
+    async ebiSearch(provider, args) {
+        const url = provider.url + '?' + new URLSearchParams({ size: '20', [args.field]: args.query }).toString();
+        const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const list = await resp.json();
+        if (!Array.isArray(list)) throw new Error('unexpected payload');
+        return list.map(p => {
+            const gene = (p.gene && p.gene[0] && p.gene[0].name) ? p.gene[0].name.value : '';
+            const organism = (p.organism && p.organism.names && p.organism.names[0]) ? p.organism.names[0].value : '';
+            const protein = (p.protein && p.protein.recommendedName && p.protein.recommendedName.fullName) ? p.protein.recommendedName.fullName.value : '';
+            return { accession: p.accession, name: p.name || '', gene, organism, protein };
+        });
+    },
+    // EBI Job Dispatcher: submit -> poll -> result JSON (BLAST, HMMER, …)
+    async ebiJob(provider, args, onProgress) {
+        const base = provider.url;
+        const body = new URLSearchParams(Object.assign({ email: 'q2dv@example.com' }, provider.params || {}, { sequence: args.sequence })).toString();
+        let jobId = '', runResp = null;
+        for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
+            try {
+                runResp = await fetchWithTimeout(base + 'run', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, 90000);
+                if (runResp.ok) jobId = (await runResp.text()).trim();
+                uniprotLog('submit attempt ' + (attempt + 1) + ': HTTP ' + (runResp ? runResp.status : '?') + (jobId ? ' job=' + jobId : ''));
+            } catch (e) { uniprotLog('submit attempt ' + (attempt + 1) + ' threw: ' + (e && e.message ? e.message : e)); }
+        }
+        if (!runResp || !runResp.ok) throw new Error('submit failed' + (runResp ? ' (HTTP ' + runResp.status + ')' : ''));
+        if (!jobId) throw new Error('no job id returned');
+        const t0 = Date.now();
+        const elapsed = () => Math.round((Date.now() - t0) / 1000);
+        let status = '', lastLogged = '', poll = 0;
+        const deadline = Date.now() + 15 * 60 * 1000;
+        while (Date.now() < deadline) {
+            poll++;
+            await new Promise(r => setTimeout(r, 3000));
+            try { status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 60000)).text()).trim(); }
+            catch (e) { uniprotLog('poll ' + poll + ': status fetch failed — continuing'); continue; }
+            if (status !== lastLogged) { uniprotLog('poll ' + poll + ': status=' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
+            if (status === 'FINISHED') break;
+            if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('job ' + status);
+            if (onProgress) onProgress('job ' + jobId + ' running… ' + elapsed() + 's (' + (status || 'queued') + ')');
+        }
+        if (status !== 'FINISHED') throw new Error('timed out after ' + elapsed() + 's');
+        return await (await fetchWithTimeout(base + 'result/' + jobId + '/json', {}, 60000)).json();
+    },
+    // ESMFold: POST text/plain sequence -> PDB text
+    async esmfold(provider, args) {
+        const seq = String(args.sequence || '');
+        if (provider.maxLength && seq.length > provider.maxLength) throw new Error('sequence too long (max ' + provider.maxLength + ' aa)');
+        const resp = await fetch(provider.url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: seq });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const text = await resp.text();
+        if (!text || text.length < 60 || !/^(ATOM|HEADER|MODEL)/m.test(text)) throw new Error('empty/invalid prediction');
+        return { pdbText: text, format: 'pdb', label: provider.label };
+    },
+    // Foldseek (planned)
+    async foldseek() { throw new Error('Foldseek adapter not implemented yet'); },
+};
+
+// Runs a capability's providers in order until one succeeds.
+async function runCapability(capName, args, onProgress) {
+    const cap = SERVICE_REGISTRY.capabilities[capName];
+    if (!cap) throw new Error('Unknown capability: ' + capName);
+    const providers = (cap.providers || []).filter(p => p.enabled !== false);
+    if (!providers.length) throw new Error('No enabled provider for ' + cap.label);
+    let lastErr = null;
+    for (const provider of providers) {
+        const adapter = SERVICE_ADAPTERS[provider.adapter];
+        if (!adapter) { lastErr = new Error('Unknown adapter: ' + provider.adapter); continue; }
+        try {
+            if (onProgress) onProgress('Trying ' + provider.label + '…');
+            return await adapter(provider, args, onProgress);
+        } catch (err) {
+            lastErr = err;
+            if (onProgress) onProgress(provider.label + ' failed (' + (err && err.message ? err.message : err) + ') — trying next…');
+        }
+    }
+    throw lastErr || new Error('All providers failed for ' + cap.label);
+}
+
+function uniprotApiBase() { return SERVICE_REGISTRY.capabilities.annotation.providers[0].url; }
+
+// --- External-services opt-in ---------------------------------------------
+// Gates every outbound API call (UniProt, BLAST, ESMFold, Foldseek). The first
+// time an external action runs, the user is asked once; the choice is
+// remembered and can be flipped from File > External services.
+let externalServicesEnabled = false;
+async function ensureExternalServices() {
+    if (externalServicesEnabled) return true;
+    const ok = await confirmDialog(
+        'Q2DV can make API calls on your behalf — sending the relevant sequence or accession to public services (UniProt, EBI BLAST/HMMER, ESMFold, Foldseek). Enable external services?',
+        { okLabel: 'Enable', danger: false }
+    );
+    if (ok) { externalServicesEnabled = true; syncExternalServicesMenu(); schedulePersist(); }
+    return ok;
+}
+function syncExternalServicesMenu() {
+    const el = document.getElementById('menuExternalServices');
+    if (el) el.textContent = 'External services: ' + (externalServicesEnabled ? 'ON' : 'OFF');
+}
+function toggleExternalServices() {
+    externalServicesEnabled = !externalServicesEnabled;
+    syncExternalServicesMenu();
+    schedulePersist();
+    showToast('External services ' + (externalServicesEnabled ? 'enabled.' : 'disabled.'), 'info');
+}
+
+// --- ESMFold structure prediction -----------------------------------------
+// Predicts a structure for the current sequence via the `fold` capability and
+// attaches the returned PDB through the normal structure pipeline, so pLDDT,
+// RSA, cofactors and the 3D viewer all light up — tagged source: 'ESMFold'.
+async function predictStructureESMFold() {
+    const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!seq) { showToast('Load a sequence first, then predict a structure.', 'error'); return; }
+    if (!(await ensureExternalServices())) return;
+    const statusEl = document.getElementById('esmfoldStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    setStatus('Predicting with ESMFold…');
+    try {
+        const result = await runCapability('fold', { sequence: seq }, (m) => setStatus(m));
+        const base = 'ESMFold_' + (currentProteinLabel ? currentProteinLabel.replace(/[^A-Za-z0-9]+/g, '_') : 'model');
+        await attachStructureText(base + '.pdb', result.pdbText, 'pdb', { source: 'ESMFold' });
+        renderViewer(parsedTracks);
+        populateCrossRefDropdown();
+        if (p3dViewerOpen) { refreshP3DModelOptions(); updateP3DColoring(); }
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        schedulePersist();
+        setStatus('ESMFold model attached.');
+        showToast('ESMFold model attached — pLDDT, RSA and 3D are available.', 'success');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('ESMFold failed: ' + m);
+        showToast('ESMFold prediction failed: ' + m, 'error');
+    }
+}
 
 // Appends a timestamped entry to the annotation debug log, mirrors it to the
 // console, and refreshes the visible <pre> if present.
@@ -2698,112 +2916,45 @@ function summarizeUniProtFeatures(features) {
 async function fetchUniProtFeaturesByAccession(acc) {
     setUniProtStatus('Fetching ' + acc + ' from UniProt…');
     const encoded = encodeURIComponent(acc);
-    // Two backends, tried in order: rest.uniprot.org (canonical) then the EBI
-    // Proteins API on www.ebi.ac.uk. Some networks/browsers can reach one
-    // domain but not the other, so falling back makes annotation offload work
-    // in either case.
-    const endpoints = [
-        { url: uniprotApiBase() + encoded + '.json', parse: parseUniProtFeatures, label: '' },
-        { url: SERVICE_URLS.uniprotEbiFeatures + encoded + '.json', parse: parseUniProtFeaturesEBI, label: ' (EBI)' }
-    ];
-    let lastError = null;
-    for (const ep of endpoints) {
-        uniprotLog('try ' + ep.url);
-        try {
-            const resp = await fetch(ep.url);
-            uniprotLog(ep.url + ' -> HTTP ' + resp.status);
-            if (!resp.ok) { lastError = new Error('HTTP ' + resp.status); continue; }
-            const features = ep.parse(await resp.json());
-            const summary = summarizeUniProtFeatures(features);
-            uniprotLog('parsed ' + features.length + ' features: ' + summary);
-            if (!features.length) { lastError = new Error('no residue-level features'); continue; }
-            setUniProtStatus('Loaded ' + acc + ep.label + ': ' + summary);
-            return features;
-        } catch (err) { uniprotLog(ep.url + ' threw: ' + (err && err.message ? err.message : err)); lastError = err; }
+    uniprotLog('annotation capability for ' + acc);
+    try {
+        const features = await runCapability('annotation', { accession: acc }, (msg) => uniprotLog(msg));
+        const summary = summarizeUniProtFeatures(features);
+        uniprotLog('parsed ' + features.length + ' features: ' + summary);
+        setUniProtStatus('Loaded ' + acc + ': ' + summary);
+        return features;
+    } catch (err) {
+        const m = err && err.message ? err.message : 'network';
+        const netFail = /networkerror|failed to fetch|aborted|no residue/i.test(m);
+        setUniProtStatus('Fetch failed: ' + m);
+        showToast(netFail
+            ? 'Could not reach UniProt (network/DNS, or a privacy extension/tracking protection blocked it). Try https://rest.uniprot.org/uniprotkb/' + encoded + '.json in a new tab - if it loads there, it is a browser blocking issue.'
+            : 'Could not fetch UniProt annotations for ' + acc + ' (' + m + ').', 'error');
+        return null;
     }
-    const m = lastError && lastError.message ? lastError.message : 'network';
-    const netFail = /networkerror|failed to fetch|aborted|no residue/i.test(m);
-    setUniProtStatus('Fetch failed: ' + m);
-    showToast(netFail
-        ? 'Could not reach UniProt (network/DNS, or a privacy extension/tracking protection blocked it). Try https://rest.uniprot.org/uniprotkb/' + encoded + '.json in a new tab - if it loads there, it is a browser blocking issue.'
-        : 'Could not fetch UniProt annotations for ' + acc + ' (' + m + ').', 'error');
-    return null;
 }
 
-// Sequence -> accession via the EBI NCBI-BLAST job API (submit -> poll ->
-// result). No CORS-friendly sequence-similarity endpoint exists on
-// rest.uniprot.org, so this path may be blocked in-browser; it degrades to a
-// clear message pointing at the accession path. Kept so the sequence mode is
-// fully wired end-to-end.
+// Sequence -> accession via the BLAST capability (EBI NCBI-BLAST job API).
+// The provider chain (and the resilient submit/poll/result logic) now live in
+// the service registry / ebiJob adapter, so a different BLAST provider can be
+// added or swapped there without touching this function.
 async function resolveAccessionFromSequence(seq) {
-    const base = SERVICE_URLS.ebiNcbiblast;
-    const t0 = Date.now();
-    const elapsed = () => Math.round((Date.now() - t0) / 1000);
-    const fetchWithTimeout = (url, opts, ms) => {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), ms);
-        return fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})).finally(() => clearTimeout(timer));
-    };
-    const submitBody = 'email=q2dv@example.com&program=blastp&database=uniprotkb&stype=protein&alignments=5&scores=5&exp=1e-3&sequence=' + encodeURIComponent(seq);
     uniprotLog('BLAST sequence mode: seq length ' + seq.length + ', head "' + seq.slice(0, 20) + '"');
-
-    for (let jobAttempt = 0; jobAttempt < 2; jobAttempt++) {
-        if (jobAttempt) { uniprotLog('Retrying whole BLAST job (attempt ' + (jobAttempt + 1) + ')'); setUniProtStatus('Retrying BLAST (attempt ' + (jobAttempt + 1) + ')…'); }
-        else setUniProtStatus('Submitting sequence to BLAST (UniProtKB)…');
-        try {
-            let jobId = '', runResp = null;
-            for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
-                try {
-                    runResp = await fetchWithTimeout(base + 'run', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: submitBody
-                    }, 90000);
-                    if (runResp.ok) jobId = (await runResp.text()).trim();
-                    uniprotLog('submit attempt ' + (attempt + 1) + ': HTTP ' + (runResp ? runResp.status : '?') + (jobId ? ' job=' + jobId : ''));
-                } catch (e) { uniprotLog('submit attempt ' + (attempt + 1) + ' threw: ' + (e && e.message ? e.message : e)); }
-            }
-            if (!runResp || !runResp.ok) throw new Error('submit failed' + (runResp ? ' (HTTP ' + runResp.status + ')' : ''));
-            if (!jobId) throw new Error('no job id returned');
-
-            let status = '';
-            let lastLogged = '';
-            let poll = 0;
-            const deadline = Date.now() + 15 * 60 * 1000; // 15 min hard cap (UniProtKB BLAST can take 5-10 min under load)
-            while (Date.now() < deadline) {
-                poll++;
-                await new Promise(r => setTimeout(r, 3000));
-                try {
-                    status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 60000)).text()).trim();
-                } catch (e) {
-                    uniprotLog('poll ' + poll + ': status fetch failed (' + (e && e.name === 'AbortError' ? 'timeout' : (e && e.message ? e.message : e)) + ') — continuing');
-                    continue; // a stalled status check is transient; keep polling the same job
-                }
-                if (status !== lastLogged) { uniprotLog('poll ' + poll + ': status=' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
-                if (status === 'FINISHED') break;
-                if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('BLAST ' + status);
-                setUniProtStatus(`BLAST job ${jobId} still running… ${elapsed()}s (${status || 'queued'})`);
-            }
-            if (status !== 'FINISHED') throw new Error('timed out after ' + elapsed() + 's');
-
-            uniprotLog('BLAST FINISHED — fetching result');
-            const data = await (await fetchWithTimeout(base + 'result/' + jobId + '/json', {}, 60000)).json();
-            const hits = (data && data.hits) || [];
-            const acc = hits.length ? (hits[0].hit_acc || hits[0].hit_id || null) : null;
-            uniprotLog('result: ' + hits.length + ' hit(s)' + (acc ? ', top accession ' + acc : ', NO accession'));
-            if (!acc) throw new Error('no hit accession in results');
-            setUniProtStatus('Matched ' + acc + ' (top BLAST hit).');
-            return acc;
-        } catch (err) {
-            const msg = (err && err.name === 'AbortError') ? 'request aborted' : (err && err.message ? err.message : String(err));
-            uniprotLog('BLAST attempt ' + (jobAttempt + 1) + ' failed: ' + msg);
-            if (jobAttempt === 0) continue; // resubmit a fresh job once
-            setUniProtStatus('Sequence search failed: ' + msg);
-            showToast('Sequence search failed (' + msg + '). Copy the debug log below and share it, or paste the UniProt accession directly.', 'error');
-            return null;
-        }
+    try {
+        const data = await runCapability('sequence_search', { sequence: seq }, (msg) => { uniprotLog(msg); setUniProtStatus(msg); });
+        const hits = (data && data.hits) || [];
+        const acc = hits.length ? (hits[0].hit_acc || hits[0].hit_id || null) : null;
+        uniprotLog('result: ' + hits.length + ' hit(s)' + (acc ? ', top accession ' + acc : ', NO accession'));
+        if (!acc) throw new Error('no hit accession in results');
+        setUniProtStatus('Matched ' + acc + ' (top BLAST hit).');
+        return acc;
+    } catch (err) {
+        const msg = (err && err.name === 'AbortError') ? 'request aborted' : (err && err.message ? err.message : String(err));
+        uniprotLog('sequence search failed: ' + msg);
+        setUniProtStatus('Sequence search failed: ' + msg);
+        showToast('Sequence search failed (' + msg + '). Copy the debug log below and share it, or paste the UniProt accession directly.', 'error');
+        return null;
     }
-    return null;
 }
 
 // Main dispatcher for the Options "Fetch annotations" button, honoring the
@@ -2812,6 +2963,7 @@ async function resolveAccessionFromSequence(seq) {
 // by the Accession mode, the Sequence mode's resolved accession, and a picked
 // Search result.
 async function useUniProtAccession(acc) {
+    if (!(await ensureExternalServices())) return;
     uniprotLog('using accession ' + acc);
     const features = await fetchUniProtFeaturesByAccession(acc);
     if (!features) return;
@@ -2821,25 +2973,14 @@ async function useUniProtAccession(acc) {
     schedulePersist();
 }
 
-// Text search against the EBI Proteins API (gene / protein / organism name) to
-// find candidate accessions. Returns [{accession, name, gene, organism, protein}]
-// or null on a network failure, or [] when there are no matches.
+// Text search (gene / protein / organism name) via the text_search capability.
+// Returns [{accession, name, gene, organism, protein}] or null on failure.
 async function uniprotSearchEntries(field, query) {
-    const url = SERVICE_URLS.uniprotEbiSearch + '?' + new URLSearchParams({ size: '20', [field]: query }).toString();
-    uniprotLog('search: ' + url);
+    uniprotLog('search: field=' + field + ' query="' + query + '"');
     try {
-        const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
-        if (!resp.ok) { uniprotLog('search -> HTTP ' + resp.status); return null; }
-        const list = await resp.json();
-        if (!Array.isArray(list)) { uniprotLog('search -> unexpected payload'); return null; }
-        return list.map(p => {
-            const gene = (p.gene && p.gene[0] && p.gene[0].name) ? p.gene[0].name.value : '';
-            const organism = (p.organism && p.organism.names && p.organism.names[0]) ? p.organism.names[0].value : '';
-            const protein = (p.protein && p.protein.recommendedName && p.protein.recommendedName.fullName) ? p.protein.recommendedName.fullName.value : '';
-            return { accession: p.accession, name: p.name || '', gene, organism, protein };
-        });
+        return await runCapability('text_search', { field, query }, (msg) => uniprotLog(msg));
     } catch (err) {
-        uniprotLog('search threw: ' + (err && err.message ? err.message : err));
+        uniprotLog('search failed: ' + (err && err.message ? err.message : err));
         return null;
     }
 }
@@ -2873,6 +3014,7 @@ function renderUniProtSearchResults(results, query) {
 async function fetchUniProtAnnotations() {
     uniprotLogEntries.length = 0;
     uniprotLog('Annotation fetch started (mode ' + uniprotAnnotationMode + ')');
+    if (!(await ensureExternalServices())) return;
     if (uniprotAnnotationMode === 'sequence') {
         const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
         if (!seq) { showToast('Load a sequence first, then try Sequence mode.', 'error'); return; }
@@ -3293,6 +3435,7 @@ function menuBarAction(action) {
         case 'input': openInputDataModal(); break;
         case 'save': exportFullSave(); break;
         case 'reset': resetAllData(); break;
+        case 'toggleExternal': toggleExternalServices(); break;
         case 'graphPlddt': { const c = document.getElementById('graphPlddtCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
         case 'graphRsa': { const c = document.getElementById('graphRsaCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
         case 'legend': toggleLegend(); break;
@@ -3831,7 +3974,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.12.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -5203,6 +5346,70 @@ function syncGraphModeControls() {
 }
 
 // Structure File Upload Handler
+// Parses one structure text (pdb/cif/af3-json) into pLDDT/RSA/cofactor tracks,
+// registers it in uploadedStructureFiles, and (for coordinate formats) caches
+// the raw text for the 3D viewer + device cache. Returns a promise for the
+// cache write (or null). Shared by the file-upload handler and the ESMFold
+// "predict structure" action.
+async function attachStructureText(fileName, text, ext, opts) {
+    opts = opts || {};
+    const baseName = fileName.replace(/\.[^/.]+$/, '');
+    let cachePromise = null;
+    if (ext === 'pdb' || ext === 'cif') {
+        cachedStructureTexts[fileName] = text;
+        p3dStructureMeta[fileName] = buildP3DStructureMeta(fileName);
+        cachePromise = cacheStructureText(fileName, ext, text);
+    }
+    let structureResidues = {};
+    if (ext === 'pdb') structureResidues = parsePDB(text);
+    else if (ext === 'cif') structureResidues = parseCIF(text);
+    else if (ext === 'json') structureResidues = parseAF3JSON(text);
+    else return null;
+
+    const plddtData = new Array(parsedTracks.AA.length).fill(null);
+    const rsaData = new Array(parsedTracks.AA.length).fill(null);
+    await computeRSA(text, structureResidues);
+    Object.keys(structureResidues).forEach(resSeq => {
+        const idx = parseInt(resSeq) - 1;
+        if (idx >= 0 && idx < parsedTracks.AA.length) {
+            if (structureResidues[resSeq].plddt !== undefined) plddtData[idx] = { type: 'plddt', val: structureResidues[resSeq].plddt };
+            if (structureResidues[resSeq].rsa !== undefined) rsaData[idx] = { type: 'rsa', val: structureResidues[resSeq].rsa };
+        }
+    });
+    const plddtKey = `${baseName}_pLDDT`;
+    const rsaKey = `${baseName}_RSA`;
+    parsedTracks[plddtKey] = plddtData;
+    graphHighlights[plddtKey] = true;
+    if (opts.source) setTrackMeta(plddtKey, { source: opts.source });
+    if (rsaData.some(x => x !== null)) {
+        parsedTracks[rsaKey] = rsaData;
+        graphHighlights[rsaKey] = true;
+        if (opts.source) setTrackMeta(rsaKey, { source: opts.source });
+    }
+
+    let cofactorResult = { cofactors: [], labelByResSeq: new Map() };
+    if (ext === 'pdb' || ext === 'cif') {
+        try { cofactorResult = extractCofactorNeighborhoods(text, ext); }
+        catch (err) { console.error('Cofactor extraction failed for', fileName, err); }
+    }
+    if (cofactorResult.cofactors.length) {
+        const cofactorChars = new Array(parsedTracks.AA.length).fill(' ');
+        cofactorResult.labelByResSeq.forEach((cofactorNum, resSeq) => {
+            const idx = resSeq - 1;
+            if (idx >= 0 && idx < cofactorChars.length) cofactorChars[idx] = String(cofactorNum);
+        });
+        const cofactorKey = `${baseName}_Cofactors`;
+        parsedTracks[cofactorKey] = cofactorChars.join('');
+        if (opts.source) setTrackMeta(cofactorKey, { source: opts.source });
+    }
+
+    // Lightweight metadata only (name/ext/size) for the Cached Data listing -
+    // raw text lives in the IndexedDB structure cache, never in localStorage.
+    uploadedStructureFiles = uploadedStructureFiles.filter(f => f.name !== fileName);
+    uploadedStructureFiles.push({ name: fileName, ext, size: text.length, ...scanStructureMetadata(text, ext), cofactors: cofactorResult.cofactors });
+    return cachePromise;
+}
+
 document.getElementById('structureUpload').addEventListener('change', async (event) => {
     const files = [...event.target.files];
 
@@ -5254,98 +5461,16 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
         try {
             const text = await file.text();
             const ext = file.name.split('.').pop().toLowerCase();
-            const baseName = file.name.replace(/\.[^/.]+$/, "");
-
-            // In-session cache of the raw structure text for the floating 3D
-            // viewer. JSON (AF3) files carry no atomic coordinates, so they're
-            // kept out. Re-uploading the same filename replaces its entry.
-            if (ext === 'pdb' || ext === 'cif') {
-                cachedStructureTexts[file.name] = text;
-                p3dStructureMeta[file.name] = buildP3DStructureMeta(file.name);
-                // Also store the raw text in the device-local IndexedDB
-                // structure cache (failures surface in the Options > Local
-                // Structure Cache panel) so a later refresh or save-import on
-                // this machine can rehydrate 3D without asking for the file
-                // again. Awaiting them below ensures the fileName -> hash
-                // registry is persisted before the session's first save.
-                cachePromises.push(cacheStructureText(file.name, ext, text));
-            }
-
             if (ext === 'fasta' || ext === 'fa' || ext === 'faa' || ext === 'fas') {
                 importVariantFastaFile(text, file.name);
                 continue; // variant FASTA alignment tracks are handled separately - nothing below (pLDDT/RSA/cofactor) applies
             }
-
             if (ext === 'hhr') {
                 importHHpredFile(text, file.name);
                 continue; // homolog tracks aren't pLDDT/RSA/cofactor data - nothing below applies
             }
-
-            const plddtData = new Array(parsedTracks.AA.length).fill(null);
-            const rsaData = new Array(parsedTracks.AA.length).fill(null);
-            let structureResidues = {};
-
-            if (ext === 'pdb') structureResidues = parsePDB(text);
-            else if (ext === 'cif') structureResidues = parseCIF(text);
-            else if (ext === 'json') structureResidues = parseAF3JSON(text);
-            else continue;
-
-            await computeRSA(text, structureResidues);
-
-            Object.keys(structureResidues).forEach(resSeq => {
-                const idx = parseInt(resSeq) - 1;
-                if (idx >= 0 && idx < parsedTracks.AA.length) {
-                    if (structureResidues[resSeq].plddt !== undefined) {
-                        plddtData[idx] = { type: 'plddt', val: structureResidues[resSeq].plddt };
-                    }
-                    if (structureResidues[resSeq].rsa !== undefined) {
-                        rsaData[idx] = { type: 'rsa', val: structureResidues[resSeq].rsa };
-                    }
-                }
-            });
-
-            const plddtKey = `${baseName}_pLDDT`;
-            const rsaKey = `${baseName}_RSA`;
-            parsedTracks[plddtKey] = plddtData;
-            graphHighlights[plddtKey] = true;
-            if (rsaData.some(x => x !== null)) {
-                parsedTracks[rsaKey] = rsaData;
-                graphHighlights[rsaKey] = true;
-            }
-
-            let cofactorResult = { cofactors: [], labelByResSeq: new Map() };
-            if (ext === 'pdb' || ext === 'cif') {
-                try {
-                    cofactorResult = extractCofactorNeighborhoods(text, ext);
-                } catch (err) {
-                    console.error('Cofactor extraction failed for', file.name, err);
-                }
-            }
-            if (cofactorResult.cofactors.length) {
-                const cofactorChars = new Array(parsedTracks.AA.length).fill(' ');
-                cofactorResult.labelByResSeq.forEach((cofactorNum, resSeq) => {
-                    const idx = resSeq - 1;
-                    if (idx >= 0 && idx < cofactorChars.length) cofactorChars[idx] = String(cofactorNum);
-                });
-                const cofactorKey = `${baseName}_Cofactors`;
-                parsedTracks[cofactorKey] = cofactorChars.join('');
-            }
-
-            // Only cache lightweight metadata here (name/ext/size) for the
-            // Cached Data listing - the raw file text is handled by the
-            // IndexedDB structure cache above, NOT by localStorage. The
-            // derived pLDDT/RSA arrays are what get restored on reload;
-            // complete structure text is kept machine-locally in IndexedDB
-            // (hashed, deduplicated, soft-capped) so 3D can rehydrate without
-            // re-uploading - keeping the localStorage payload (~5MB quota)
-            // small. Re-uploading the same filename replaces its entry rather
-            // than duplicating it.
-            uploadedStructureFiles = uploadedStructureFiles.filter(f => f.name !== file.name);
-            uploadedStructureFiles.push({
-                name: file.name, ext, size: text.length,
-                ...scanStructureMetadata(text, ext),
-                cofactors: cofactorResult.cofactors
-            });
+            const cp = await attachStructureText(file.name, text, ext);
+            if (cp) cachePromises.push(cp);
         } catch (err) {
             console.error(err);
         }
@@ -10253,6 +10378,7 @@ function gatherPersistableState() {
         },
         preferences: {
             graphMode: { pLDDT: graphMode.pLDDT, RSA: graphMode.RSA },
+            externalServicesEnabled,
             selectionScope,
             gridCellW,
             commandEngineId,
@@ -10637,6 +10763,8 @@ function applyPersistedState(state) {
         graphMode.RSA = false;
     }
     syncGraphModeControls();
+    externalServicesEnabled = !!prefs.externalServicesEnabled;
+    syncExternalServicesMenu();
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
     renderSelectionScopeToggle();
     // Restore the horizontal accordion zoom (px/residue). Newer saves store
@@ -11073,6 +11201,8 @@ async function resetAllData() {
     lastRanges = null;
     graphMode = { pLDDT: false, RSA: false };
     syncGraphModeControls();
+    externalServicesEnabled = false;
+    syncExternalServicesMenu();
     commandEngineId = 'chimerax';
     applyTypePalette('default');
     trackControlState = getDefaultTrackControlState();

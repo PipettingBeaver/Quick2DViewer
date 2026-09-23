@@ -101,7 +101,8 @@ deposited entries).
 0. **Housekeeping (done, 0.10.1)** — test harness (`npm test`), non-blocking dialogs,
    HTML escaping pass, centralized `SERVICE_URLS`, dead-code sweep.
 1. `trackMeta` + source tagging + `HH_`→`HL_` rename — **done (0.11.0)**
-2. ESMFold integration
+2. ESMFold integration — **done (0.12.0)**; service registry + provider fallback
+   + external-services opt-in shipped alongside
 3. Foldseek integration
 4. Contradiction engine (Rules panel)
 5. Client-side interface analysis

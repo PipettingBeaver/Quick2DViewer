@@ -160,6 +160,36 @@ assert(/<h3 class="cl-ver">\[1\.0\.0\]/.test(mdHtml) && /<strong>b<\/strong>/.te
 section('confirm dialog (headless-safe)');
 assert(ctxRun(`typeof confirmDialog === 'function'`), 'confirmDialog is defined');
 
-// ---------- summary ----------
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+section('service registry + capability fallback');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.annotation.providers.length`) === 2, 'annotation capability has 2 providers (fallback chain)');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.fold.providers[0].id`) === 'esmfold', 'fold -> esmfold provider');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.sequence_search.providers[0].adapter`) === 'ebiJob', 'sequence_search -> ebiJob adapter');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_search.providers[0].enabled`) === false, 'foldseek provider disabled (planned)');
+assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 'function'`), 'registry helpers present');
+
+// ---------- async tests ----------
+(async () => {
+    let err = null;
+    try { await ctxRun(`runCapability('fold', { sequence: 'X'.repeat(500) })`); }
+    catch (e) { err = e; }
+    assert(err && /too long/.test(err.message), 'fold rejects >400 aa before any network call');
+
+    err = null;
+    try { await ctxRun(`runCapability('no_such_capability', {})`); }
+    catch (e) { err = e; }
+    assert(err && /Unknown capability/.test(err.message), 'unknown capability rejects');
+
+    // Provider fallback: a capability whose first provider throws, second succeeds.
+    ctxRun(`
+        SERVICE_ADAPTERS.__ok = async () => 'second-provider-result';
+        SERVICE_REGISTRY.capabilities.__test = { label: 'Test', providers: [
+            { id: 'a', label: 'A', adapter: 'nope' },
+            { id: 'b', label: 'B', adapter: '__ok' }
+        ] };
+    `);
+    const result = await ctxRun(`runCapability('__test', {})`);
+    assert(result === 'second-provider-result', 'runCapability falls through a failing provider to the next');
+
+    console.log(`\n${passed} passed, ${failed} failed`);
+    process.exit(failed ? 1 : 0);
+})();

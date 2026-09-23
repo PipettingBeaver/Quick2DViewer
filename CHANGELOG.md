@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-23
+
+### Added
+
+- **ESMFold structure prediction** (Input Data → "Predict structure (ESMFold)"):
+  predicts a 3D model for the current sequence (≤400 aa) and attaches it through the
+  normal structure pipeline, so pLDDT / RSA / cofactors / 3D all light up — tagged
+  `source: ESMFold`.
+- **Config-driven service registry** (`SERVICE_REGISTRY`): each *capability* maps to
+  an ordered provider list with automatic fallback (e.g. UniProt REST → EBI Proteins;
+  add a second BLAST provider and it is tried if the first fails). Adapters:
+  `uniprotRest`, `ebiFeatures`, `ebiSearch`, `ebiJob` (EBI submit/poll/result),
+  `esmfold`; Foldseek and HMMER providers are pre-declared but disabled.
+- **External-services opt-in**: the first outbound API call asks once; flip it in
+  File → External services. The choice persists.
+
 ## [0.11.0] - 2026-09-23
 
 ### Changed
