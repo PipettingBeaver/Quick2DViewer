@@ -105,6 +105,27 @@
         .workflow-section summary::after { content: ' ▾'; color: #94a3b8; font-size: 0.7rem; }
         .workflow-section:not([open]) summary::after { content: ' ▸'; }
         .workflow-section[open] summary { margin-bottom: 8px; }
+        /* Sidebar tabs (Selection / Tracks / Workflow) + track manager. */
+        .sidebar-tabs { display: flex; gap: 3px; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; }
+        .sidebar-tab {
+            flex: 1; text-align: center; padding: 6px 4px; font-size: 0.75rem; font-weight: 700;
+            color: #64748b; background: transparent; border: none; border-bottom: 2px solid transparent;
+            border-radius: 0; cursor: pointer;
+        }
+        .sidebar-tab:hover { color: #334155; background: #f1f5f9; }
+        .sidebar-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+        .sidebar-panel[hidden] { display: none; }
+        .tm-group { margin-bottom: 8px; }
+        .tm-group-head { display: flex; align-items: center; gap: 6px; padding: 4px 2px; border-bottom: 1px solid #f1f5f9; }
+        .tm-group-name { font-size: 0.78rem; font-weight: 700; color: #334155; }
+        .tm-track { display: flex; align-items: center; gap: 6px; padding: 2px 2px 2px 18px; }
+        .tm-track-name { font-size: 0.74rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tm-eye {
+            width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.62rem; line-height: 1; padding: 0; background: #fff; color: #2563eb;
+            border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;
+        }
+        .tm-eye:hover { background: #e2e8f0; }
         #btnP3D.tb-btn-active { background: #2563eb; color: #fff; border-color: #1d4ed8; }
         /* Floating 3D structure viewer (Py3Dmol) */
         .p3d-viewer {
@@ -1834,6 +1855,13 @@
                 </button>
             </div>
 
+            <div class="sidebar-tabs" role="tablist" aria-label="Workspace panels">
+                <button type="button" class="sidebar-tab active" data-tab="selection" onclick="switchSidebarTab('selection')">Selection</button>
+                <button type="button" class="sidebar-tab" data-tab="tracks" onclick="switchSidebarTab('tracks')">Tracks</button>
+                <button type="button" class="sidebar-tab" data-tab="workflow" onclick="switchSidebarTab('workflow')">Workflow</button>
+            </div>
+
+            <div class="sidebar-panel" id="side-panel-selection">
             <div class="sel-workspace-header">
                 <h3 class="sidebar-title" style="margin:0; font-size:1.1rem; color:#0f172a;">Selection Workspace</h3>
                 <div id="savedSelectionsBar" class="saved-selections-bar">
@@ -1960,9 +1988,22 @@
                 </span></span>
                 <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a region or graph point for statistics.</div>
             </div>
+            </div>
 
-            <details class="workflow-section">
-                <summary>External Workflow</summary>
+            <div class="sidebar-panel" id="side-panel-tracks" hidden>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <h3 class="sidebar-title" style="margin:0; font-size:1.05rem; color:#0f172a;">Tracks</h3>
+                    <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                        <strong>Track Manager</strong><br>
+                        Show/hide each loaded type or individual track. Per-type display options (Glyphs / Bar / AA / Config) live on the grid's Track Control chevrons.
+                    </span></span>
+                </div>
+                <div id="trackManagerList"></div>
+            </div>
+
+            <div class="sidebar-panel" id="side-panel-workflow" hidden>
+            <details class="workflow-section" open>
+            <summary>External Workflow</summary>
             <div>
                 <strong id="cmdTargetLabel">ChimeraX Target:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
                     <strong>Command Target</strong><br>
@@ -2006,6 +2047,7 @@
                 Change engine (ChimeraX / PyMOL / VMD) in <a href="#" onclick="openOptionsModal(); return false;" style="color: #2563eb;">Options</a>.
             </div>
             </details>
+            </div>
         </div>
     </div>
 </div>
@@ -3128,6 +3170,61 @@ function autoLookupAccession() {
         if (inp) inp.value = currentProteinLabel;
     }
     showToast('Use "Search" (name/gene/organism) or "Sequence (BLAST)" to find the UniProt accession.', 'info');
+}
+
+// --- Sidebar tabs (Selection / Tracks / Workflow) -------------------------
+function switchSidebarTab(name) {
+    document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.sidebar-panel').forEach(p => { p.hidden = (p.id !== 'side-panel-' + name); });
+    if (name === 'tracks') renderTrackManager();
+}
+
+// JalView-style track manager: one row per type group (with a show/hide eye)
+// and an indented row per individual track. Visibility routes through the same
+// trackControlState the Track Control popover uses, so they stay in sync.
+function renderTrackManager() {
+    const wrap = document.getElementById('trackManagerList');
+    if (!wrap) return;
+    const groups = getTctlGroupsInOrder().filter(g => g !== 'AA');
+    const anyTracks = groups.some(g => getGroupTrackKeys(g).length);
+    if (!anyTracks) { wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.78rem;">No tracks loaded yet.</p>'; return; }
+    let html = '';
+    groups.forEach(g => {
+        const keys = getGroupTrackKeys(g);
+        if (!keys.length) return;
+        const groupHidden = isTrackGroupHidden(g);
+        html += '<div class="tm-group">' +
+            '<div class="tm-group-head">' +
+            '<button type="button" class="tm-eye" data-g="' + structureEscapeHtml(g) + '" onclick="toggleTrackManagerGroup(this.dataset.g)" title="Show/hide all ' + structureEscapeHtml(trackGroupLabel(g)) + '">' + (groupHidden ? '○' : '●') + '</button>' +
+            '<span class="tm-group-name">' + structureEscapeHtml(trackGroupLabel(g)) + ' <span style="color:#94a3b8;">(' + keys.length + ')</span></span>' +
+            '</div>';
+        keys.forEach(k => {
+            const vis = !isTrackFiltered(k);
+            html += '<div class="tm-track">' +
+                '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
+                '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) + '</span>' +
+                '</div>';
+        });
+        html += '</div>';
+    });
+    wrap.innerHTML = html;
+}
+function toggleTrackManagerGroup(g) {
+    if (isTrackGroupHidden(g)) delete trackControlState.hidden[g];
+    else trackControlState.hidden[g] = true;
+    tctlAfterChange();
+    renderTrackManager();
+}
+function toggleTrackManagerTrack(k) {
+    if (isTrackFiltered(k)) delete trackControlState.filtered[k];
+    else trackControlState.filtered[k] = true;
+    tctlAfterChange();
+    renderTrackManager();
+}
+// Refreshes the manager in place when new data renders while its tab is open.
+function refreshTrackManagerIfVisible() {
+    const panel = document.getElementById('side-panel-tracks');
+    if (panel && !panel.hidden) renderTrackManager();
 }
 
 // --- Collapsible legend (T4) ----------------------------------------------
@@ -6373,6 +6470,7 @@ function renderViewer(tracks) {
     }
 
     updateSelectionUI();
+    refreshTrackManagerIfVisible();
 }
 
 // Which key in a given (already-sorted) key list opens the Track Control
