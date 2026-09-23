@@ -1,0 +1,8 @@
+{
+  "name": "quick2dviewer",
+  "private": true,
+  "description": "Dev tooling only — the app itself is the single-file index.html with no dependencies.",
+  "scripts": {
+    "test": "node tests/run.js"
+  }
+}

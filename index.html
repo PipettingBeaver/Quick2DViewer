@@ -2375,6 +2375,21 @@
     </div>
 </div>
 
+<!-- Confirm Modal (replaces blocking window.confirm) -->
+<div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="modal-content" style="width: 460px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="confirmModalTitle" style="margin: 0; color: #0f172a;">Confirm</h3>
+            <button onclick="resolveConfirm(false)" style="background: #64748b; padding: 4px 10px; font-size: 0.8rem;">Cancel</button>
+        </div>
+        <p id="confirmModalMessage" style="font-size: 0.85rem; color: #334155; line-height: 1.5; margin: 16px 0;"></p>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" onclick="resolveConfirm(false)">Cancel</button>
+            <button type="button" id="confirmModalOk" onclick="resolveConfirm(true)" style="background: #dc2626;">Confirm</button>
+        </div>
+    </div>
+</div>
+
 <!-- Floating 3D structure viewer (Py3Dmol) -->
 <div id="p3dViewer" class="p3d-viewer p3d-small" hidden>
     <div class="p3d-header" id="p3dDragHandle" title="Drag to reposition the 3D viewer">
@@ -3417,6 +3432,34 @@ function openHelpModal() {
 function closeHelpModal() {
     closeModalAsDialog('helpModal');
 }
+
+// --- Confirm dialog (headless-safe replacement for window.confirm) --------
+// Returns a Promise<boolean>. Non-blocking (so it never hangs automation), and
+// falls back to window.confirm only if the modal element is unavailable.
+let confirmResolve = null;
+function confirmDialog(message, opts) {
+    opts = opts || {};
+    return new Promise((resolve) => {
+        const modal = getModalEl('confirmModal');
+        if (!modal) { resolve(typeof window !== 'undefined' && window.confirm ? window.confirm(message) : true); return; }
+        const msgEl = document.getElementById('confirmModalMessage');
+        const okBtn = document.getElementById('confirmModalOk');
+        if (msgEl) msgEl.textContent = message;
+        if (okBtn) { okBtn.textContent = opts.okLabel || 'Confirm'; okBtn.style.background = (opts.danger === false) ? '#2563eb' : '#dc2626'; }
+        confirmResolve = resolve;
+        openModalAsDialog('confirmModal');
+    });
+}
+function resolveConfirm(value) {
+    closeModalAsDialog('confirmModal');
+    const r = confirmResolve;
+    confirmResolve = null;
+    if (r) r(!!value);
+}
+// Escape / outside-click on the confirm modal resolves as "cancel".
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && confirmResolve) resolveConfirm(false);
+});
 
 // --- Changelog modal (click the version badge) ----------------------------
 let changelogLoaded = false;
@@ -5214,14 +5257,14 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             continue;
         }
         if (maybeSave && maybeSave.q2dvSave === true) {
-            importSaveFile(maybeSave, file.name);
+            await importSaveFile(maybeSave, file.name);
         } else {
             remainingFiles.push(file); // valid JSON, but not one of our saves (e.g. an AF3 prediction)
         }
     }
 
     if (remainingFiles.length && !parsedTracks.AA) {
-        alert("Please paste and parse the Quick2D FASTA sequence first.");
+        showToast('Please paste and parse the Quick2D FASTA sequence first.', 'error');
         event.target.value = '';
         return;
     }
@@ -5348,10 +5391,11 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
     await Promise.allSettled(cachePromises);
     saveStateToStorage();
     if (lastPersistError) {
-        alert(
-            'Structure data was added and is active for this session, but caching it locally failed:\n\n' +
+        showToast(
+            'Structure data was added and is active for this session, but caching it locally failed: ' +
             lastPersistError +
-            '\n\nIt may not survive a page refresh. See Options > Cached Data for details.'
+            ' It may not survive a page refresh. See Options > Cached Data for details.',
+            'error'
         );
     }
 });
@@ -8616,8 +8660,8 @@ function computeCrossReferenceHTML(trackKey, indices) {
         } else if (isRsa) {
             html += `• Mean RSA: <strong>${mean.toFixed(2)}</strong><br>• Buried Core (<0.2): <strong>${((buried / count) * 100).toFixed(1)}%</strong>`;
         }
-        return html;
-    }
+    return html;
+}
 
     if (typeof trackData === 'string') {
         const counts = {};
@@ -8962,7 +9006,7 @@ function computeMetricsRows() {
 function openMetricsTable() {
     const { rows, region, hasData } = computeMetricsRows();
     if (!hasData) {
-        alert("Please attach structure files first.");
+        showToast('Please attach structure files first.', 'error');
         return;
     }
 
@@ -10015,7 +10059,7 @@ async function renderStructureCacheInfo() {
 }
 async function deleteStructureCacheEntry(hash) {
     if (!hash) return;
-    if (!confirm('Remove this cached structure from this device?')) return;
+    if (!(await confirmDialog('Remove this cached structure from this device?', { okLabel: 'Remove' }))) return;
     try { await structureCacheDelete(hash); } catch (err) { console.error(err); }
     missingStructureRefs = missingStructureRefs.filter(m => m.hash !== hash);
     showToast('Removed from the structure cache.', 'success');
@@ -10023,7 +10067,7 @@ async function deleteStructureCacheEntry(hash) {
     renderCachedDataInfo();
 }
 async function clearStructureCache() {
-    if (!confirm('This permanently deletes ALL cached PDB/CIF copies on this device. Structures in the current session stay usable, but after a refresh or a save re-import they would need re-attaching (or Find in Data). Continue?')) return;
+    if (!(await confirmDialog('This permanently deletes ALL cached PDB/CIF copies on this device. Structures in the current session stay usable, but after a refresh or a save re-import they would need re-attaching (or Find in Data). Continue?', { okLabel: 'Clear Cache' }))) return;
     try { await structureCacheClear(); } catch (err) { console.error(err); }
     missingStructureRefs = missingStructureRefs.map(m => ({ fileName: m.fileName, hash: null, ext: m.ext }));
     renderStructureCacheInfo();
@@ -10475,7 +10519,7 @@ function onExportSelect() {
 // the structure-upload handler's auto-detection (see below) - kept separate
 // from that detection logic so it's easy to call from elsewhere later (e.g.
 // a dedicated "Import" control) without duplicating the restore steps.
-function importSaveFile(saveObj, fileLabel) {
+async function importSaveFile(saveObj, fileLabel) {
     if (!saveObj.parsedTracks || !saveObj.parsedTracks.AA) {
         showToast(`"${fileLabel}" is marked as a Q2DV save but has no sequence data - skipped.`, 'error');
         return false;
@@ -10484,8 +10528,9 @@ function importSaveFile(saveObj, fileLabel) {
         showToast(`"${fileLabel}" was saved by a newer version of Q2DV - importing anyway on a best-effort basis.`, 'error');
     }
     if (parsedTracks.AA) {
-        const proceed = confirm(
-            `Importing "${fileLabel}" will replace the current session (sequence, structures, selection, and preferences). Continue?`
+        const proceed = await confirmDialog(
+            `Importing "${fileLabel}" will replace the current session (sequence, structures, selection, and preferences). Continue?`,
+            { okLabel: 'Import' }
         );
         if (!proceed) return false;
     }
@@ -11005,11 +11050,11 @@ function closeDataModal() {
 
 function copyDataJSON() {
     const text = document.getElementById('dataJSONView').textContent;
-    navigator.clipboard.writeText(text).then(() => { alert('Copied JSON to clipboard!'); });
+    navigator.clipboard.writeText(text).then(() => { showToast('Copied JSON to clipboard.', 'success'); });
 }
 
-function resetAllData() {
-    if (!confirm('This permanently deletes all cached data - parsed sequence, structure files, selection, and preferences - and resets the page. Continue?')) {
+async function resetAllData() {
+    if (!(await confirmDialog('This permanently deletes all cached data - parsed sequence, structure files, selection, and preferences - and resets the page. Continue?', { okLabel: 'Reset Data' }))) {
         return;
     }
     try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.error(err); }
@@ -11098,7 +11143,7 @@ function resetAllData() {
 function copyText(elementId) {
     const text = document.getElementById(elementId).textContent;
     if (text === '-' || text === 'No selection active' || text.startsWith('#')) return;
-    navigator.clipboard.writeText(text).then(() => { alert("Copied selection data to clipboard!"); });
+    navigator.clipboard.writeText(text).then(() => { showToast('Copied selection data to clipboard.', 'success'); });
 }
 
 // Restore whatever was cached from a previous visit, if any. Runs last so
