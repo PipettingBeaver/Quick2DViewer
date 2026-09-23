@@ -2546,10 +2546,18 @@ async function resolveAccessionFromSequence(seq) {
 
             let status = '';
             let lastLogged = '';
-            for (let i = 0; i < 100; i++) {
+            let poll = 0;
+            const deadline = Date.now() + 15 * 60 * 1000; // 15 min hard cap (UniProtKB BLAST can take 5-10 min under load)
+            while (Date.now() < deadline) {
+                poll++;
                 await new Promise(r => setTimeout(r, 3000));
-                status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 30000)).text()).trim();
-                if (status !== lastLogged) { uniprotLog('poll ' + (i + 1) + ': status=' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
+                try {
+                    status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 60000)).text()).trim();
+                } catch (e) {
+                    uniprotLog('poll ' + poll + ': status fetch failed (' + (e && e.name === 'AbortError' ? 'timeout' : (e && e.message ? e.message : e)) + ') — continuing');
+                    continue; // a stalled status check is transient; keep polling the same job
+                }
+                if (status !== lastLogged) { uniprotLog('poll ' + poll + ': status=' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
                 if (status === 'FINISHED') break;
                 if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('BLAST ' + status);
                 setUniProtStatus(`BLAST job ${jobId} still running… ${elapsed()}s (${status || 'queued'})`);
@@ -3134,7 +3142,7 @@ document.addEventListener('click', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.5.6';
+const APP_VERSION = '0.5.7';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

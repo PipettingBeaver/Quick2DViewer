@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-09-22
+
+### Fixed
+
+- UniProt BLAST polling is now resilient: a single stalled status check no longer
+  aborts the whole run (it retries the same job), status timeout raised to 60s,
+  and the overall window extended to 15 min so slow EBI jobs finish.
+
 ## [0.5.6] - 2026-09-22
 
 ### Changed
