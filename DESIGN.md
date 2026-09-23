@@ -103,7 +103,8 @@ deposited entries).
 1. `trackMeta` + source tagging + `HH_`→`HL_` rename — **done (0.11.0)**
 2. ESMFold integration — **done (0.12.0)**; service registry + provider fallback
    + external-services opt-in shipped alongside
-3. Foldseek integration
+3. Foldseek integration — **done (0.13.0)**; structure-query only (server-side
+   sequence/ProstT5 path errors), results as `HL_` tracks + template table
 4. Contradiction engine (Rules panel)
 5. Client-side interface analysis
 6. HMMER hmmscan
@@ -111,6 +112,10 @@ deposited entries).
 
 ## 10. Open items / to discuss
 
+- **UI polish — left sidebar / track rows (noted).** The `tctl-chevron state-on`
+  on the first row of a track type reads as visually messy; the track rows overall
+  should be cleaner and more reactive (hover/active affordances). Revisit the
+  chevron placement/styling + row hover states after the service integrations.
 - Contradiction **presets** — need literature backing before finalizing.
 - Co-localization UI shape (track + table) — confirm during build.
 - Foldseek result semantics (TM-score color-coding) — confirm during build.

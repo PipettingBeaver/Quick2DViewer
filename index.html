@@ -1783,15 +1783,24 @@
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:6px; flex-wrap:wrap;">
                     <h4 style="margin:0; color: #0f172a; font-size: 0.95rem;">Loaded Data</h4>
-                    <span style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <span style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="autoLookupAccession()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Predict a 3D structure for the current sequence with ESMFold (≤400 aa) and attach it">Predict structure (ESMFold)</button>
+                        <select id="foldseekDb" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Foldseek search database">
+                            <option value="afdb50">afdb50 (AlphaFoldDB)</option>
+                            <option value="pdb100">pdb100 (PDB)</option>
+                            <option value="swissprot">swissprot</option>
+                            <option value="bfvd">bfvd (viral)</option>
+                        </select>
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="runFoldseekSearch()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Search a structure database for structural homologs with Foldseek (uses the active/first attached model)">Find structural homologs (Foldseek)</button>
                     </span>
                 </div>
                 <div id="inputDataSummary" class="data-box" style="font-size:0.78rem; white-space:pre-wrap; line-height:1.5;">No data loaded yet.</div>
                 <div id="esmfoldStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                <div id="foldseekStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -2655,7 +2664,8 @@ const SERVICE_REGISTRY = {
             label: 'Structural homology (Foldseek)',
             providers: [
                 { id: 'foldseek', label: 'Foldseek', adapter: 'foldseek',
-                  url: 'https://search.foldseek.com/api/', enabled: false }, // planned
+                  url: 'https://search.foldseek.com/api/', mode: '3diaa',
+                  defaultDatabase: 'afdb50', enabled: true },
             ],
         },
         domain_scan: {
@@ -2751,8 +2761,36 @@ const SERVICE_ADAPTERS = {
         if (!text || text.length < 60 || !/^(ATOM|HEADER|MODEL)/m.test(text)) throw new Error('empty/invalid prediction');
         return { pdbText: text, format: 'pdb', label: provider.label };
     },
-    // Foldseek (planned)
-    async foldseek() { throw new Error('Foldseek adapter not implemented yet'); },
+    // Foldseek: submit a STRUCTURE (PDB text) -> poll -> result JSON.
+    // Note: the server's sequence/ProstT5 path currently errors for every job;
+    // structure queries work, which is what we need (AlphaFold/ESMFold models).
+    async foldseek(provider, args, onProgress) {
+        const db = args.database || provider.defaultDatabase || 'afdb50';
+        const body = new URLSearchParams();
+        body.set('q', args.pdbText || '');
+        body.append('database[]', db);
+        body.set('mode', provider.mode || '3diaa');
+        const resp = await fetch(provider.url + 'ticket', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
+        if (!resp.ok) throw new Error('submit HTTP ' + resp.status);
+        const job = await resp.json();
+        const id = job && job.id;
+        if (!id) throw new Error('no ticket id');
+        const t0 = Date.now();
+        const elapsed = () => Math.round((Date.now() - t0) / 1000);
+        let status = job.status || 'PENDING';
+        const deadline = Date.now() + 5 * 60 * 1000;
+        while (Date.now() < deadline && status !== 'COMPLETE') {
+            await new Promise(r => setTimeout(r, 3000));
+            try { const st = await (await fetch(provider.url + 'ticket/' + id)).json(); status = st && st.status; }
+            catch (e) { /* transient - keep polling */ }
+            if (status === 'ERROR' || status === 'FAILURE' || status === 'FAILED') throw new Error('Foldseek job ' + status);
+            if (onProgress) onProgress('Foldseek ' + db + ' running… ' + elapsed() + 's (' + (status || '?') + ')');
+        }
+        if (status !== 'COMPLETE') throw new Error('Foldseek timed out after ' + elapsed() + 's');
+        const res = await fetch(provider.url + 'result/' + id + '/0');
+        if (!res.ok) throw new Error('result HTTP ' + res.status);
+        return await res.json();
+    },
 };
 
 // Runs a capability's providers in order until one succeeds.
@@ -2830,6 +2868,116 @@ async function predictStructureESMFold() {
         const m = err && err.message ? err.message : String(err);
         setStatus('ESMFold failed: ' + m);
         showToast('ESMFold prediction failed: ' + m, 'error');
+    }
+}
+
+// --- Foldseek structural homology -----------------------------------------
+// Extracts a 4-char PDB id from a Foldseek target label ("2iiu-assembly1…").
+function foldseekPdbId(target) {
+    const m = String(target || '').match(/^([0-9][A-Za-z0-9]{3})/);
+    return m ? m[1].toUpperCase() : null;
+}
+// Rough match-quality glyph for one aligned column (mirrors HHpred's symbols).
+function foldseekQualityChar(q, d) {
+    if (!q || !d || q === '-' || d === '-') return ' ';
+    if (q === d) return '|';
+    return (typeof blosum62Score === 'function' && blosum62Score(q, d) > 0) ? ':' : '.';
+}
+// Flattens a Foldseek result JSON into hit objects (best probability first).
+function parseFoldseekResults(result) {
+    const out = [];
+    ((result && result.results) || []).forEach(dbRes => {
+        (dbRes.alignments || []).forEach(group => {
+            (group || []).forEach(a => {
+                out.push({
+                    db: dbRes.db,
+                    target: a.target || '',
+                    pdbId: foldseekPdbId(a.target),
+                    seqId: a.seqId, prob: a.prob, evalue: a.eval, score: a.score,
+                    qStart: a.qStartPos, qEnd: a.qEndPos,
+                    qAln: a.qAln || '', dbAln: a.dbAln || '',
+                    qLen: a.qLen, dbLen: a.dbLen, taxName: a.taxName || ''
+                });
+            });
+        });
+    });
+    out.sort((a, b) => (b.prob || 0) - (a.prob || 0));
+    return out;
+}
+// Creates HL_ tracks + homologHitsInfo entries (source 'Foldseek') from hits,
+// mirroring the HHpred import so they flow through the existing homolog UI,
+// 3D viewer (PDB id -> RCSB fetch) and Homolog Templates table.
+function applyFoldseekHits(hits) {
+    const totalLength = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!totalLength || !hits || !hits.length) return 0;
+    let startRank = 0;
+    Object.keys(parsedTracks).forEach(k => { const m = k.match(/^HL_(\d+)_/); if (m) startRank = Math.max(startRank, parseInt(m[1], 10)); });
+    let added = 0;
+    hits.slice(0, 20).forEach(hit => {
+        if (hit.qStart == null || hit.qEnd == null || !hit.qAln) return;
+        const rank = startRank + added + 1;
+        const idPart = hit.pdbId || ((hit.target.split(/\s+/)[0] || 'hit').slice(0, 20));
+        const trackKey = `HL_${String(rank).padStart(2, '0')}_${idPart}`;
+        const track = new Array(totalLength).fill(' ');
+        const aaTrack = new Array(totalLength).fill(' ');
+        let qPos = hit.qStart; // 1-based
+        for (let i = 0; i < hit.qAln.length; i++) {
+            const qc = hit.qAln[i];
+            if (qc === '-') continue; // template insertion -> no query residue here
+            const idx = qPos - 1;
+            if (idx >= 0 && idx < totalLength) {
+                const dc = hit.dbAln[i];
+                track[idx] = foldseekQualityChar(qc, dc);
+                aaTrack[idx] = (dc && dc !== '-' && dc !== '~') ? dc : ' ';
+            }
+            qPos++;
+        }
+        parsedTracks[trackKey] = track.join('');
+        graphHighlights[trackKey] = true;
+        homologHitsInfo[trackKey] = {
+            rank,
+            hitId: hit.pdbId || idPart,
+            hitDesc: hit.target,
+            stats: {
+                Probab: hit.prob != null ? (hit.prob * 100).toFixed(1) : '',
+                'E-value': hit.evalue != null ? String(hit.evalue) : '',
+                Score: hit.score != null ? String(hit.score) : '',
+                Aligned_cols: String(hit.qAln.length),
+                Identities: hit.seqId != null ? String(hit.seqId) : ''
+            },
+            aaTrack: aaTrack.join(''),
+            source: 'Foldseek'
+        };
+        added++;
+    });
+    return added;
+}
+async function runFoldseekSearch() {
+    if (!(await ensureExternalServices())) return;
+    const files = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
+    if (!files.length) { showToast('Foldseek searches by structure — attach a PDB/CIF (or predict one with ESMFold) first.', 'error'); return; }
+    let file = files[0];
+    if (p3dModel && p3dModel.kind === 'pdb' && cachedStructureTexts[p3dModel.fileName]) file = p3dModel.fileName;
+    const dbEl = document.getElementById('foldseekDb');
+    const db = (dbEl && dbEl.value) || 'afdb50';
+    const statusEl = document.getElementById('foldseekStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    setStatus('Searching Foldseek (' + db + ') with ' + file + '…');
+    try {
+        const result = await runCapability('structure_search', { pdbText: cachedStructureTexts[file], database: db }, (m) => setStatus(m));
+        const hits = parseFoldseekResults(result);
+        const added = applyFoldseekHits(hits);
+        renderViewer(parsedTracks);
+        populateCrossRefDropdown();
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        schedulePersist();
+        setStatus(added ? ('Foldseek: ' + added + ' hit(s) added from ' + db + ' (of ' + hits.length + ').') : 'No Foldseek hits.');
+        showToast(added ? ('Foldseek added ' + added + ' structural homolog track(s).') : 'Foldseek returned no hits.', added ? 'success' : 'info');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('Foldseek failed: ' + m);
+        showToast('Foldseek search failed: ' + m, 'error');
     }
 }
 
@@ -3974,7 +4122,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.12.0';
+const APP_VERSION = '0.13.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

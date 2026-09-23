@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-23
+
+### Added
+
+- **Foldseek structural homology** (Input Data → "Find structural homologs
+  (Foldseek)"): searches a structure database (`afdb50` / `pdb100` / `swissprot` /
+  `bfvd`) using the active or first attached model, and adds each hit as an `HL_`
+  track (match-quality glyphs + template residues) tagged `source: Foldseek`. Hit
+  PDB ids are extracted so they load in the 3D viewer and appear in the Homolog
+  Templates table.
+  *Note:* Foldseek's server-side sequence (ProstT5) path currently errors for every
+  job, so Q2DV queries with the **structure** — which is what it has (AlphaFold /
+  ESMFold models).
+
 ## [0.12.0] - 2026-09-23
 
 ### Added
