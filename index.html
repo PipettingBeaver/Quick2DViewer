@@ -115,6 +115,16 @@
         }
         .tm-group-head:hover .tm-chevron { color: #475569; }
         .tm-chevron:hover { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+        .tm-mini {
+            width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; line-height: 1; padding: 0; background: #f1f5f9; color: #475569;
+            border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;
+        }
+        .tm-mini:hover { background: #e2e8f0; color: #1e293b; }
+        /* New-feature QA marker: a purple dashed accent on unreviewed additions so
+           they are easy to spot and test. Toggle via File > New-feature highlights. */
+        .qa-new { outline: 2px dashed #a855f7; outline-offset: 2px; border-radius: 4px; }
+        body.qa-off .qa-new { outline: none; }
         /* Floating 3D structure viewer (Py3Dmol) */
         .p3d-viewer {
             position: fixed;
@@ -1728,6 +1738,7 @@
                     <button type="button" onclick="menuBarAction('save')">Export Save (.json)</button>
                     <button type="button" onclick="menuBarAction('reset')">Reset Data</button>
                     <button type="button" id="menuExternalServices" onclick="menuBarAction('toggleExternal')">External services: OFF</button>
+                    <button type="button" id="menuQaHighlights" onclick="menuBarAction('toggleQa')">New-feature highlights: ON</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -1802,7 +1813,7 @@
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:6px; flex-wrap:wrap;">
                     <h4 style="margin:0; color: #0f172a; font-size: 0.95rem;">Loaded Data</h4>
-                    <span style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <span class="qa-new" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="autoLookupAccession()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
@@ -2034,22 +2045,16 @@
             </div>
 
             <div class="sidebar-panel" id="side-panel-tracks" hidden>
-                <details class="workflow-section" id="trackManagerSection" open>
+                <details class="workflow-section qa-new" id="trackManagerSection" open>
                     <summary>Tracks</summary>
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;">
-                        <span style="font-size:0.68rem; color:#94a3b8;">per type → expand for tracks <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
-                            <strong>Track Manager</strong><br>
-                            Show/hide each loaded type or individual track. Per-type display options (Glyphs / Bar / AA / Config) live on the grid's Track Control chevrons.
-                        </span></span></span>
-                        <span style="display:flex; gap:4px;">
-                            <button type="button" class="copy-btn" onclick="trackManagerExpandAll(true)" style="padding:1px 6px;" title="Expand all types">expand all</button>
-                            <button type="button" class="copy-btn" onclick="trackManagerExpandAll(false)" style="padding:1px 6px;" title="Collapse all types">collapse all</button>
-                        </span>
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-bottom:6px;">
+                        <button type="button" class="tm-mini" onclick="trackManagerExpandAll(true)" title="Expand all types">+</button>
+                        <button type="button" class="tm-mini" onclick="trackManagerExpandAll(false)" title="Collapse all types">−</button>
                     </div>
                     <div id="trackManagerList"></div>
                 </details>
 
-                <details class="workflow-section" id="rulesSection" open style="margin-top: 12px;">
+                <details class="workflow-section qa-new" id="rulesSection" open style="margin-top: 12px;">
                     <summary>Rules (contradiction / co-localization)</summary>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                         Flag residues satisfying a boolean query across tracks (e.g. disorder ∧ TM ∧ low&nbsp;pLDDT). Each enabled rule becomes a coloured track; "select" turns its matches into a selection.
@@ -2058,7 +2063,7 @@
                     <div id="rulesList" style="margin-top:8px;"></div>
                 </details>
 
-                <details class="workflow-section" id="interfaceSection" style="margin-top: 10px;">
+                <details class="workflow-section qa-new" id="interfaceSection" style="margin-top: 10px;">
                     <summary>Interfaces (oligomer contacts)</summary>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                         Find residues at chain–chain interfaces in the active (or first) multi-chain structure. Runs client-side, so it works on AlphaFold / ESMFold models too; each chain gets an interface track.
@@ -2922,6 +2927,22 @@ function toggleExternalServices() {
     syncExternalServicesMenu();
     schedulePersist();
     showToast('External services ' + (externalServicesEnabled ? 'enabled.' : 'disabled.'), 'info');
+}
+
+// --- New-feature QA highlights (purple marker) -----------------------------
+// New UI is tagged with `.qa-new` (a purple dashed outline) so it is easy to
+// spot and test, instead of relying on verbose comments. Toggle from the File
+// menu once reviewed.
+let qaHighlightsEnabled = true;
+function syncQaHighlights() {
+    document.body.classList.toggle('qa-off', !qaHighlightsEnabled);
+    const el = document.getElementById('menuQaHighlights');
+    if (el) el.textContent = 'New-feature highlights: ' + (qaHighlightsEnabled ? 'ON' : 'OFF');
+}
+function toggleQaHighlights() {
+    qaHighlightsEnabled = !qaHighlightsEnabled;
+    syncQaHighlights();
+    schedulePersist();
 }
 
 // --- ESMFold structure prediction -----------------------------------------
@@ -4067,6 +4088,7 @@ function menuBarAction(action) {
         case 'save': exportFullSave(); break;
         case 'reset': resetAllData(); break;
         case 'toggleExternal': toggleExternalServices(); break;
+        case 'toggleQa': toggleQaHighlights(); break;
         case 'graphPlddt': { const c = document.getElementById('graphPlddtCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
         case 'graphRsa': { const c = document.getElementById('graphRsaCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
         case 'legend': toggleLegend(); break;
@@ -4607,7 +4629,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.15.1';
+const APP_VERSION = '0.15.2';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11044,6 +11066,7 @@ function gatherPersistableState() {
         preferences: {
             graphMode: { pLDDT: graphMode.pLDDT, RSA: graphMode.RSA },
             externalServicesEnabled,
+            qaHighlightsEnabled,
             analysisRules,
             selectionScope,
             gridCellW,
@@ -11431,6 +11454,8 @@ function applyPersistedState(state) {
     syncGraphModeControls();
     externalServicesEnabled = !!prefs.externalServicesEnabled;
     syncExternalServicesMenu();
+    qaHighlightsEnabled = prefs.qaHighlightsEnabled !== false;
+    syncQaHighlights();
     // Analysis rules (rebuild their trackMeta so the restored RULE_ tracks keep their colour).
     analysisRules = Array.isArray(prefs.analysisRules) ? prefs.analysisRules : [];
     analysisRules.forEach(r => { if (r && r.id) setTrackMeta('RULE_' + r.id, { source: 'Rule', color: r.color, ruleName: r.name }); });
@@ -11871,6 +11896,8 @@ async function resetAllData() {
     graphMode = { pLDDT: false, RSA: false };
     syncGraphModeControls();
     externalServicesEnabled = false;
+    qaHighlightsEnabled = true;
+    syncQaHighlights();
     trackManagerExpanded = {};
     syncExternalServicesMenu();
     analysisRules = [];

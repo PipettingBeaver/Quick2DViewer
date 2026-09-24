@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-09-23
+
+### Changed
+
+- Tracks panel: removed the stray "per type → expand for tracks" helper text, and
+  compacted the expand/collapse-all controls to `+` / `−` icon buttons (with tooltips).
+
+### Added
+
+- **New-feature QA highlights** — new UI is tagged with a purple dashed outline
+  (`.qa-new`) so it is easy to spot and test, instead of verbose comments. Toggle via
+  **File → New-feature highlights**. First applied to the Tracks / Rules / Interfaces
+  sections and the lookup / predict-ESMFold / Foldseek row.
+- **`UX_GUIDELINES.md`** — a design-pass checklist grounded in modern UX research
+  (Nielsen, WCAG 2.2, Gestalt, Tufte, 2026 practice), with Q2DV-specific application
+  notes, visual tokens, and anti-patterns to avoid.
+
 ## [0.15.1] - 2026-09-23
 
 ### Changed
