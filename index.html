@@ -2033,6 +2033,15 @@
                     </span></span>
                 </div>
                 <div id="trackManagerList"></div>
+
+                <details class="workflow-section" id="rulesSection" style="margin-top: 12px;">
+                    <summary>Rules (contradiction / co-localization)</summary>
+                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                        Flag residues satisfying a boolean query across tracks (e.g. disorder ∧ TM ∧ low&nbsp;pLDDT). Each enabled rule becomes a coloured track; "select" turns its matches into a selection.
+                    </p>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="openRuleEditor()" style="font-size:0.72rem; padding:3px 8px;">+ New rule</button>
+                    <div id="rulesList" style="margin-top:8px;"></div>
+                </details>
             </div>
 
             <div class="sidebar-panel" id="side-panel-workflow" hidden>
@@ -2371,6 +2380,40 @@
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
             <button type="button" onclick="resolveConfirm(false)">Cancel</button>
             <button type="button" id="confirmModalOk" onclick="resolveConfirm(true)" style="background: #dc2626;">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- Rule editor modal (analysis rules) -->
+<div class="modal-overlay" id="ruleModal" role="dialog" aria-modal="true" aria-labelledby="ruleModalTitle">
+    <div class="modal-content" style="width: 640px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="ruleModalTitle" style="margin: 0; color: #0f172a;">Analysis Rule</h3>
+            <button onclick="closeRuleEditor()" style="background: #64748b; padding: 4px 10px; font-size: 0.8rem;">Cancel</button>
+        </div>
+        <div style="margin-top: 14px;">
+            <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                <div style="flex:1; min-width:180px;">
+                    <label for="ruleNameInput" style="display:block; font-size:0.75rem; font-weight:600; color:#475569; margin-bottom:4px;">Name</label>
+                    <input type="text" id="ruleNameInput" placeholder="e.g. Topology contradiction" style="width:100%; box-sizing:border-box; padding:5px; font-size:0.8rem; border:1px solid #cbd5e1; border-radius:4px;">
+                </div>
+                <div>
+                    <label for="ruleModeSelect" style="display:block; font-size:0.75rem; font-weight:600; color:#475569; margin-bottom:4px;">Match</label>
+                    <select id="ruleModeSelect" class="q2dv-select" style="font-size:0.8rem; padding:5px;">
+                        <option value="all">All conditions (AND)</option>
+                        <option value="any">Any condition (OR)</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <div style="font-size:0.75rem; font-weight:600; color:#475569; margin-bottom:6px;">Conditions</div>
+                <div id="ruleConditions"></div>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="addRuleCondition()" style="font-size:0.72rem; padding:3px 8px; margin-top:4px;">+ Add condition</button>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button type="button" onclick="closeRuleEditor()">Cancel</button>
+                <button type="button" onclick="saveRuleEditor()" style="background:#2563eb;">Save rule</button>
+            </div>
         </div>
     </div>
 </div>
@@ -3374,6 +3417,237 @@ function renderTopologySourceList() {
     wrap.innerHTML = html;
 }
 
+// --- Analysis rules (contradiction / co-localization engine) --------------
+// A rule is a boolean query across per-residue tracks. Each enabled rule becomes
+// a RULE_ track (matching residues flagged in the rule's colour) and can be
+// turned into a selection. The condition model is open: numeric sources
+// (conservation, pLDDT, RSA, …) and categorical sources (any string track) can be
+// combined with all/any. Literature-backed presets can be layered on later.
+let analysisRules = []; // [{ id, name, color, mode:'all'|'any', enabled, conditions:[{kind,source,op,value}] }]
+const RULE_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
+const RULE_MARKER = '■';
+
+function getRuleNumericSources() {
+    const out = [];
+    if (parsedTracks.CONSERVATION && Array.isArray(parsedTracks.CONSERVATION.values)) out.push({ id: 'CONSERVATION', label: 'Conservation (0-1)' });
+    const plddt = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT'));
+    const rsa = Object.keys(parsedTracks).filter(k => k.endsWith('_RSA'));
+    if (plddt.length > 1) {
+        out.push({ id: 'pLDDT_mean', label: 'pLDDT (mean of ' + plddt.length + ' models)' });
+        out.push({ id: 'pLDDT_min', label: 'pLDDT (min of ' + plddt.length + ' models)' });
+    }
+    plddt.forEach(k => out.push({ id: 'pLDDT:' + k, label: formatTrackLabel(k) + ' pLDDT' }));
+    rsa.forEach(k => out.push({ id: 'RSA:' + k, label: formatTrackLabel(k) + ' RSA' }));
+    return out;
+}
+function ruleNumericValue(sourceId, i) {
+    if (sourceId === 'CONSERVATION') {
+        const c = parsedTracks.CONSERVATION;
+        return (c && Array.isArray(c.values) && c.values[i] != null) ? c.values[i] : null;
+    }
+    if (sourceId === 'pLDDT_mean' || sourceId === 'pLDDT_min') {
+        const vals = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT'))
+            .map(k => parsedTracks[k][i]).filter(x => x && x.val != null).map(x => x.val);
+        if (!vals.length) return null;
+        return sourceId === 'pLDDT_mean' ? vals.reduce((a, b) => a + b, 0) / vals.length : Math.min.apply(null, vals);
+    }
+    if (sourceId.startsWith('pLDDT:')) { const t = parsedTracks[sourceId.slice(6)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
+    if (sourceId.startsWith('RSA:')) { const t = parsedTracks[sourceId.slice(4)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
+    return null;
+}
+function getRuleCategoricalSources() {
+    return Object.keys(parsedTracks)
+        .filter(k => typeof parsedTracks[k] === 'string' && k !== 'AA')
+        .map(k => ({ id: 'track:' + k, label: formatTrackLabel(k) }));
+}
+function ruleCategoricalValue(sourceId, i) {
+    const t = parsedTracks[sourceId.slice(6)];
+    return (typeof t === 'string') ? t[i] : undefined;
+}
+function ruleCompare(v, op, ref) {
+    if (v == null || isNaN(ref)) return false;
+    if (op === '<') return v < ref;
+    if (op === '<=') return v <= ref;
+    if (op === '>') return v > ref;
+    if (op === '>=') return v >= ref;
+    if (op === '==') return v === ref;
+    if (op === '!=') return v !== ref;
+    return false;
+}
+function evaluateRuleCondition(c, i) {
+    if (!c) return false;
+    if (c.kind === 'numeric') return ruleCompare(ruleNumericValue(c.source, i), c.op, parseFloat(c.value));
+    if (c.kind === 'categorical') {
+        const ch = ruleCategoricalValue(c.source, i);
+        const annotated = !!(ch && ch !== ' ' && ch !== '-' && ch !== '\t');
+        if (c.op === 'annotated') return annotated;
+        if (c.op === 'not_annotated') return !annotated;
+        if (c.op === 'eq') return ch === c.value;
+    }
+    return false;
+}
+// Boolean mask (per residue, 0-based) for a rule.
+function evaluateRule(rule) {
+    const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const out = new Array(totalLength).fill(false);
+    if (!rule || !rule.conditions || !rule.conditions.length) return out;
+    for (let i = 0; i < totalLength; i++) {
+        const results = rule.conditions.map(c => evaluateRuleCondition(c, i));
+        out[i] = rule.mode === 'any' ? results.some(Boolean) : results.every(Boolean);
+    }
+    return out;
+}
+// Rebuilds all RULE_ tracks from analysisRules and re-renders.
+function applyRules() {
+    Object.keys(parsedTracks).forEach(k => { if (k.startsWith('RULE_')) delete parsedTracks[k]; });
+    const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (totalLength) {
+        analysisRules.forEach(rule => {
+            if (rule.enabled === false) return;
+            const mask = evaluateRule(rule);
+            const track = new Array(totalLength).fill(' ');
+            mask.forEach((m, i) => { if (m) track[i] = RULE_MARKER; });
+            const key = 'RULE_' + rule.id;
+            parsedTracks[key] = track.join('');
+            setTrackMeta(key, { source: 'Rule', color: rule.color, ruleName: rule.name });
+        });
+    }
+    renderViewer(parsedTracks);
+    refreshTrackManagerIfVisible();
+    schedulePersist();
+}
+// Selects a rule's matching residues via the normal selection pipeline.
+function selectRuleMatches(id) {
+    const rule = analysisRules.find(r => r.id === id);
+    if (!rule) return;
+    const mask = evaluateRule(rule);
+    const ranges = [];
+    let start = -1;
+    for (let i = 0; i < mask.length; i++) {
+        if (mask[i] && start === -1) start = i;
+        else if (!mask[i] && start !== -1) { ranges.push([start, i - 1]); start = -1; }
+    }
+    if (start !== -1) ranges.push([start, mask.length - 1]);
+    if (!ranges.length) { showToast('Rule "' + rule.name + '" matches no residues.', 'info'); return; }
+    selectSeqSearchRanges(ranges, 'all');
+    showToast('Selected residues matching "' + rule.name + '".', 'success');
+}
+
+// --- Rule list + editor UI -------------------------------------------------
+let ruleEditing = null; // working copy while the editor modal is open
+
+function renderRulesList() {
+    const wrap = document.getElementById('rulesList');
+    if (!wrap) return;
+    if (!analysisRules.length) { wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.75rem;">No rules yet.</p>'; return; }
+    let html = '';
+    analysisRules.forEach(r => {
+        html += '<div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; margin-bottom:4px;">' +
+            '<span style="width:10px; height:10px; border-radius:2px; background:' + structureEscapeHtml(r.color) + '; flex-shrink:0;"></span>' +
+            '<button type="button" class="tm-eye" onclick="toggleRuleEnabled(\'' + structureEscapeHtml(r.id) + '\')" title="Enable / disable this rule">' + (r.enabled === false ? '○' : '●') + '</button>' +
+            '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + structureEscapeHtml(r.name) +
+            ' <span style="color:#94a3b8;">(' + r.conditions.length + ' cond, ' + (r.mode === 'any' ? 'any' : 'all') + ')</span></span>' +
+            '<button type="button" class="copy-btn" onclick="selectRuleMatches(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;" title="Select matching residues">select</button>' +
+            '<button type="button" class="copy-btn" onclick="openRuleEditor(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;">edit</button>' +
+            '<button type="button" class="copy-btn" onclick="deleteRule(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;">×</button>' +
+            '</div>';
+    });
+    wrap.innerHTML = html;
+}
+function toggleRuleEnabled(id) {
+    const r = analysisRules.find(x => x.id === id);
+    if (!r) return;
+    r.enabled = (r.enabled === false);
+    applyRules();
+    renderRulesList();
+}
+function deleteRule(id) {
+    analysisRules = analysisRules.filter(r => r.id !== id);
+    applyRules();
+    renderRulesList();
+}
+
+function renderRuleConditions() {
+    const wrap = document.getElementById('ruleConditions');
+    if (!wrap || !ruleEditing) return;
+    const numSources = getRuleNumericSources();
+    const catSources = getRuleCategoricalSources();
+    let html = '';
+    ruleEditing.conditions.forEach((c, idx) => {
+        const sources = c.kind === 'numeric' ? numSources : catSources;
+        html += '<div style="display:flex; gap:4px; align-items:center; margin-bottom:5px; flex-wrap:wrap;">';
+        html += '<select class="q2dv-select" onchange="onRuleKindChange(' + idx + ', this.value)" style="font-size:0.72rem; padding:2px 4px;">' +
+            '<option value="numeric"' + (c.kind === 'numeric' ? ' selected' : '') + '>number</option>' +
+            '<option value="categorical"' + (c.kind === 'categorical' ? ' selected' : '') + '>track</option></select>';
+        html += '<select class="q2dv-select" onchange="onRuleSourceChange(' + idx + ', this.value)" style="font-size:0.72rem; padding:2px 4px; flex:1; min-width:130px;">';
+        if (!sources.some(s => s.id === c.source)) html += '<option value="" selected>— pick a source —</option>';
+        sources.forEach(s => { html += '<option value="' + structureEscapeHtml(s.id) + '"' + (c.source === s.id ? ' selected' : '') + '>' + structureEscapeHtml(s.label) + '</option>'; });
+        html += '</select>';
+        const ops = c.kind === 'numeric'
+            ? [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['==', '='], ['!=', '≠']]
+            : [['annotated', 'is annotated'], ['not_annotated', 'is not annotated'], ['eq', 'equals char']];
+        html += '<select class="q2dv-select" onchange="onRuleOpChange(' + idx + ', this.value)" style="font-size:0.72rem; padding:2px 4px;">';
+        ops.forEach(([v, l]) => { html += '<option value="' + v + '"' + (c.op === v ? ' selected' : '') + '>' + l + '</option>'; });
+        html += '</select>';
+        if (c.kind === 'numeric' || c.op === 'eq') {
+            html += '<input type="text" class="rule-value" value="' + structureEscapeHtml(c.value || '') + '" oninput="onRuleValueInput(' + idx + ', this.value)" placeholder="value" style="width:70px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">';
+        }
+        html += '<button type="button" class="copy-btn" onclick="removeRuleCondition(' + idx + ')" style="padding:1px 6px;">×</button>';
+        html += '</div>';
+    });
+    if (!ruleEditing.conditions.length) html = '<p style="color:#94a3b8; font-size:0.75rem;">No conditions yet — add one below.</p>';
+    wrap.innerHTML = html;
+}
+function onRuleKindChange(idx, kind) {
+    if (!ruleEditing || !ruleEditing.conditions[idx]) return;
+    const c = ruleEditing.conditions[idx];
+    c.kind = kind === 'categorical' ? 'categorical' : 'numeric';
+    const srcs = c.kind === 'numeric' ? getRuleNumericSources() : getRuleCategoricalSources();
+    c.source = srcs.length ? srcs[0].id : '';
+    c.op = c.kind === 'numeric' ? '<' : 'annotated';
+    c.value = '';
+    renderRuleConditions();
+}
+function onRuleSourceChange(idx, source) { if (ruleEditing && ruleEditing.conditions[idx]) ruleEditing.conditions[idx].source = source; }
+function onRuleOpChange(idx, op) { if (ruleEditing && ruleEditing.conditions[idx]) { ruleEditing.conditions[idx].op = op; renderRuleConditions(); } }
+function onRuleValueInput(idx, value) { if (ruleEditing && ruleEditing.conditions[idx]) ruleEditing.conditions[idx].value = value; }
+function addRuleCondition() {
+    if (!ruleEditing) return;
+    const num = getRuleNumericSources();
+    const cat = getRuleCategoricalSources();
+    const useNum = num.length > 0;
+    ruleEditing.conditions.push({ kind: useNum ? 'numeric' : 'categorical', source: useNum ? num[0].id : ((cat[0] && cat[0].id) || ''), op: useNum ? '<' : 'annotated', value: '' });
+    renderRuleConditions();
+}
+function removeRuleCondition(idx) { if (ruleEditing) { ruleEditing.conditions.splice(idx, 1); renderRuleConditions(); } }
+function openRuleEditor(id) {
+    const existing = id ? analysisRules.find(r => r.id === id) : null;
+    ruleEditing = existing
+        ? JSON.parse(JSON.stringify(existing))
+        : { id: 'r' + Date.now().toString(36), name: 'New rule', color: RULE_COLORS[analysisRules.length % RULE_COLORS.length], mode: 'all', enabled: true, conditions: [] };
+    const nameEl = document.getElementById('ruleNameInput');
+    const modeEl = document.getElementById('ruleModeSelect');
+    if (nameEl) nameEl.value = ruleEditing.name;
+    if (modeEl) modeEl.value = ruleEditing.mode;
+    renderRuleConditions();
+    openModalAsDialog('ruleModal');
+}
+function closeRuleEditor() { closeModalAsDialog('ruleModal'); ruleEditing = null; }
+function saveRuleEditor() {
+    if (!ruleEditing) return;
+    const nameEl = document.getElementById('ruleNameInput');
+    const modeEl = document.getElementById('ruleModeSelect');
+    ruleEditing.name = (nameEl && nameEl.value || '').trim() || 'Rule';
+    ruleEditing.mode = (modeEl && modeEl.value === 'any') ? 'any' : 'all';
+    ruleEditing.conditions = ruleEditing.conditions.filter(c => c.source);
+    const i = analysisRules.findIndex(r => r.id === ruleEditing.id);
+    if (i >= 0) analysisRules[i] = ruleEditing; else analysisRules.push(ruleEditing);
+    closeRuleEditor();
+    applyRules();
+    renderRulesList();
+    showToast('Rule saved.', 'success');
+}
+
 let persistTimer = null;
 let lastPersistError = null;
 
@@ -3519,7 +3793,7 @@ function autoLookupAccession() {
 function switchSidebarTab(name) {
     document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('.sidebar-panel').forEach(p => { p.hidden = (p.id !== 'side-panel-' + name); });
-    if (name === 'tracks') renderTrackManager();
+    if (name === 'tracks') { renderTrackManager(); renderRulesList(); }
 }
 
 // JalView-style track manager: one row per type group (with a show/hide eye)
@@ -4132,7 +4406,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.13.1';
+const APP_VERSION = '0.14.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -5480,12 +5754,13 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('VAR_')) return 6;
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 7;
     if (key.startsWith('UP_')) return 8;
+    if (key.startsWith('RULE_')) return 9;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
     // above the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 9;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 10;
-    return 11;
+    if (key.endsWith('_Cofactors')) return 10;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 11;
+    return 12;
 }
 
 function onGraphModeChange() {
@@ -6699,6 +6974,7 @@ const TRACK_GROUP_LABELS = {
     CONSERVATION: 'Conservation',
     UP: 'UniProt',
     TP: 'Topology',
+    RULE: 'Rules',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
@@ -6724,6 +7000,7 @@ function getTrackGroup(key) {
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 'CONSERVATION';
     if (key.startsWith('UP_')) return 'UP';
     if (key.startsWith('TP_')) return 'TP';
+    if (key.startsWith('RULE_')) return 'RULE';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
@@ -6751,6 +7028,7 @@ function getTrackSource(key) {
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 'Conservation';
     if (key.startsWith('UP_')) return 'UniProt';
     if (key.startsWith('TP_')) return 'Topology';
+    if (key.startsWith('RULE_')) return 'Rule';
     if (key.endsWith('_pLDDT') || key.endsWith('_RSA') || key.endsWith('_Cofactors')) return 'Structure';
     return 'Other';
 }
@@ -6847,7 +7125,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, pLDDT: 11, RSA: 12, Cofactors: 13, other: 99 };
+    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, RULE: 10.5, pLDDT: 11, RSA: 12, Cofactors: 13, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -7302,6 +7580,18 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     cellEl.title = `Residue ${i + 1}: ${TOPOLOGY_STATE_LABELS[char] || char}`;
                 } else {
                     cellEl.title = `Residue ${i + 1}: (no topology assignment)`;
+                }
+            }
+            else if (key.startsWith('RULE_')) {
+                // Analysis-rule track: matching residues flagged in the rule colour.
+                const rMeta = getTrackMeta(key);
+                if (char === RULE_MARKER) {
+                    cellEl.style.backgroundColor = (rMeta && rMeta.color) || '#ef4444';
+                    const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
+                    if (gSpan) gSpan.style.color = '#fff';
+                    cellEl.title = `Residue ${i + 1}: matches rule "${(rMeta && rMeta.ruleName) || key}"`;
+                } else {
+                    cellEl.title = `Residue ${i + 1}: no rule match`;
                 }
             }
             else if (char === 'H') cellEl.classList.add('cell-H');
@@ -10537,6 +10827,7 @@ function gatherPersistableState() {
         preferences: {
             graphMode: { pLDDT: graphMode.pLDDT, RSA: graphMode.RSA },
             externalServicesEnabled,
+            analysisRules,
             selectionScope,
             gridCellW,
             commandEngineId,
@@ -10923,6 +11214,9 @@ function applyPersistedState(state) {
     syncGraphModeControls();
     externalServicesEnabled = !!prefs.externalServicesEnabled;
     syncExternalServicesMenu();
+    // Analysis rules (rebuild their trackMeta so the restored RULE_ tracks keep their colour).
+    analysisRules = Array.isArray(prefs.analysisRules) ? prefs.analysisRules : [];
+    analysisRules.forEach(r => { if (r && r.id) setTrackMeta('RULE_' + r.id, { source: 'Rule', color: r.color, ruleName: r.name }); });
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
     renderSelectionScopeToggle();
     // Restore the horizontal accordion zoom (px/residue). Newer saves store
@@ -11361,6 +11655,8 @@ async function resetAllData() {
     syncGraphModeControls();
     externalServicesEnabled = false;
     syncExternalServicesMenu();
+    analysisRules = [];
+    renderRulesList();
     commandEngineId = 'chimerax';
     applyTypePalette('default');
     trackControlState = getDefaultTrackControlState();

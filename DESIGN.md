@@ -78,6 +78,8 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
 1. **Cross-Track Contradiction Engine** — small **Rules panel** with presets
    (e.g. `disorder>0.6 ∧ TM==1 ∧ pLDDT<50`). Low effort, high value.
    *Preset list to be finalized with literature.*
+   **Framework done (0.14.0)** — Rules panel (Tracks tab): numeric + categorical
+   conditions, ALL/ANY, `RULE_` tracks, select-matches. **Presets still TBD.**
 2. **Multi-Metric Co-localization Engine** — boolean query across metrics
    (conservation ∧ distance-to-ligand ∧ variant score). Output: a **track** of
    passing residues **plus** a separate Data **table**. Needs spatial distance

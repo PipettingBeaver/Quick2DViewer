@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-23
+
+### Added
+
+- **Analysis Rules panel** (Tracks tab → Rules): define boolean queries across
+  per-residue tracks — numeric conditions (Conservation; pLDDT per-model / mean / min;
+  RSA) and categorical conditions (any string track: is annotated / is not annotated /
+  equals char) — combined with **ALL (AND)** or **ANY (OR)**. Each enabled rule becomes
+  a coloured `RULE_` track (its own Track Control group) and a "select" action turns its
+  matches into a selection. This is the contradiction / co-localization engine's open
+  config framework; literature-backed presets will be layered on next.
+
 ## [0.13.1] - 2026-09-23
 
 ### Changed (UI polish)
