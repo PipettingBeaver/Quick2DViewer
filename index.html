@@ -108,6 +108,13 @@
             border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;
         }
         .tm-eye:hover { background: #e2e8f0; }
+        .tm-chevron {
+            width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.5rem; color: #94a3b8; background: transparent; border: none; border-radius: 4px; cursor: pointer;
+            transition: background 0.12s ease, color 0.12s ease;
+        }
+        .tm-group-head:hover .tm-chevron { color: #475569; }
+        .tm-chevron:hover { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
         /* Floating 3D structure viewer (Py3Dmol) */
         .p3d-viewer {
             position: fixed;
@@ -2027,14 +2034,20 @@
             </div>
 
             <div class="sidebar-panel" id="side-panel-tracks" hidden>
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                    <h3 class="sidebar-title" style="margin:0; font-size:1.05rem; color:#0f172a;">Tracks</h3>
-                    <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
-                        <strong>Track Manager</strong><br>
-                        Show/hide each loaded type or individual track. Per-type display options (Glyphs / Bar / AA / Config) live on the grid's Track Control chevrons.
-                    </span></span>
-                </div>
-                <div id="trackManagerList"></div>
+                <details class="workflow-section" id="trackManagerSection" open>
+                    <summary>Tracks</summary>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;">
+                        <span style="font-size:0.68rem; color:#94a3b8;">per type → expand for tracks <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                            <strong>Track Manager</strong><br>
+                            Show/hide each loaded type or individual track. Per-type display options (Glyphs / Bar / AA / Config) live on the grid's Track Control chevrons.
+                        </span></span></span>
+                        <span style="display:flex; gap:4px;">
+                            <button type="button" class="copy-btn" onclick="trackManagerExpandAll(true)" style="padding:1px 6px;" title="Expand all types">expand all</button>
+                            <button type="button" class="copy-btn" onclick="trackManagerExpandAll(false)" style="padding:1px 6px;" title="Collapse all types">collapse all</button>
+                        </span>
+                    </div>
+                    <div id="trackManagerList"></div>
+                </details>
 
                 <details class="workflow-section" id="rulesSection" open style="margin-top: 12px;">
                     <summary>Rules (contradiction / co-localization)</summary>
@@ -3970,6 +3983,8 @@ function switchSidebarTab(name) {
 // JalView-style track manager: one row per type group (with a show/hide eye)
 // and an indented row per individual track. Visibility routes through the same
 // trackControlState the Track Control popover uses, so they stay in sync.
+let trackManagerExpanded = {}; // group -> bool (session-only accordion state)
+
 function renderTrackManager() {
     const wrap = document.getElementById('trackManagerList');
     if (!wrap) return;
@@ -3981,21 +3996,34 @@ function renderTrackManager() {
         const keys = getGroupTrackKeys(g);
         if (!keys.length) return;
         const groupHidden = isTrackGroupHidden(g);
+        const expanded = !!trackManagerExpanded[g];
+        const gEsc = structureEscapeHtml(g);
         html += '<div class="tm-group">' +
             '<div class="tm-group-head">' +
-            '<button type="button" class="tm-eye" data-g="' + structureEscapeHtml(g) + '" onclick="toggleTrackManagerGroup(this.dataset.g)" title="Show/hide all ' + structureEscapeHtml(trackGroupLabel(g)) + '">' + (groupHidden ? '○' : '●') + '</button>' +
-            '<span class="tm-group-name">' + structureEscapeHtml(trackGroupLabel(g)) + ' <span style="color:#94a3b8;">(' + keys.length + ')</span></span>' +
+            '<button type="button" class="tm-chevron" data-g="' + gEsc + '" onclick="toggleTrackManagerExpand(this.dataset.g)" title="' + (expanded ? 'Collapse' : 'Expand') + ' individual tracks">' + (expanded ? '▾' : '▸') + '</button>' +
+            '<button type="button" class="tm-eye" data-g="' + gEsc + '" onclick="toggleTrackManagerGroup(this.dataset.g)" title="Show/hide all ' + structureEscapeHtml(trackGroupLabel(g)) + '">' + (groupHidden ? '○' : '●') + '</button>' +
+            '<span class="tm-group-name" style="cursor:pointer;" onclick="toggleTrackManagerExpand(\'' + gEsc + '\')">' + structureEscapeHtml(trackGroupLabel(g)) + ' <span style="color:#94a3b8;">(' + keys.length + ')</span></span>' +
             '</div>';
-        keys.forEach(k => {
-            const vis = !isTrackFiltered(k);
-            html += '<div class="tm-track">' +
-                '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
-                '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) + ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
-                '</div>';
-        });
+        if (expanded) {
+            keys.forEach(k => {
+                const vis = !isTrackFiltered(k);
+                html += '<div class="tm-track">' +
+                    '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
+                    '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) + ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
+                    '</div>';
+            });
+        }
         html += '</div>';
     });
     wrap.innerHTML = html;
+}
+function toggleTrackManagerExpand(g) {
+    trackManagerExpanded[g] = !trackManagerExpanded[g];
+    renderTrackManager();
+}
+function trackManagerExpandAll(open) {
+    getTctlGroupsInOrder().forEach(g => { trackManagerExpanded[g] = !!open; });
+    renderTrackManager();
 }
 function toggleTrackManagerGroup(g) {
     if (isTrackGroupHidden(g)) delete trackControlState.hidden[g];
@@ -4579,7 +4607,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.15.0';
+const APP_VERSION = '0.15.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11843,6 +11871,7 @@ async function resetAllData() {
     graphMode = { pLDDT: false, RSA: false };
     syncGraphModeControls();
     externalServicesEnabled = false;
+    trackManagerExpanded = {};
     syncExternalServicesMenu();
     analysisRules = [];
     renderRulesList();

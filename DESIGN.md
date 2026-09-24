@@ -113,6 +113,9 @@ deposited entries).
 7. Ensemble variance graph; co-localization table; wet-lab constructs
 
 ## 10. Open items / to discuss
+- **Tracks vs Track Control redundancy (noted).** The right sidebar's *Tracks* tab and the
+  grid's *Track Control* popover overlap (visibility + view-as). Not necessarily a problem,
+  but consider consolidating later (e.g. Track Control popover → "open full manager").
 - **UI polish — left sidebar / track rows (noted).** The `tctl-chevron state-on`
   on the first row of a track type reads as visually messy; the track rows overall
   should be cleaner and more reactive (hover/active affordances). Revisit the

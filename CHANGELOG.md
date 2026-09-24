@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-09-23
+
+### Changed
+
+- **Tracks tab is now compact.** The "Tracks" list is a collapsible section and each
+  track type is an **accordion** — collapsed by default (header shows type + count +
+  show/hide eye), chevron to expand its individual tracks, plus **expand all /
+  collapse all** buttons. The sidebar no longer scrolls past every track.
+
 ## [0.15.0] - 2026-09-23
 
 ### Added
