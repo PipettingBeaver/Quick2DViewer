@@ -108,7 +108,7 @@ deposited entries).
 3. Foldseek integration — **done (0.13.0)**; structure-query only (server-side
    sequence/ProstT5 path errors), results as `HL_` tracks + template table
 4. Contradiction engine (Rules panel)
-5. Client-side interface analysis
+5. Client-side interface analysis — **done (0.15.0)**: `IF_<chain>` tracks + chain-pair table
 6. HMMER hmmscan
 7. Ensemble variance graph; co-localization table; wet-lab constructs
 

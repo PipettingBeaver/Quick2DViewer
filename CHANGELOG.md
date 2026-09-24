@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-23
+
+### Added
+
+- **Client-side interface analysis** (right sidebar → Tracks → Interfaces, or
+  Data → Interfaces…): finds residues at chain–chain interfaces in the active/first
+  multi-chain structure (CA–CA contacts within a configurable cutoff, default 8 Å),
+  adds an `IF_<chain>` track per chain (own "Interfaces" Track Control group), and
+  shows a chain-pair contact table. Runs entirely client-side, so it works on
+  AlphaFold / ESMFold models (PDBe PISA only covers deposited entries).
+
+### Fixed
+
+- The **Rules panel is now expanded by default** and reachable from
+  **Data → Analysis Rules…**. (It lives in the right sidebar's **Tracks** tab — not
+  the Track Control popover at the top-left.)
+
 ## [0.14.0] - 2026-09-23
 
 ### Added

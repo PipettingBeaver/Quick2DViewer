@@ -1737,6 +1737,8 @@
                 <div class="menubar-menu" id="menubar-data" hidden>
                     <button type="button" onclick="menuBarAction('data')">Data &amp; Structures…</button>
                     <button type="button" onclick="menuBarAction('options')">Options…</button>
+                    <button type="button" onclick="menuBarAction('rules')">Analysis Rules…</button>
+                    <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -2034,13 +2036,28 @@
                 </div>
                 <div id="trackManagerList"></div>
 
-                <details class="workflow-section" id="rulesSection" style="margin-top: 12px;">
+                <details class="workflow-section" id="rulesSection" open style="margin-top: 12px;">
                     <summary>Rules (contradiction / co-localization)</summary>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                         Flag residues satisfying a boolean query across tracks (e.g. disorder ∧ TM ∧ low&nbsp;pLDDT). Each enabled rule becomes a coloured track; "select" turns its matches into a selection.
                     </p>
                     <button type="button" class="tb-btn tb-btn-secondary" onclick="openRuleEditor()" style="font-size:0.72rem; padding:3px 8px;">+ New rule</button>
                     <div id="rulesList" style="margin-top:8px;"></div>
+                </details>
+
+                <details class="workflow-section" id="interfaceSection" style="margin-top: 10px;">
+                    <summary>Interfaces (oligomer contacts)</summary>
+                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                        Find residues at chain–chain interfaces in the active (or first) multi-chain structure. Runs client-side, so it works on AlphaFold / ESMFold models too; each chain gets an interface track.
+                    </p>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <label style="font-size:0.72rem; color:#475569;">CA–CA cutoff (Å)
+                            <input type="number" id="ifaceCutoff" value="8" min="3" max="20" step="0.5" style="width:52px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">
+                        </label>
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="runInterfaceAnalysis()" style="font-size:0.72rem; padding:3px 8px;">Compute interfaces</button>
+                    </div>
+                    <div id="interfaceStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                    <div id="interfaceResults" style="margin-top:8px; overflow-x:auto;"></div>
                 </details>
             </div>
 
@@ -3648,6 +3665,142 @@ function saveRuleEditor() {
     showToast('Rule saved.', 'success');
 }
 
+// --- Client-side interface analysis (oligomer contacts) -------------------
+// Works on ANY loaded multi-chain structure (incl. AlphaFold/ESMFold models),
+// unlike PDBe PISA which only covers deposited entries. Per-chain CA
+// coordinates are extracted, chain pairs with CA-CA contacts within a cutoff
+// are found, and each chain gets an IF_<chain> track marking its interface
+// residues (structure numbering, i.e. the query grid for homomers).
+const INTERFACE_CHAIN_COLORS = ['#0ea5e9', '#f97316', '#22c55e', '#a855f7', '#eab308', '#ec4899', '#14b8a6', '#ef4444'];
+const INTERFACE_MARKER = '◆';
+
+function parseStructureChains(text, ext) {
+    const chains = {};
+    const add = (chain, resSeq, x, y, z) => {
+        const id = chain || '_';
+        if (!isFinite(resSeq) || !isFinite(x) || !isFinite(y) || !isFinite(z)) return;
+        (chains[id] = chains[id] || []).push({ resSeq, x, y, z });
+    };
+    if (ext === 'pdb' || (ext !== 'cif' && /^(ATOM|HEADER|MODEL)/m.test(text))) {
+        for (const line of text.split('\n')) {
+            if (!line.startsWith('ATOM') || line.substring(12, 16).trim() !== 'CA') continue;
+            add((line.substring(21, 22) || '').trim(), parseInt(line.substring(22, 26).trim(), 10),
+                parseFloat(line.substring(30, 38).trim()), parseFloat(line.substring(38, 46).trim()), parseFloat(line.substring(46, 54).trim()));
+        }
+    } else {
+        let inAtomSite = false, colIndex = 0;
+        let seqIdIdx = -1, atomIdIdx = -1, xIdx = -1, yIdx = -1, zIdx = -1, asymIdx = -1, authAsymIdx = -1;
+        for (const line of text.split('\n')) {
+            if (line.startsWith('_atom_site.')) {
+                inAtomSite = true;
+                if (line.includes('label_seq_id')) seqIdIdx = colIndex;
+                if (line.includes('label_atom_id')) atomIdIdx = colIndex;
+                if (line.includes('Cartn_x')) xIdx = colIndex;
+                if (line.includes('Cartn_y')) yIdx = colIndex;
+                if (line.includes('Cartn_z')) zIdx = colIndex;
+                if (line.includes('label_asym_id')) asymIdx = colIndex;
+                else if (line.includes('auth_asym_id')) authAsymIdx = colIndex;
+                colIndex++;
+            } else if (inAtomSite && line.startsWith('ATOM')) {
+                const cols = line.trim().split(/\s+/);
+                if (cols[atomIdIdx] === 'CA') {
+                    add(asymIdx >= 0 ? cols[asymIdx] : (authAsymIdx >= 0 ? cols[authAsymIdx] : '_'),
+                        parseInt(cols[seqIdIdx], 10), parseFloat(cols[xIdx]), parseFloat(cols[yIdx]), parseFloat(cols[zIdx]));
+                }
+            } else if (inAtomSite && line.startsWith('#')) inAtomSite = false;
+        }
+    }
+    return chains;
+}
+
+// Chain-pair CA-CA contacts within `cutoff` Å (default 8 Å — the standard
+// CA-based interface distance). Returns per-chain interface residue sets +
+// a pair summary. Naive O(resA × resB) per pair; fine for typical oligomers.
+function computeInterfaces(chains, cutoff) {
+    const ids = Object.keys(chains);
+    const residuesByChain = {};
+    ids.forEach(id => { residuesByChain[id] = new Set(); });
+    const pairs = [];
+    const c2 = cutoff * cutoff;
+    for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+            const A = ids[i], B = ids[j];
+            let contacts = 0;
+            for (const p of chains[A]) {
+                for (const q of chains[B]) {
+                    const dx = p.x - q.x, dy = p.y - q.y, dz = p.z - q.z;
+                    if (dx * dx + dy * dy + dz * dz <= c2) {
+                        residuesByChain[A].add(p.resSeq);
+                        residuesByChain[B].add(q.resSeq);
+                        contacts++;
+                    }
+                }
+            }
+            if (contacts) pairs.push({ a: A, b: B, contacts });
+        }
+    }
+    return { ids, residuesByChain, pairs };
+}
+
+function applyInterfaceTracks(result) {
+    const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    Object.keys(parsedTracks).forEach(k => { if (k.startsWith('IF_')) delete parsedTracks[k]; });
+    if (!totalLength || !result) return 0;
+    let added = 0;
+    result.ids.forEach((id, idx) => {
+        const set = result.residuesByChain[id];
+        if (!set || !set.size) return;
+        const track = new Array(totalLength).fill(' ');
+        set.forEach(resSeq => { const i = resSeq - 1; if (i >= 0 && i < totalLength) track[i] = INTERFACE_MARKER; });
+        const key = 'IF_' + id;
+        parsedTracks[key] = track.join('');
+        setTrackMeta(key, { source: 'Interface', chain: id, color: INTERFACE_CHAIN_COLORS[idx % INTERFACE_CHAIN_COLORS.length] });
+        added++;
+    });
+    return added;
+}
+
+function runInterfaceAnalysis() {
+    const files = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
+    if (!files.length) { showToast('Attach a multi-chain PDB/CIF (or predict one) first — interface analysis needs coordinates.', 'error'); return; }
+    let file = files[0];
+    if (p3dModel && p3dModel.kind === 'pdb' && cachedStructureTexts[p3dModel.fileName]) file = p3dModel.fileName;
+    const ext = structExt(file);
+    const cutEl = document.getElementById('ifaceCutoff');
+    const cutoff = (cutEl && parseFloat(cutEl.value)) || 8;
+    const chains = parseStructureChains(cachedStructureTexts[file], ext);
+    const ids = Object.keys(chains);
+    const statusEl = document.getElementById('interfaceStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    if (ids.length < 2) {
+        setStatus('"' + file + '" has ' + ids.length + ' chain(s) — need ≥2.');
+        showToast('Interface analysis needs ≥2 chains; "' + file + '" has ' + ids.length + '.', 'error');
+        return;
+    }
+    const result = computeInterfaces(chains, cutoff);
+    const added = applyInterfaceTracks(result);
+    renderViewer(parsedTracks);
+    renderInterfaceSummary(result, file, cutoff);
+    refreshTrackManagerIfVisible();
+    schedulePersist();
+    setStatus(added ? (result.pairs.length + ' chain pair(s), ' + added + ' interface track(s) from ' + file + '.') : 'No inter-chain contacts within ' + cutoff + ' Å.');
+    showToast(added ? ('Interface: ' + result.pairs.length + ' chain pair(s) in ' + file + '.') : 'No inter-chain contacts found.', added ? 'success' : 'info');
+}
+
+function renderInterfaceSummary(result, file, cutoff) {
+    const wrap = document.getElementById('interfaceResults');
+    if (!wrap) return;
+    if (!result || !result.pairs.length) { wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.75rem;">No inter-chain contacts within ' + cutoff + ' Å.</p>'; return; }
+    let html = '<p style="font-size:0.72rem; color:#64748b; margin:0 0 6px;">' + structureEscapeHtml(file) + ' — CA–CA ≤ ' + cutoff + ' Å</p>';
+    html += '<table class="metrics-table" style="width:100%; font-size:0.72rem;"><thead><tr><th>Chain pair</th><th>Contacts</th><th>Interface resi. (A/B)</th></tr></thead><tbody>';
+    result.pairs.slice().sort((a, b) => b.contacts - a.contacts).forEach(p => {
+        html += '<tr><td>' + structureEscapeHtml(p.a) + ' – ' + structureEscapeHtml(p.b) + '</td><td>' + p.contacts + '</td><td>' +
+            result.residuesByChain[p.a].size + ' / ' + result.residuesByChain[p.b].size + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
 let persistTimer = null;
 let lastPersistError = null;
 
@@ -3790,6 +3943,24 @@ function autoLookupAccession() {
 }
 
 // --- Sidebar tabs (Selection / Tracks / Workflow) -------------------------
+// Jumps to a Tracks-tab section (right sidebar) and expands it.
+function showInterfacesPanel() {
+    switchSidebarTab('tracks');
+    const sec = document.getElementById('interfaceSection');
+    if (sec) { sec.open = true; if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' }); }
+}
+
+// Jumps to the Rules panel (right sidebar -> Tracks tab) and expands it.
+function showRulesPanel() {
+    switchSidebarTab('tracks');
+    const sec = document.getElementById('rulesSection');
+    if (sec) {
+        sec.open = true;
+        if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' });
+    }
+    renderRulesList();
+}
+
 function switchSidebarTab(name) {
     document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('.sidebar-panel').forEach(p => { p.hidden = (p.id !== 'side-panel-' + name); });
@@ -3874,6 +4045,8 @@ function menuBarAction(action) {
         case 'p3d': toggleP3DViewer(); break;
         case 'data': openDataModal(); break;
         case 'options': openOptionsModal(); break;
+        case 'rules': showRulesPanel(); break;
+        case 'interfaces': showInterfacesPanel(); break;
         case 'json': exportFullSave(); break;
         case 'tsv': exportMetricsTableTSV(); break;
         case 'csv': exportMetricsCSV(); break;
@@ -4406,7 +4579,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.14.0';
+const APP_VERSION = '0.15.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -5755,12 +5928,13 @@ function getTrackCategoryOrder(key) {
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 7;
     if (key.startsWith('UP_')) return 8;
     if (key.startsWith('RULE_')) return 9;
+    if (key.startsWith('IF_')) return 10;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
     // above the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 10;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 11;
-    return 12;
+    if (key.endsWith('_Cofactors')) return 11;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 12;
+    return 13;
 }
 
 function onGraphModeChange() {
@@ -6975,6 +7149,7 @@ const TRACK_GROUP_LABELS = {
     UP: 'UniProt',
     TP: 'Topology',
     RULE: 'Rules',
+    IF: 'Interfaces',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
@@ -7001,6 +7176,7 @@ function getTrackGroup(key) {
     if (key.startsWith('UP_')) return 'UP';
     if (key.startsWith('TP_')) return 'TP';
     if (key.startsWith('RULE_')) return 'RULE';
+    if (key.startsWith('IF_')) return 'IF';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
@@ -7029,6 +7205,7 @@ function getTrackSource(key) {
     if (key.startsWith('UP_')) return 'UniProt';
     if (key.startsWith('TP_')) return 'Topology';
     if (key.startsWith('RULE_')) return 'Rule';
+    if (key.startsWith('IF_')) return 'Interface';
     if (key.endsWith('_pLDDT') || key.endsWith('_RSA') || key.endsWith('_Cofactors')) return 'Structure';
     return 'Other';
 }
@@ -7125,7 +7302,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, RULE: 10.5, pLDDT: 11, RSA: 12, Cofactors: 13, other: 99 };
+    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, RULE: 11, IF: 12, pLDDT: 13, RSA: 14, Cofactors: 15, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -7592,6 +7769,18 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     cellEl.title = `Residue ${i + 1}: matches rule "${(rMeta && rMeta.ruleName) || key}"`;
                 } else {
                     cellEl.title = `Residue ${i + 1}: no rule match`;
+                }
+            }
+            else if (key.startsWith('IF_')) {
+                // Interface track: residues at a chain-chain interface.
+                const iMeta = getTrackMeta(key);
+                if (char === INTERFACE_MARKER) {
+                    cellEl.style.backgroundColor = (iMeta && iMeta.color) || '#0ea5e9';
+                    const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
+                    if (gSpan) gSpan.style.color = '#fff';
+                    cellEl.title = `Residue ${i + 1}: interface residue (chain ${(iMeta && iMeta.chain) || '?'})`;
+                } else {
+                    cellEl.title = `Residue ${i + 1}: not at an interface`;
                 }
             }
             else if (char === 'H') cellEl.classList.add('cell-H');
