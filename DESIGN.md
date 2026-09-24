@@ -113,7 +113,6 @@ deposited entries).
 7. Ensemble variance graph; co-localization table; wet-lab constructs
 
 ## 10. Open items / to discuss
-
 - **UI polish — left sidebar / track rows (noted).** The `tctl-chevron state-on`
   on the first row of a track type reads as visually messy; the track rows overall
   should be cleaner and more reactive (hover/active affordances). Revisit the
@@ -122,3 +121,35 @@ deposited entries).
 - Co-localization UI shape (track + table) — confirm during build.
 - Foldseek result semantics (TM-score color-coding) — confirm during build.
 - MPI proxy — deferred; revisit if clipboard friction is high.
+
+## 11. Rule preset draft (for review — not yet implemented)
+
+A curated set of named rules to seed the Rules panel. Each maps onto the existing
+condition model (numeric / categorical / ALL-ANY). **Note:** most presets should
+reference a *group* ("any TM track") rather than a specific predictor key, so a small
+extension is needed first — a `group:<GROUP>` condition source meaning "any track in
+that group is annotated" (and a group-numeric aggregate for conservation/pLDDT/RSA).
+Links are provided for checking; please verify before we lock them in.
+
+| # | Preset | Conditions (sketch) | Rationale |
+|---|--------|--------------------|-----------|
+| 1 | **Topology contradiction** (QC) | disorder `group:DO` annotated **AND** `group:TM` annotated **AND** `pLDDT (mean) < 50` | TM and disorder predictions should rarely overlap; a residue flagged both is usually a hydrophobic segment misread as a helix, or a genuinely disordered membrane-proximal region. |
+| 2 | **Conserved buried residue** (functional/catalytic candidate) | `conservation ≥ 0.85` **AND** `RSA < 0.2` | Conservation + burial enriches strongly for active-site / binding residues. |
+| 3 | **Conserved exposed patch** (interaction/interface candidate) | `conservation ≥ 0.8` **AND** `RSA ≥ 0.5` | Conserved *surface* residues often mark protein–protein interfaces / functional surfaces. |
+| 4 | **Rigid, well-folded core** | `pLDDT (min) ≥ 90` **AND** `RSA < 0.25` | High confidence + buried = rigid structural core. |
+| 5 | **Flexible / disordered region** | `pLDDT (mean) < 70` **AND** `group:DO` annotated | Agreement between low structural confidence and disorder prediction. |
+| 6 | **No-model-confidence region** | `pLDDT (min of models) < 50` | Regions where *no* model is confident → likely flexible / unmodelled. |
+| 7 | **Conserved but poorly modelled** | `conservation ≥ 0.8` **AND** `pLDDT (min) < 50` | A real, evolutionarily constrained region the models fail on (ligand-bound or membrane-embedded cores). Prime "look here" flag. |
+| 8 | **Signal / topology feature** | `group:TP` annotated (or `UP_Signal`) | Flag signal-peptide / topology features for construct design. |
+
+### References (verify before locking)
+
+- TMHMM — Krogh, Larsson, von Heijne, Sonnhammer, *J Mol Biol* 2001 — https://doi.org/10.1006/jmbi.2001.4911
+- IUPred2A (disorder) — Mészáros, Erdős, Dosztányi, *NAR* 2018 — https://doi.org/10.1093/nar/gky384
+- AlphaFold2 (pLDDT) — Jumper et al., *Nature* 2021 — https://doi.org/10.1038/s41586-021-03819-2
+- AlphaFold & disordered proteins — Ruff & Pappu, *J Mol Biol* 2021 — https://doi.org/10.1016/j.jmb.2021.167089
+- ConSurf 2016 (conservation) — Ashkenazy et al., *NAR* 2016 — https://doi.org/10.1093/nar/gkw408
+- Functionally important residues from conservation — Capra & Singh, *Bioinformatics* 2007 — https://doi.org/10.1093/bioinformatics/btm242
+- Evolutionary trace (binding surfaces) — Lichtarge, Bourne, Cohen, *J Mol Biol* 1996 — https://doi.org/10.1006/jmbi.1996.0298
+- Interface conservation — Valdar & Thornton, *Proteins* 2002 — https://doi.org/10.1002/prot.10103
+- SignalP 6.0 — Teufel et al., *Nat Biotechnol* 2022 — https://doi.org/10.1038/s41587-021-01156-3
