@@ -600,7 +600,7 @@ ctxRun(`
 ctxRun(`runTmCrossCheck();`);
 let report = ctxRun(`buildMethodsReport()`);
 assert(report.indexOf('# Quick2DViewer methods summary') === 0, 'the report opens with a title');
-assert(report.indexOf('## Intake') !== -1 && report.indexOf('Is it membrane-associated or secreted? — Yes') !== -1, 'the report records the intake answers');
+assert(report.indexOf('## Intake') !== -1 && report.indexOf('Is it membrane-associated or secreted?: Yes') !== -1, 'the report records the intake answers');
 assert(report.indexOf('## Workflow coverage') !== -1 && report.indexOf('| # | Step | Status | Answer(s) |') !== -1, 'the report has a coverage table');
 assert(report.indexOf('Coverage: ' + ctxRun(`guideProgress().covered`) + ' of ' + ctxRun(`guideProgress().denominator`)) !== -1,
     'the report states the coverage count (' + ctxRun(`guideProgress().covered`) + '/' + ctxRun(`guideProgress().denominator`) + ')');
@@ -784,6 +784,49 @@ assert(WORKFLOW_MD.indexOf('https://toolkit.tuebingen.mpg.de/tools/hhpred') !== 
 assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as a markdown link');
 assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
 assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
+
+section('layout, hover + copy polish');
+// --- 1/2. heatmap rows span the full scroll width (the "doesn't reach the
+// right / looks duplicated" report): block boxes in a horizontal scroller are
+// viewport-sized, so rows needed max-content + min-width explicitly. ---
+assert(HTML.indexOf('width: max-content;') !== -1, 'rows declare a content width');
+const rowCss = HTML.slice(HTML.indexOf('.track-row {'), HTML.indexOf('.track-row {') + 700);
+assert(rowCss.indexOf('width: max-content') !== -1 && rowCss.indexOf('min-width: 100%') !== -1, '.track-row spans max(content, viewport)');
+const stickyCss = HTML.slice(HTML.indexOf('.sticky-top {'), HTML.indexOf('.sticky-top {') + 500);
+assert(stickyCss.indexOf('width: max-content') !== -1, '.sticky-top spans the content width too');
+const posCss = HTML.slice(HTML.indexOf('.track-position-row {'), HTML.indexOf('.track-position-row {') + 400);
+assert(posCss.indexOf('width: max-content') !== -1, 'the residue-position row spans the content width');
+
+// --- 6. the grey column highlight is hover-only ---
+assert(typeof ctxRun(`clearHoverHighlight`) === 'function' && typeof ctxRun(`installHoverHighlightClear`) === 'function', 'the hover highlight can be cleared and is installed');
+assert(HTML.indexOf("getElementById('alignmentGrid')") !== -1 && HTML.indexOf("addEventListener('mouseleave', clearHoverHighlight)") !== -1, 'leaving the grid clears it');
+assert(HTML.indexOf("document.documentElement.addEventListener('mouseleave', clearHoverHighlight)") !== -1, 'leaving the window clears it');
+assert(HTML.indexOf("window.addEventListener('blur', clearHoverHighlight)") !== -1, 'losing focus clears it');
+
+// --- 3. no em-dashes anywhere the user reads ---
+assert(HTML.indexOf('\u2014') === -1, 'no literal em-dash escapes remain in the app');
+assert(HTML.indexOf('\u2014'.replace('\\u', '\\u')) === -1, 'no literal em-dash escapes remain (second form)');
+assert(HTML.indexOf(String.fromCharCode(8212)) === -1, 'no real em-dash characters remain in the app');
+assert(WORKFLOW_MD.indexOf(String.fromCharCode(8212)) === -1, 'no em-dash in the generated reference doc');
+
+// --- 4. intake is a "Protein Background" accordion that compresses ---
+assert(HTML.indexOf('Protein Background') !== -1, 'the intake block is titled Protein Background');
+assert(ctxRun(`typeof guideIntakeOpen !== 'undefined'`), 'its open state is tracked');
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
+let guideHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(guideHtml.indexOf('Protein Background') !== -1, 'the accordion renders');
+assert(guideHtml.indexOf('guideIntake" open') !== -1, 'it starts open while questions are unanswered');
+ctxRun(`GUIDE_QUESTIONS.forEach(q => { guideProfile[q.id] = q.options[0].value; }); guideIntakeOpen = null; renderWorkflowGuide();`);
+guideHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(guideHtml.indexOf('guideIntake" open') === -1, 'it compresses once every question is answered');
+assert(guideHtml.indexOf('reset answers') !== -1, 'a reset affordance is still offered');
+ctxRun(`guideIntakeOpen = true; renderWorkflowGuide();`);
+assert(ctxRun(`document.getElementById('guidePanel').innerHTML`).indexOf('guideIntake" open') !== -1, 'the user can re-open it for the session');
+
+// --- 5. no filler sign-off ---
+assert(HTML.indexOf('for the record') === -1, 'the filler "for the record" sign-off is gone');
+assert(HTML.indexOf('All steps covered</strong>') !== -1, 'the all-covered state is a plain status line');
+ctxRun(`guideProfile = {}; guideIntakeOpen = null; parsedTracks = {};`);
 
 section('guide coachmarks (walk the user to a submenu)');
 assert(ctxRun(`Object.keys(GUIDE_COACHMARKS).join(',')`) === 'rules,interfaces', 'coachmarks are declared for the two submenu hand-offs');

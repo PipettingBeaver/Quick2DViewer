@@ -1,6 +1,6 @@
-# Quick2DViewer — Protein Characterization Workflow (reference)
+# Quick2DViewer: Protein Characterization Workflow (reference)
 
-> **Generated file — do not edit by hand.** Regenerate with
+> **Generated file, do not edit by hand.** Regenerate with
 > `node tools/build-workflow-doc.js`. The Evaluation Guide in the app is
 > driven by the same definition, so the steps, rationale and citations below
 > are exactly what the guide shows.
@@ -18,11 +18,11 @@ then asks its own short questions (below) that pick the *specific* action and
 defaults to offer. Everything is advisory: any step can be marked done,
 skipped or re-run at any time, and all tools stay reachable from the menus.
 
-- **Is it membrane-associated or secreted?** — Yes / No / Not sure
-- **Is a 3D structure available or planned?** — Yes / Not yet / Not sure
-- **Are homologs / an HHpred MSA in hand?** — Yes / No / Not sure
-- **Are you evaluating sequence variants?** — Yes / No / Not sure
-- **Is the function / domain architecture unknown?** — Yes / No / Not sure
+- **Is it membrane-associated or secreted?**: Yes / No / Not sure
+- **Is a 3D structure available or planned?**: Yes / Not yet / Not sure
+- **Are homologs / an HHpred MSA in hand?**: Yes / No / Not sure
+- **Are you evaluating sequence variants?**: Yes / No / Not sure
+- **Is the function / domain architecture unknown?**: Yes / No / Not sure
 
 ## Steps
 
@@ -40,12 +40,12 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- How is the sequence coming in? — Quick2D output / FASTA / paste / UniProt accession
+- How is the sequence coming in?: Quick2D output / FASTA / paste / UniProt accession
 
-**Promoted when.** Always — it is the prerequisite for every other step.
+**Promoted when.** Always. It is the prerequisite for every other step.
 
 **Citations.**
-- UniProt Consortium, Nucleic Acids Res 2023 — <https://doi.org/10.1093/nar/gkac1052>
+- UniProt Consortium, Nucleic Acids Res 2023. <https://doi.org/10.1093/nar/gkac1052>
 
 ### 2. SS / disorder / TM predictions
 
@@ -55,29 +55,29 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **How to read it.**
 - Helix/sheet runs suggest a folded core; long disorder runs suggest flexible regions.
-- TM segments should line up with the topology consensus later — a conflict is a flag to inspect, not an error.
+- TM segments should line up with the topology consensus later. A conflict is a flag to inspect, not an error.
 
 **In-app action.** `Load Quick2D output…`
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Are the Quick2D predictions ready to paste? — Yes / Not yet
+- Are the Quick2D predictions ready to paste?: Yes / Not yet
 
 **Promoted when.** Promoted when the protein is flagged membrane-associated or secreted.
 
 **Citations.**
-- Buchan & Jones, Nucleic Acids Res 2019 (PSIPRED workbench) — <https://doi.org/10.1093/nar/gkz297>
-- Klausen et al., Proteins 2019 (NetSurfP-2.0) — <https://doi.org/10.1002/prot.25674>
-- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A) — <https://doi.org/10.1093/nar/gky384>
-- Krogh et al., J Mol Biol 2001 (TMHMM) — <https://doi.org/10.1006/jmbi.2000.4315>
-- Teufel et al., Nat Biotechnol 2022 (SignalP 6.0) — <https://doi.org/10.1038/s41587-021-01156-3>
-- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs) — <https://doi.org/10.1016/j.jmb.2021.167208>
+- Buchan & Jones, Nucleic Acids Res 2019 (PSIPRED workbench). <https://doi.org/10.1093/nar/gkz297>
+- Klausen et al., Proteins 2019 (NetSurfP-2.0). <https://doi.org/10.1002/prot.25674>
+- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A). <https://doi.org/10.1093/nar/gky384>
+- Krogh et al., J Mol Biol 2001 (TMHMM). <https://doi.org/10.1006/jmbi.2000.4315>
+- Teufel et al., Nat Biotechnol 2022 (SignalP 6.0). <https://doi.org/10.1038/s41587-021-01156-3>
+- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs). <https://doi.org/10.1016/j.jmb.2021.167208>
 
 ### 3. Curated annotation & domains
 
 **Purpose.** UniProt domains/PTMs/variants, plus HMMER/Pfam domain architecture.
 
-**Why it matters.** Curated entries and profile searches place the sequence in a known family and mark the residues that already have experimental support — the baseline every prediction is judged against.
+**Why it matters.** Curated entries and profile searches place the sequence in a known family and mark the residues that already have experimental support. That is the baseline every prediction is judged against.
 
 **How to read it.**
 - Prefer curated domain boundaries where they agree with the profile hits; investigate where they disagree.
@@ -87,13 +87,13 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Do you already have the accession or family? — Yes — fetch it / No — search for it / Only Pfam domains
+- Do you already have the accession or family?: Yes, fetch it / No, search for it / Only Pfam domains
 
 **Promoted when.** Promoted when the function or domain architecture is unknown or unclear.
 
 **Citations.**
-- Mistry et al., Nucleic Acids Res 2021 (Pfam) — <https://doi.org/10.1093/nar/gkaa913>
-- Finn, Clements & Eddy, Nucleic Acids Res 2011 (HMMER web server) — <https://doi.org/10.1093/nar/gkr367>
+- Mistry et al., Nucleic Acids Res 2021 (Pfam). <https://doi.org/10.1093/nar/gkaa913>
+- Finn, Clements & Eddy, Nucleic Acids Res 2011 (HMMER web server). <https://doi.org/10.1093/nar/gkr367>
 
 ### 4. Homologs & conservation
 
@@ -103,21 +103,21 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **How to read it.**
 - Probability > 90% with coverage near 100% makes a template a solid model.
-- Conservation is only as good as the alignment depth — check how many sequences went in.
+- Conservation is only as good as the alignment depth, so check how many sequences went in.
 
 **In-app action.** `Load .hhr / variant FASTA…`
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Is the HHpred .hhr ready? — Yes, ready to attach / Not yet
+- Is the HHpred .hhr ready?: Yes, ready to attach / Not yet
 
-**Promoted when.** Always — homology is the main cross-check on the sequence-based layers.
+**Promoted when.** Always. Homology is the main cross-check on the sequence-based layers.
 
 **Citations.**
-- Söding, Biegert & Lupas, Nucleic Acids Res 2005 (HHpred) — <https://doi.org/10.1093/nar/gki408>
-- Remmert et al., Nat Methods 2012 (HHblits) — <https://doi.org/10.1038/nmeth.1818>
-- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016) — <https://doi.org/10.1093/nar/gkw408>
-- Capra & Singh, Bioinformatics 2007 (functionally important residues) — <https://doi.org/10.1093/bioinformatics/btm270>
+- Söding, Biegert & Lupas, Nucleic Acids Res 2005 (HHpred). <https://doi.org/10.1093/nar/gki408>
+- Remmert et al., Nat Methods 2012 (HHblits). <https://doi.org/10.1038/nmeth.1818>
+- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016). <https://doi.org/10.1093/nar/gkw408>
+- Capra & Singh, Bioinformatics 2007 (functionally important residues). <https://doi.org/10.1093/bioinformatics/btm270>
 
 ### 5. Structural model
 
@@ -126,42 +126,44 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 **Why it matters.** A model converts sequence annotations into spatial context: buried vs exposed, domain packing, and which residues form interfaces.
 
 **How to read it.**
-- pLDDT > 70 is confident, 50–70 tentative, < 50 unreliable — read it per region, not per protein.
+- pLDDT > 70 is confident, 50-70 tentative and < 50 unreliable. Read it per region, not per protein.
 - RSA says whether a residue is buried; a variant in a buried position is usually more disruptive.
 
 **In-app action.** `Attach / predict structure…`
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Where should the model come from? — AlphaFold DB / PDB / CIF file / Predict (ESMFold)
+- Where should the model come from?: AlphaFold DB / PDB / CIF file / Predict (ESMFold)
 
 **Promoted when.** Promoted when a structure is available or planned, or the answer is unsure.
 
 **Citations.**
-- Jumper et al., Nature 2021 (AlphaFold2) — <https://doi.org/10.1038/s41586-021-03819-2>
-- Lin et al., Science 2023 (ESMFold) — <https://doi.org/10.1126/science.ade2574>
-- Kabsch & Sander, Biopolymers 1983 (DSSP) — <https://doi.org/10.1002/bip.360221211>
+- Jumper et al., Nature 2021 (AlphaFold2). <https://doi.org/10.1038/s41586-021-03819-2>
+- Lin et al., Science 2023 (ESMFold). <https://doi.org/10.1126/science.ade2574>
+- Kabsch & Sander, Biopolymers 1983 (DSSP). <https://doi.org/10.1002/bip.360221211>
 
 ### 6. Structural homology
 
-**Purpose.** Search Foldseek for remote relatives that sequence search misses.
+**Purpose.** Search Foldseek for remote relatives that sequence search misses. Needs at least one structure attached first (an AlphaFold/PDB/CIF model, or an ESMFold prediction).
 
 **Why it matters.** Structure is more conserved than sequence: Foldseek finds the remote homologs that decide a fold assignment when BLAST/HMMER come up empty.
 
 **How to read it.**
+- Attach at least one structure: Foldseek searches by 3D coordinates, not by sequence.
+- The search uses the active (or first attached) model. Attaching more models does NOT widen the search, so pull one representative structure per state you care about and run that.
 - High probability + low E-value with good query coverage is a credible structural relative.
 - Use it to sanity-check the family assignment, not to overrule curated data.
 
-**In-app action.** `Run Foldseek`
+**In-app action.** `Run Foldseek` · `Attach Structure(s)`
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Which Foldseek database? — afdb50 / pdb100 / swissprot / bfvd
+- Which Foldseek database?: afdb50 / pdb100 / swissprot / bfvd
 
 **Promoted when.** Promoted when the function or domain architecture is unknown.
 
 **Citations.**
-- van Kempen et al., Nat Biotechnol 2023 (Foldseek) — <https://doi.org/10.1038/s41587-023-01773-0>
+- van Kempen et al., Nat Biotechnol 2023 (Foldseek). <https://doi.org/10.1038/s41587-023-01773-0>
 
 ### 7. Membrane topology
 
@@ -177,14 +179,14 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Which predictor output do you have? — TMHMM / Phobius / DeepTMHMM / None yet
+- Which predictor output do you have?: TMHMM / Phobius / DeepTMHMM / None yet
 
 **Promoted when.** Promoted when the protein is flagged membrane-associated or secreted.
 
 **Ruled out when.** Your answer says this protein is not membrane-associated or secreted.
 
 **Citations.**
-- Krogh et al., J Mol Biol 2001 (TMHMM) — <https://doi.org/10.1006/jmbi.2000.4315>
+- Krogh et al., J Mol Biol 2001 (TMHMM). <https://doi.org/10.1006/jmbi.2000.4315>
 
 ### 8. Integrate & export
 
@@ -193,20 +195,20 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 **Why it matters.** The last step is where evidence becomes a claim: co-localization and contradiction rules keep the reasoning explicit, inspectable and reproducible.
 
 **How to read it.**
-- A rule hit is a hypothesis to inspect, not a conclusion — click through its matches.
+- A rule hit is a hypothesis to inspect, not a conclusion. Click through its matches.
 - Export the figure plus table so the track state behind the claim is archived.
 
 **In-app action.** `Open Analysis Rules…` · `Interfaces…`
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- What are you closing on? — Variant triage / Binding interface / Construct design / Figure / report
+- What are you closing on?: Variant triage / Binding interface / Construct design / Figure / report
 
-**Promoted when.** Always — it is where the collected evidence is combined.
+**Promoted when.** Always. It is where the collected evidence is combined.
 
 **Citations.**
-- Lichtarge, Bourne & Cohen, J Mol Biol 1996 (evolutionary trace) — <https://doi.org/10.1006/jmbi.1996.0167>
-- Valdar & Thornton, Proteins 2001 (interface conservation) — <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
+- Lichtarge, Bourne & Cohen, J Mol Biol 1996 (evolutionary trace). <https://doi.org/10.1006/jmbi.1996.0167>
+- Valdar & Thornton, Proteins 2001 (interface conservation). <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
 
 ## Rule presets
 
@@ -224,18 +226,18 @@ is loaded.
 **Rationale.** TM and disorder predictions should rarely overlap; a residue flagged as both is usually a hydrophobic segment misread as a helix, or a genuinely disordered membrane-proximal region.
 
 **Citations.**
-- Krogh et al., J Mol Biol 2001 (TMHMM) — <https://doi.org/10.1006/jmbi.2000.4315>
-- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A) — <https://doi.org/10.1093/nar/gky384>
+- Krogh et al., J Mol Biol 2001 (TMHMM). <https://doi.org/10.1006/jmbi.2000.4315>
+- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A). <https://doi.org/10.1093/nar/gky384>
 
 ### 2. Conserved buried residue
 
 **Query (ALL).** Conservation ≥ 0.85 · RSA (any model) < 0.2
 
-**Rationale.** Conservation plus burial enriches strongly for active-site and binding residues — the classic "look here first" flag.
+**Rationale.** Conservation plus burial enriches strongly for active-site and binding residues. This is the classic "look here first" flag.
 
 **Citations.**
-- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016) — <https://doi.org/10.1093/nar/gkw408>
-- Capra & Singh, Bioinformatics 2007 — <https://doi.org/10.1093/bioinformatics/btm270>
+- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016). <https://doi.org/10.1093/nar/gkw408>
+- Capra & Singh, Bioinformatics 2007. <https://doi.org/10.1093/bioinformatics/btm270>
 
 ### 3. Conserved exposed patch
 
@@ -244,8 +246,8 @@ is loaded.
 **Rationale.** Conserved surface residues often mark protein–protein interfaces and functional surfaces rather than a hydrophobic core.
 
 **Citations.**
-- Capra & Singh, Bioinformatics 2007 — <https://doi.org/10.1093/bioinformatics/btm270>
-- Valdar & Thornton, Proteins 2001 (interface conservation) — <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
+- Capra & Singh, Bioinformatics 2007. <https://doi.org/10.1093/bioinformatics/btm270>
+- Valdar & Thornton, Proteins 2001 (interface conservation). <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
 
 ### 4. Rigid, well-folded core
 
@@ -254,17 +256,17 @@ is loaded.
 **Rationale.** High confidence everywhere in the ensemble plus burial identifies the rigid structural core a construct should keep.
 
 **Citations.**
-- Jumper et al., Nature 2021 (AlphaFold2) — <https://doi.org/10.1038/s41586-021-03819-2>
+- Jumper et al., Nature 2021 (AlphaFold2). <https://doi.org/10.1038/s41586-021-03819-2>
 
 ### 5. Flexible / disordered region
 
 **Query (ALL).** pLDDT (mean) < 70 · Disorder annotated
 
-**Rationale.** Low structural confidence agreeing with a disorder prediction is the most reliable flexible-region signal — and a caveat on any fold-level claim there.
+**Rationale.** Low structural confidence agreeing with a disorder prediction is the most reliable flexible-region signal, and a caveat on any fold-level claim there.
 
 **Citations.**
-- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs) — <https://doi.org/10.1016/j.jmb.2021.167208>
-- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A) — <https://doi.org/10.1093/nar/gky384>
+- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs). <https://doi.org/10.1016/j.jmb.2021.167208>
+- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A). <https://doi.org/10.1093/nar/gky384>
 
 ### 6. No-model-confidence region
 
@@ -273,8 +275,8 @@ is loaded.
 **Rationale.** Where no model in the ensemble is confident the region is likely flexible, unmodelled, or only ordered in a complex/ligand-bound state.
 
 **Citations.**
-- Jumper et al., Nature 2021 (AlphaFold2) — <https://doi.org/10.1038/s41586-021-03819-2>
-- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs) — <https://doi.org/10.1016/j.jmb.2021.167208>
+- Jumper et al., Nature 2021 (AlphaFold2). <https://doi.org/10.1038/s41586-021-03819-2>
+- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs). <https://doi.org/10.1016/j.jmb.2021.167208>
 
 ### 7. Conserved but poorly modelled
 
@@ -283,8 +285,8 @@ is loaded.
 **Rationale.** An evolutionarily constrained region the models fail on is a prime "look here" flag: ligand-bound, membrane-embedded, or otherwise context-dependent cores.
 
 **Citations.**
-- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016) — <https://doi.org/10.1093/nar/gkw408>
-- Jumper et al., Nature 2021 (AlphaFold2) — <https://doi.org/10.1038/s41586-021-03819-2>
+- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016). <https://doi.org/10.1093/nar/gkw408>
+- Jumper et al., Nature 2021 (AlphaFold2). <https://doi.org/10.1038/s41586-021-03819-2>
 
 ### 8. Signal / topology feature
 
@@ -293,8 +295,8 @@ is loaded.
 **Rationale.** Flags signal-peptide and topology features so they are considered explicitly in construct design instead of being trimmed by accident.
 
 **Citations.**
-- Teufel et al., Nat Biotechnol 2022 (SignalP 6.0) — <https://doi.org/10.1038/s41587-021-01156-3>
-- Krogh et al., J Mol Biol 2001 (TMHMM) — <https://doi.org/10.1006/jmbi.2000.4315>
+- Teufel et al., Nat Biotechnol 2022 (SignalP 6.0). <https://doi.org/10.1038/s41587-021-01156-3>
+- Krogh et al., J Mol Biol 2001 (TMHMM). <https://doi.org/10.1006/jmbi.2000.4315>
 
 ---
 

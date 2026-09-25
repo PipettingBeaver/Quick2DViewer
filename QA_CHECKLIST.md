@@ -171,6 +171,24 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 90 | Check a homolog row's default view (fresh session, or after Reset Data) | Rows show **AA letters**; TM still defaults to Bar; changing either persists across reload |
 | 91 | Track Control → a homolog row → View as → Bar/Glyphs/AA | Each still switches correctly (the default changed, not the options) |
 
+## 0.26.0 - layout, hover and copy polish
+
+| # | Try | Watch for |
+|---|---|---|
+| 92 | Load a long sequence, zoom in until it scrolls sideways, hover a row, then scroll right | The row's hover band and background follow all the way to the last residue (this was the "doesn't adhere to the right" report) |
+| 93 | Same, watching the pinned AA + residue-number block | Its background and bottom border span the full content width; the AA area must not look cut or duplicated mid-panel |
+| 94 | Repeat with pLDDT/RSA in **graph** mode | Still aligned (that mode was already correct, so it must not regress) |
+| 95 | Hover a residue, then move the mouse out of the grid / out of the window | The grey column highlight clears immediately; the cell tooltip goes with it |
+| 96 | Hover a residue, then Alt+Tab away and back | Highlight is gone (window blur clears it) |
+| 97 | Hover a residue and take a screenshot without moving the mouse | The highlight is *expected* while hovering; the bug was only that it survived leaving |
+| 98 | Read every guide read-out line, toast, tooltip and panel | No em-dashes anywhere (they were swept; the harness fails if one returns) |
+| 99 | Open the Guide tab fresh | "Protein Background" accordion is **open** while questions are unanswered |
+| 100 | Answer all five questions | The accordion compresses itself to one line showing "5/5" |
+| 101 | Click it back open, then reload | Re-opens for the session; after reload it is auto (open until complete) |
+| 102 | Click "reset answers" inside it | Answers clear and the accordion reopens |
+| 103 | Finish every step (or mark them done) | The Next card reads "**All steps covered** (N of M)." with no advice sentence |
+| 104 | Check the homolog table and methods report for empty values | Placeholders render as `-` (not an em-dash) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -195,4 +213,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 4. 39–46 (rules/presets), then 47–55 (cross-check/report).
 5. 56–73 (import/FASTA/lookup — test this round with GFP as the reference system).
 6. 74–91 (task lockout, domain tooltips, relevance, Foldseek, coachmarks).
+6b. 92–104 (layout/hover/copy polish - check 92/93 first, they are the reported bug).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

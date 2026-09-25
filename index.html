@@ -475,6 +475,14 @@
             display: flex;
             align-items: center;
             height: 24px;
+            /* Block boxes inside a horizontal scroll container are sized to the
+               *viewport*, not to their overflowing content, so a heatmap row's
+               background/hover band stopped at the right edge of the visible
+               area once you scrolled. Graph sections set an explicit content
+               width, which is why they looked right. max-content matches the
+               cells; min-width keeps the band spanning a short row too. */
+            width: max-content;
+            min-width: 100%;
         }
         .track-row:hover { background-color: #f1f5f9; }
         /* Subtle separator between track types (inset shadow = layout-neutral). */
@@ -490,12 +498,19 @@
             z-index: 30;
             background: #fafafa;
             border-bottom: 1px solid #cbd5e1;
+            /* Same reasoning as .track-row: the pinned block's background and
+               border have to cover the full content width, otherwise the AA
+               area reads as cut off / duplicated once scrolled. */
+            width: max-content;
+            min-width: 100%;
         }
         .sticky-top .track-label { z-index: 12; }
         .track-position-row {
             display: flex;
             align-items: center;
             height: 24px;
+            width: max-content;
+            min-width: 100%;
         }
         .track-position-label {
             width: 195px;
@@ -1155,7 +1170,15 @@
         table.metrics-table tr.homolog-best td { border-color: #a7f3d0; }
         /* Guided evaluation workflow (Workflow tab) */
         .guide-intake { border:1px solid #e2e8f0; border-radius:6px; padding:8px; margin-bottom:10px; background:#f8fafc; }
-        .guide-intake-head { font-size:0.72rem; font-weight:700; color:#334155; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:6px; }
+        .guide-intake > summary {
+            cursor:pointer; list-style:none; display:flex; align-items:center; gap:6px;
+            font-size:0.72rem; font-weight:700; color:#334155;
+        }
+        .guide-intake > summary::-webkit-details-marker { display:none; }
+        .guide-intake > summary::before { content:'\u25b8'; color:#94a3b8; font-size:0.7rem; }
+        .guide-intake[open] > summary::before { content:'\u25be'; }
+        .guide-intake[open] > summary { margin-bottom:6px; }
+        .guide-intake > summary > .guide-count { margin-left:auto; font-weight:400; color:#64748b; }
         .guide-count { font-weight:400; color:#64748b; }
         .guide-reset { background:none; border:none; color:#2563eb; font-size:0.68rem; cursor:pointer; padding:0 2px; }
         .guide-q { margin-bottom:6px; }
@@ -2170,7 +2193,7 @@
                     <select id="metricsCrossRef" onchange="onCrossRefChange()" title="Cross-reference the current selection against another track"
                         aria-label="Cross-reference track" class="q2dv-select"
                         style="font-size: 0.68rem; padding: 1px 3px; border: 1px solid #cbd5e1; border-radius: 4px; max-width: 105px; vertical-align: middle;">
-                        <option value="">— none —</option>
+                        <option value="">- none -</option>
                     </select>
                     <button type="button" class="tb-btn tb-btn-secondary" onclick="openMetricsTable()"
                         title="Open the comparative metrics table across all loaded models"
@@ -2242,7 +2265,7 @@
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                         Compares two independent reads of the same question. <strong>TM consensus vs Quick2D TM</strong>
                         flags every residue where the pasted topology consensus and the Quick2D transmembrane call
-                        disagree — inspect those before trusting either. Runs client-side.
+                        disagree, so inspect those before trusting either. Runs client-side.
                     </p>
                     <button type="button" class="tb-btn tb-btn-secondary" onclick="runTmCrossCheck()" style="font-size:0.72rem; padding:3px 8px;">Run TM cross-check</button>
                     <div id="crossCheckStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
@@ -2533,7 +2556,7 @@
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Homolog Templates (HHpred)</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
-                Homologs imported from <code>.hhr</code> files, ranked by a <strong>template score</strong> (HHpred probability × identity × query coverage) — the top hit is the best candidate for structural/functional templating. <strong>Structure</strong> shows whether a matching PDB/CIF is already cached or auto-fetchable from RCSB.
+                Homologs imported from <code>.hhr</code> files, ranked by a <strong>template score</strong> (HHpred probability × identity × query coverage). The top hit is the best candidate for structural/functional templating. <strong>Structure</strong> shows whether a matching PDB/CIF is already cached or auto-fetchable from RCSB.
             </p>
             <div id="dataHomologTableWrap" style="overflow-x: auto;"></div>
         </div>
@@ -3058,7 +3081,7 @@ const SERVICE_ADAPTERS = {
             poll++;
             await new Promise(r => setTimeout(r, 3000));
             try { status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 60000)).text()).trim(); }
-            catch (e) { uniprotLog('poll ' + poll + ': status fetch failed — continuing'); continue; }
+            catch (e) { uniprotLog('poll ' + poll + ': status fetch failed, continuing'); continue; }
             if (status !== lastLogged) { uniprotLog('poll ' + poll + ': status=' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
             if (status === 'FINISHED') break;
             if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('job ' + status);
@@ -3138,7 +3161,7 @@ async function runCapability(capName, args, onProgress) {
             return await adapter(provider, args, onProgress);
         } catch (err) {
             lastErr = err;
-            if (onProgress) onProgress(provider.label + ' failed (' + (err && err.message ? err.message : err) + ') — trying next…');
+            if (onProgress) onProgress(provider.label + ' failed (' + (err && err.message ? err.message : err) + '); trying next…');
         }
     }
     throw lastErr || new Error('All providers failed for ' + cap.label);
@@ -3154,7 +3177,7 @@ let externalServicesEnabled = false;
 async function ensureExternalServices() {
     if (externalServicesEnabled) return true;
     const ok = await confirmDialog(
-        'Q2DV can make API calls on your behalf — sending the relevant sequence or accession to public services (UniProt, EBI BLAST/HMMER, ESMFold, Foldseek). Enable external services?',
+        'Q2DV can make API calls on your behalf: it sends the relevant sequence or accession to public services (UniProt, EBI BLAST/HMMER, ESMFold, Foldseek). Enable external services?',
         { okLabel: 'Enable', danger: false }
     );
     if (ok) { externalServicesEnabled = true; syncExternalServicesMenu(); schedulePersist(); }
@@ -3190,7 +3213,7 @@ function toggleQaHighlights() {
 // --- ESMFold structure prediction -----------------------------------------
 // Predicts a structure for the current sequence via the `fold` capability and
 // attaches the returned PDB through the normal structure pipeline, so pLDDT,
-// RSA, cofactors and the 3D viewer all light up — tagged source: 'ESMFold'.
+// RSA, cofactors and the 3D viewer all light up (tagged source 'ESMFold').
 async function predictStructureESMFold() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     if (!seq) { showToast('Load a sequence first, then predict a structure.', 'error'); return; }
@@ -3209,7 +3232,7 @@ async function predictStructureESMFold() {
         refreshTrackManagerIfVisible();
         schedulePersist();
         setStatus('ESMFold model attached.');
-        showToast('ESMFold model attached — pLDDT, RSA and 3D are available.', 'success');
+        showToast('ESMFold model attached. pLDDT, RSA and 3D are available.', 'success');
     } catch (err) {
         const m = err && err.message ? err.message : String(err);
         setStatus('ESMFold failed: ' + m);
@@ -3300,14 +3323,14 @@ function applyFoldseekHits(hits) {
 }
 async function runFoldseekSearch() {
     const files = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
-    if (!files.length) { showToast('Foldseek searches by structure — attach a PDB/CIF (or predict one with ESMFold) first.', 'error'); return; }
+    if (!files.length) { showToast('Foldseek searches by structure: attach a PDB/CIF (or predict one with ESMFold) first.', 'error'); return; }
     let file = files[0];
     if (p3dModel && p3dModel.kind === 'pdb' && cachedStructureTexts[p3dModel.fileName]) file = p3dModel.fileName;
     const dbEl = document.getElementById('foldseekDb');
     const db = (dbEl && dbEl.value) || 'afdb50';
     // Lock synchronously (before any await) so a double click cannot start two jobs.
     if (!beginGuideTask('foldseek', 'Foldseek search (' + db + ') with ' + file + ' running' +
-        (files.length > 1 ? ' — using 1 of ' + files.length + ' attached models' : ''))) return;
+        (files.length > 1 ? ' (using 1 of ' + files.length + ' attached models)' : ''))) return;
     const statusEl = document.getElementById('foldseekStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
     try {
@@ -3402,14 +3425,14 @@ function applyDomainTracks(domains, database) {
 
 async function runDomainScan() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
-    if (!seq) { showToast('Load a protein sequence first \u2014 hmmscan searches the sequence against Pfam.', 'error'); return; }
+    if (!seq) { showToast('Load a protein sequence first. hmmscan searches the sequence against Pfam.', 'error'); return; }
     // Lock synchronously, before any await, so a double click cannot start two jobs.
     if (!beginGuideTask('annotation', 'HMMER hmmscan (Pfam) search running')) return;
     const statusEl = document.getElementById('domainScanStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
     try {
         if (!(await ensureExternalServices())) { endGuideTask('annotation'); return; }
-        setStatus('Submitting hmmscan job (Pfam) \u2014 this usually takes a minute or two\u2026');
+        setStatus('Submitting hmmscan job (Pfam). This usually takes a minute or two\u2026');
         const text = await runCapability('domain_scan', { sequence: seq }, (m) => setStatus(m));
         const domains = parseHmmerDomains(text);
         const added = applyDomainTracks(domains, 'Pfam');
@@ -3598,13 +3621,13 @@ function renderUniProtSearchResults(results, query) {
         setUniProtStatus('No matches');
         return;
     }
-    setUniProtStatus('Found ' + results.length + ' match(es) — pick one to load its annotations.');
+    setUniProtStatus('Found ' + results.length + ' match(es). Pick one to load its annotations.');
     let html = '<div style="display:flex; flex-direction:column; gap:4px;">';
     results.forEach(r => {
         const detail = [r.protein, r.gene ? 'gene ' + r.gene : '', r.organism].filter(Boolean).join(' · ');
         html += '<button type="button" class="copy-btn" data-acc="' + structureEscapeHtml(r.accession) + '" onclick="useUniProtAccession(this.dataset.acc)" ' +
             'title="' + structureEscapeHtml(detail) + '" style="text-align:left; font-size:0.75rem; padding:5px 8px;">' +
-            '<strong>' + structureEscapeHtml(r.accession) + '</strong> — ' + structureEscapeHtml(detail) + '</button>';
+            '<strong>' + structureEscapeHtml(r.accession) + '</strong>: ' + structureEscapeHtml(detail) + '</button>';
     });
     html += '</div>';
     wrap.innerHTML = html;
@@ -3635,11 +3658,11 @@ async function fetchUniProtAnnotations() {
         uniprotLog('search: field=' + resolved.field + ' term="' + resolved.term + '"' +
             (resolved.correctedFrom ? ' (autocorrected from "' + resolved.correctedFrom + '")' : ''));
         if (resolved.correctedFrom) {
-            showToast('Autocorrected EBI Search to "' + resolved.term + '". Running in the background — you can leave this panel.', 'info');
+            showToast('Autocorrected EBI Search to "' + resolved.term + '". Running in the background, so you can leave this panel.', 'info');
         }
         beginLookupStatus('search', 'EBI Search (' + (LOOKUP_FIELD_LABELS[resolved.field] || resolved.field) + ') for "' + resolved.term + '"');
         const results = await uniprotSearchEntries(resolved.field, resolved.term);
-        endLookupStatus(results && results.length ? (results.length + ' result(s) — pick one to load') : '');
+        endLookupStatus(results && results.length ? (results.length + ' result(s). Pick one to load') : '');
         renderUniProtSearchResults(results, resolved.term);
     } else {
         const acc = ((document.getElementById('uniprotAccessionInput') || {}).value || '').trim();
@@ -3716,7 +3739,7 @@ function onUniprotAccessionInput() {
 // Users paste/import topology predictor output (TMHMM segments, DeepTMHMM JSON,
 // etc.); each source becomes a per-residue inside/outside/TM-helix track, plus
 // a majority-vote "Consensus" track when two or more sources are loaded.
-let topologySources = []; // [{ name, state }] — state is a per-residue char string (i/M/o/S/space)
+let topologySources = []; // [{ name, state }]: state is a per-residue char string (i/M/o/S/space)
 const TOPOLOGY_STATE_COLORS = { i: '#bfdbfe', o: '#bbf7d0', M: '#e98cd3', S: '#fde68a' };
 const TOPOLOGY_STATE_LABELS = { i: 'Inside', o: 'Outside', M: 'TM helix', S: 'Signal peptide' };
 
@@ -3825,7 +3848,7 @@ function renderTopologySourceList() {
     topologySources.forEach((s, i) => {
         const tmCount = (s.state.match(/M/g) || []).length;
         html += '<div style="display:flex; align-items:center; gap:6px; font-size:0.75rem;">' +
-            '<span style="flex:1;">' + structureEscapeHtml(s.name) + ' — ' + tmCount + ' TM helix/TM-helix segments</span>' +
+            '<span style="flex:1;">' + structureEscapeHtml(s.name) + ': ' + tmCount + ' TM helix/TM-helix segments</span>' +
             '<button type="button" class="copy-btn" onclick="removeTopologySource(' + i + ')" style="padding:1px 8px;">remove</button></div>';
     });
     html += '</div>';
@@ -3901,7 +3924,7 @@ function runTmCrossCheck() {
     refreshGuideIfVisible();
     renderTmCrossCheckSummary(res);
     schedulePersist();
-    setStatus('TM cross-check: ' + res.pct + '% agreement — ' + res.agree + ' agree, ' + res.topoOnly + ' topology-only, ' + res.q2dOnly + ' Quick2D-only.');
+    setStatus('TM cross-check: ' + res.pct + '% agreement: ' + res.agree + ' agree, ' + res.topoOnly + ' topology-only, ' + res.q2dOnly + ' Quick2D-only.');
     showToast('TM cross-check: ' + res.pct + '% agreement.', res.pct >= 80 ? 'success' : 'info');
     return res;
 }
@@ -3920,7 +3943,7 @@ function renderTmCrossCheckSummary(res) {
             '</td></tr>';
     });
     html += '</tbody></table><div style="font-size:0.68rem; color:#64748b; margin-top:4px;">Track <code>XC_TM</code>: ' +
-        '<code>=</code> both, <code>t</code> topology only, <code>q</code> Quick2D only — against ' +
+        '<code>=</code> both, <code>t</code> topology only, <code>q</code> Quick2D only, against ' +
         (res.consensus ? ('the ' + res.sources + '-source consensus') : 'the single topology source') +
         ' and ' + res.tmKeys.length + ' Quick2D TM track(s).</div>';
     wrap.innerHTML = html;
@@ -4113,7 +4136,7 @@ const RULE_PRESETS = [
     },
     {
         id: 'conserved_buried', name: 'Conserved buried residue', color: '#7c3aed', mode: 'all',
-        rationale: 'Conservation plus burial enriches strongly for active-site and binding residues — the classic "look here first" flag.',
+        rationale: 'Conservation plus burial enriches strongly for active-site and binding residues. This is the classic "look here first" flag.',
         conditions: [
             { kind: 'numeric', source: 'CONSERVATION', op: '>=', value: '0.85' },
             { kind: 'numeric', source: 'RSA:', op: '<', value: '0.2', anyKey: true }
@@ -4146,7 +4169,7 @@ const RULE_PRESETS = [
     },
     {
         id: 'flexible_disorder', name: 'Flexible / disordered region', color: '#eab308', mode: 'all',
-        rationale: 'Low structural confidence agreeing with a disorder prediction is the most reliable flexible-region signal — and a caveat on any fold-level claim there.',
+        rationale: 'Low structural confidence agreeing with a disorder prediction is the most reliable flexible-region signal, and a caveat on any fold-level claim there.',
         conditions: [
             { kind: 'numeric', source: 'pLDDT_mean', op: '<', value: '70' },
             { kind: 'categorical', source: 'group:DO', op: 'annotated', value: '' }
@@ -4290,7 +4313,7 @@ function renderRulePresets() {
             '<strong>' + structureEscapeHtml(preset.name) + '</strong>' +
             (isSuggested ? '<span class="rp-badge">suggested</span>' : '') + '</div>' +
             '<div class="rp-why">' + structureEscapeHtml(preset.rationale) + '</div>' +
-            '<div class="rp-cond">' + (preset.mode === 'any' ? 'ANY' : 'ALL') + ' — ' +
+            '<div class="rp-cond">' + (preset.mode === 'any' ? 'ANY' : 'ALL') + ': ' +
             preset.conditions.map(c => structureEscapeHtml(describeRuleCondition(c))).join('  ·  ') + '</div>' +
             (missing.length ? '<div class="rp-needs">needs ' + structureEscapeHtml(missing.map(ruleSourceLabel).join(', ')) + '</div>' : '') +
             '<div class="rp-actions"><button type="button" class="rp-add" onclick="addRuleFromPreset(\'' + preset.id + '\')">Add rule</button>' +
@@ -4309,7 +4332,7 @@ function renderRulesList() {
     const wrap = document.getElementById('rulesList');
     if (!wrap) return;
     if (!analysisRules.length) {
-        wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.75rem;">No rules yet — add one from a preset below, or build one from scratch.</p>';
+        wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.75rem;">No rules yet. Add one from a preset below, or build one from scratch.</p>';
         return;
     }
     let html = '';
@@ -4352,7 +4375,7 @@ function renderRuleConditions() {
             '<option value="numeric"' + (c.kind === 'numeric' ? ' selected' : '') + '>number</option>' +
             '<option value="categorical"' + (c.kind === 'categorical' ? ' selected' : '') + '>track</option></select>';
         html += '<select class="q2dv-select" onchange="onRuleSourceChange(' + idx + ', this.value)" style="font-size:0.72rem; padding:2px 4px; flex:1; min-width:130px;">';
-        if (!sources.some(s => s.id === c.source)) html += '<option value="" selected>— pick a source —</option>';
+        if (!sources.some(s => s.id === c.source)) html += '<option value="" selected>- pick a source -</option>';
         sources.forEach(s => { html += '<option value="' + structureEscapeHtml(s.id) + '"' + (c.source === s.id ? ' selected' : '') + '>' + structureEscapeHtml(s.label) + '</option>'; });
         html += '</select>';
         const ops = c.kind === 'numeric'
@@ -4367,7 +4390,7 @@ function renderRuleConditions() {
         html += '<button type="button" class="copy-btn" onclick="removeRuleCondition(' + idx + ')" style="padding:1px 6px;">×</button>';
         html += '</div>';
     });
-    if (!ruleEditing.conditions.length) html = '<p style="color:#94a3b8; font-size:0.75rem;">No conditions yet — add one below.</p>';
+    if (!ruleEditing.conditions.length) html = '<p style="color:#94a3b8; font-size:0.75rem;">No conditions yet. Add one below.</p>';
     wrap.innerHTML = html;
 }
 function onRuleKindChange(idx, kind) {
@@ -4468,7 +4491,7 @@ function parseStructureChains(text, ext) {
     return chains;
 }
 
-// Chain-pair CA-CA contacts within `cutoff` Å (default 8 Å — the standard
+// Chain-pair CA-CA contacts within `cutoff` Å (default 8 Å, the standard
 // CA-based interface distance). Returns per-chain interface residue sets +
 // a pair summary. Naive O(resA × resB) per pair; fine for typical oligomers.
 function computeInterfaces(chains, cutoff) {
@@ -4517,7 +4540,7 @@ function applyInterfaceTracks(result) {
 
 function runInterfaceAnalysis() {
     const files = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
-    if (!files.length) { showToast('Attach a multi-chain PDB/CIF (or predict one) first — interface analysis needs coordinates.', 'error'); return; }
+    if (!files.length) { showToast('Attach a multi-chain PDB/CIF (or predict one) first: interface analysis needs coordinates.', 'error'); return; }
     let file = files[0];
     if (p3dModel && p3dModel.kind === 'pdb' && cachedStructureTexts[p3dModel.fileName]) file = p3dModel.fileName;
     const ext = structExt(file);
@@ -4528,7 +4551,7 @@ function runInterfaceAnalysis() {
     const statusEl = document.getElementById('interfaceStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
     if (ids.length < 2) {
-        setStatus('"' + file + '" has ' + ids.length + ' chain(s) — need ≥2.');
+        setStatus('"' + file + '" has ' + ids.length + ' chain(s), need ≥2.');
         showToast('Interface analysis needs ≥2 chains; "' + file + '" has ' + ids.length + '.', 'error');
         return;
     }
@@ -4546,7 +4569,7 @@ function renderInterfaceSummary(result, file, cutoff) {
     const wrap = document.getElementById('interfaceResults');
     if (!wrap) return;
     if (!result || !result.pairs.length) { wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.75rem;">No inter-chain contacts within ' + cutoff + ' Å.</p>'; return; }
-    let html = '<p style="font-size:0.72rem; color:#64748b; margin:0 0 6px;">' + structureEscapeHtml(file) + ' — CA–CA ≤ ' + cutoff + ' Å</p>';
+    let html = '<p style="font-size:0.72rem; color:#64748b; margin:0 0 6px;">' + structureEscapeHtml(file) + ': CA–CA ≤ ' + cutoff + ' Å</p>';
     html += '<table class="metrics-table" style="width:100%; font-size:0.72rem;"><thead><tr><th>Chain pair</th><th>Contacts</th><th>Interface resi. (A/B)</th></tr></thead><tbody>';
     result.pairs.slice().sort((a, b) => b.contacts - a.contacts).forEach(p => {
         html += '<tr><td>' + structureEscapeHtml(p.a) + ' – ' + structureEscapeHtml(p.b) + '</td><td>' + p.contacts + '</td><td>' +
@@ -4583,7 +4606,7 @@ function showTimerToast(id, text) {
     el._base = text;
     const tick = () => {
         const secs = Math.round((Date.now() - el._start) / 1000);
-        el.textContent = el._base + ' — ' + secs + ' s';
+        el.textContent = el._base + ' (' + secs + ' s)';
     };
     tick();
     if (el._timer) clearInterval(el._timer);
@@ -4615,7 +4638,7 @@ function endTimerToast(id, text, type) {
 let guideTask = null;
 function beginGuideTask(stepId, label) {
     if (guideTask) {
-        showToast((guideTask.label || 'A task') + ' is already running — one moment.', 'info');
+        showToast((guideTask.label || 'A task') + ' is already running, one moment.', 'info');
         return false;
     }
     guideTask = { stepId, label, startedAt: Date.now() };
@@ -4644,7 +4667,7 @@ function syncTaskButtons() {
         btn.classList.toggle('task-running', busy);
         if (busy) { btn.setAttribute('aria-busy', 'true'); } else { btn.removeAttribute('aria-busy'); }
         if (locked && btn.getAttribute('data-lock-note') !== '1') {
-            btn.setAttribute('title', 'Another task is running — finishes first');
+            btn.setAttribute('title', 'Another task is running, this finishes first');
         }
     });
 }
@@ -4737,7 +4760,7 @@ const WORKFLOW_STEPS = [
         refs: [{ cite: 'UniProt Consortium, Nucleic Acids Res 2023', doi: '10.1093/nar/gkac1052' }],
         check: () => !!parsedTracks.AA,
         priority: () => true,
-        priorityNote: 'Always — it is the prerequisite for every other step.'
+        priorityNote: 'Always. It is the prerequisite for every other step.'
     },
     {
         id: 'features', title: 'SS / disorder / TM predictions',
@@ -4745,7 +4768,7 @@ const WORKFLOW_STEPS = [
         why: 'Predicted SS and disorder are the fastest orthogonal read on domain architecture, and they anchor every later cross-check (a variant in a helix, a domain inside a disordered linker).',
         action: { label: 'Load Quick2D output…', run: 'openInputDataModal()' },
         how: ['Helix/sheet runs suggest a folded core; long disorder runs suggest flexible regions.',
-              'TM segments should line up with the topology consensus later — a conflict is a flag to inspect, not an error.'],
+              'TM segments should line up with the topology consensus later. A conflict is a flag to inspect, not an error.'],
         refs: [
             { cite: 'Buchan & Jones, Nucleic Acids Res 2019 (PSIPRED workbench)', doi: '10.1093/nar/gkz297' },
             { cite: 'Klausen et al., Proteins 2019 (NetSurfP-2.0)', doi: '10.1002/prot.25674' },
@@ -4761,7 +4784,7 @@ const WORKFLOW_STEPS = [
     {
         id: 'annotation', title: 'Curated annotation & domains',
         desc: 'UniProt domains/PTMs/variants, plus HMMER/Pfam domain architecture.',
-        why: 'Curated entries and profile searches place the sequence in a known family and mark the residues that already have experimental support — the baseline every prediction is judged against.',
+        why: 'Curated entries and profile searches place the sequence in a known family and mark the residues that already have experimental support. That is the baseline every prediction is judged against.',
         action: { label: 'Fetch UniProt', run: 'autoLookupAccession()' },
         extraActions: [{ label: 'Scan HMMER/Pfam', run: 'runDomainScan()' }],
         how: ['Prefer curated domain boundaries where they agree with the profile hits; investigate where they disagree.',
@@ -4780,7 +4803,7 @@ const WORKFLOW_STEPS = [
         why: 'Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.',
         action: { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()' },
         how: ['Probability > 90% with coverage near 100% makes a template a solid model.',
-              'Conservation is only as good as the alignment depth — check how many sequences went in.'],
+              'Conservation is only as good as the alignment depth, so check how many sequences went in.'],
         refs: [
             { cite: 'Söding, Biegert & Lupas, Nucleic Acids Res 2005 (HHpred)', doi: '10.1093/nar/gki408' },
             { cite: 'Remmert et al., Nat Methods 2012 (HHblits)', doi: '10.1038/nmeth.1818' },
@@ -4789,14 +4812,14 @@ const WORKFLOW_STEPS = [
         ],
         check: () => Object.keys(parsedTracks).some(k => k.startsWith('HL_')) || !!parsedTracks.CONSERVATION,
         priority: () => true,
-        priorityNote: 'Always — homology is the main cross-check on the sequence-based layers.'
+        priorityNote: 'Always. Homology is the main cross-check on the sequence-based layers.'
     },
     {
         id: 'structure', title: 'Structural model',
         desc: 'Attach AlphaFold/PDB/CIF (or predict with ESMFold) for pLDDT, RSA, cofactors and the 3D view.',
         why: 'A model converts sequence annotations into spatial context: buried vs exposed, domain packing, and which residues form interfaces.',
         action: { label: 'Attach / predict structure…', run: 'openInputDataModal()' },
-        how: ['pLDDT > 70 is confident, 50–70 tentative, < 50 unreliable — read it per region, not per protein.',
+        how: ['pLDDT > 70 is confident, 50-70 tentative and < 50 unreliable. Read it per region, not per protein.',
               'RSA says whether a residue is buried; a variant in a buried position is usually more disruptive.'],
         refs: [
             { cite: 'Jumper et al., Nature 2021 (AlphaFold2)', doi: '10.1038/s41586-021-03819-2' },
@@ -4813,8 +4836,8 @@ const WORKFLOW_STEPS = [
         why: 'Structure is more conserved than sequence: Foldseek finds the remote homologs that decide a fold assignment when BLAST/HMMER come up empty.',
         action: { label: 'Run Foldseek', run: 'runFoldseekSearch()' },
         extraActions: [{ label: 'Attach Structure(s)', run: 'attachStructures()' }],
-        how: ['Attach at least one structure — Foldseek searches by 3D coordinates, not by sequence.',
-              'The search uses the active (or first attached) model. Attaching more models does NOT widen the search — pull one representative structure per state you care about and run that.',
+        how: ['Attach at least one structure: Foldseek searches by 3D coordinates, not by sequence.',
+              'The search uses the active (or first attached) model. Attaching more models does NOT widen the search, so pull one representative structure per state you care about and run that.',
               'High probability + low E-value with good query coverage is a credible structural relative.',
               'Use it to sanity-check the family assignment, not to overrule curated data.'],
         refs: [{ cite: 'van Kempen et al., Nat Biotechnol 2023 (Foldseek)', doi: '10.1038/s41587-023-01773-0' }],
@@ -4846,7 +4869,7 @@ const WORKFLOW_STEPS = [
         why: 'The last step is where evidence becomes a claim: co-localization and contradiction rules keep the reasoning explicit, inspectable and reproducible.',
         action: { label: 'Open Analysis Rules…', run: "openGuideCoachmark('rules')" },
         extraActions: [{ label: 'Interfaces…', run: "openGuideCoachmark('interfaces')" }],
-        how: ['A rule hit is a hypothesis to inspect, not a conclusion — click through its matches.',
+        how: ['A rule hit is a hypothesis to inspect, not a conclusion. Click through its matches.',
               'Export the figure plus table so the track state behind the claim is archived.'],
         refs: [
             { cite: 'Lichtarge, Bourne & Cohen, J Mol Biol 1996 (evolutionary trace)', doi: '10.1006/jmbi.1996.0167' },
@@ -4854,7 +4877,7 @@ const WORKFLOW_STEPS = [
         ],
         check: () => analysisRules.length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('IF_')),
         priority: () => true,
-        priorityNote: 'Always — it is where the collected evidence is combined.'
+        priorityNote: 'Always. It is where the collected evidence is combined.'
     }
 ];
 
@@ -4874,6 +4897,9 @@ const GUIDE_QUESTIONS = [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] }
 ];
 let guideProfile = {};
+// The intake block auto-collapses once every question is answered (and stays
+// wherever the user last put it for the session).
+let guideIntakeOpen = null;
 // Per-step questions. Unlike the global intake (which re-ranks steps), these
 // choose *how* a step is satisfied: the answers pick the concrete action and
 // pre-fill the matching defaults, so the wizard hands over a specific next move
@@ -4892,8 +4918,8 @@ const STEP_QUESTIONS = {
     ],
     annotation: [
         { id: 'have', label: 'Do you already have the accession or family?', options: [
-            { value: 'accession', label: 'Yes — fetch it' },
-            { value: 'search', label: 'No — search for it' },
+            { value: 'accession', label: 'Yes, fetch it' },
+            { value: 'search', label: 'No, search for it' },
             { value: 'domains', label: 'Only Pfam domains' }] }
     ],
     homologs: [
@@ -4958,7 +4984,7 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     annotation(a) {
-        if (a.have === 'domains') return { label: 'Scan HMMER/Pfam', run: 'runDomainScan()', hint: 'Adds domain architecture only — no UniProt fetch.' };
+        if (a.have === 'domains') return { label: 'Scan HMMER/Pfam', run: 'runDomainScan()', hint: 'Adds domain architecture only, no UniProt fetch.' };
         if (a.have === 'search') return { label: 'Search UniProt…', run: 'autoLookupAccession()', hint: 'Opens the UniProt search with the current protein label pre-filled.' };
         if (a.have === 'accession') return { label: 'Fetch UniProt entry', run: 'autoLookupAccession()' };
         return null;
@@ -5055,7 +5081,7 @@ async function undoGuideStep(stepId) {
         { okLabel: 'Remove', danger: true });
     if (!ok) return;
     const n = removeTracks(keys);
-    showToast('Removed ' + n + ' track(s) — the step no longer counts as covered.', 'success');
+    showToast('Removed ' + n + ' track(s). The step no longer counts as covered.', 'success');
 }
 
 function openTopologyPanel() {
@@ -5148,7 +5174,7 @@ function guideRefsHTML(step) {
 function computeGuideInsights() {
     const out = [];
     if (!parsedTracks.AA) {
-        out.push({ level: 'info', text: 'Load a sequence to start — the guide fills in as data arrives.' });
+        out.push({ level: 'info', text: 'Load a sequence to start. The guide fills in as data arrives.' });
         return out;
     }
     const keys = Object.keys(parsedTracks);
@@ -5160,20 +5186,20 @@ function computeGuideInsights() {
     if (plddtVals.length) {
         const mean = plddtVals.reduce((a, b) => a + b, 0) / plddtVals.length;
         out.push(mean < 70
-            ? { level: 'warn', text: 'Mean pLDDT is ' + mean.toFixed(0) + ' — treat fold-level conclusions (domain edges, interface detail) as tentative.' }
-            : { level: 'info', text: 'Mean pLDDT is ' + mean.toFixed(0) + ' — the backbone is confident; inspect local dips individually.' });
+            ? { level: 'warn', text: 'Mean pLDDT is ' + mean.toFixed(0) + '. Treat fold-level conclusions (domain edges, interface detail) as tentative.' }
+            : { level: 'info', text: 'Mean pLDDT is ' + mean.toFixed(0) + '. The backbone is confident, so inspect local dips individually.' });
     }
     const hlKeys = keys.filter(k => k.startsWith('HL_'));
     if (!hlKeys.length) {
-        out.push({ level: 'warn', text: 'No homologs loaded — nothing cross-checks the sequence predictions yet. Add an HHpred .hhr (or run Foldseek).' });
+        out.push({ level: 'warn', text: 'No homologs loaded, so nothing cross-checks the sequence predictions yet. Add an HHpred .hhr (or run Foldseek).' });
     } else {
         let best = 0;
         try {
             homologTemplateMetrics().forEach(r => { const v = parseFloat(r.ident); if (isFinite(v) && v > best) best = v; });
         } catch (e) { /* metrics are best-effort */ }
         out.push(best && best >= 30
-            ? { level: 'info', text: 'Best homolog identity is ' + best.toFixed(0) + '% — annotation transfer from templates is reasonable.' }
-            : { level: 'warn', text: 'No homolog above ~30% identity — homology-based annotation transfer is weak; lean on structural and curated evidence.' });
+            ? { level: 'info', text: 'Best homolog identity is ' + best.toFixed(0) + '%. Annotation transfer from templates is reasonable.' }
+            : { level: 'warn', text: 'No homolog above ~30% identity, so homology-based annotation transfer is weak. Lean on structural and curated evidence.' });
     }
     if (guideProfile.membrane === 'yes' && !keys.some(k => k.startsWith('TM_') || k.startsWith('SP_'))) {
         out.push({ level: 'warn', text: 'You flagged a membrane/secreted protein, but no TM or signal-peptide track is loaded.' });
@@ -5190,7 +5216,7 @@ function computeGuideInsights() {
             if (parsedTracks['XC_TM']) {
                 out.push({ level: xc.pct >= 80 ? 'info' : 'warn', text: 'TM cross-check: ' + xc.pct + '% agreement between the topology consensus and Quick2D TM.' });
             } else if (xc.topoOnly + xc.q2dOnly) {
-                out.push({ level: 'warn', text: 'Topology consensus and Quick2D TM disagree on ' + (xc.topoOnly + xc.q2dOnly) + ' residue(s) (' + xc.topoOnly + ' topology-only, ' + xc.q2dOnly + ' Quick2D-only) — run the TM cross-check to see the segments.' });
+                out.push({ level: 'warn', text: 'Topology consensus and Quick2D TM disagree on ' + (xc.topoOnly + xc.q2dOnly) + ' residue(s) (' + xc.topoOnly + ' topology-only, ' + xc.q2dOnly + ' Quick2D-only). Run the TM cross-check to see the segments.' });
             } else {
                 out.push({ level: 'info', text: 'Topology consensus and Quick2D TM agree on every TM residue.' });
             }
@@ -5199,7 +5225,7 @@ function computeGuideInsights() {
     try {
         const sug = suggestedRulePresets();
         if (sug.length && !analysisRules.length) {
-            out.push({ level: 'info', text: 'Rule presets ready for this dataset: ' + sug.slice(0, 3).map(p => p.name).join(', ') + (sug.length > 3 ? ' (+' + (sug.length - 3) + ' more)' : '') + ' — open Analysis Rules to add one.' });
+            out.push({ level: 'info', text: 'Rule presets ready for this dataset: ' + sug.slice(0, 3).map(p => p.name).join(', ') + (sug.length > 3 ? ' (+' + (sug.length - 3) + ' more)' : '') + '. Open Analysis Rules to add one.' });
         }
     } catch (e) { /* suggestions are advisory */ }
     return out;
@@ -5233,7 +5259,7 @@ function buildMethodsReport() {
     GUIDE_QUESTIONS.forEach(q => {
         const a = guideProfile[q.id];
         const opt = a ? (q.options.find(o => o.value === a) || {}) : null;
-        L.push('- ' + q.label + ' — ' + (opt && opt.label ? opt.label : 'not answered'));
+        L.push('- ' + q.label + ': ' + (opt && opt.label ? opt.label : 'not answered'));
     });
     L.push('');
 
@@ -5252,7 +5278,7 @@ function buildMethodsReport() {
             const opt = q.options.find(o => o.value === a) || {};
             notes.push(q.label + ': ' + (opt.label || a));
         });
-        L.push('| ' + (r.index + 1) + ' | ' + r.step.title + ' | ' + status + ' | ' + (notes.join('; ') || '—') + ' |');
+        L.push('| ' + (r.index + 1) + ' | ' + r.step.title + ' | ' + status + ' | ' + (notes.join('; ') || '-') + ' |');
     });
     L.push('');
     L.push('Coverage: ' + prog.covered + ' of ' + prog.denominator + ' steps' + (prog.skipped ? ' (' + prog.skipped + ' skipped)' : '') + '.');
@@ -5297,7 +5323,7 @@ function buildMethodsReport() {
         L.push('');
         analysisRules.forEach(r => {
             L.push('- **' + r.name + '** (' + (r.mode === 'any' ? 'ANY' : 'ALL') + (r.enabled === false ? ', disabled' : '') + ')' +
-                (r.presetId ? ' [preset: ' + r.presetId + ']' : '') + ' — ' + (r.conditions || []).map(describeRuleCondition).join(' · '));
+                (r.presetId ? ' [preset: ' + r.presetId + ']' : '') + ': ' + (r.conditions || []).map(describeRuleCondition).join(' · '));
         });
         L.push('');
     }
@@ -5329,7 +5355,7 @@ function buildMethodsReport() {
     if (refs.length) {
         L.push('## References');
         L.push('');
-        refs.forEach(ref => L.push('- ' + ref.cite + ' — https://doi.org/' + ref.doi));
+        refs.forEach(ref => L.push('- ' + ref.cite + '. https://doi.org/' + ref.doi));
         L.push('');
     }
     L.push('---');
@@ -5340,7 +5366,7 @@ function buildMethodsReport() {
     return L.join('\n');
 }
 function exportMethodsReport() {
-    if (!parsedTracks.AA) { showToast('Load data first — the methods summary reports what has been evaluated.', 'error'); return; }
+    if (!parsedTracks.AA) { showToast('Load data first: the methods summary reports what has been evaluated.', 'error'); return; }
     const text = buildMethodsReport();
     const safe = (currentProteinLabel || 'session').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'session';
     downloadTextFile('q2dv-methods-' + safe + '-' + methodsReportDate() + '.md', text, 'text/markdown');
@@ -5363,9 +5389,10 @@ function renderWorkflowGuide() {
     const overrideCount = Object.keys(guideOverrides).length;
     let html = '';
 
-    html += '<div class="guide-intake"><div class="guide-intake-head"><span>Tell the guide about this protein</span>' +
-        '<span><span class="guide-count">' + answered + '/' + GUIDE_QUESTIONS.length + '</span>' +
-        (answered ? ' <button type="button" class="guide-reset" onclick="resetGuideProfile()">reset</button>' : '') + '</span></div>';
+    const intakeOpen = guideIntakeOpen === null ? (answered < GUIDE_QUESTIONS.length) : guideIntakeOpen;
+    html += '<details class="guide-intake" id="guideIntake"' + (intakeOpen ? ' open' : '') +
+        ' ontoggle="guideIntakeOpen = this.open;">' +
+        '<summary><span>Protein Background</span><span class="guide-count">' + answered + '/' + GUIDE_QUESTIONS.length + '</span></summary>';
     GUIDE_QUESTIONS.forEach(q => {
         html += '<div class="guide-q"><div class="guide-q-label">' + q.label + '</div><div class="guide-q-opts">';
         q.options.forEach(o => {
@@ -5374,7 +5401,10 @@ function renderWorkflowGuide() {
         });
         html += '</div></div>';
     });
-    html += '</div>';
+    if (answered) {
+        html += '<div style="margin-top:6px;"><button type="button" class="guide-reset" onclick="resetGuideProfile()">reset answers</button></div>';
+    }
+    html += '</details>';
 
     html += '<div class="guide-next"><div class="guide-progress"><span class="guide-bar"><span style="width:' +
         Math.round((prog.covered / prog.denominator) * 100) + '%"></span></span>' + prog.covered + ' of ' + prog.denominator +
@@ -5383,7 +5413,7 @@ function renderWorkflowGuide() {
         (Object.keys(guideAnswers).length ? ' <button type="button" class="guide-reset" onclick="resetStepAnswers()">reset answers</button>' : '') + '</div>';
     if (next) {
         const nextAct = resolveStepAction(next.step);
-        html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title + ' — ' + next.step.desc +
+        html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title + ': ' + next.step.desc +
             (nextAct.hint ? '<br><span class="guide-next-hint">' + nextAct.hint + '</span>' : '') + '<br>' +
             '<button type="button" class="guide-run" onclick="' + nextAct.run + '">' + nextAct.label + '</button>' +
             (nextAct.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' : '') +
@@ -5393,7 +5423,7 @@ function renderWorkflowGuide() {
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + next.step.id + '\',\'skipped\')">Skip this step</button>' +
             '</div></div>';
     } else {
-        html += '<div class="guide-next-action">All steps covered — combine the evidence in Rules, then export the figure and table for the record.' +
+        html += '<div class="guide-next-action"><strong>All steps covered</strong> (' + prog.covered + ' of ' + prog.denominator + ').' +
             (overrideCount ? '<div class="guide-next-meta"><button type="button" class="guide-mini" onclick="resetGuideOverrides()">Clear ' + overrideCount + ' override(s)</button></div>' : '') +
             '</div>';
     }
@@ -5411,8 +5441,8 @@ function renderWorkflowGuide() {
             (busy ? ' disabled aria-busy="true"' : (locked ? ' disabled' : ''));
         const stepQs = STEP_QUESTIONS[r.step.id] || [];
         const status = r.manualDone ? 'Status: marked done by you (auto-detection says ' + (r.autoDone ? 'done' : 'not yet') + ').'
-            : r.skipped ? 'Status: skipped by you — it stays out of the progress count.'
-            : r.notRelevant ? 'Status: not relevant for this protein' + (r.step.relevantNote ? ' — ' + r.step.relevantNote : '') + ' Mark done or skip to settle it.'
+            : r.skipped ? 'Status: skipped by you, so it stays out of the progress count.'
+            : r.notRelevant ? 'Status: not relevant for this protein. ' + (r.step.relevantNote ? r.step.relevantNote + ' ' : '') + 'Mark done or skip to settle it.'
             : r.autoDone ? 'Status: detected from the loaded data.'
             : 'Status: not detected yet.';
         html += '<details class="guide-step' + (r.done ? ' guide-step-done' : '') + (r.skipped ? ' guide-step-skip' : '') + '" data-step="' + r.step.id + '">' +
@@ -5428,7 +5458,7 @@ function renderWorkflowGuide() {
             }).join('') + '</div>' : '') +
             '<p><strong>Why it matters:</strong> ' + r.step.why + '</p>' +
             '<p><strong>How to read it:</strong></p><ul>' + (r.step.how || []).map(h => '<li>' + h + '</li>').join('') + '</ul>' +
-            (r.step.priorityNote ? '<p class="guide-pri-note">' + (r.priority ? '<strong>Recommended</strong> — ' : 'Optional — ') + r.step.priorityNote + '</p>' : '') +
+            (r.step.priorityNote ? '<p class="guide-pri-note">' + (r.priority ? '<strong>Recommended</strong>: ' : 'Optional: ') + r.step.priorityNote + '</p>' : '') +
             guideRefsHTML(r.step) +
             '<div class="guide-state">' + status + '</div>' +
             '<div class="guide-actions">' +
@@ -5491,7 +5521,7 @@ function renderInputDataModal() {
             const color = r.done ? '#15803d' : (r.skipped ? '#94a3b8' : (r.priority ? '#b45309' : '#cbd5e1'));
             html += '<div style="display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:0.78rem;">' +
                 '<span style="flex-shrink:0; width:16px; text-align:center; color:' + color + '; font-weight:700;">' + icon + '</span>' +
-                '<span><strong style="color:' + (r.done ? '#334155' : '#64748b') + ';">' + r.step.title + '</strong> — ' + r.step.desc +
+                '<span><strong style="color:' + (r.done ? '#334155' : '#64748b') + ';">' + r.step.title + '</strong>: ' + r.step.desc +
                 (r.skipped ? ' <em style="color:#94a3b8;">(skipped)</em>' : '') +
                 (r.priority && !r.done && !r.skipped ? ' <em style="color:#b45309;">(recommended)</em>' : '') +
                 '</span></div>';
@@ -6087,7 +6117,7 @@ function buildDomainPredictorInfo(trackKey) {
     const spans = (d.domains || []).map(x => x.start + '–' + x.end).join(', ');
     const total = (d.domains || []).reduce((n, x) => n + Math.max(0, x.end - x.start + 1), 0);
     return {
-        name: model + (d.description ? ' — ' + d.description : ''),
+        name: model + (d.description ? ' (' + d.description + ')' : ''),
         category: 'Protein domain (' + db + ', HMMER hmmscan)',
         description: 'Significant match to the ' + db + ' family "' + model + '"' +
             ((d.domains || []).length > 1 ? ' (' + d.domains.length + ' occurrences)' : '') +
@@ -6095,7 +6125,7 @@ function buildDomainPredictorInfo(trackKey) {
         useCase: 'One bar per ' + db + ' family, filled across the aligned span' +
             (spans ? ' (' + spans + '; ' + total + ' aa total)' : '') +
             '. A domain is a span rather than a per-residue feature, so the bar is solid where the family matches and blank elsewhere.',
-        citation: 'Mistry et al., Nucleic Acids Res 2021 (Pfam) — https://doi.org/10.1093/nar/gkaa913 · Finn, Clements & Eddy, Nucleic Acids Res 2011 (HMMER web server) — https://doi.org/10.1093/nar/gkr367'
+        citation: 'Mistry et al., Nucleic Acids Res 2021 (Pfam). https://doi.org/10.1093/nar/gkaa913 · Finn, Clements & Eddy, Nucleic Acids Res 2011 (HMMER web server). https://doi.org/10.1093/nar/gkr367'
     };
 }
 
@@ -6302,7 +6332,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.25.0';
+const APP_VERSION = '0.26.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -6811,7 +6841,7 @@ function buildConfigGear(g) {
     const cell = mkEl('div', 'tctl-config-cell');
     const gear = mkEl('button', 'tctl-gear', '⚙');
     const hintText = groupConfigHint(g);
-    gear.title = 'Config for ' + trackGroupLabel(g) + (hintText ? ' — ' + hintText : '');
+    gear.title = 'Config for ' + trackGroupLabel(g) + (hintText ? ': ' + hintText : '');
     gear.addEventListener('click', () => {
         tctlConfigGroup = g;
         tctlRefreshPopup();
@@ -8713,8 +8743,8 @@ function renderLookupStatus(kind) {
     if (!el) return;
     const secs = Math.round((Date.now() - lookupStatusStart) / 1000);
     el.hidden = false;
-    el.textContent = lookupStatusBase + ' — ' + (LOOKUP_ESTIMATES[kind] || '') + (secs > 0 ? ' · ' + secs + ' s elapsed' : '') +
-        (secs > 20 ? ' (safe to leave this panel — it keeps running)' : '');
+    el.textContent = lookupStatusBase + ': ' + (LOOKUP_ESTIMATES[kind] || '') + (secs > 0 ? ' · ' + secs + ' s elapsed' : '') +
+        (secs > 20 ? ' (safe to leave this panel, it keeps running)' : '');
 }
 function beginLookupStatus(kind, detail) {
     lookupStatusStart = Date.now();
@@ -9812,7 +9842,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                         if (gSpan) gSpan.textContent = '-';
                     }
                 }
-                const varDescLine = varDesc ? formatTrackLabel(key) + ' \u2014 ' + varDesc + '\n' : '';
+                const varDescLine = varDesc ? formatTrackLabel(key) + ': ' + varDesc + '\n' : '';
                 cellEl.title = varDescLine + (varChar !== ' ' && varChar !== '-'
                     ? (isMismatch ? `Residue ${i + 1}: variant AA '${varChar}' (mismatch vs reference '${refChar}')` : `Residue ${i + 1}: variant AA '${varChar}' (matches reference)`)
                     : `Residue ${i + 1}: variant (no aligned residue)`);
@@ -9827,7 +9857,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     cellEl.style.backgroundColor = upMeta ? upMeta.color : '#e2e8f0';
                     const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
                     if (gSpan) gSpan.style.color = '#1e293b';
-                    cellEl.title = `Residue ${i + 1}: ${feat.type}` + (feat.description ? ` — ${feat.description}` : '');
+                    cellEl.title = `Residue ${i + 1}: ${feat.type}` + (feat.description ? ` (${feat.description})` : '');
                 } else {
                     cellEl.title = `Residue ${i + 1}: (no UniProt feature)`;
                 }
@@ -10289,6 +10319,21 @@ function handleMouseDown(idx, trackKey, ev) {
     }
     updateSelectionUI();
 }
+
+// The grey column highlight is a hover affordance, not state: clear it when
+// the pointer leaves the grid (or the window entirely), so a screenshot or a
+// mouse-out never keeps a column looking selected.
+function clearHoverHighlight() {
+    document.querySelectorAll('.column-highlight').forEach(c => c.classList.remove('column-highlight'));
+    if (!pinnedIcon) hideTooltip();
+}
+function installHoverHighlightClear() {
+    const gridEl = document.getElementById('alignmentGrid');
+    if (gridEl) gridEl.addEventListener('mouseleave', clearHoverHighlight);
+    document.documentElement.addEventListener('mouseleave', clearHoverHighlight);
+    window.addEventListener('blur', clearHoverHighlight);
+}
+installHoverHighlightClear();
 
 function handleMouseEnter(idx) {
     document.querySelectorAll('.column-highlight').forEach(c => c.classList.remove('column-highlight'));
@@ -11252,7 +11297,7 @@ function renderSeqSearchResults() {
     countBtn.title = 'Select all ' + seqSearchMatches.length + ' hit range(s)';
     countBtn.addEventListener('click', () => selectSeqSearchAll());
     head.appendChild(countBtn);
-    head.appendChild(document.createTextNode(' — click a number to select that hit:'));
+    head.appendChild(document.createTextNode(': click a number to select that hit:'));
     resEl.appendChild(head);
     // One numbered Select button + range per hit.
     seqSearchMatches.forEach((m, idx) => {
@@ -11593,7 +11638,7 @@ function populateCrossRefDropdown() {
         ['RSA Exposure', k => k.endsWith('_RSA'), 'RSA']
     ];
 
-    select.innerHTML = '<option value="">— none —</option>';
+    select.innerHTML = '<option value="">- none -</option>';
 
     // Saved Selections: one entry per slot (1-5), showing the stored ranges,
     // so the current selection can be cross-referenced against any earlier
@@ -12044,7 +12089,7 @@ async function openP3DViewer() {
     refreshP3DModelOptions();
     const sel = document.getElementById('p3dModelSelect');
     if (!sel.options.length) {
-        setP3DNotice('No 3D-capable structure cached yet — attach a PDB/CIF file, or select a Homolog row.');
+        setP3DNotice('No 3D-capable structure cached yet: attach a PDB/CIF file, or select a Homolog row.');
         return;
     }
     updateP3DColoring();
@@ -12249,7 +12294,7 @@ async function p3dRemoteFetchForHomolog(hhKey) {
     if (!parsed) {
         setP3DNotice('No cached structure for this homolog. Attach a PDB/CIF file whose name matches "' +
             info.hitId + '", or rename a file to match, then reselect.');
-        setP3DStatus('Homolog — no structure');
+        setP3DStatus('Homolog: no structure');
         return;
     }
     if (p3dRemotePending) return; // a fetch is already in flight; it reloads its own model
@@ -12273,13 +12318,13 @@ async function p3dRemoteFetchForHomolog(hhKey) {
         } else {
             setP3DNotice('Could not fetch "' + info.hitId + '" from RCSB PDB (unknown ID or offline?). ' +
                 'Attach a PDB/CIF file whose name matches "' + info.hitId + '", or check your connection and reselect.');
-            setP3DStatus('Homolog — no structure');
+            setP3DStatus('Homolog: no structure');
             if (p3dView) { try { p3dView.render(); } catch (e) {} }
         }
     } catch (err) {
         setP3DNotice('Could not fetch "' + info.hitId + '" from RCSB PDB. Attach a PDB/CIF file whose name matches "' +
             info.hitId + '", or check your connection and reselect.');
-        setP3DStatus('Homolog — no structure');
+        setP3DStatus('Homolog: no structure');
     } finally {
         p3dRemotePending = false;
         // If the user moved on to ANOTHER still-unfetched homolog while this
@@ -12339,7 +12384,7 @@ function onP3DModelChange() {
     loadP3DModel(p3dParseModelValue(sel ? sel.value : ''));
 }
 function p3dModelDisplayName() {
-    if (!p3dModel) return '—';
+    if (!p3dModel) return '-';
     if (p3dModel.kind === 'homolog') return p3dHomologLabel(p3dModel.key);
     return structBaseName(p3dModel.fileName);
 }
@@ -12403,7 +12448,7 @@ function loadP3DModel(model) {
     p3dModel = model;
     updateP3DModelInfo();
     if (!p3dModel) return;
-    if (!p3dLoaded || !p3dView) { setP3DNotice('3D engine not ready — toggle 3D again.'); return; }
+    if (!p3dLoaded || !p3dView) { setP3DNotice('3D engine not ready. Toggle 3D again.'); return; }
     let fileName = null;
     if (model.kind === 'homolog') {
         fileName = p3dHomologStructureFile(model.key);
@@ -12497,7 +12542,7 @@ function applyP3DColoring(resiColors, statusLabel) {
     for (const hex of Object.keys(matched)) p3dView.setStyle({ resi: matched[hex] }, coloredP3DStyle(hex));
     if (nomatch.length) p3dView.setStyle({ resi: nomatch }, coloredP3DStyle(P3D_NO_MATCH_COLOR));
     const nMatched = Object.keys(matched).reduce((a, k) => a + matched[k].length, 0);
-    let msg = p3dModelDisplayName() + ' — ' + nMatched + ' resi ' + (statusLabel || 'colored');
+    let msg = p3dModelDisplayName() + ': ' + nMatched + ' resi ' + (statusLabel || 'colored');
     if (nomatch.length) msg += ', ' + nomatch.length + ' not matched → blue';
     if (p3dLocked) msg += ' (locked)';
     setP3DStatus(msg);
@@ -12519,7 +12564,7 @@ function updateP3DColoring() {
     const selRanges = (lastRanges && lastRanges.length) ? lastRanges : null;
     if (!selRanges) {
         p3dView.setStyle({}, baseP3DStyle());
-        setP3DStatus(p3dModelDisplayName() + ' — no selection');
+        setP3DStatus(p3dModelDisplayName() + ': no selection');
         p3dView.zoomTo();
         p3dView.render();
         return;
@@ -12559,7 +12604,7 @@ function applyP3DConservationColoring() {
     const resiColors = p3dConservationResidueColors();
     if (!resiColors.size) {
         p3dView.setStyle({}, baseP3DStyle());
-        setP3DStatus(p3dModelDisplayName() + ' — no conservation data');
+        setP3DStatus(p3dModelDisplayName() + ': no conservation data');
         p3dView.zoomTo();
         p3dView.render();
         return;
@@ -13786,17 +13831,17 @@ function renderHomologTable() {
         '</tr></thead><tbody>';
     rows.forEach((r, i) => {
         const best = i === 0 && r.score != null;
-        let structCell = '—';
+        let structCell = '-';
         if (r.cachedFile) structCell = '<span style="color:#15803d;">✓ cached</span>';
         else if (r.hasPdb) structCell = '<span style="color:#b45309;">PDB ' + structureEscapeHtml(r.pdbId) + '</span>';
         const scoreCell = r.score == null ? 'N/A' : r.score.toFixed(1) + (best ? ' <span style="color:#15803d;">★ best</span>' : '');
         html += '<tr' + (best ? ' class="homolog-best"' : '') + '>' +
             '<td>' + (r.rank != null ? r.rank : '') + '</td>' +
-            '<td><strong>' + structureEscapeHtml(r.hitId) + '</strong> <span style="color:#94a3b8; font-size:0.72rem;">[' + structureEscapeHtml(r.source) + ']</span>' + (r.desc ? ' — <span style="color:#64748b;">' + structureEscapeHtml(r.desc) + '</span>' : '') + '</td>' +
-            '<td>' + (r.probab == null ? '—' : r.probab.toFixed(1) + '%') + '</td>' +
-            '<td>' + structureEscapeHtml(r.evalue || '—') + '</td>' +
-            '<td>' + (r.ident == null ? '—' : r.ident.toFixed(1) + '%') + '</td>' +
-            '<td>' + (r.coverage == null ? '—' : r.coverage.toFixed(1) + '%') + '</td>' +
+            '<td><strong>' + structureEscapeHtml(r.hitId) + '</strong> <span style="color:#94a3b8; font-size:0.72rem;">[' + structureEscapeHtml(r.source) + ']</span>' + (r.desc ? ' <span style="color:#64748b;">' + structureEscapeHtml(r.desc) + '</span>' : '') + '</td>' +
+            '<td>' + (r.probab == null ? '-' : r.probab.toFixed(1) + '%') + '</td>' +
+            '<td>' + structureEscapeHtml(r.evalue || '-') + '</td>' +
+            '<td>' + (r.ident == null ? '-' : r.ident.toFixed(1) + '%') + '</td>' +
+            '<td>' + (r.coverage == null ? '-' : r.coverage.toFixed(1) + '%') + '</td>' +
             '<td>' + structCell + '</td>' +
             '<td>' + scoreCell + '</td>' +
             '<td><button type="button" class="copy-btn" data-key="' + structureEscapeHtml(r.key) + '" onclick="loadHomologIn3D(this.dataset.key)" title="Load this homolog in the 3D viewer" style="font-size:0.7rem; padding:2px 8px;">3D</button></td>' +
@@ -13855,7 +13900,7 @@ function renderDataModal() {
                 else if (col === 'cacheStatus') {
                     if (val === 'cached') val = '<span style="color:#15803d;">✓ cached locally</span>';
                     else if (val === 'missing') val = '<span style="color:#b45309;">✗ re-attach / Find</span>';
-                    else val = '—';
+                    else val = '-';
                 }
                 else if (col === 'cofactors') {
                     // Full per-neighbor distances/roles/padding live in the
@@ -13996,7 +14041,7 @@ async function resetAllData() {
     updateHomologFastaSection();
     setMetricsBase('Select a region or graph point for statistics.');
     document.getElementById('chimeraxDisplay').textContent = '-';
-    document.getElementById('metricsCrossRef').innerHTML = '<option value="">— none —</option>';
+    document.getElementById('metricsCrossRef').innerHTML = '<option value="">- none -</option>';
 
     document.getElementById('alignmentGrid').innerHTML =
         '<p style="padding: 20px; color: #94a3b8; text-align: center;">No data loaded. Add input data under File to use Quick2DViewer.</p>';

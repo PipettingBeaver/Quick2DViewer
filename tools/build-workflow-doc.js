@@ -56,9 +56,9 @@ function mdLinks(text) {
 
 function render() {
   const lines = [];
-  lines.push('# Quick2DViewer — Protein Characterization Workflow (reference)');
+  lines.push('# Quick2DViewer: Protein Characterization Workflow (reference)');
   lines.push('');
-  lines.push('> **Generated file — do not edit by hand.** Regenerate with');
+  lines.push('> **Generated file, do not edit by hand.** Regenerate with');
   lines.push('> `node tools/build-workflow-doc.js`. The Evaluation Guide in the app is');
   lines.push('> driven by the same definition, so the steps, rationale and citations below');
   lines.push('> are exactly what the guide shows.');
@@ -77,7 +77,7 @@ function render() {
   lines.push('skipped or re-run at any time, and all tools stay reachable from the menus.');
   lines.push('');
   GUIDE_QUESTIONS.forEach(q => {
-    lines.push(`- **${q.label}** — ${q.options.map(o => o.label).join(' / ')}`);
+    lines.push(`- **${q.label}**: ${q.options.map(o => o.label).join(' / ')}`);
   });
   lines.push('');
   lines.push('## Steps');
@@ -99,7 +99,7 @@ function render() {
     if (qs.length) {
       lines.push('**Guided questions** (the answers choose the concrete action offered).');
       lines.push('');
-      qs.forEach(q => lines.push(`- ${q.label} — ${q.options.map(o => o.label).join(' / ')}`));
+      qs.forEach(q => lines.push(`- ${q.label}: ${q.options.map(o => o.label).join(' / ')}`));
       lines.push('');
     }
     if (s.priorityNote) {
@@ -112,7 +112,7 @@ function render() {
     }
     if ((s.refs || []).length) {
       lines.push('**Citations.**');
-      s.refs.forEach(r => lines.push(`- ${r.cite} — <${doiUrl(r.doi)}>`));
+      s.refs.forEach(r => lines.push(`- ${r.cite}. <${doiUrl(r.doi)}>`));
     } else {
       lines.push('**Citations.** _none yet._');
     }
@@ -136,7 +136,7 @@ function render() {
     lines.push('');
     if ((p.refs || []).length) {
       lines.push('**Citations.**');
-      p.refs.forEach(r => lines.push(`- ${r.cite} — <${doiUrl(r.doi)}>`));
+      p.refs.forEach(r => lines.push(`- ${r.cite}. <${doiUrl(r.doi)}>`));
       lines.push('');
     }
   });

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-25
+
+### Fixed
+
+- **Heatmap rows did not reach the right edge** (and the pinned AA block looked cut
+  off / duplicated once you scrolled). A block box inside a horizontal scroll
+  container is sized to the *viewport*, not to its overflowing content, so a row's
+  background and hover band stopped where the visible area ended. Graph sections set
+  an explicit content width, which is why graph mode looked right. `.track-row`,
+  `.track-position-row` and `.sticky-top` now use `width: max-content` with
+  `min-width: 100%`, so they span max(content, viewport) in both directions.
+- **The grey column highlight lingered.** It is a hover affordance, but nothing
+  cleared it when the pointer left, so it stayed in screenshots and after the mouse
+  left the window. It is now cleared on grid `mouseleave`, on document `mouseleave`
+  and on window `blur` (and hides the cell tooltip with it).
+
+### Changed
+
+- **All em-dashes removed** from the app's user-facing text and from the generated
+  `WORKFLOW.md` (95 sites): read-out sentences became separate sentences, short
+  status/tooltip separators became colons, and standalone "no value" dashes became
+  hyphens. The test harness now fails if an em-dash is reintroduced.
+- **"Tell the guide about this protein" is now the "Protein Background" accordion**,
+  and it compresses itself once every question is answered (re-openable for the
+  session, with a "reset answers" affordance inside).
+- The all-covered state is a plain status line ("**All steps covered** (8 of 8).")
+  instead of the filler sign-off sentence.
+
 ## [0.25.0] - 2026-09-25
 
 ### Added
