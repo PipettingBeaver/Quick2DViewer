@@ -148,6 +148,29 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 72 | Fetch from the UniProt section, then close the Options modal mid-request | The request should still complete (or fail cleanly); re-opening shows the outcome — confirm nothing is left half-rendered |
 | 73 | Type a header with no accession (`>GFP Aequorea victoria green fluorescent protein`) | Lookup defaults to **Search (protein)** with that name — check the term is sensible and the search finds GFP |
 
+## 0.25.0 — task lockout, domain tooltips, step links, relevance, Foldseek, coachmarks
+
+| # | Try | Watch for |
+|---|---|---|
+| 74 | Click **Scan domains (HMMER/Pfam)** twice, fast | Second click is refused; the button disables, shows a spinner and reads *Working…*; a top-right toast counts elapsed seconds and ends with "Added N Pfam domain track(s) from hmmscan (Xs)" |
+| 75 | While hmmscan runs, look at the Input Data modal and the Guide's other task buttons | Every task button is disabled (HMMER, Foldseek, ESMFold) — nothing can start a second job |
+| 76 | Press Scan with no sequence loaded | Refused with a message; the lock is **not** taken (no spinner left behind) |
+| 77 | Toggle **External services** off, then press Scan | No task is started; the lock clears cleanly; toggling on and retrying works |
+| 78 | Hover the ℹ on a `DM_` row (or its Track Control tooltip) | Names the family + description, says *Protein domain (Pfam, HMMER hmmscan)*, gives best i-Evalue/bit score, lists the spans and cites Pfam/HMMER — no blank "Structural Prediction" |
+| 79 | Click the *MPI's HHpred* link in the Guide's homologs step | Opens the HHpred tool page; the topology step's TMHMM/Phobius/DeepTMHMM links likewise |
+| 80 | Answer the membrane question **No**, then read the topology card | Chip says *not relevant*, the card explains why, coverage excludes it, and "Next:" never points at it |
+| 81 | Answer **Not sure** | Topology is *optional* (not ruled out) — confirm that distinction reads clearly |
+| 82 | Answer **Yes** after having answered No | The step becomes recommended again and rejoins the coverage count |
+| 83 | With no structure attached, open the Foldseek step | The offered action is **Attach Structure(s)…**, with a hint explaining that Foldseek needs coordinates |
+| 84 | Attach a PDB, then open the Foldseek step | The action becomes *Run Foldseek (<db>)*; the hint states "N attached, 1 used" |
+| 85 | Attach two models, then run Foldseek | The running toast names the model actually searched and says "using 1 of 2 attached" — confirm that reads as intended rather than as a bug |
+| 86 | From the Guide's Integrate step click **Open Analysis Rules…** | Jumps to Tracks; Tracks manager / Interfaces / Cross-checks collapse; Rules + Presets open; suggested presets get a highlight; banner says "…then **Return to Guide**" |
+| 87 | Click **Return to Guide** | Returns to the Guide tab with the coachmark gone and the previously-open Tracks sections restored |
+| 88 | Open the coachmark, then click the **Selection** or **Guide** sidebar tab | Coachmark clears (moving out of the submenu) and sections restore |
+| 89 | Open the coachmark, then collapse the Rules section | Coachmark clears |
+| 90 | Check a homolog row's default view (fresh session, or after Reset Data) | Rows show **AA letters**; TM still defaults to Bar; changing either persists across reload |
+| 91 | Track Control → a homolog row → View as → Bar/Glyphs/AA | Each still switches correctly (the default changed, not the options) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -171,4 +194,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 3. 13–26 (guide/wizard — most interactive).
 4. 39–46 (rules/presets), then 47–55 (cross-check/report).
 5. 56–73 (import/FASTA/lookup — test this round with GFP as the reference system).
-6. 1–12 (design pass + HMMER) last, as they are the most self-contained.
+6. 74–91 (task lockout, domain tooltips, relevance, Foldseek, coachmarks).
+7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
