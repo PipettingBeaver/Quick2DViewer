@@ -1189,6 +1189,7 @@
         .guide-insight { font-size:0.72rem; line-height:1.4; padding:5px 7px; border-radius:5px; margin-bottom:4px; border-left:3px solid #94a3b8; background:#f8fafc; color:#475569; }
         .guide-insight-warn { border-left-color:#f59e0b; background:#fffbeb; color:#92400e; }
         .guide-chip-skip { background:#f1f5f9; color:#94a3b8; }
+        .guide-chip-rel { background:#f1f5f9; color:#64748b; font-style:italic; }
         .guide-step-skip > summary { opacity:0.65; }
         .guide-step-skip .guide-title { text-decoration: line-through; }
         .guide-pri-note { color:#64748b; }
@@ -4756,7 +4757,7 @@ const WORKFLOW_STEPS = [
     },
     {
         id: 'homologs', title: 'Homologs & conservation',
-        desc: 'Run HHpred (toolkit.tuebingen.mpg.de) and attach the .hhr; attach a variant FASTA for per-residue conservation.',
+        desc: 'Run <a href="https://toolkit.tuebingen.mpg.de/tools/hhpred" target="_blank" rel="noopener">MPI\'s HHpred</a> and attach the .hhr; attach a variant FASTA for per-residue conservation.',
         why: 'Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.',
         action: { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()' },
         how: ['Probability > 90% with coverage near 100% makes a template a solid model.',
@@ -4801,7 +4802,7 @@ const WORKFLOW_STEPS = [
     },
     {
         id: 'topology', title: 'Membrane topology',
-        desc: 'Paste TMHMM/Phobius/DeepTMHMM output for a consensus topology bar.',
+        desc: 'Paste <a href="https://services.healthtech.dtu.dk/services/TMHMM-2.0/" target="_blank" rel="noopener">TMHMM</a>, <a href="https://services.healthtech.dtu.dk/services/Phobius-1.01/" target="_blank" rel="noopener">Phobius</a> or <a href="https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/" target="_blank" rel="noopener">DeepTMHMM</a> output for a consensus topology bar.',
         why: 'Orientation decides which loops face the cytosol: it changes which residues are accessible to ligands, antibodies and variants.',
         action: { label: 'Paste topology…', run: 'openTopologyPanel()' },
         extraActions: [{ label: 'Cross-check TM', run: 'runTmCrossCheck()' }],
@@ -4810,7 +4811,12 @@ const WORKFLOW_STEPS = [
         refs: [{ cite: 'Krogh et al., J Mol Biol 2001 (TMHMM)', doi: '10.1006/jmbi.2000.4315' }],
         check: () => topologySources.length > 0,
         priority: (p) => p.membrane === 'yes',
-        priorityNote: 'Promoted when the protein is flagged membrane-associated or secreted.'
+        priorityNote: 'Promoted when the protein is flagged membrane-associated or secreted.',
+        // The intake can also rule a step *out*: answering "No" to membrane means
+        // a topology pass is not what this protein needs, so it stops being
+        // recommended and leaves the coverage count instead of looping back.
+        relevant: (p) => p.membrane !== 'no',
+        relevantNote: 'Your answer says this protein is not membrane-associated or secreted.'
     },
     {
         id: 'integration', title: 'Integrate & export',
@@ -5057,32 +5063,39 @@ function guideStepStatus() {
         try { autoDone = !!step.check(); } catch (e) { autoDone = false; }
         let priority = false;
         try { priority = !!(step.priority && step.priority(guideProfile)); } catch (e) { priority = false; }
+        let notRelevant = false;
+        try { notRelevant = !!(step.relevant && !step.relevant(guideProfile)); } catch (e) { notRelevant = false; }
         const override = guideOverrides[step.id] || null;
         const skipped = override === 'skipped';
         return {
-            step, index, autoDone, override, skipped,
+            step, index, autoDone, override, skipped, notRelevant,
             manualDone: override === 'done',
             done: skipped ? false : (autoDone || override === 'done'),
             priority
         };
     });
 }
-// Skipped steps drop out of the denominator: once declared out of scope they
-// should not keep the progress bar permanently short.
+// Steps that are settled one way or another (skipped by the user, or ruled out
+// by the intake answers) drop out of the denominator: they should not keep the
+// progress bar permanently short.
 function guideProgress() {
     const rows = guideStepStatus();
     const skipped = rows.filter(r => r.skipped).length;
+    const notRelevant = rows.filter(r => r.notRelevant && !r.skipped).length;
     const covered = rows.filter(r => r.done).length;
-    return { rows, covered, skipped, total: rows.length, denominator: Math.max(1, rows.length - skipped) };
+    const excluded = skipped + notRelevant;
+    return { rows, covered, skipped, notRelevant, excluded, total: rows.length, denominator: Math.max(1, rows.length - excluded) };
 }
-// First incomplete priority step, else the first incomplete step at all.
+// First incomplete priority step, else the first incomplete step at all. Steps
+// ruled out by the answers are never recommended.
 function nextGuideStep() {
-    const rows = guideStepStatus().filter(r => !r.done && !r.skipped);
+    const rows = guideStepStatus().filter(r => !r.done && !r.skipped && !r.notRelevant);
     return rows.find(r => r.priority) || rows[0] || null;
 }
 function guideChip(r) {
     if (r.done) return '<span class="guide-chip guide-chip-done">' + (r.manualDone ? 'done (you)' : 'done') + '</span>';
     if (r.skipped) return '<span class="guide-chip guide-chip-skip">skipped</span>';
+    if (r.notRelevant) return '<span class="guide-chip guide-chip-rel">not relevant</span>';
     if (r.priority) return '<span class="guide-chip guide-chip-pri">recommended</span>';
     return '<span class="guide-chip">optional</span>';
 }
@@ -5330,6 +5343,7 @@ function renderWorkflowGuide() {
     html += '<div class="guide-next"><div class="guide-progress"><span class="guide-bar"><span style="width:' +
         Math.round((prog.covered / prog.denominator) * 100) + '%"></span></span>' + prog.covered + ' of ' + prog.denominator +
         ' covered' + (prog.skipped ? ' · ' + prog.skipped + ' skipped' : '') +
+        (prog.notRelevant ? ' · ' + prog.notRelevant + ' not relevant' : '') +
         (Object.keys(guideAnswers).length ? ' <button type="button" class="guide-reset" onclick="resetStepAnswers()">reset answers</button>' : '') + '</div>';
     if (next) {
         const nextAct = resolveStepAction(next.step);
@@ -5362,6 +5376,7 @@ function renderWorkflowGuide() {
         const stepQs = STEP_QUESTIONS[r.step.id] || [];
         const status = r.manualDone ? 'Status: marked done by you (auto-detection says ' + (r.autoDone ? 'done' : 'not yet') + ').'
             : r.skipped ? 'Status: skipped by you — it stays out of the progress count.'
+            : r.notRelevant ? 'Status: not relevant for this protein' + (r.step.relevantNote ? ' — ' + r.step.relevantNote : '') + ' Mark done or skip to settle it.'
             : r.autoDone ? 'Status: detected from the loaded data.'
             : 'Status: not detected yet.';
         html += '<details class="guide-step' + (r.done ? ' guide-step-done' : '') + (r.skipped ? ' guide-step-skip' : '') + '" data-step="' + r.step.id + '">' +

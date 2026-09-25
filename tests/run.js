@@ -755,6 +755,36 @@ assert(ctxRun(`typeof SERVICE_ADAPTERS.ebiSearchUniprot === 'function'`), 'the E
 assert(ctxRun(`EBI_SEARCH_FIELDS.protein`) === 'descRecName' && ctxRun(`EBI_SEARCH_FIELDS.any`) === '', 'field prefixes map to real EBI Search fields (any = bare query)');
 assert(ctxRun(`typeof beginLookupStatus === 'function' && typeof endLookupStatus === 'function' && LOOKUP_ESTIMATES.search.indexOf('s') !== -1`), 'lookup progress helpers exist with estimates');
 
+section('step links + intake relevance');
+const stepsById = ctxRun(`(function(){ var o = {}; WORKFLOW_STEPS.forEach(s => { o[s.id] = s; }); return o; })()`);
+assert(stepsById.homologs.desc.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') !== -1, 'the homologs step links to MPI HHpred');
+assert(stepsById.homologs.desc.indexOf("MPI's HHpred") !== -1, 'the link text is MPI\'s HHpred');
+assert(stepsById.topology.desc.indexOf('services.healthtech.dtu.dk/services/TMHMM-2.0') !== -1, 'the topology step links TMHMM');
+assert(stepsById.topology.desc.indexOf('services/Phobius-1.01') !== -1 && stepsById.topology.desc.indexOf('services/DeepTMHMM-1.0') !== -1, 'the topology step links Phobius and DeepTMHMM');
+
+// --- the intake can rule a step out (the "not membrane associated" loop) ----
+ctxRun(`guideOverrides = {}; guideAnswers = {}; parsedTracks = { AA: 'MKV' };`);
+ctxRun(`guideProfile = { membrane: 'yes' };`);
+let topo = ctxRun(`guideStepStatus().filter(r => r.step.id === 'topology')[0]`);
+assert(topo.priority === true && topo.notRelevant === false, 'membrane=yes keeps topology recommended');
+ctxRun(`guideProfile = { membrane: 'no' };`);
+topo = ctxRun(`guideStepStatus().filter(r => r.step.id === 'topology')[0]`);
+assert(topo.notRelevant === true && topo.priority === false, 'membrane=no marks topology not relevant');
+assert(ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) !== 'topology', 'a not-relevant step is never the recommendation');
+const progNo = ctxRun(`guideProgress()`);
+assert(progNo.notRelevant === 1 && progNo.denominator === progNo.total - 1, 'not-relevant steps leave the coverage denominator');
+assert(progNo.excluded === 1, 'the excluded count covers not-relevant steps');
+assert(ctxRun(`guideChip(guideStepStatus().filter(r => r.step.id === 'topology')[0])`).indexOf('not relevant') !== -1, 'the chip says not relevant');
+ctxRun(`guideProfile = { membrane: 'unsure' };`);
+assert(ctxRun(`guideStepStatus().filter(r => r.step.id === 'topology')[0].notRelevant`) === false, 'only an explicit "no" rules it out (unsure keeps it optional)');
+ctxRun(`guideProfile = {}; guideOverrides = {}; parsedTracks = {};`);
+
+// --- the doc mirrors the links (markdown, not raw html) --------------------
+assert(WORKFLOW_MD.indexOf('https://toolkit.tuebingen.mpg.de/tools/hhpred') !== -1, 'WORKFLOW.md carries the HHpred link');
+assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as a markdown link');
+assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
+assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
+
 section('task lockout + domain tooltips');
 ctxRun(`
     analysisRules = []; guideProfile = {}; guideOverrides = {}; guideAnswers = {};

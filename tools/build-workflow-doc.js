@@ -48,6 +48,12 @@ function condText(c) {
 
 function doiUrl(doi) { return 'https://doi.org/' + doi; }
 
+// The step text carries real links (the app renders them as HTML); the document
+// is Markdown, so convert the few anchors rather than duplicating the text.
+function mdLinks(text) {
+  return String(text || '').replace(/<a\s+[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g, '[$2]($1)');
+}
+
 function render() {
   const lines = [];
   lines.push('# Quick2DViewer — Protein Characterization Workflow (reference)');
@@ -79,12 +85,12 @@ function render() {
   WORKFLOW_STEPS.forEach((s, i) => {
     lines.push(`### ${i + 1}. ${s.title}`);
     lines.push('');
-    lines.push(`**Purpose.** ${s.desc}`);
+    lines.push(`**Purpose.** ${mdLinks(s.desc)}`);
     lines.push('');
-    lines.push(`**Why it matters.** ${s.why}`);
+    lines.push(`**Why it matters.** ${mdLinks(s.why)}`);
     lines.push('');
     lines.push('**How to read it.**');
-    (s.how || []).forEach(h => lines.push(`- ${h}`));
+    (s.how || []).forEach(h => lines.push(`- ${mdLinks(h)}`));
     lines.push('');
     lines.push(`**In-app action.** \`${s.action.label}\`` +
       (s.extraActions || []).map(a => ` · \`${a.label}\``).join(''));
@@ -97,7 +103,11 @@ function render() {
       lines.push('');
     }
     if (s.priorityNote) {
-      lines.push(`**Promoted when.** ${s.priorityNote}`);
+      lines.push(`**Promoted when.** ${mdLinks(s.priorityNote)}`);
+      lines.push('');
+    }
+    if (s.relevantNote) {
+      lines.push(`**Ruled out when.** ${mdLinks(s.relevantNote)}`);
       lines.push('');
     }
     if ((s.refs || []).length) {

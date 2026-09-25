@@ -97,7 +97,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 ### 4. Homologs & conservation
 
-**Purpose.** Run HHpred (toolkit.tuebingen.mpg.de) and attach the .hhr; attach a variant FASTA for per-residue conservation.
+**Purpose.** Run [MPI's HHpred](https://toolkit.tuebingen.mpg.de/tools/hhpred) and attach the .hhr; attach a variant FASTA for per-residue conservation.
 
 **Why it matters.** Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.
 
@@ -165,7 +165,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 ### 7. Membrane topology
 
-**Purpose.** Paste TMHMM/Phobius/DeepTMHMM output for a consensus topology bar.
+**Purpose.** Paste [TMHMM](https://services.healthtech.dtu.dk/services/TMHMM-2.0/), [Phobius](https://services.healthtech.dtu.dk/services/Phobius-1.01/) or [DeepTMHMM](https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/) output for a consensus topology bar.
 
 **Why it matters.** Orientation decides which loops face the cytosol: it changes which residues are accessible to ligands, antibodies and variants.
 
@@ -180,6 +180,8 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - Which predictor output do you have? — TMHMM / Phobius / DeepTMHMM / None yet
 
 **Promoted when.** Promoted when the protein is flagged membrane-associated or secreted.
+
+**Ruled out when.** Your answer says this protein is not membrane-associated or secreted.
 
 **Citations.**
 - Krogh et al., J Mol Biol 2001 (TMHMM) — <https://doi.org/10.1006/jmbi.2000.4315>
