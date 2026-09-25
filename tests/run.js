@@ -785,6 +785,28 @@ assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as
 assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
 assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
 
+section('foldseek prerequisite + lockout');
+const fsStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0]`);
+assert(fsStep.desc.indexOf('at least one structure') !== -1, 'the foldseek step states the structure prerequisite');
+assert(fsStep.extraActions && fsStep.extraActions.some(a => a.run === 'attachStructures()'), 'the step offers Attach Structure(s)');
+assert(typeof ctxRun(`attachStructures`) === 'function', 'the attach action is shared with the Input Data button');
+
+// no structure attached -> the prerequisite is what gets offered
+ctxRun(`cachedStructureTexts = {}; guideAnswers = {};`);
+let fa = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0])`);
+assert(fa.run === 'attachStructures()', 'without a structure the step offers Attach Structure(s) (not a search that can only fail)');
+assert(fa.hint.indexOf('3D structure') !== -1, 'the hint explains why a structure is needed');
+
+// with a structure attached -> the real search, labelled with the db + honesty about usage
+ctxRun(`cachedStructureTexts = { 'model.pdb': 'ATOM' };`);
+ctxRun(`setStepAnswer('foldseek', 'db', 'pdb100');`);
+fa = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0])`);
+assert(fa.run === 'runFoldseekSearch()', 'a structure unlocks the Foldseek search action');
+assert(fa.label.indexOf('pdb100') !== -1, 'the button names the chosen database');
+assert(fa.hint.indexOf('1 attached, 1 used') !== -1, 'the hint says only one model is searched (more do not widen it)');
+assert(ctxRun(`STEP_TASK_RUNS.foldseek`) === fa.run, 'the Foldseek button is marked as a long-running task (spinner + lock)');
+ctxRun(`cachedStructureTexts = {}; guideAnswers = {};`);
+
 section('default track views (homologs = AA)');
 const defState = ctxRun(`getDefaultTrackControlState()`);
 assert(defState.aaSeq.HL === true, 'homolog rows default to the AA-letters view');

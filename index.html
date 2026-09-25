@@ -1923,7 +1923,7 @@
                     Copy and paste data from <a href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener" style="color:#2563eb;">MPI's Quick2D</a> or FASTA.
                 </p>
                 <div class="toolbar-group toolbar-group-input" style="display:flex; gap:6px; flex-wrap:wrap;">
-                    <button type="button" class="tb-btn tb-btn-primary" onclick="document.getElementById('structureUpload').click()">
+                    <button type="button" class="tb-btn tb-btn-primary" onclick="attachStructures()">
                         Attach Structure(s) or JSON
                     </button>
                     <span class="import-pair">
@@ -3285,17 +3285,20 @@ function applyFoldseekHits(hits) {
     return added;
 }
 async function runFoldseekSearch() {
-    if (!(await ensureExternalServices())) return;
     const files = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
     if (!files.length) { showToast('Foldseek searches by structure — attach a PDB/CIF (or predict one with ESMFold) first.', 'error'); return; }
     let file = files[0];
     if (p3dModel && p3dModel.kind === 'pdb' && cachedStructureTexts[p3dModel.fileName]) file = p3dModel.fileName;
     const dbEl = document.getElementById('foldseekDb');
     const db = (dbEl && dbEl.value) || 'afdb50';
+    // Lock synchronously (before any await) so a double click cannot start two jobs.
+    if (!beginGuideTask('foldseek', 'Foldseek search (' + db + ') with ' + file + ' running' +
+        (files.length > 1 ? ' — using 1 of ' + files.length + ' attached models' : ''))) return;
     const statusEl = document.getElementById('foldseekStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
-    setStatus('Searching Foldseek (' + db + ') with ' + file + '…');
     try {
+        if (!(await ensureExternalServices())) { endGuideTask('foldseek'); return; }
+        setStatus('Searching Foldseek (' + db + ') with ' + file + '…');
         const result = await runCapability('structure_search', { pdbText: cachedStructureTexts[file], database: db }, (m) => setStatus(m));
         const hits = parseFoldseekResults(result);
         const added = applyFoldseekHits(hits);
@@ -3305,11 +3308,13 @@ async function runFoldseekSearch() {
         refreshTrackManagerIfVisible();
         schedulePersist();
         setStatus(added ? ('Foldseek: ' + added + ' hit(s) added from ' + db + ' (of ' + hits.length + ').') : 'No Foldseek hits.');
-        showToast(added ? ('Foldseek added ' + added + ' structural homolog track(s).') : 'Foldseek returned no hits.', added ? 'success' : 'info');
+        endGuideTask('foldseek',
+            added ? ('Added ' + added + ' structural homolog track(s) from ' + db) : 'Foldseek returned no hits',
+            added ? 'success' : 'info');
     } catch (err) {
         const m = err && err.message ? err.message : String(err);
         setStatus('Foldseek failed: ' + m);
-        showToast('Foldseek search failed: ' + m, 'error');
+        endGuideTask('foldseek', 'Foldseek failed: ' + m, 'error');
     }
 }
 
@@ -4790,10 +4795,13 @@ const WORKFLOW_STEPS = [
     },
     {
         id: 'foldseek', title: 'Structural homology',
-        desc: 'Search Foldseek for remote relatives that sequence search misses.',
+        desc: 'Search Foldseek for remote relatives that sequence search misses. Needs at least one structure attached first (an AlphaFold/PDB/CIF model, or an ESMFold prediction).',
         why: 'Structure is more conserved than sequence: Foldseek finds the remote homologs that decide a fold assignment when BLAST/HMMER come up empty.',
         action: { label: 'Run Foldseek', run: 'runFoldseekSearch()' },
-        how: ['High probability + low E-value with good query coverage is a credible structural relative.',
+        extraActions: [{ label: 'Attach Structure(s)', run: 'attachStructures()' }],
+        how: ['Attach at least one structure — Foldseek searches by 3D coordinates, not by sequence.',
+              'The search uses the active (or first attached) model. Attaching more models does NOT widen the search — pull one representative structure per state you care about and run that.',
+              'High probability + low E-value with good query coverage is a credible structural relative.',
               'Use it to sanity-check the family assignment, not to overrule curated data.'],
         refs: [{ cite: 'van Kempen et al., Nat Biotechnol 2023 (Foldseek)', doi: '10.1038/s41587-023-01773-0' }],
         check: () => Object.keys(parsedTracks).some(k => { const h = homologHitsInfo[k]; return h && /Foldseek/i.test(h.source || ''); }),
@@ -4952,7 +4960,21 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     foldseek(a) {
-        if (a.db) return { label: 'Run Foldseek (' + a.db + ')', run: 'runFoldseekSearch()', hint: 'Searches the selected structure database with the active model.' };
+        // The prerequisite is the offered action: without a structure there is
+        // nothing to search, so hand over Attach Structure(s) instead of a
+        // button that could only fail.
+        const hasStructure = typeof cachedStructureTexts === 'object' &&
+            Object.keys(cachedStructureTexts).some(k => p3dUsableStructure(k));
+        if (!hasStructure) {
+            return {
+                label: 'Attach Structure(s)…', run: 'attachStructures()',
+                hint: 'Foldseek searches 3D structure, so attach a PDB/CIF (or predict one with ESMFold) first.'
+            };
+        }
+        if (a.db) return {
+            label: 'Run Foldseek (' + a.db + ')', run: 'runFoldseekSearch()',
+            hint: 'Searches ' + a.db + ' with the active model (' + Object.keys(cachedStructureTexts).length + ' attached, 1 used).'
+        };
         return null;
     },
     topology(a) {
@@ -5490,6 +5512,13 @@ function autoLookupAccession() {
 
 // --- Sidebar tabs (Selection / Tracks / Workflow) -------------------------
 // Jumps to a Tracks-tab section (right sidebar) and expands it.
+// Opens the same file picker the Input Data button uses, so the Guide can hand
+// over the prerequisite action directly.
+function attachStructures() {
+    const el = document.getElementById('structureUpload');
+    if (el && typeof el.click === 'function') el.click();
+}
+
 function showCrossCheckPanel() {
     switchSidebarTab('tracks');
     const sec = document.getElementById('crossCheckSection');
