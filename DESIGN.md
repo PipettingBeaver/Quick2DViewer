@@ -227,6 +227,28 @@ metric and tool available for manual inspection.
   is linked from the guide header. The test harness asserts the document contains
   every step title and DOI, so it cannot drift from the app.
 
+### Per-step questions (v0.20.0)
+
+The global intake re-ranks steps; each step then asks its own short questions
+(`STEP_QUESTIONS`) that choose *how* the step is satisfied. Answers are stored
+flat as `'<stepId>.<questionId>'` in `guideAnswers` (persisted) and are resolved
+by `STEP_ACTION_RESOLVERS` into the concrete action to offer — e.g.:
+
+| Step | Answer | Offered action |
+|---|---|---|
+| Sequence | UniProt accession | `autoLookupAccession()` (fetch entry) |
+| Annotation | "Only Pfam domains" | `runDomainScan()` |
+| Structure | ESMFold | `predictStructureESMFold()` (≤400 aa hint) |
+| Foldseek | pdb100 | `Run Foldseek (pdb100)` — also sets the DB select |
+| Topology | TMHMM / Phobius / DeepTMHMM | `openTopologyPanel()`; "None yet" → opens a predictor |
+| Integrate | Variant triage / Interface / Construct / Figure | Rules / Interfaces / command generator / export |
+
+`resolveStepAction(step)` always returns something runnable: with no answers it
+falls back to the step's own action and reports `custom: false`, so the wizard
+degrades to the generic action rather than blocking. Re-clicking a selected
+option clears it; `resetStepAnswers()` clears all. The generic action stays on
+the card as a secondary button whenever an answer overrides it.
+
 ### Roadmap (next iterations)
 
 - **Profile → rule presets**: when variants/membrane are flagged, offer the

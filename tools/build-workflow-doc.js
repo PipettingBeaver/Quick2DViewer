@@ -11,8 +11,9 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf-8');
 
-function extractArrayLiteral(name) {
-  const re = new RegExp(`const ${name} = \\[[\\s\\S]*?\\n\\];`);
+// Handles both array (`... \n];`) and object (`... \n};`) literals.
+function extractLiteral(name) {
+  const re = new RegExp(`const ${name} = [\\[{][\\s\\S]*?\\n[\\]}];`);
   const m = HTML.match(re);
   if (!m) throw new Error(`could not find ${name} in index.html`);
   return m[0];
@@ -20,8 +21,9 @@ function extractArrayLiteral(name) {
 
 // The literals only *define* their arrow functions (check/priority), so they
 // evaluate fine in a bare context with no DOM.
-const WORKFLOW_STEPS = new Function(`${extractArrayLiteral('WORKFLOW_STEPS')}; return WORKFLOW_STEPS;`)();
-const GUIDE_QUESTIONS = new Function(`${extractArrayLiteral('GUIDE_QUESTIONS')}; return GUIDE_QUESTIONS;`)();
+const WORKFLOW_STEPS = new Function(`${extractLiteral('WORKFLOW_STEPS')}; return WORKFLOW_STEPS;`)();
+const GUIDE_QUESTIONS = new Function(`${extractLiteral('GUIDE_QUESTIONS')}; return GUIDE_QUESTIONS;`)();
+const STEP_QUESTIONS = new Function(`${extractLiteral('STEP_QUESTIONS')}; return STEP_QUESTIONS;`)();
 
 function doiUrl(doi) { return 'https://doi.org/' + doi; }
 
@@ -42,8 +44,10 @@ function render() {
   lines.push('');
   lines.push('## Intake questions');
   lines.push('');
-  lines.push('The guide asks these to re-rank the steps for the protein at hand. They are');
-  lines.push('advisory: every step stays available, in any order, from the menus.');
+  lines.push('The guide asks these to re-rank the steps for the protein at hand. Each step');
+  lines.push('then asks its own short questions (below) that pick the *specific* action and');
+  lines.push('defaults to offer. Everything is advisory: any step can be marked done,');
+  lines.push('skipped or re-run at any time, and all tools stay reachable from the menus.');
   lines.push('');
   GUIDE_QUESTIONS.forEach(q => {
     lines.push(`- **${q.label}** — ${q.options.map(o => o.label).join(' / ')}`);
@@ -64,6 +68,13 @@ function render() {
     lines.push(`**In-app action.** \`${s.action.label}\`` +
       (s.extraActions || []).map(a => ` · \`${a.label}\``).join(''));
     lines.push('');
+    const qs = STEP_QUESTIONS[s.id] || [];
+    if (qs.length) {
+      lines.push('**Guided questions** (the answers choose the concrete action offered).');
+      lines.push('');
+      qs.forEach(q => lines.push(`- ${q.label} — ${q.options.map(o => o.label).join(' / ')}`));
+      lines.push('');
+    }
     if (s.priorityNote) {
       lines.push(`**Promoted when.** ${s.priorityNote}`);
       lines.push('');
@@ -90,4 +101,5 @@ function render() {
 
 const out = render();
 fs.writeFileSync(path.join(ROOT, 'WORKFLOW.md'), out);
-console.log(`WORKFLOW.md written (${out.length} chars, ${WORKFLOW_STEPS.length} steps, ${GUIDE_QUESTIONS.length} questions)`);
+const totalQs = WORKFLOW_STEPS.reduce((n, s) => n + ((STEP_QUESTIONS[s.id] || []).length), 0);
+console.log(`WORKFLOW.md written (${out.length} chars, ${WORKFLOW_STEPS.length} steps, ${GUIDE_QUESTIONS.length} intake + ${totalQs} step questions)`);

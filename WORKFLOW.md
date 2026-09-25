@@ -13,8 +13,10 @@ never interpreted in isolation.
 
 ## Intake questions
 
-The guide asks these to re-rank the steps for the protein at hand. They are
-advisory: every step stays available, in any order, from the menus.
+The guide asks these to re-rank the steps for the protein at hand. Each step
+then asks its own short questions (below) that pick the *specific* action and
+defaults to offer. Everything is advisory: any step can be marked done,
+skipped or re-run at any time, and all tools stay reachable from the menus.
 
 - **Is it membrane-associated or secreted?** — Yes / No / Not sure
 - **Is a 3D structure available or planned?** — Yes / Not yet / Not sure
@@ -36,6 +38,10 @@ advisory: every step stays available, in any order, from the menus.
 
 **In-app action.** `Load data…`
 
+**Guided questions** (the answers choose the concrete action offered).
+
+- How is the sequence coming in? — Quick2D output / FASTA / paste / UniProt accession
+
 **Promoted when.** Always — it is the prerequisite for every other step.
 
 **Citations.**
@@ -52,6 +58,10 @@ advisory: every step stays available, in any order, from the menus.
 - TM segments should line up with the topology consensus later — a conflict is a flag to inspect, not an error.
 
 **In-app action.** `Load Quick2D output…`
+
+**Guided questions** (the answers choose the concrete action offered).
+
+- Are the Quick2D predictions ready to paste? — Yes / Not yet
 
 **Promoted when.** Promoted when the protein is flagged membrane-associated or secreted.
 
@@ -75,6 +85,10 @@ advisory: every step stays available, in any order, from the menus.
 
 **In-app action.** `Fetch UniProt` · `Scan HMMER/Pfam`
 
+**Guided questions** (the answers choose the concrete action offered).
+
+- Do you already have the accession or family? — Yes — fetch it / No — search for it / Only Pfam domains
+
 **Promoted when.** Promoted when the function or domain architecture is unknown or unclear.
 
 **Citations.**
@@ -92,6 +106,10 @@ advisory: every step stays available, in any order, from the menus.
 - Conservation is only as good as the alignment depth — check how many sequences went in.
 
 **In-app action.** `Load .hhr / variant FASTA…`
+
+**Guided questions** (the answers choose the concrete action offered).
+
+- Is the HHpred .hhr ready? — Yes, ready to attach / Not yet
 
 **Promoted when.** Always — homology is the main cross-check on the sequence-based layers.
 
@@ -113,6 +131,10 @@ advisory: every step stays available, in any order, from the menus.
 
 **In-app action.** `Attach / predict structure…`
 
+**Guided questions** (the answers choose the concrete action offered).
+
+- Where should the model come from? — AlphaFold DB / PDB / CIF file / Predict (ESMFold)
+
 **Promoted when.** Promoted when a structure is available or planned, or the answer is unsure.
 
 **Citations.**
@@ -132,6 +154,10 @@ advisory: every step stays available, in any order, from the menus.
 
 **In-app action.** `Run Foldseek`
 
+**Guided questions** (the answers choose the concrete action offered).
+
+- Which Foldseek database? — afdb50 / pdb100 / swissprot / bfvd
+
 **Promoted when.** Promoted when the function or domain architecture is unknown.
 
 **Citations.**
@@ -149,6 +175,10 @@ advisory: every step stays available, in any order, from the menus.
 
 **In-app action.** `Paste topology…`
 
+**Guided questions** (the answers choose the concrete action offered).
+
+- Which predictor output do you have? — TMHMM / Phobius / DeepTMHMM / None yet
+
 **Promoted when.** Promoted when the protein is flagged membrane-associated or secreted.
 
 **Citations.**
@@ -165,6 +195,10 @@ advisory: every step stays available, in any order, from the menus.
 - Export the figure plus table so the track state behind the claim is archived.
 
 **In-app action.** `Open Analysis Rules…` · `Interfaces…`
+
+**Guided questions** (the answers choose the concrete action offered).
+
+- What are you closing on? — Variant triage / Binding interface / Construct design / Figure / report
 
 **Promoted when.** Always — it is where the collected evidence is combined.
 

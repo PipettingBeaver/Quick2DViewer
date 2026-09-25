@@ -1201,6 +1201,10 @@
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
         .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+        .guide-step-qs { border-top:1px dashed #e2e8f0; border-bottom:1px dashed #e2e8f0; padding:6px 0; margin:2px 0 7px; }
+        .guide-step-qs .guide-q:last-child { margin-bottom:0; }
+        .guide-hint { font-size:0.68rem; color:#475569; margin-top:5px; line-height:1.4; }
+        .guide-next-hint { color:#475569; font-size:0.7rem; }
         .wf-summary { font-size:0.74rem; color:#334155; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:5px 7px; margin-bottom:6px; }
         /* Keyboard focus + reduced motion (WCAG 2.2 / prefers-reduced-motion). */
         .tctl-chevron:focus-visible, .tm-chevron:focus-visible, .tm-eye:focus-visible,
@@ -4250,6 +4254,143 @@ const GUIDE_QUESTIONS = [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] }
 ];
 let guideProfile = {};
+// Per-step questions. Unlike the global intake (which re-ranks steps), these
+// choose *how* a step is satisfied: the answers pick the concrete action and
+// pre-fill the matching defaults, so the wizard hands over a specific next move
+// instead of a generic one. Stored flat as '<stepId>.<questionId>'.
+const STEP_QUESTIONS = {
+    sequence: [
+        { id: 'source', label: 'How is the sequence coming in?', options: [
+            { value: 'quick2d', label: 'Quick2D output' },
+            { value: 'fasta', label: 'FASTA / paste' },
+            { value: 'uniprot', label: 'UniProt accession' }] }
+    ],
+    features: [
+        { id: 'ready', label: 'Are the Quick2D predictions ready to paste?', options: [
+            { value: 'yes', label: 'Yes' },
+            { value: 'no', label: 'Not yet' }] }
+    ],
+    annotation: [
+        { id: 'have', label: 'Do you already have the accession or family?', options: [
+            { value: 'accession', label: 'Yes — fetch it' },
+            { value: 'search', label: 'No — search for it' },
+            { value: 'domains', label: 'Only Pfam domains' }] }
+    ],
+    homologs: [
+        { id: 'hhpred', label: 'Is the HHpred .hhr ready?', options: [
+            { value: 'ready', label: 'Yes, ready to attach' },
+            { value: 'no', label: 'Not yet' }] }
+    ],
+    structure: [
+        { id: 'model', label: 'Where should the model come from?', options: [
+            { value: 'afdb', label: 'AlphaFold DB' },
+            { value: 'pdb', label: 'PDB / CIF file' },
+            { value: 'esmfold', label: 'Predict (ESMFold)' }] }
+    ],
+    foldseek: [
+        { id: 'db', label: 'Which Foldseek database?', options: [
+            { value: 'afdb50', label: 'afdb50' },
+            { value: 'pdb100', label: 'pdb100' },
+            { value: 'swissprot', label: 'swissprot' },
+            { value: 'bfvd', label: 'bfvd' }] }
+    ],
+    topology: [
+        { id: 'predictor', label: 'Which predictor output do you have?', options: [
+            { value: 'tmhmm', label: 'TMHMM' },
+            { value: 'phobius', label: 'Phobius' },
+            { value: 'deeptmhmm', label: 'DeepTMHMM' },
+            { value: 'none', label: 'None yet' }] }
+    ],
+    integration: [
+        { id: 'goal', label: 'What are you closing on?', options: [
+            { value: 'variants', label: 'Variant triage' },
+            { value: 'interface', label: 'Binding interface' },
+            { value: 'construct', label: 'Construct design' },
+            { value: 'report', label: 'Figure / report' }] }
+    ]
+};
+let guideAnswers = {};
+function stepAnswerKey(stepId, qid) { return stepId + '.' + qid; }
+function getStepAnswer(stepId, qid) { return guideAnswers[stepAnswerKey(stepId, qid)] || null; }
+function setStepAnswer(stepId, qid, value) {
+    const key = stepAnswerKey(stepId, qid);
+    if (guideAnswers[key] === value) delete guideAnswers[key]; // click again to clear
+    else guideAnswers[key] = value;
+    applyStepAnswerDefaults(stepId, qid, guideAnswers[key]);
+    schedulePersist();
+    renderWorkflowGuide();
+}
+function resetStepAnswers() { guideAnswers = {}; schedulePersist(); renderWorkflowGuide(); }
+// Answers that map onto an existing control also drive that control, so the
+// action the wizard offers and the tool's own defaults agree.
+function applyStepAnswerDefaults(stepId, qid, value) {
+    if (!value) return;
+    if (stepId === 'foldseek' && qid === 'db') {
+        const el = document.getElementById('foldseekDb');
+        if (el) el.value = value;
+    }
+}
+// Turns the per-step answers into the concrete action to offer.
+const STEP_ACTION_RESOLVERS = {
+    sequence(a) {
+        if (a.source === 'uniprot') return { label: 'Fetch UniProt entry', run: 'autoLookupAccession()', hint: 'Q2DV pulls the curated entry and adopts its sequence.' };
+        if (a.source === 'fasta') return { label: 'Attach / paste FASTA', run: 'openInputDataModal()', hint: 'Attach the FASTA file, or paste the sequence into Raw Input.' };
+        return null;
+    },
+    annotation(a) {
+        if (a.have === 'domains') return { label: 'Scan HMMER/Pfam', run: 'runDomainScan()', hint: 'Adds domain architecture only — no UniProt fetch.' };
+        if (a.have === 'search') return { label: 'Search UniProt…', run: 'autoLookupAccession()', hint: 'Opens the UniProt search with the current protein label pre-filled.' };
+        if (a.have === 'accession') return { label: 'Fetch UniProt entry', run: 'autoLookupAccession()' };
+        return null;
+    },
+    homologs(a) {
+        if (a.hhpred === 'no') return { label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')", hint: 'Run HHpred on the sequence, then attach the resulting .hhr here.' };
+        return null;
+    },
+    structure(a) {
+        if (a.model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (≤400 aa) and attaches the model.' };
+        if (a.model === 'afdb') return { label: 'Fetch AlphaFold model…', run: 'openDataModal()', hint: 'Data & Structures lists AlphaFold entries for the current accession.' };
+        if (a.model === 'pdb') return { label: 'Attach PDB / CIF…', run: 'openInputDataModal()', hint: 'Attach the experimental model; pLDDT/RSA follow from it.' };
+        return null;
+    },
+    foldseek(a) {
+        if (a.db) return { label: 'Run Foldseek (' + a.db + ')', run: 'runFoldseekSearch()', hint: 'Searches the selected structure database with the active model.' };
+        return null;
+    },
+    topology(a) {
+        if (a.predictor === 'none') return { label: 'Open a predictor ↗', run: "window.open('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/','_blank')", hint: 'Run the predictor, then paste its output into Options → Data Sources → Topology.' };
+        const names = { tmhmm: 'TMHMM', phobius: 'Phobius', deeptmhmm: 'DeepTMHMM' };
+        if (names[a.predictor]) return { label: 'Paste ' + names[a.predictor] + ' output…', run: 'openTopologyPanel()', hint: 'Opens the topology paste box; two or more sources give a consensus bar.' };
+        return null;
+    },
+    integration(a) {
+        const map = {
+            variants: { label: 'Open Analysis Rules…', run: 'showRulesPanel()', hint: 'Co-localize variants with conservation, domains and structure.' },
+            interface: { label: 'Run interface analysis…', run: 'showInterfacesPanel()', hint: 'Needs a multi-chain model; residues under the cut-off become IF_ tracks.' },
+            construct: { label: 'Open command generator →', run: "switchSidebarTab('workflow')", hint: 'Build ChimeraX/PyMOL/VMD selections for the construct.' },
+            report: { label: 'Export figure & table…', run: "menuBarAction('png')", hint: 'PNG/SVG of the viewport plus TSV/CSV of the metrics.' }
+        };
+        return map[a.goal] || null;
+    }
+};
+function resolveStepAction(step) {
+    let resolved = null;
+    try {
+        const answers = {};
+        (STEP_QUESTIONS[step.id] || []).forEach(q => { answers[q.id] = getStepAnswer(step.id, q.id); });
+        resolved = STEP_ACTION_RESOLVERS[step.id] ? STEP_ACTION_RESOLVERS[step.id](answers) : null;
+    } catch (e) { resolved = null; }
+    // Fall back to the step's own action, and report whether the answer changed it.
+    const base = { label: step.action.label, run: step.action.run, hint: '' };
+    if (!resolved) return Object.assign({ custom: false }, base);
+    return { label: resolved.label, run: resolved.run, hint: resolved.hint || '', custom: resolved.run !== step.action.run || resolved.label !== step.action.label };
+}
+function openTopologyPanel() {
+    openOptionsModal();
+    switchOptionsTab('data');
+    const el = document.getElementById('topologyPasteInput');
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+}
 // Per-step user overrides. The guide is advisory, so a researcher can settle a
 // step by hand ('done' - e.g. it was handled outside Q2DV), declare it out of
 // scope ('skipped'), or clear either to fall back to auto-detection. Overrides
@@ -4395,10 +4536,14 @@ function renderWorkflowGuide() {
 
     html += '<div class="guide-next"><div class="guide-progress"><span class="guide-bar"><span style="width:' +
         Math.round((prog.covered / prog.denominator) * 100) + '%"></span></span>' + prog.covered + ' of ' + prog.denominator +
-        ' covered' + (prog.skipped ? ' · ' + prog.skipped + ' skipped' : '') + '</div>';
+        ' covered' + (prog.skipped ? ' · ' + prog.skipped + ' skipped' : '') +
+        (Object.keys(guideAnswers).length ? ' <button type="button" class="guide-reset" onclick="resetStepAnswers()">reset answers</button>' : '') + '</div>';
     if (next) {
-        html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title + ' — ' + next.step.desc + '<br>' +
-            '<button type="button" class="guide-run" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' +
+        const nextAct = resolveStepAction(next.step);
+        html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title + ' — ' + next.step.desc +
+            (nextAct.hint ? '<br><span class="guide-next-hint">' + nextAct.hint + '</span>' : '') + '<br>' +
+            '<button type="button" class="guide-run" onclick="' + nextAct.run + '">' + nextAct.label + '</button>' +
+            (nextAct.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' : '') +
             (next.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
             '<div class="guide-next-meta">' +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + next.step.id + '\',\'done\')">Mark done</button>' +
@@ -4413,7 +4558,9 @@ function renderWorkflowGuide() {
 
     html += '<div class="guide-steps">';
     prog.rows.forEach(r => {
-        const label = r.done ? ('Re-run: ' + r.step.action.label) : r.step.action.label;
+        const act = resolveStepAction(r.step);
+        const label = r.done ? ('Re-run: ' + act.label) : act.label;
+        const stepQs = STEP_QUESTIONS[r.step.id] || [];
         const status = r.manualDone ? 'Status: marked done by you (auto-detection says ' + (r.autoDone ? 'done' : 'not yet') + ').'
             : r.skipped ? 'Status: skipped by you — it stays out of the progress count.'
             : r.autoDone ? 'Status: detected from the loaded data.'
@@ -4422,18 +4569,27 @@ function renderWorkflowGuide() {
             '<summary><span class="guide-num">' + (r.index + 1) + '</span><span class="guide-title">' + r.step.title + '</span>' + guideChip(r) + '</summary>' +
             '<div class="guide-body">' +
             '<p class="guide-desc">' + r.step.desc + '</p>' +
+            (stepQs.length ? '<div class="guide-step-qs">' + stepQs.map(q => {
+                const cur = getStepAnswer(r.step.id, q.id);
+                return '<div class="guide-q"><div class="guide-q-label">' + q.label + '</div><div class="guide-q-opts">' +
+                    q.options.map(o => '<button type="button" class="guide-opt' + (cur === o.value ? ' guide-opt-on' : '') +
+                        '" onclick="setStepAnswer(\'' + r.step.id + '\',\'' + q.id + '\',\'' + o.value + '\')">' + o.label + '</button>').join('') +
+                    '</div></div>';
+            }).join('') + '</div>' : '') +
             '<p><strong>Why it matters:</strong> ' + r.step.why + '</p>' +
             '<p><strong>How to read it:</strong></p><ul>' + (r.step.how || []).map(h => '<li>' + h + '</li>').join('') + '</ul>' +
             (r.step.priorityNote ? '<p class="guide-pri-note">' + (r.priority ? '<strong>Recommended</strong> — ' : 'Optional — ') + r.step.priorityNote + '</p>' : '') +
             guideRefsHTML(r.step) +
             '<div class="guide-state">' + status + '</div>' +
             '<div class="guide-actions">' +
-            '<button type="button" class="guide-run" onclick="' + r.step.action.run + '">' + label + '</button>' +
+            '<button type="button" class="guide-run" onclick="' + act.run + '">' + label + '</button>' +
+            (act.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + r.step.action.run + '">' + r.step.action.label + '</button>' : '') +
             (r.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
             (r.done && !r.manualDone ? '' : '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.manualDone ? 'clear' : 'done') + '\')">' + (r.manualDone ? 'Clear "done"' : 'Mark done') + '</button>') +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.skipped ? 'clear' : 'skipped') + '\')">' + (r.skipped ? 'Unskip' : 'Skip') + '</button>' +
             (r.override ? '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'clear\')">Reset</button>' : '') +
             '</div>' +
+            (act.hint ? '<div class="guide-hint">' + act.hint + '</div>' : '') +
             '</div></details>';
     });
     html += '</div>';
@@ -5177,7 +5333,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.19.0';
+const APP_VERSION = '0.20.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11667,6 +11823,7 @@ function gatherPersistableState() {
             analysisRules,
             guideProfile,
             guideOverrides,
+            guideAnswers,
             selectionScope,
             gridCellW,
             commandEngineId,
@@ -12059,6 +12216,7 @@ function applyPersistedState(state) {
     analysisRules = Array.isArray(prefs.analysisRules) ? prefs.analysisRules : [];
     guideProfile = (prefs.guideProfile && typeof prefs.guideProfile === 'object') ? prefs.guideProfile : {};
     guideOverrides = (prefs.guideOverrides && typeof prefs.guideOverrides === 'object') ? prefs.guideOverrides : {};
+    guideAnswers = (prefs.guideAnswers && typeof prefs.guideAnswers === 'object') ? prefs.guideAnswers : {};
     analysisRules.forEach(r => { if (r && r.id) setTrackMeta('RULE_' + r.id, { source: 'Rule', color: r.color, ruleName: r.name }); });
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
     renderSelectionScopeToggle();

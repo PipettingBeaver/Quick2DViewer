@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-25
+
+### Added
+
+- **Per-step wizard questions.** Each step now asks its own short questions, and
+  the answers pick the *concrete* action and defaults to offer instead of a
+  generic one:
+  - Sequence → Quick2D / FASTA / UniProt accession → *Attach / paste FASTA* or
+    *Fetch UniProt entry*.
+  - Annotation → accession / search / **domains only** → *Fetch UniProt* or
+    *Scan HMMER/Pfam*.
+  - Homologs → no `.hhr` yet → *Open HHpred ↗*.
+  - Structure → AlphaFold DB / PDB-CIF / ESMFold → *Fetch AlphaFold model…* /
+    *Attach PDB…* / *Predict with ESMFold* (with the ≤400 aa hint).
+  - Foldseek → database choice → *Run Foldseek (pdb100)*, and the choice also
+    sets the Foldseek database control.
+  - Topology → TMHMM / Phobius / DeepTMHMM / none → *Paste … output…*
+    (opens the topology box) or *Open a predictor ↗*.
+  - Integrate → variant triage / interface / construct / figure → Rules /
+    Interfaces / command generator / export.
+  - The generic action stays on the card as a secondary button when an answer
+    overrides it; re-clicking an option clears it; "reset answers" clears all.
+- `openTopologyPanel()` opens Options → Data Sources and scrolls to the topology
+  paste box.
+- `WORKFLOW.md` now also documents the per-step questions and their options, and
+  the harness asserts the document lists them.
+
 ## [0.19.0] - 2026-09-25
 
 ### Added

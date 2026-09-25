@@ -329,7 +329,54 @@ steps.forEach(s => {
 });
 assert(docDrift.length === 0, 'WORKFLOW.md contains every step title and DOI' + (docDrift.length ? ' (missing ' + docDrift.join(', ') + ')' : ''));
 assert(WORKFLOW_MD.indexOf('node tools/build-workflow-doc.js') !== -1, 'WORKFLOW.md documents how to regenerate itself');
+assert(WORKFLOW_MD.indexOf('Guided questions') !== -1, 'WORKFLOW.md documents the per-step questions');
+assert(WORKFLOW_MD.indexOf(ctxRun(`STEP_QUESTIONS.foldseek[0].options[1].label`)) !== -1, 'WORKFLOW.md lists the per-step options');
 assert(WORKFLOW_MD.indexOf('quick2dv') !== -1 || WORKFLOW_MD.indexOf('Quick2DViewer') !== -1, 'WORKFLOW.md is the Q2DV reference');
+
+section('per-step wizard questions (action resolution)');
+ctxRun(`guideAnswers = {}; guideOverrides = {}; guideProfile = {}; parsedTracks = {};`);
+const stepIds = ctxRun(`WORKFLOW_STEPS.map(s => s.id)`);
+assert(stepIds.every(id => ctxRun(`Array.isArray(STEP_QUESTIONS['` + id + `']) && STEP_QUESTIONS['` + id + `'].length > 0`)), 'every step has at least one sub-question');
+assert(ctxRun(`WORKFLOW_STEPS.every(s => resolveStepAction(s).run && resolveStepAction(s).label)`), 'every step resolves to a runnable action');
+
+// default: no answers -> the step's own action, not flagged as custom
+let act = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(act.run === 'openInputDataModal()' && act.custom === false, 'unanswered step offers its own default action');
+
+// answers change the action + mark it custom
+ctxRun(`setStepAnswer('structure', 'model', 'esmfold');`);
+act = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(act.run === 'predictStructureESMFold()' && act.custom === true, 'ESMFold answer offers the prediction action');
+assert(/400 aa/.test(act.hint), 'the resolved action carries a hint');
+ctxRun(`setStepAnswer('structure', 'model', 'afdb');`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]).run`) === 'openDataModal()', 'AlphaFold answer offers the data modal');
+
+ctxRun(`setStepAnswer('foldseek', 'db', 'pdb100');`);
+act = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0])`);
+assert(/pdb100/.test(act.label) && act.run === 'runFoldseekSearch()', 'Foldseek answer names the chosen database');
+ctxRun(`setStepAnswer('integration', 'goal', 'interface');`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0]).run`) === 'showInterfacesPanel()', 'integration goal picks the closing action');
+ctxRun(`setStepAnswer('integration', 'goal', 'construct');`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0]).run`).indexOf('workflow') !== -1, 'construct goal opens the command generator');
+ctxRun(`setStepAnswer('topology', 'predictor', 'tmhmm');`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`) === 'openTopologyPanel()', 'topology answer opens the paste panel');
+ctxRun(`setStepAnswer('topology', 'predictor', 'none');`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`).indexOf('window.open') === 0, 'no-predictor answer offers an external runner');
+ctxRun(`setStepAnswer('annotation', 'have', 'domains');`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0]).run`) === 'runDomainScan()', 'annotation "domains only" resolves to the Pfam scan');
+
+// answers toggle off when re-selected, and reset wholesale
+ctxRun(`setStepAnswer('foldseek', 'db', 'pdb100');`);
+assert(ctxRun(`getStepAnswer('foldseek', 'db')`) === null, 're-selecting an option clears the answer');
+ctxRun(`setStepAnswer('foldseek', 'db', 'afdb50'); setStepAnswer('structure', 'model', 'pdb');`);
+ctxRun(`resetStepAnswers();`);
+assert(ctxRun(`Object.keys(guideAnswers).length`) === 0, 'reset answers clears them all');
+
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
+let ansPersist = null;
+try { ansPersist = ctxRun(`gatherPersistableState().preferences.guideAnswers['homologs.hhpred']`); } catch (e) { ansPersist = 'threw: ' + e.message; }
+assert(ansPersist === 'no', 'step answers are persisted in preferences');
+ctxRun(`guideAnswers = {}; guideProfile = {}; guideOverrides = {}; parsedTracks = {};`);
 
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [
