@@ -785,6 +785,17 @@ assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as
 assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
 assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
 
+section('default track views (homologs = AA)');
+const defState = ctxRun(`getDefaultTrackControlState()`);
+assert(defState.aaSeq.HL === true, 'homolog rows default to the AA-letters view');
+assert(defState.fullBar.HH === undefined, 'the stale fullBar.HH key from the HH_ rename is gone');
+assert(defState.fullBar.TM === true, 'transmembrane still defaults to the bar view');
+ctxRun(`trackControlState = getDefaultTrackControlState();`);
+assert(ctxRun(`getEffectiveGroupView('HL')`) === 'aa', 'the homolog group resolves to AA with the default state');
+assert(ctxRun(`getEffectiveGroupView('TM')`) === 'bar', 'transmembrane resolves to bar with the default state');
+ctxRun(`trackControlState = getDefaultTrackControlState(); trackControlState.aaSeq.HL = false;`);
+assert(ctxRun(`getEffectiveGroupView('HL')`) === 'glyphs', 'clearing the flag falls back to the match-quality glyphs');
+
 section('task lockout + domain tooltips');
 ctxRun(`
     analysisRules = []; guideProfile = {}; guideOverrides = {}; guideAnswers = {};

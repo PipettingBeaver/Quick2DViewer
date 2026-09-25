@@ -9010,11 +9010,13 @@ const TRACK_GROUP_LABELS = {
 };
 let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {}, consColor: {}, viewOverride: {} };
 
-// Fresh-install / cleared-cache default: Transmembrane and Homolog rows start
-// in "Bar" (fullBar) mode so new users see labeled bars instead of letters.
-// Persisted preferences override this when loading a previous session.
+// Fresh-install / cleared-cache default: Transmembrane rows start in "Bar"
+// (fullBar) mode so new users see labeled bars instead of letters, and Homolog
+// rows start in "AA letters" (aaSeq) so the template sequence is readable at a
+// glance. Persisted preferences override this when loading a previous session.
+// (The old `fullBar.HH` key predated the HH_ -> HL_ rename, so it never applied.)
 function getDefaultTrackControlState() {
-    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true, HH: true }, filtered: {}, aaSeq: {}, consColor: {}, viewOverride: {} };
+    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true }, filtered: {}, aaSeq: { HL: true }, consColor: {}, viewOverride: {} };
 }
 
 function getTrackGroup(key) {
