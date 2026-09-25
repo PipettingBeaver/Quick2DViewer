@@ -107,11 +107,12 @@ best practice; see §7 for sources.
 
 ## 6. Suggested polish targets (running list)
 
-- The selection workspace block is long; consider collapsing FASTA/metrics.
+- ~~The selection workspace block is long; collapse FASTA/metrics.~~ **done (0.16.0)**
+- ~~Unify all "collapse/expand" affordances on the ghost-caret style.~~ **done (0.16.0)**
+- ~~Menus: group as File / View / Analyze / Export / Help.~~ **done (0.16.0)**
 - Options modal tabs are good; move per-track Config *into* the row's popover
   where possible.
-- Unify all "collapse/expand" affordances on the ghost-caret style.
-- Menus: consider grouping (Input / Analyze / Export) instead of File/Data/View.
+- Consider unifying the Track Control popover and the Tracks tab (one "manager" home).
 
 ## 7. References
 

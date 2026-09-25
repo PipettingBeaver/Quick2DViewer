@@ -69,17 +69,6 @@
             margin-bottom: 12px;
         }
         .sidebar-toolbar .tb-btn { font-size: 0.7rem; padding: 4px 7px; }
-        .graph-toggle {
-            display: inline-flex;
-            align-items: center;
-            gap: 3px;
-            font-size: 0.68rem;
-            font-weight: 600;
-            color: #475569;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .graph-toggle input { width: auto; margin: 0; }
         /* Collapsible "External Workflow" section in the sidebar (command generator). */
         .workflow-section { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; background: #f8fafc; }
         .workflow-section summary { cursor: pointer; font-size: 0.85rem; font-weight: 700; color: #0f172a; list-style: none; user-select: none; }
@@ -564,6 +553,12 @@
         .track-label.active-row { background: #2563eb; color: #fff; }
         .track-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
         .type-badges { display: flex; gap: 3px; margin-left: 6px; flex-shrink: 0; }
+        /* Type badges are selection affordances - reveal them on row hover
+           (or when one is active) so they don't compete with the data. */
+        .track-label .type-badges { opacity: 0; transition: opacity 0.12s ease; }
+        .track-label:hover .type-badges,
+        .track-label:focus-within .type-badges,
+        .track-label:has(.type-badge.active-badge) .type-badges { opacity: 1; }
         .type-badge {
             width: 15px;
             height: 15px;
@@ -1158,6 +1153,20 @@
         table.metrics-table tr:hover { background: #f8fafc; }
         table.metrics-table tr.homolog-best { background: #ecfdf5; }
         table.metrics-table tr.homolog-best td { border-color: #a7f3d0; }
+        /* Keyboard focus + reduced motion (WCAG 2.2 / prefers-reduced-motion). */
+        .tctl-chevron:focus-visible, .tm-chevron:focus-visible, .tm-eye:focus-visible,
+        .tm-mini:focus-visible, .type-badge:focus-visible, .menubar-btn:focus-visible,
+        .options-tab:focus-visible, .sidebar-tab:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 1px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
 
         /* --- Info tooltips ---------------------------------------------- */
         .info-icon {
@@ -1736,6 +1745,7 @@
                 <div class="menubar-menu" id="menubar-file" hidden>
                     <button type="button" onclick="menuBarAction('input')">Input Data…</button>
                     <button type="button" onclick="menuBarAction('save')">Export Save (.json)</button>
+                    <button type="button" onclick="menuBarAction('options')">Options…</button>
                     <button type="button" onclick="menuBarAction('reset')">Reset Data</button>
                     <button type="button" id="menuExternalServices" onclick="menuBarAction('toggleExternal')">External services: OFF</button>
                     <button type="button" id="menuQaHighlights" onclick="menuBarAction('toggleQa')">New-feature highlights: ON</button>
@@ -1751,10 +1761,9 @@
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('data', this)">Data ▾</button>
+                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('data', this)">Analyze ▾</button>
                 <div class="menubar-menu" id="menubar-data" hidden>
                     <button type="button" onclick="menuBarAction('data')">Data &amp; Structures…</button>
-                    <button type="button" onclick="menuBarAction('options')">Options…</button>
                     <button type="button" onclick="menuBarAction('rules')">Analysis Rules…</button>
                     <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
                 </div>
@@ -1843,7 +1852,7 @@
         </div>
     </div>
 
-    <div class="legend" id="mainLegend">
+    <div class="legend" id="mainLegend" hidden>
         <div class="legend-item"><div class="box" style="background:#fff;"></div> Amino Acid (AA)</div>
         <div class="legend-item"><div class="box" style="background:var(--q2dv-H-bg);"></div> SS: Helix (H)<span class="info-icon">ⓘ<span class="tooltip-content">
             <strong>Secondary Structure (SS)</strong><br>
@@ -1860,11 +1869,6 @@
             Combines predictions from: <span class="tool-name">PSIPRED, SPIDER3, PSSPred4, DeepCNF-SS, NetSurfP-2.0</span>.<br>
             Identifies alpha-helical, sheet, and pi-helical regions from sequence-based models.
         </span></span></div>
-        <div class="legend-item"><div class="box" style="background:var(--q2dv-C-bg);"></div> CC: Coiled Coils (C)<span class="info-icon">ⓘ<span class="tooltip-content">
-            <strong>Coiled-Coil Domains (CC)</strong><br>
-            Combines predictions from: <span class="tool-name">COILS, PCOILS, MARCOIL</span>.<br>
-            Flags heptad-repeat alpha-helical segments likely to form coiled coils.
-        </span></span></div>
         <div class="legend-item"><div class="box" style="background:var(--q2dv-M-bg);"></div> TM: Membrane (M)<span class="info-icon">ⓘ<span class="tooltip-content">
             <strong>Transmembrane Topology (TM)</strong><br>
             Combines predictions from: <span class="tool-name">TMHMM, Phobius, PolyPhobius</span>.<br>
@@ -1875,7 +1879,12 @@
             Combines predictions from: <span class="tool-name">NetSurfP-2.0, DISOPRED3, SPOT-Disorder, IUPred</span>.<br>
             Flags intrinsically disordered, flexible, or non-crystallizable regions.
         </span></span></div>
-        <div class="legend-item">
+        <div class="legend-item"><div class="box" style="background:var(--q2dv-C-bg);"></div> CC: Coiled Coils (C)<span class="info-icon">ⓘ<span class="tooltip-content">
+            <strong>Coiled-Coil Domains (CC)</strong><br>
+            Combines predictions from: <span class="tool-name">COILS, PCOILS, MARCOIL</span>.<br>
+            Flags heptad-repeat alpha-helical segments likely to form coiled coils.
+        </span></span></div>
+        <div class="legend-item" id="legendPlddtRow" hidden>
             <span style="font-weight:600; font-size:0.8rem;">pLDDT:</span>
             <div class="box" style="background:#0053d6;" title="&gt;90 - Very high confidence"></div>
             <div class="box" style="background:#00c1df;" title="70-90 - High confidence"></div>
@@ -1883,7 +1892,7 @@
             <div class="box" style="background:#ff7d45;" title="&lt;50 - Very low confidence"></div>
             <span class="info-icon" id="plddtLegendIcon">ⓘ<span class="tooltip-content"></span></span>
         </div>
-        <div class="legend-item">
+        <div class="legend-item" id="legendRsaRow" hidden>
             <span style="font-weight:600; font-size:0.8rem;">RSA:</span>
             <div class="box" style="background:rgb(205,205,205);" title="0.0-0.2 - Buried"></div>
             <div class="box" style="background:rgb(153,153,153);" title="0.2-0.5 - Intermediate"></div>
@@ -1899,16 +1908,6 @@
         </div>
 
         <div class="sidebar" role="region" aria-label="Selection Workspace">
-            <div class="sidebar-toolbar" role="toolbar" aria-label="View and data input controls">
-                <span style="font-size:0.68rem; font-weight:700; color:#64748b; white-space:nowrap;">Graph view</span>
-                <label class="graph-toggle" title="Render all pLDDT tracks as an overlaid graph instead of heatmap rows">
-                    <input type="checkbox" id="graphPlddtCheck" onchange="onGraphModeChange()"> pLDDT
-                </label>
-                <label class="graph-toggle" title="Render all RSA tracks as an overlaid graph instead of heatmap rows">
-                    <input type="checkbox" id="graphRsaCheck" onchange="onGraphModeChange()"> RSA
-                </label>
-            </div>
-
             <div class="sidebar-tabs" role="tablist" aria-label="Workspace panels">
                 <button type="button" class="sidebar-tab active" data-tab="selection" onclick="switchSidebarTab('selection')">Selection</button>
                 <button type="button" class="sidebar-tab" data-tab="tracks" onclick="switchSidebarTab('tracks')">Tracks</button>
@@ -2002,14 +2001,14 @@
                 </div>
             </div>
 
-            <div>
-                <strong>FASTA Segment:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+            <details class="workflow-section" id="fastaSection" open style="margin-top: 10px;">
+                <summary>FASTA Segment <span class="info-icon" onclick="event.preventDefault()">ⓘ<span class="tooltip-content">
                     <strong>FASTA Segment</strong><br>
                     The amino acid sequence for the selected residue range(s).<br>
                     For piecewise selections, each contiguous segment's sequence is joined by a comma, matching the residue ranges above.<br>
                     When a Homolog track is selected, its own aligned sequence is shown beneath, divided by a line, and &quot;Copy Track&quot; copies that homolog's sequence.
-                </span></span>
-                <div class="data-box" id="fastaDisplay" style="max-height: 70px; overflow-y: auto;">-</div>
+                </span></span></summary>
+                <div class="data-box" id="fastaDisplay" style="max-height: 70px; overflow-y: auto; margin-top: 6px;">-</div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="copy-btn" onclick="copyText('fastaDisplay')" title="Copy the main AA sequence of the selection">Copy Sequence</button>
                     <button class="copy-btn" id="copyTrackBtn" onclick="copyHomologTrack()" disabled title="Select a Homolog track to copy its aligned sequence">Copy Track</button>
@@ -2018,30 +2017,32 @@
                     <strong id="homologFastaLabel">Homolog sequence:</strong>
                     <div class="data-box" id="fastaHomologDisplay" style="max-height: 70px; overflow-y: auto; margin-top: 4px;">-</div>
                 </div>
-            </div>
+            </details>
 
-            <div>
-                <strong>Quantitative Metrics:</strong>
-                <label for="metricsCrossRef" style="position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;">Cross-reference the current selection against another track</label>
-                <select id="metricsCrossRef" onchange="onCrossRefChange()" title="Cross-reference the current selection against another track"
-                    aria-label="Cross-reference track" class="q2dv-select"
-                    style="font-size: 0.68rem; padding: 1px 3px; border: 1px solid #cbd5e1; border-radius: 4px; margin-left: 4px; max-width: 105px; vertical-align: middle;">
-                    <option value="">— none —</option>
-                </select>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="openMetricsTable()"
-                    title="Open the comparative metrics table across all loaded models"
-                    style="font-size: 0.72rem; padding: 3px 8px; margin-left: 4px; vertical-align: middle;">Table</button>
-                <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
-                    <strong>Quantitative Metrics</strong><br>
-                    Structural statistics computed from attached PDB / CIF / AlphaFold JSON files for the current selection.<br><br>
-                    <strong>pLDDT</strong> - AlphaFold's per-residue confidence score (1-100). Hover the pLDDT row's ⓘ for full score bands.<br>
-                    <strong>RSA</strong> - Relative Solvent Accessibility (0.0-1.0). Hover the RSA row's ⓘ for full score bands.<br><br>
-                    Requires at least one structure file attached above.<br><br>
-                    <strong>Cross-reference dropdown</strong> - pick any loaded SS/TM/DO/CC track or pLDDT/RSA model to see how the <span class="tool-name">current selection</span> (manual range, or a row/band/residue-type filter) overlaps with it, shown below the metrics above.<br><br>
-                    For pLDDT/RSA, <strong>All</strong>/<strong>Apo</strong>/<strong>Holo</strong>/oligomeric-state (Monomer/Dimer/Trimer/...) mass-selections are also available - each shows every matching model's stats individually, plus an <strong>Average of N</strong> summary line when more than one model is included.
-                </span></span>
+            <details class="workflow-section" id="metricsSection" open style="margin-top: 10px;">
+                <summary>Quantitative Metrics</summary>
+                <div style="display:flex; align-items:center; gap:4px; margin:6px 0; flex-wrap:wrap;">
+                    <label for="metricsCrossRef" style="position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;">Cross-reference the current selection against another track</label>
+                    <select id="metricsCrossRef" onchange="onCrossRefChange()" title="Cross-reference the current selection against another track"
+                        aria-label="Cross-reference track" class="q2dv-select"
+                        style="font-size: 0.68rem; padding: 1px 3px; border: 1px solid #cbd5e1; border-radius: 4px; max-width: 105px; vertical-align: middle;">
+                        <option value="">— none —</option>
+                    </select>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="openMetricsTable()"
+                        title="Open the comparative metrics table across all loaded models"
+                        style="font-size: 0.72rem; padding: 3px 8px; vertical-align: middle;">Table</button>
+                    <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                        <strong>Quantitative Metrics</strong><br>
+                        Structural statistics computed from attached PDB / CIF / AlphaFold JSON files for the current selection.<br><br>
+                        <strong>pLDDT</strong> - AlphaFold's per-residue confidence score (1-100). Hover the pLDDT row's ⓘ for full score bands.<br>
+                        <strong>RSA</strong> - Relative Solvent Accessibility (0.0-1.0). Hover the RSA row's ⓘ for full score bands.<br><br>
+                        Requires at least one structure file attached above.<br><br>
+                        <strong>Cross-reference dropdown</strong> - pick any loaded SS/TM/DO/CC track or pLDDT/RSA model to see how the <span class="tool-name">current selection</span> (manual range, or a row/band/residue-type filter) overlaps with it, shown below the metrics above.<br><br>
+                        For pLDDT/RSA, <strong>All</strong>/<strong>Apo</strong>/<strong>Holo</strong>/oligomeric-state (Monomer/Dimer/Trimer/...) mass-selections are also available - each shows every matching model's stats individually, plus an <strong>Average of N</strong> summary line when more than one model is included.
+                    </span></span>
+                </div>
                 <div class="data-box" id="metricsDisplay" style="color: #047857; font-size: 0.75rem; white-space: pre-wrap;">Select a region or graph point for statistics.</div>
-            </div>
+            </details>
             </div>
 
             <div class="sidebar-panel" id="side-panel-tracks" hidden>
@@ -4089,8 +4090,8 @@ function menuBarAction(action) {
         case 'reset': resetAllData(); break;
         case 'toggleExternal': toggleExternalServices(); break;
         case 'toggleQa': toggleQaHighlights(); break;
-        case 'graphPlddt': { const c = document.getElementById('graphPlddtCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
-        case 'graphRsa': { const c = document.getElementById('graphRsaCheck'); if (c) { c.checked = !c.checked; onGraphModeChange(); } break; }
+        case 'graphPlddt': toggleGraphMode('pLDDT'); break;
+        case 'graphRsa': toggleGraphMode('RSA'); break;
         case 'legend': toggleLegend(); break;
         case 'p3d': toggleP3DViewer(); break;
         case 'data': openDataModal(); break;
@@ -4629,7 +4630,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.15.2';
+const APP_VERSION = '0.16.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -5088,6 +5089,7 @@ function buildGroupViewSelect(g) {
     const sel = mkEl('select', 'tctl-view-select');
     const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
     if (g === 'HL') opts.push(['aa', 'AA']);
+    if (g === 'pLDDT' || g === 'RSA') opts.unshift(['graph', 'Graph']);
     opts.push(['hidden', 'Hidden']);
     opts.forEach(([v, t]) => {
         const o = document.createElement('option');
@@ -5987,9 +5989,17 @@ function getTrackCategoryOrder(key) {
     return 13;
 }
 
+// pLDDT/RSA graph-vs-heatmap is a type-level view choice (Track Control's
+// "View as" for those types); this toggles it from the View menu too.
+function isGraphType(g) { return g === 'pLDDT' ? !!graphMode.pLDDT : (g === 'RSA' ? !!graphMode.RSA : false); }
+function toggleGraphMode(g) {
+    if (g !== 'pLDDT' && g !== 'RSA') return;
+    setGroupView(g, isGraphType(g) ? 'glyphs' : 'graph');
+    tctlAfterChange();
+}
 function onGraphModeChange() {
-    graphMode.pLDDT = !!document.getElementById('graphPlddtCheck').checked;
-    graphMode.RSA = !!document.getElementById('graphRsaCheck').checked;
+    graphMode.pLDDT = isGraphType('pLDDT');
+    graphMode.RSA = isGraphType('RSA');
     renderViewer(parsedTracks);
     schedulePersist();
 }
@@ -6000,6 +6010,11 @@ function syncGraphModeControls() {
     const r = document.getElementById('graphRsaCheck');
     if (p) p.checked = !!graphMode.pLDDT;
     if (r) r.checked = !!graphMode.RSA;
+    // The legend's pLDDT/RSA rows only apply when that type is shown as a graph.
+    const pRow = document.getElementById('legendPlddtRow');
+    const rRow = document.getElementById('legendRsaRow');
+    if (pRow) pRow.hidden = !graphMode.pLDDT;
+    if (rRow) rRow.hidden = !graphMode.RSA;
 }
 
 // Structure File Upload Handler
@@ -7277,6 +7292,8 @@ function getTrackViewOverride(key) {
 // The authoritative view mode for a whole type group, derived from the old
 // independent flags: hidden > bar > AA > no-letters > glyphs.
 function getEffectiveGroupView(g) {
+    // pLDDT/RSA can be shown as an overlaid graph instead of heatmap rows.
+    if ((g === 'pLDDT' || g === 'RSA') && graphMode[g]) return 'graph';
     if (isTrackGroupHidden(g)) return 'hidden';
     if (isTrackGroupFullBar(g)) return 'bar';
     if (isTrackGroupAASeq(g)) return 'aa';
@@ -7286,6 +7303,9 @@ function getEffectiveGroupView(g) {
 // Inverse of getEffectiveGroupView: sets one authoritative view mode for a
 // group, clearing the other mutually-exclusive flags.
 function setGroupView(g, v) {
+    // "Graph" is a pLDDT/RSA-only type view (overlaid graph vs heatmap rows).
+    if (g === 'pLDDT' || g === 'RSA') graphMode[g] = (v === 'graph');
+    if (v === 'graph') { trackControlState.hidden[g] = false; return; }
     if (v === 'hidden') { trackControlState.hidden[g] = true; return; }
     trackControlState.hidden[g] = false;
     trackControlState.fullBar[g] = (v === 'bar');
@@ -8341,7 +8361,9 @@ function updateManualPiecewiseSelection() {
         fastaSegments.push(parsedTracks.AA.substring(s, e + 1));
         totalLength += (e - s + 1);
     });
-    document.getElementById('rangeDisplay').innerHTML = `Selection: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
+    document.getElementById('rangeDisplay').innerHTML = (rangeLabels.length === 1 && totalLength === 1)
+        ? `Selection: <strong>Residue ${rangeLabels[0]}</strong>`
+        : `Selection: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
     document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
     updateHomologFastaSection();
     lastRanges = rowRanges.map(([s, e]) => [s + 1, e + 1]);
@@ -9689,7 +9711,9 @@ function calculateSelectionMetadata() {
     const length = resEnd - resStart + 1;
     const selectedSequence = parsedTracks.AA.substring(startIdx, endIdx + 1);
 
-    document.getElementById('rangeDisplay').innerHTML = `Residues: <strong>${resStart} - ${resEnd}</strong> <span style="color:#64748b;">(Length: ${length}aa)</span>`;
+    document.getElementById('rangeDisplay').innerHTML = resStart === resEnd
+        ? `Residue <strong>${resStart}</strong>`
+        : `Residues: <strong>${resStart} - ${resEnd}</strong> <span style="color:#64748b;">(Length: ${length}aa)</span>`;
     document.getElementById('fastaDisplay').textContent = selectedSequence;
     lastRanges = [[resStart, resEnd]];
     
@@ -9715,7 +9739,11 @@ function calculateRowSelectionMetadata(trackKey, typeChar) {
         totalLength += (endIdx - startIdx + 1);
     });
 
-    document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${structureEscapeHtml(rowLabel)}</strong><br>Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
+    const single = (rangeLabels.length === 1 && totalLength === 1);
+    const rangeText = single
+        ? `Residue <strong>${rangeLabels[0]}</strong>`
+        : `Residues: <strong>${rangeLabels.join(', ')}</strong> <span style="color:#64748b;">(${totalLength}aa)</span>`;
+    document.getElementById('rangeDisplay').innerHTML = `Row: <strong>${structureEscapeHtml(rowLabel)}</strong><br>${rangeText}`;
     document.getElementById('fastaDisplay').textContent = fastaSegments.join(',');
     lastRanges = rowRanges.map(([s, e]) => [s + 1, e + 1]);
     
@@ -11485,11 +11513,12 @@ function applyPersistedState(state) {
     // Restore the import-group collapse and legend-hidden states.
     const legendEl = document.getElementById('mainLegend');
     const legendBtn = document.getElementById('btnToggleLegend');
-    if (legendEl && prefs.legendHidden) {
-        legendEl.hidden = true;
+    if (legendEl) {
+        // Hidden by default; only show when the saved pref explicitly says so.
+        legendEl.hidden = prefs.legendHidden !== false;
         if (legendBtn) {
-            legendBtn.setAttribute('aria-expanded', 'false');
-            legendBtn.textContent = 'Show Legend ▸';
+            legendBtn.setAttribute('aria-expanded', String(!legendEl.hidden));
+            legendBtn.textContent = legendEl.hidden ? 'Show Legend ▸' : 'Hide Legend ▾';
         }
     }
 

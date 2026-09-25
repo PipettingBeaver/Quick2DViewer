@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-23
+
+### Changed (design pass — see `UX_GUIDELINES.md`)
+
+- **Legend** is now **hidden by default** (the existing Show/Hide Legend button remains
+  the single toggle), reordered to match the track order, and its pLDDT/RSA rows appear
+  only when that type is shown as a graph — so it no longer occludes tracks.
+- **Graph vs heatmap is now a "View as" option** on the pLDDT/RSA rows in Track Control
+  (and the View menu); the redundant sidebar "Graph view" checkboxes are removed.
+- **Sidebar**: "FASTA Segment" and "Quantitative Metrics" are collapsible sections, so
+  the Selection tab is much shorter.
+- **Microcopy**: a single-residue selection reads "Residue 148" rather than
+  "Residues: 148 - 148 (Length: 1aa)".
+- **Menus**: Options moved to **File**; Data renamed **Analyze** (Data & Structures,
+  Analysis Rules, Interfaces).
+- **Polish / accessibility**: type badges reveal on row hover (kept while active);
+  `:focus-visible` outlines on interactive controls; `prefers-reduced-motion` respected.
+
 ## [0.15.2] - 2026-09-23
 
 ### Changed
