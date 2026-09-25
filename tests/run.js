@@ -10,6 +10,7 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf-8');
 const CHANGELOG = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf-8');
+const WORKFLOW_MD = fs.readFileSync(path.join(ROOT, 'WORKFLOW.md'), 'utf-8');
 
 // ---------- DOM stubs ----------
 function makeEl() {
@@ -287,6 +288,48 @@ let gPersist = null;
 try { gPersist = ctxRun(`gatherPersistableState().preferences.guideProfile.variants`); } catch (e) { gPersist = 'threw: ' + e.message; }
 assert(gPersist === 'yes', 'guide profile is persisted in preferences');
 ctxRun(`guideProfile = {}; parsedTracks = {};`);
+
+section('guide overrides + citations + reference doc');
+ctxRun(`guideProfile = {}; guideOverrides = {}; parsedTracks = {};`);
+
+// --- overrides -----------------------------------------------------------
+assert(ctxRun(`Object.keys(guideOverrides).length`) === 0, 'no overrides by default');
+ctxRun(`setGuideOverride('foldseek', 'skipped');`);
+assert(ctxRun(`guideOverrides.foldseek`) === 'skipped', 'skip is stored on the override map');
+let st = ctxRun(`guideStepStatus().filter(r => r.step.id === 'foldseek')[0]`);
+assert(st.skipped === true && st.done === false, 'a skipped step is settled but not "done"');
+const prog = ctxRun(`guideProgress()`);
+assert(prog.skipped === 1 && prog.denominator === prog.total - 1, 'skipped steps leave the progress denominator');
+assert(ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) !== 'foldseek', 'skipped steps are not recommended');
+
+ctxRun(`setGuideOverride('foldseek', 'done');`);
+st = ctxRun(`guideStepStatus().filter(r => r.step.id === 'foldseek')[0]`);
+assert(st.done === true && st.manualDone === true && st.autoDone === false, 'manual done overrides auto-detection');
+assert(ctxRun(`guideStepStatus().filter(r => r.step.id === 'foldseek')[0].done`) === true, 'manually-done steps report done');
+assert(ctxRun(`guideProgress().covered >= 1`), 'manually-done steps count as covered');
+ctxRun(`setGuideOverride('foldseek', 'clear');`);
+assert(ctxRun(`guideOverrides.foldseek`) === undefined, 'clear removes the override');
+ctxRun(`setGuideOverride('a', 'done'); setGuideOverride('b', 'skipped');`);
+ctxRun(`resetGuideOverrides();`);
+assert(ctxRun(`Object.keys(guideOverrides).length`) === 0, 'reset clears all overrides');
+
+// --- citations -----------------------------------------------------------
+assert(ctxRun(`WORKFLOW_STEPS.every(s => Array.isArray(s.refs) && s.refs.length > 0)`), 'every step carries at least one citation');
+assert(ctxRun(`WORKFLOW_STEPS.every(s => s.refs.every(r => r.doi.indexOf('10.') === 0 && r.doi.indexOf('/') > 3 && r.cite.length > 10))`), 'citations look like DOIs and have a label');
+assert(ctxRun(`WORKFLOW_STEPS.every(s => typeof s.priorityNote === 'string' && s.priorityNote.length > 0)`), 'every step explains when it is promoted');
+assert(ctxRun(`typeof guideRefsHTML === 'function' && /doi\.org/.test(guideRefsHTML(WORKFLOW_STEPS[0]))`), 'refs render as doi.org links');
+
+// --- external reference doc stays in sync --------------------------------
+ctxRun(`guideProfile = {}; parsedTracks = {};`);
+const steps = ctxRun(`WORKFLOW_STEPS.map(s => ({ title: s.title, refs: s.refs }))`);
+let docDrift = [];
+steps.forEach(s => {
+  if (WORKFLOW_MD.indexOf(s.title) === -1) docDrift.push('title: ' + s.title);
+  s.refs.forEach(r => { if (WORKFLOW_MD.indexOf(r.doi) === -1) docDrift.push('doi: ' + r.doi); });
+});
+assert(docDrift.length === 0, 'WORKFLOW.md contains every step title and DOI' + (docDrift.length ? ' (missing ' + docDrift.join(', ') + ')' : ''));
+assert(WORKFLOW_MD.indexOf('node tools/build-workflow-doc.js') !== -1, 'WORKFLOW.md documents how to regenerate itself');
+assert(WORKFLOW_MD.indexOf('quick2dv') !== -1 || WORKFLOW_MD.indexOf('Quick2DViewer') !== -1, 'WORKFLOW.md is the Q2DV reference');
 
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [

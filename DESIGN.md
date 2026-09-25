@@ -145,17 +145,27 @@ Links are provided for checking; please verify before we lock them in.
 | 7 | **Conserved but poorly modelled** | `conservation ≥ 0.8` **AND** `pLDDT (min) < 50` | A real, evolutionarily constrained region the models fail on (ligand-bound or membrane-embedded cores). Prime "look here" flag. |
 | 8 | **Signal / topology feature** | `group:TP` annotated (or `UP_Signal`) | Flag signal-peptide / topology features for construct design. |
 
-### References (verify before locking)
+### References
 
-- TMHMM — Krogh, Larsson, von Heijne, Sonnhammer, *J Mol Biol* 2001 — https://doi.org/10.1006/jmbi.2001.4911
-- IUPred2A (disorder) — Mészáros, Erdős, Dosztányi, *NAR* 2018 — https://doi.org/10.1093/nar/gky384
-- AlphaFold2 (pLDDT) — Jumper et al., *Nature* 2021 — https://doi.org/10.1038/s41586-021-03819-2
-- AlphaFold & disordered proteins — Ruff & Pappu, *J Mol Biol* 2021 — https://doi.org/10.1016/j.jmb.2021.167089
-- ConSurf 2016 (conservation) — Ashkenazy et al., *NAR* 2016 — https://doi.org/10.1093/nar/gkw408
-- Functionally important residues from conservation — Capra & Singh, *Bioinformatics* 2007 — https://doi.org/10.1093/bioinformatics/btm242
-- Evolutionary trace (binding surfaces) — Lichtarge, Bourne, Cohen, *J Mol Biol* 1996 — https://doi.org/10.1006/jmbi.1996.0298
-- Interface conservation — Valdar & Thornton, *Proteins* 2002 — https://doi.org/10.1002/prot.10103
-- SignalP 6.0 — Teufel et al., *Nat Biotechnol* 2022 — https://doi.org/10.1038/s41587-021-01156-3
+The canonical, DOI-verified reference list now lives in **`WORKFLOW.md`**
+(generated from `WORKFLOW_STEPS` by `tools/build-workflow-doc.js`). Every DOI
+there was resolved against the Crossref API on 2026-09.
+
+Six entries in the earlier list below resolved to unrelated papers and were
+corrected during that check; the wrong values are kept here only so the
+correction is auditable:
+
+| Reference | Was (wrong) | Now (verified) |
+|---|---|---|
+| TMHMM 2001 | `10.1006/jmbi.2001.4911` | `10.1006/jmbi.2000.4315` |
+| Ruff & Pappu 2021 | `10.1016/j.jmb.2021.167089` | `10.1016/j.jmb.2021.167208` |
+| Capra & Singh 2007 | `10.1093/bioinformatics/btm242` | `10.1093/bioinformatics/btm270` |
+| Lichtarge et al. 1996 | `10.1006/jmbi.1996.0298` | `10.1006/jmbi.1996.0167` |
+| Valdar & Thornton 2001 | `10.1002/prot.10103` | `10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o` |
+
+Unchanged (verified): IUPred2A `10.1093/nar/gky384`; AlphaFold2
+`10.1038/s41586-021-03819-2`; ConSurf 2016 `10.1093/nar/gkw408`; SignalP 6.0
+`10.1038/s41587-021-01156-3`.
 
 ## 12. Guided evaluation workflow ("Evaluation Guide", v0.18.0)
 
@@ -194,10 +204,31 @@ metric and tool available for manual inspection.
 - Insights are advisory and cite their basis ("mean pLDDT", "best homolog identity")
   rather than asserting biology — they are flags to inspect, not conclusions.
 
+### Placement, overrides and citations (v0.19.0)
+
+- **Own tab.** The guide lives in its own **Guide** sidebar tab (Selection /
+  Tracks / Guide / Workflow). The Workflow tab keeps the External Workflow
+  command generator. The Input Data checklist is now a **read-only indicator**:
+  it renders the same `WORKFLOW_STEPS` status + overrides and links to the Guide
+  tab, so there is one editable place, not two.
+- **User overrides** (`guideOverrides`, persisted): any step can be
+  `done` (handled outside Q2DV), `skipped` (out of scope — it leaves the progress
+  denominator and is never recommended), or cleared back to auto-detection. The
+  `check()` stays the source of truth; overrides only layer on top, and the card
+  always states which of the two is speaking.
+- **Re-run at any time.** A step's action button is never disabled: when a step
+  is done it reads *Re-run: …*, so a category can be refreshed when partial data
+  was already added.
+- **Citations.** Each step carries `refs` (DOI + label) shown on the card, and
+  `priorityNote` (when the intake promotes it). Every DOI was resolved against
+  Crossref on 2026-09; six DOIs from the old §11 list were wrong and are corrected.
+- **External reference doc.** `WORKFLOW.md` is generated from `WORKFLOW_STEPS` +
+  `GUIDE_QUESTIONS` by `tools/build-workflow-doc.js` (`npm run doc:workflow`) and
+  is linked from the guide header. The test harness asserts the document contains
+  every step title and DOI, so it cannot drift from the app.
+
 ### Roadmap (next iterations)
 
-- **Citations per step**: surface the DOI(s) backing each `why` (reuse the §11
-  reference list) as a tooltip/footnote, so the framework is auditable.
 - **Profile → rule presets**: when variants/membrane are flagged, offer the
   matching rule preset (needs the `group:<GROUP>` condition source from §11).
 - **Profile → topology/TM cross-check**: auto-run a "TM consensus vs Quick2D TM"

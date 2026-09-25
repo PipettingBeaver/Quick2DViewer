@@ -1188,6 +1188,20 @@
         .guide-insights-head { font-size:0.72rem; font-weight:700; color:#334155; margin-bottom:5px; }
         .guide-insight { font-size:0.72rem; line-height:1.4; padding:5px 7px; border-radius:5px; margin-bottom:4px; border-left:3px solid #94a3b8; background:#f8fafc; color:#475569; }
         .guide-insight-warn { border-left-color:#f59e0b; background:#fffbeb; color:#92400e; }
+        .guide-chip-skip { background:#f1f5f9; color:#94a3b8; }
+        .guide-step-skip > summary { opacity:0.65; }
+        .guide-step-skip .guide-title { text-decoration: line-through; }
+        .guide-pri-note { color:#64748b; }
+        .guide-refs { font-size:0.68rem; color:#64748b; line-height:1.45; }
+        .guide-refs a { color:#2563eb; text-decoration:none; }
+        .guide-refs a:hover { text-decoration:underline; }
+        .guide-state { font-size:0.68rem; color:#94a3b8; margin:2px 0 6px; }
+        .guide-actions { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+        .guide-actions .guide-run { margin-top:0; }
+        .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
+        .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
+        .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+        .wf-summary { font-size:0.74rem; color:#334155; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:5px 7px; margin-bottom:6px; }
         /* Keyboard focus + reduced motion (WCAG 2.2 / prefers-reduced-motion). */
         .tctl-chevron:focus-visible, .tm-chevron:focus-visible, .tm-eye:focus-visible,
         .tm-mini:focus-visible, .type-badge:focus-visible, .menubar-btn:focus-visible,
@@ -1905,7 +1919,7 @@
                     Suggested steps for characterizing a protein, checked off as you load the corresponding data.
                 </p>
                 <div id="workflowChecklist"></div>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeInputDataModal(); switchSidebarTab('workflow');"
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeInputDataModal(); switchSidebarTab('guide');"
                     style="font-size:0.72rem; padding:3px 8px; margin-top:8px;"
                     title="Open the step-by-step Evaluation Guide (Workflow tab) with live status, actions and interpretation">Open the Evaluation Guide →</button>
             </div>
@@ -1971,6 +1985,7 @@
             <div class="sidebar-tabs" role="tablist" aria-label="Workspace panels">
                 <button type="button" class="sidebar-tab active" data-tab="selection" onclick="switchSidebarTab('selection')">Selection</button>
                 <button type="button" class="sidebar-tab" data-tab="tracks" onclick="switchSidebarTab('tracks')">Tracks</button>
+                <button type="button" class="sidebar-tab" data-tab="guide" onclick="switchSidebarTab('guide')">Guide</button>
                 <button type="button" class="sidebar-tab" data-tab="workflow" onclick="switchSidebarTab('workflow')">Workflow</button>
             </div>
 
@@ -2143,16 +2158,20 @@
                 </details>
             </div>
 
-            <div class="sidebar-panel" id="side-panel-workflow" hidden>
+            <div class="sidebar-panel" id="side-panel-guide" hidden>
             <details class="workflow-section qa-new" id="guideSection" open>
             <summary>Evaluation Guide</summary>
             <p style="font-size:0.72rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
-                The literature-backed characterization pipeline, with a live status per step.
-                Answer the questions to re-rank the steps for your protein; every tool stays available manually.
+                The literature-backed characterization pipeline
+                (<a href="WORKFLOW.md" target="_blank" rel="noopener" style="color:#2563eb;">reference doc</a>),
+                with a live status per step. Answer the questions to re-rank the steps for your protein; each
+                step can be marked done, skipped, or re-run. Every tool stays available manually.
             </p>
             <div id="guidePanel"></div>
             </details>
+            </div>
 
+            <div class="sidebar-panel" id="side-panel-workflow" hidden>
             <details class="workflow-section" open>
             <summary>External Workflow</summary>
             <div>
@@ -4100,8 +4119,10 @@ const WORKFLOW_STEPS = [
         action: { label: 'Load data…', run: 'openInputDataModal()' },
         how: ['Check the length and the first/last residues match your construct.',
               'Confirm the protein label/accession so the UniProt step fetches the right entry.'],
+        refs: [{ cite: 'UniProt Consortium, Nucleic Acids Res 2023', doi: '10.1093/nar/gkac1052' }],
         check: () => !!parsedTracks.AA,
-        priority: () => true
+        priority: () => true,
+        priorityNote: 'Always — it is the prerequisite for every other step.'
     },
     {
         id: 'features', title: 'SS / disorder / TM predictions',
@@ -4110,8 +4131,17 @@ const WORKFLOW_STEPS = [
         action: { label: 'Load Quick2D output…', run: 'openInputDataModal()' },
         how: ['Helix/sheet runs suggest a folded core; long disorder runs suggest flexible regions.',
               'TM segments should line up with the topology consensus later — a conflict is a flag to inspect, not an error.'],
+        refs: [
+            { cite: 'Buchan & Jones, Nucleic Acids Res 2019 (PSIPRED workbench)', doi: '10.1093/nar/gkz297' },
+            { cite: 'Klausen et al., Proteins 2019 (NetSurfP-2.0)', doi: '10.1002/prot.25674' },
+            { cite: 'Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A)', doi: '10.1093/nar/gky384' },
+            { cite: 'Krogh et al., J Mol Biol 2001 (TMHMM)', doi: '10.1006/jmbi.2000.4315' },
+            { cite: 'Teufel et al., Nat Biotechnol 2022 (SignalP 6.0)', doi: '10.1038/s41587-021-01156-3' },
+            { cite: 'Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs)', doi: '10.1016/j.jmb.2021.167208' }
+        ],
         check: () => Object.keys(parsedTracks).some(k => /^(SS_|TM_|DO_|CC_|SP_)/.test(k)),
-        priority: (p) => p.membrane === 'yes'
+        priority: (p) => p.membrane === 'yes',
+        priorityNote: 'Promoted when the protein is flagged membrane-associated or secreted.'
     },
     {
         id: 'annotation', title: 'Curated annotation & domains',
@@ -4121,8 +4151,13 @@ const WORKFLOW_STEPS = [
         extraActions: [{ label: 'Scan HMMER/Pfam', run: 'runDomainScan()' }],
         how: ['Prefer curated domain boundaries where they agree with the profile hits; investigate where they disagree.',
               'PTM/site annotations mark residues where a variant is more likely to matter.'],
+        refs: [
+            { cite: 'Mistry et al., Nucleic Acids Res 2021 (Pfam)', doi: '10.1093/nar/gkaa913' },
+            { cite: 'Finn, Clements & Eddy, Nucleic Acids Res 2011 (HMMER web server)', doi: '10.1093/nar/gkr367' }
+        ],
         check: () => !!uniprotFeatures || Object.keys(parsedTracks).some(k => k.startsWith('DM_')),
-        priority: (p) => p.unknownFunction === 'yes' || p.unknownFunction === 'unsure'
+        priority: (p) => p.unknownFunction === 'yes' || p.unknownFunction === 'unsure',
+        priorityNote: 'Promoted when the function or domain architecture is unknown or unclear.'
     },
     {
         id: 'homologs', title: 'Homologs & conservation',
@@ -4131,8 +4166,15 @@ const WORKFLOW_STEPS = [
         action: { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()' },
         how: ['Probability > 90% with coverage near 100% makes a template a solid model.',
               'Conservation is only as good as the alignment depth — check how many sequences went in.'],
+        refs: [
+            { cite: 'Söding, Biegert & Lupas, Nucleic Acids Res 2005 (HHpred)', doi: '10.1093/nar/gki408' },
+            { cite: 'Remmert et al., Nat Methods 2012 (HHblits)', doi: '10.1038/nmeth.1818' },
+            { cite: 'Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016)', doi: '10.1093/nar/gkw408' },
+            { cite: 'Capra & Singh, Bioinformatics 2007 (functionally important residues)', doi: '10.1093/bioinformatics/btm270' }
+        ],
         check: () => Object.keys(parsedTracks).some(k => k.startsWith('HL_')) || !!parsedTracks.CONSERVATION,
-        priority: () => true
+        priority: () => true,
+        priorityNote: 'Always — homology is the main cross-check on the sequence-based layers.'
     },
     {
         id: 'structure', title: 'Structural model',
@@ -4141,8 +4183,14 @@ const WORKFLOW_STEPS = [
         action: { label: 'Attach / predict structure…', run: 'openInputDataModal()' },
         how: ['pLDDT > 70 is confident, 50–70 tentative, < 50 unreliable — read it per region, not per protein.',
               'RSA says whether a residue is buried; a variant in a buried position is usually more disruptive.'],
+        refs: [
+            { cite: 'Jumper et al., Nature 2021 (AlphaFold2)', doi: '10.1038/s41586-021-03819-2' },
+            { cite: 'Lin et al., Science 2023 (ESMFold)', doi: '10.1126/science.ade2574' },
+            { cite: 'Kabsch & Sander, Biopolymers 1983 (DSSP)', doi: '10.1002/bip.360221211' }
+        ],
         check: () => (uploadedStructureFiles && uploadedStructureFiles.length > 0) || Object.keys(parsedTracks).some(k => k.endsWith('_pLDDT') || k.endsWith('_RSA')),
-        priority: (p) => p.structure === 'yes' || p.structure === 'unsure'
+        priority: (p) => p.structure === 'yes' || p.structure === 'unsure',
+        priorityNote: 'Promoted when a structure is available or planned, or the answer is unsure.'
     },
     {
         id: 'foldseek', title: 'Structural homology',
@@ -4151,8 +4199,10 @@ const WORKFLOW_STEPS = [
         action: { label: 'Run Foldseek', run: 'runFoldseekSearch()' },
         how: ['High probability + low E-value with good query coverage is a credible structural relative.',
               'Use it to sanity-check the family assignment, not to overrule curated data.'],
+        refs: [{ cite: 'van Kempen et al., Nat Biotechnol 2023 (Foldseek)', doi: '10.1038/s41587-023-01773-0' }],
         check: () => Object.keys(parsedTracks).some(k => { const h = homologHitsInfo[k]; return h && /Foldseek/i.test(h.source || ''); }),
-        priority: (p) => p.unknownFunction === 'yes'
+        priority: (p) => p.unknownFunction === 'yes',
+        priorityNote: 'Promoted when the function or domain architecture is unknown.'
     },
     {
         id: 'topology', title: 'Membrane topology',
@@ -4161,8 +4211,10 @@ const WORKFLOW_STEPS = [
         action: { label: 'Paste topology…', run: 'openInputDataModal()' },
         how: ['Build a consensus across predictors; a segment that flips orientation between tools is not settled.',
               'Compare the consensus with the Quick2D TM call to judge how robust the TM prediction is.'],
+        refs: [{ cite: 'Krogh et al., J Mol Biol 2001 (TMHMM)', doi: '10.1006/jmbi.2000.4315' }],
         check: () => topologySources.length > 0,
-        priority: (p) => p.membrane === 'yes'
+        priority: (p) => p.membrane === 'yes',
+        priorityNote: 'Promoted when the protein is flagged membrane-associated or secreted.'
     },
     {
         id: 'integration', title: 'Integrate & export',
@@ -4172,8 +4224,13 @@ const WORKFLOW_STEPS = [
         extraActions: [{ label: 'Interfaces…', run: 'showInterfacesPanel()' }],
         how: ['A rule hit is a hypothesis to inspect, not a conclusion — click through its matches.',
               'Export the figure plus table so the track state behind the claim is archived.'],
+        refs: [
+            { cite: 'Lichtarge, Bourne & Cohen, J Mol Biol 1996 (evolutionary trace)', doi: '10.1006/jmbi.1996.0167' },
+            { cite: 'Valdar & Thornton, Proteins 2001 (interface conservation)', doi: '10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o' }
+        ],
         check: () => analysisRules.length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('IF_')),
-        priority: () => true
+        priority: () => true,
+        priorityNote: 'Always — it is where the collected evidence is combined.'
     }
 ];
 
@@ -4193,6 +4250,12 @@ const GUIDE_QUESTIONS = [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] }
 ];
 let guideProfile = {};
+// Per-step user overrides. The guide is advisory, so a researcher can settle a
+// step by hand ('done' - e.g. it was handled outside Q2DV), declare it out of
+// scope ('skipped'), or clear either to fall back to auto-detection. Overrides
+// never disable a step's action: any step can be re-run at any time, even when
+// its category already has data.
+let guideOverrides = {};
 
 function setGuideAnswer(id, value) {
     guideProfile[id] = value;
@@ -4204,19 +4267,60 @@ function resetGuideProfile() {
     schedulePersist();
     renderWorkflowGuide();
 }
+function setGuideOverride(id, value) {
+    if (!id) return;
+    if (value === 'clear') delete guideOverrides[id];
+    else guideOverrides[id] = value;
+    schedulePersist();
+    renderWorkflowGuide();
+}
+function resetGuideOverrides() {
+    guideOverrides = {};
+    schedulePersist();
+    renderWorkflowGuide();
+}
 function guideStepStatus() {
     return WORKFLOW_STEPS.map((step, index) => {
-        let done = false;
-        try { done = !!step.check(); } catch (e) { done = false; }
+        let autoDone = false;
+        try { autoDone = !!step.check(); } catch (e) { autoDone = false; }
         let priority = false;
         try { priority = !!(step.priority && step.priority(guideProfile)); } catch (e) { priority = false; }
-        return { step, index, done, priority };
+        const override = guideOverrides[step.id] || null;
+        const skipped = override === 'skipped';
+        return {
+            step, index, autoDone, override, skipped,
+            manualDone: override === 'done',
+            done: skipped ? false : (autoDone || override === 'done'),
+            priority
+        };
     });
+}
+// Skipped steps drop out of the denominator: once declared out of scope they
+// should not keep the progress bar permanently short.
+function guideProgress() {
+    const rows = guideStepStatus();
+    const skipped = rows.filter(r => r.skipped).length;
+    const covered = rows.filter(r => r.done).length;
+    return { rows, covered, skipped, total: rows.length, denominator: Math.max(1, rows.length - skipped) };
 }
 // First incomplete priority step, else the first incomplete step at all.
 function nextGuideStep() {
-    const rows = guideStepStatus();
-    return rows.find(r => !r.done && r.priority) || rows.find(r => !r.done) || null;
+    const rows = guideStepStatus().filter(r => !r.done && !r.skipped);
+    return rows.find(r => r.priority) || rows[0] || null;
+}
+function guideChip(r) {
+    if (r.done) return '<span class="guide-chip guide-chip-done">' + (r.manualDone ? 'done (you)' : 'done') + '</span>';
+    if (r.skipped) return '<span class="guide-chip guide-chip-skip">skipped</span>';
+    if (r.priority) return '<span class="guide-chip guide-chip-pri">recommended</span>';
+    return '<span class="guide-chip">optional</span>';
+}
+function guideRefsHTML(step) {
+    const refs = step.refs || [];
+    if (!refs.length) return '';
+    return '<p class="guide-refs"><strong>Evidence base:</strong> ' +
+        refs.map(r => '<a href="https://doi.org/' + r.doi.replace(/</g, '%3C').replace(/>/g, '%3E') +
+            '" target="_blank" rel="noopener" title="' + r.doi.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '">' + r.cite + '</a>').join(' · ') +
+        '</p>';
 }
 // The "semi-autonomous" half: read the loaded tracks back and say what the
 // evidence does and does not support, so the user is warned before over-reading.
@@ -4262,7 +4366,7 @@ function computeGuideInsights() {
     return out;
 }
 function refreshGuideIfVisible() {
-    const panel = document.getElementById('side-panel-workflow');
+    const panel = document.getElementById('side-panel-guide');
     if (panel && !panel.hidden) renderWorkflowGuide();
 }
 function renderWorkflowGuide() {
@@ -4270,10 +4374,10 @@ function renderWorkflowGuide() {
     if (!el) return;
     // Preserve which step cards the user has expanded across live refreshes.
     const openIds = Array.prototype.slice.call(el.querySelectorAll('details.guide-step[open]')).map(d => d.dataset.step);
-    const rows = guideStepStatus();
-    const doneCount = rows.filter(r => r.done).length;
+    const prog = guideProgress();
     const next = nextGuideStep();
     const answered = Object.keys(guideProfile).length;
+    const overrideCount = Object.keys(guideOverrides).length;
     let html = '';
 
     html += '<div class="guide-intake"><div class="guide-intake-head"><span>Tell the guide about this protein</span>' +
@@ -4290,30 +4394,46 @@ function renderWorkflowGuide() {
     html += '</div>';
 
     html += '<div class="guide-next"><div class="guide-progress"><span class="guide-bar"><span style="width:' +
-        Math.round((doneCount / rows.length) * 100) + '%"></span></span>' + doneCount + ' of ' + rows.length + ' steps covered</div>';
+        Math.round((prog.covered / prog.denominator) * 100) + '%"></span></span>' + prog.covered + ' of ' + prog.denominator +
+        ' covered' + (prog.skipped ? ' · ' + prog.skipped + ' skipped' : '') + '</div>';
     if (next) {
         html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title + ' — ' + next.step.desc + '<br>' +
             '<button type="button" class="guide-run" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' +
             (next.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
-            '</div>'; 
+            '<div class="guide-next-meta">' +
+            '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + next.step.id + '\',\'done\')">Mark done</button>' +
+            '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + next.step.id + '\',\'skipped\')">Skip this step</button>' +
+            '</div></div>';
     } else {
-        html += '<div class="guide-next-action">All steps covered — combine the evidence in Rules, then export the figure and table for the record.</div>';
+        html += '<div class="guide-next-action">All steps covered — combine the evidence in Rules, then export the figure and table for the record.' +
+            (overrideCount ? '<div class="guide-next-meta"><button type="button" class="guide-mini" onclick="resetGuideOverrides()">Clear ' + overrideCount + ' override(s)</button></div>' : '') +
+            '</div>';
     }
     html += '</div>';
 
     html += '<div class="guide-steps">';
-    rows.forEach(r => {
-        const chip = r.done ? '<span class="guide-chip guide-chip-done">done</span>'
-            : r.priority ? '<span class="guide-chip guide-chip-pri">recommended</span>'
-            : '<span class="guide-chip">optional</span>';
-        html += '<details class="guide-step' + (r.done ? ' guide-step-done' : '') + '" data-step="' + r.step.id + '">' +
-            '<summary><span class="guide-num">' + (r.index + 1) + '</span><span class="guide-title">' + r.step.title + '</span>' + chip + '</summary>' +
+    prog.rows.forEach(r => {
+        const label = r.done ? ('Re-run: ' + r.step.action.label) : r.step.action.label;
+        const status = r.manualDone ? 'Status: marked done by you (auto-detection says ' + (r.autoDone ? 'done' : 'not yet') + ').'
+            : r.skipped ? 'Status: skipped by you — it stays out of the progress count.'
+            : r.autoDone ? 'Status: detected from the loaded data.'
+            : 'Status: not detected yet.';
+        html += '<details class="guide-step' + (r.done ? ' guide-step-done' : '') + (r.skipped ? ' guide-step-skip' : '') + '" data-step="' + r.step.id + '">' +
+            '<summary><span class="guide-num">' + (r.index + 1) + '</span><span class="guide-title">' + r.step.title + '</span>' + guideChip(r) + '</summary>' +
             '<div class="guide-body">' +
             '<p class="guide-desc">' + r.step.desc + '</p>' +
             '<p><strong>Why it matters:</strong> ' + r.step.why + '</p>' +
             '<p><strong>How to read it:</strong></p><ul>' + (r.step.how || []).map(h => '<li>' + h + '</li>').join('') + '</ul>' +
-            '<button type="button" class="guide-run" onclick="' + r.step.action.run + '">' + r.step.action.label + '</button>' +
+            (r.step.priorityNote ? '<p class="guide-pri-note">' + (r.priority ? '<strong>Recommended</strong> — ' : 'Optional — ') + r.step.priorityNote + '</p>' : '') +
+            guideRefsHTML(r.step) +
+            '<div class="guide-state">' + status + '</div>' +
+            '<div class="guide-actions">' +
+            '<button type="button" class="guide-run" onclick="' + r.step.action.run + '">' + label + '</button>' +
             (r.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
+            (r.done && !r.manualDone ? '' : '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.manualDone ? 'clear' : 'done') + '\')">' + (r.manualDone ? 'Clear "done"' : 'Mark done') + '</button>') +
+            '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.skipped ? 'clear' : 'skipped') + '\')">' + (r.skipped ? 'Unskip' : 'Skip') + '</button>' +
+            (r.override ? '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'clear\')">Reset</button>' : '') +
+            '</div>' +
             '</div></details>';
     });
     html += '</div>';
@@ -4353,12 +4473,20 @@ function renderInputDataModal() {
     }
     const wl = document.getElementById('workflowChecklist');
     if (wl) {
-        let html = '';
-        WORKFLOW_STEPS.forEach(s => {
-            const done = s.check();
+        // Read-only indicator: it mirrors the Guide tab (same WORKFLOW_STEPS,
+        // same overrides), so the status is never edited or maintained twice.
+        const prog = guideProgress();
+        let html = '<div class="wf-summary">Guide: <strong>' + prog.covered + ' of ' + prog.denominator + '</strong> steps covered' +
+            (prog.skipped ? ' · ' + prog.skipped + ' skipped' : '') + '</div>';
+        prog.rows.forEach(r => {
+            const icon = r.done ? '✓' : (r.skipped ? '–' : '○');
+            const color = r.done ? '#15803d' : (r.skipped ? '#94a3b8' : (r.priority ? '#b45309' : '#cbd5e1'));
             html += '<div style="display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:0.78rem;">' +
-                '<span style="flex-shrink:0; width:16px; text-align:center; color:' + (done ? '#15803d' : '#cbd5e1') + '; font-weight:700;">' + (done ? '✓' : '○') + '</span>' +
-                '<span><strong style="color:' + (done ? '#334155' : '#64748b') + ';">' + s.title + '</strong> — ' + s.desc + '</span></div>';
+                '<span style="flex-shrink:0; width:16px; text-align:center; color:' + color + '; font-weight:700;">' + icon + '</span>' +
+                '<span><strong style="color:' + (r.done ? '#334155' : '#64748b') + ';">' + r.step.title + '</strong> — ' + r.step.desc +
+                (r.skipped ? ' <em style="color:#94a3b8;">(skipped)</em>' : '') +
+                (r.priority && !r.done && !r.skipped ? ' <em style="color:#b45309;">(recommended)</em>' : '') +
+                '</span></div>';
         });
         wl.innerHTML = html;
     }
@@ -4417,7 +4545,7 @@ function switchSidebarTab(name) {
     document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('.sidebar-panel').forEach(p => { p.hidden = (p.id !== 'side-panel-' + name); });
     if (name === 'tracks') { renderTrackManager(); renderRulesList(); }
-    if (name === 'workflow') { renderWorkflowGuide(); }
+    if (name === 'guide') { renderWorkflowGuide(); }
 }
 
 // JalView-style track manager: one row per type group (with a show/hide eye)
@@ -5049,7 +5177,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.18.0';
+const APP_VERSION = '0.19.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11538,6 +11666,7 @@ function gatherPersistableState() {
             qaHighlightsEnabled,
             analysisRules,
             guideProfile,
+            guideOverrides,
             selectionScope,
             gridCellW,
             commandEngineId,
@@ -11929,6 +12058,7 @@ function applyPersistedState(state) {
     // Analysis rules (rebuild their trackMeta so the restored RULE_ tracks keep their colour).
     analysisRules = Array.isArray(prefs.analysisRules) ? prefs.analysisRules : [];
     guideProfile = (prefs.guideProfile && typeof prefs.guideProfile === 'object') ? prefs.guideProfile : {};
+    guideOverrides = (prefs.guideOverrides && typeof prefs.guideOverrides === 'object') ? prefs.guideOverrides : {};
     analysisRules.forEach(r => { if (r && r.id) setTrackMeta('RULE_' + r.id, { source: 'Rule', color: r.color, ruleName: r.name }); });
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
     renderSelectionScopeToggle();

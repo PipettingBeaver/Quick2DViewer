@@ -3,6 +3,7 @@
   "private": true,
   "description": "Dev tooling only — the app itself is the single-file index.html with no dependencies.",
   "scripts": {
-    "test": "node tests/run.js"
+    "test": "node tests/run.js",
+    "doc:workflow": "node tools/build-workflow-doc.js"
   }
 }

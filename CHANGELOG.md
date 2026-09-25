@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-25
+
+### Added
+
+- **Guide tab.** The Evaluation Guide now has its own sidebar tab
+  (Selection / Tracks / **Guide** / Workflow); the Workflow tab keeps the External
+  Workflow command generator. The Input Data modal's checklist is now a
+  **read-only indicator** that mirrors the guide (same steps, same status, same
+  overrides) and links to it — so the pipeline is maintained in one place.
+- **User overrides on every step** — the guide is advisory, so you can now:
+  - **Mark done** (settled outside Q2DV) or **Clear "done"** to return to
+    auto-detection;
+  - **Skip** a step (out of scope) — skipped steps leave the progress count and
+    are never recommended, or **Unskip** them;
+  - **Re-run** any step's action at any time — the action button is never
+    disabled, and reads *Re-run: …* once the step is done, so a category can be
+    refreshed when partial data was already added.
+  Each card states whether its status came from auto-detection or from you.
+- **Citations per step** — every step lists its evidence base as DOI links, plus a
+  *promoted when* note explaining when the intake questions recommend it.
+
+### Added — external reference document
+
+- **`WORKFLOW.md`** — the characterization workflow as a standalone reference
+  document (purpose, rationale, interpretation, citations per step), **generated
+  from the app** by `npm run doc:workflow` (`tools/build-workflow-doc.js`) and
+  linked from the guide header. The test harness asserts the document contains
+  every step title and DOI, so it cannot drift from the code.
+
+### Fixed — citation accuracy
+
+- Six DOIs carried in `DESIGN.md` §11 resolved to **unrelated papers**. Every DOI
+  in `WORKFLOW_STEPS` was re-resolved against the Crossref API (2026-09) and
+  corrected: TMHMM `10.1006/jmbi.2000.4315`, Ruff & Pappu `10.1016/j.jmb.2021.167208`,
+  Capra & Singh `10.1093/bioinformatics/btm270`, Lichtarge et al.
+  `10.1006/jmbi.1996.0167`, Valdar & Thornton
+  `10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o`.
+  `DESIGN.md` §11 now records the old→new mapping so the correction is auditable.
+
 ## [0.18.0] - 2026-09-25
 
 ### Added
