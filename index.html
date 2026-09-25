@@ -1202,6 +1202,16 @@
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
         .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+        .guide-coachmark {
+            background:#f5f3ff; border:1px solid #ddd6fe; color:#4c1d95;
+            border-radius:6px; padding:7px 9px; margin:0 0 8px; font-size:0.72rem; line-height:1.5;
+        }
+        .guide-coachmark button {
+            background:#7c3aed; color:#fff; border:none; border-radius:4px;
+            padding:3px 8px; font-size:0.68rem; font-weight:600; cursor:pointer; margin-left:4px;
+        }
+        .guide-coachmark button:hover { background:#6d28d9; }
+        .coachmark-on .rp-suggested { box-shadow:0 0 0 2px #ddd6fe; }
         .task-running { opacity:0.85; cursor:progress; }
         .task-running::after {
             content:''; display:inline-block; width:9px; height:9px; margin-left:6px;
@@ -2192,8 +2202,10 @@
                     <div id="trackManagerList"></div>
                 </details>
 
-                <details class="workflow-section qa-new" id="rulesSection" open style="margin-top: 12px;">
+                <details class="workflow-section qa-new" id="rulesSection" open style="margin-top: 12px;"
+                    ontoggle="if (!this.open) clearGuideCoachmark();">
                     <summary>Rules (contradiction / co-localization)</summary>
+                    <div id="guideCoachmarkRules" class="guide-coachmark" hidden></div>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                         Flag residues satisfying a boolean query across tracks (e.g. disorder ∧ TM ∧ low&nbsp;pLDDT). Each enabled rule becomes a coloured track; "select" turns its matches into a selection.
                     </p>
@@ -2208,8 +2220,10 @@
                     </details>
                 </details>
 
-                <details class="workflow-section qa-new" id="interfaceSection" style="margin-top: 10px;">
+                <details class="workflow-section qa-new" id="interfaceSection" style="margin-top: 10px;"
+                    ontoggle="if (!this.open) clearGuideCoachmark();">
                     <summary>Interfaces (oligomer contacts)</summary>
+                    <div id="guideCoachmarkInterfaces" class="guide-coachmark" hidden></div>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                         Find residues at chain–chain interfaces in the active (or first) multi-chain structure. Runs client-side, so it works on AlphaFold / ESMFold models too; each chain gets an interface track.
                     </p>
@@ -4830,8 +4844,8 @@ const WORKFLOW_STEPS = [
         id: 'integration', title: 'Integrate & export',
         desc: 'Combine evidence with Rules, check interfaces, then export figures and commands.',
         why: 'The last step is where evidence becomes a claim: co-localization and contradiction rules keep the reasoning explicit, inspectable and reproducible.',
-        action: { label: 'Open Analysis Rules…', run: 'showRulesPanel()' },
-        extraActions: [{ label: 'Interfaces…', run: 'showInterfacesPanel()' }],
+        action: { label: 'Open Analysis Rules…', run: "openGuideCoachmark('rules')" },
+        extraActions: [{ label: 'Interfaces…', run: "openGuideCoachmark('interfaces')" }],
         how: ['A rule hit is a hypothesis to inspect, not a conclusion — click through its matches.',
               'Export the figure plus table so the track state behind the claim is archived.'],
         refs: [
@@ -4985,8 +4999,8 @@ const STEP_ACTION_RESOLVERS = {
     },
     integration(a) {
         const map = {
-            variants: { label: 'Open Analysis Rules…', run: 'showRulesPanel()', hint: 'Co-localize variants with conservation, domains and structure.' },
-            interface: { label: 'Run interface analysis…', run: 'showInterfacesPanel()', hint: 'Needs a multi-chain model; residues under the cut-off become IF_ tracks.' },
+            variants: { label: 'Open Analysis Rules…', run: "openGuideCoachmark('rules')", hint: 'Co-localize variants with conservation, domains and structure.' },
+            interface: { label: 'Run interface analysis…', run: "openGuideCoachmark('interfaces')", hint: 'Needs a multi-chain model; residues under the cut-off become IF_ tracks.' },
             construct: { label: 'Open command generator →', run: "switchSidebarTab('workflow')", hint: 'Build ChimeraX/PyMOL/VMD selections for the construct.' },
             report: { label: 'Export figure & table…', run: "menuBarAction('png')", hint: 'PNG/SVG of the viewport plus TSV/CSV of the metrics.' }
         };
@@ -5519,6 +5533,73 @@ function attachStructures() {
     if (el && typeof el.click === 'function') el.click();
 }
 
+// --- Guide coachmarks ("walk me to the right submenu") ---------------------
+// When the Guide hands over to a submenu deep in the Tracks tab, it collapses
+// the sibling sections, opens the target, and leaves a banner explaining what to
+// do plus a way back. Leaving the panel (or closing the section) clears it, so
+// the Guide never leaves the UI in a "guided" state behind the user's back.
+const GUIDE_COACHMARKS = {
+    rules: {
+        banner: 'guideCoachmarkRules', section: 'rulesSection', target: 'rulePresetsSection',
+        text: 'From the Guide: pick every rule that applies to this protein, then',
+        open: () => showRulesPanel()
+    },
+    interfaces: {
+        banner: 'guideCoachmarkInterfaces', section: 'interfaceSection',
+        text: 'From the Guide: run the interface analysis on the loaded model, then',
+        open: () => showInterfacesPanel()
+    }
+};
+const COACHMARK_SIBLINGS = ['trackManagerSection', 'rulesSection', 'interfaceSection', 'crossCheckSection'];
+let guideCoachmark = null;
+function openGuideCoachmark(kind) {
+    const cm = GUIDE_COACHMARKS[kind];
+    if (!cm) return;
+    if (cm.open) cm.open();
+    guideCoachmark = kind;
+    applyGuideCoachmark();
+}
+function clearGuideCoachmark() {
+    if (!guideCoachmark) return;
+    guideCoachmark = null;
+    applyGuideCoachmark();
+}
+function applyGuideCoachmark() {
+    const active = guideCoachmark ? GUIDE_COACHMARKS[guideCoachmark] : null;
+    Object.keys(GUIDE_COACHMARKS).forEach(kind => {
+        const el = document.getElementById(GUIDE_COACHMARKS[kind].banner);
+        if (!el) return;
+        const on = kind === guideCoachmark;
+        el.hidden = !on;
+        if (on) {
+            el.innerHTML = structureEscapeHtml(GUIDE_COACHMARKS[kind].text) +
+                ' <button type="button" onclick="returnToGuide()">Return to Guide</button>';
+        }
+    });
+    // Collapse the sibling sections while guidance is active, restoring whatever
+    // the user had open once it ends.
+    COACHMARK_SIBLINGS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (active) {
+            if (el._coachPrevOpen === undefined) el._coachPrevOpen = el.open;
+            el.open = (id === active.section);
+        } else if (el._coachPrevOpen !== undefined) {
+            el.open = el._coachPrevOpen;
+            el._coachPrevOpen = undefined;
+        }
+    });
+    // Surface the suggested presets the guidance is pointing at.
+    const presets = document.getElementById('rulePresetsSection');
+    if (presets && active && active.target === 'rulePresetsSection') presets.open = true;
+    const presetList = document.getElementById('rulePresetList');
+    if (presetList && presetList.classList) presetList.classList.toggle('coachmark-on', !!active);
+}
+function returnToGuide() {
+    clearGuideCoachmark();
+    switchSidebarTab('guide');
+}
+
 function showCrossCheckPanel() {
     switchSidebarTab('tracks');
     const sec = document.getElementById('crossCheckSection');
@@ -5552,6 +5633,7 @@ function switchSidebarTab(name) {
     document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('.sidebar-panel').forEach(p => { p.hidden = (p.id !== 'side-panel-' + name); });
     if (name === 'tracks') { renderTrackManager(); renderRulesList(); }
+    else clearGuideCoachmark();
     if (name === 'guide') { renderWorkflowGuide(); }
 }
 
@@ -6220,7 +6302,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.24.0';
+const APP_VERSION = '0.25.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

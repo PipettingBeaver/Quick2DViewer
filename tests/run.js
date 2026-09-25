@@ -363,7 +363,7 @@ ctxRun(`setStepAnswer('foldseek', 'db', 'pdb100');`);
 act = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0])`);
 assert(/pdb100/.test(act.label) && act.run === 'runFoldseekSearch()', 'Foldseek answer names the chosen database');
 ctxRun(`setStepAnswer('integration', 'goal', 'interface');`);
-assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0]).run`) === 'showInterfacesPanel()', 'integration goal picks the closing action');
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0]).run`) === "openGuideCoachmark('interfaces')", 'integration goal opens the interface submenu through the coachmark');
 ctxRun(`setStepAnswer('integration', 'goal', 'construct');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0]).run`).indexOf('workflow') !== -1, 'construct goal opens the command generator');
 ctxRun(`setStepAnswer('topology', 'predictor', 'tmhmm');`);
@@ -784,6 +784,45 @@ assert(WORKFLOW_MD.indexOf('https://toolkit.tuebingen.mpg.de/tools/hhpred') !== 
 assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as a markdown link');
 assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
 assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
+
+section('guide coachmarks (walk the user to a submenu)');
+assert(ctxRun(`Object.keys(GUIDE_COACHMARKS).join(',')`) === 'rules,interfaces', 'coachmarks are declared for the two submenu hand-offs');
+assert(ctxRun(`GUIDE_COACHMARKS.rules.banner`) === 'guideCoachmarkRules' && ctxRun(`GUIDE_COACHMARKS.interfaces.banner`) === 'guideCoachmarkInterfaces', 'each coachmark owns a banner');
+// the integration step and its resolver both route through the coachmark
+assert(ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'integration')[0].action.run`).indexOf('openGuideCoachmark') === 0, 'the Integrate step opens Rules via the coachmark');
+assert(ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'integration')[0].extraActions[0].run`).indexOf('openGuideCoachmark') === 0, 'its Interfaces action does too');
+
+// open: target opens, siblings collapse, banner explains the way back
+ctxRun(`
+    guideCoachmark = null;
+    document.getElementById('trackManagerSection').open = true;
+    document.getElementById('crossCheckSection').open = true;
+    document.getElementById('rulesSection').open = false;
+    openGuideCoachmark('rules');
+`);
+assert(ctxRun(`guideCoachmark`) === 'rules', 'the coachmark is active');
+assert(ctxRun(`document.getElementById('guideCoachmarkRules').hidden`) === false, 'its banner is shown');
+assert(ctxRun(`document.getElementById('guideCoachmarkRules').innerHTML`).indexOf('Return to Guide') !== -1, 'the banner offers the way back');
+assert(ctxRun(`document.getElementById('trackManagerSection').open`) === false && ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'sibling Tracks sections collapse');
+assert(ctxRun(`document.getElementById('rulesSection').open`) === true, 'the target section opens');
+assert(ctxRun(`document.getElementById('rulePresetsSection').open`) === true, 'the suggested presets are surfaced');
+assert(ctxRun(`document.getElementById('rulePresetList').classList`) !== undefined, 'the preset list is reachable for highlighting');
+
+// leaving the submenu clears it and restores what was open
+ctxRun(`clearGuideCoachmark();`);
+assert(ctxRun(`guideCoachmark`) === null, 'clearing deactivates the coachmark');
+assert(ctxRun(`document.getElementById('guideCoachmarkRules').hidden`) === true, 'the banner hides again');
+assert(ctxRun(`document.getElementById('trackManagerSection').open`) === true, 'the previously-open sections are restored');
+
+// switching tabs away clears it (moving out of the submenu)
+ctxRun(`guideCoachmark = null; openGuideCoachmark('rules');`);
+ctxRun(`switchSidebarTab('tracks');`);
+assert(ctxRun(`guideCoachmark`) === 'rules', 'staying on the Tracks tab keeps the guidance');
+ctxRun(`switchSidebarTab('selection');`);
+assert(ctxRun(`guideCoachmark`) === null, 'moving to another tab clears it');
+ctxRun(`openGuideCoachmark('rules'); returnToGuide();`);
+assert(ctxRun(`guideCoachmark`) === null, 'Return to Guide clears the coachmark');
+ctxRun(`guideCoachmark = null;`);
 
 section('foldseek prerequisite + lockout');
 const fsStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0]`);

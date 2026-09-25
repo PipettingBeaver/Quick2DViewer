@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-25
+
+### Added
+
+- **One API task at a time.** Long-running Guide actions (HMMER hmmscan, Foldseek, ESMFold)
+  now lock: a second click is refused, every task button is disabled while one runs, the
+  running button shows a spinner and reads *Working…*, and a **live-timer toast** says what is
+  happening ("Foldseek search (pdb100) with model.pdb running — 12 s") before turning into a
+  success/error summary. The lock is shared by the Guide, the Input Data buttons and the
+  Analyze menu, so no entry point can start a duplicate job.
+- **Domain rows have a real ℹ tooltip.** `DM_` rows used to fall through to the blank
+  "… (Structural Prediction)" placeholder. They now name the family and description, attribute
+  the source (Pfam via HMMER hmmscan), report the best i-Evalue / bit score, list the covered
+  spans, and cite Pfam + HMMER.
+- **Step links**: the homologs step links *MPI's HHpred*; the topology step links TMHMM,
+  Phobius and DeepTMHMM. `WORKFLOW.md` renders them as Markdown links.
+- **The intake can rule a step out.** Answering "No" to membrane-associated now marks the
+  topology step **not relevant**: it leaves the recommendation and the coverage count (instead
+  of being looped back to) and the card says why. Answering "Not sure" keeps it optional.
+- **Foldseek prerequisite.** The step states it needs at least one attached structure, offers
+  **Attach Structure(s)** when none is attached, and its hint is explicit that only the active
+  model is searched — attaching more models does not widen the search.
+- **Guide coachmarks.** "Open Analysis Rules…" / "Interfaces…" from the Guide collapse the
+  other Tracks sections, open the target (surfacing the suggested presets) and leave a banner:
+  *"From the Guide: pick every rule that applies to this protein, then **Return to Guide**"*.
+  Leaving the Tracks tab, or closing the section, clears it and restores what was open.
+
+### Changed
+
+- Homolog rows now default to the **AA letters** view. The intended default never actually
+  applied: the default track-control state still carried a `fullBar.HH` key from before the
+  `HH_` → `HL_` rename, so the setting was written to a group that no longer exists.
+
 ## [0.24.0] - 2026-09-25
 
 ### Fixed
