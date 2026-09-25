@@ -755,6 +755,53 @@ assert(ctxRun(`typeof SERVICE_ADAPTERS.ebiSearchUniprot === 'function'`), 'the E
 assert(ctxRun(`EBI_SEARCH_FIELDS.protein`) === 'descRecName' && ctxRun(`EBI_SEARCH_FIELDS.any`) === '', 'field prefixes map to real EBI Search fields (any = bare query)');
 assert(ctxRun(`typeof beginLookupStatus === 'function' && typeof endLookupStatus === 'function' && LOOKUP_ESTIMATES.search.indexOf('s') !== -1`), 'lookup progress helpers exist with estimates');
 
+section('task lockout + domain tooltips');
+ctxRun(`
+    analysisRules = []; guideProfile = {}; guideOverrides = {}; guideAnswers = {};
+    parsedTracks = { AA: 'M'.repeat(238), 'DM_GFP': ' '.repeat(16) + '\u2588'.repeat(194) + ' '.repeat(28) };
+    domainHitsInfo = { DM_GFP: { model: 'GFP', description: 'Green fluorescent protein', database: 'Pfam',
+        evalue: 2.5e-40, score: 180.4, domains: [{ start: 17, end: 210, iEvalue: 2.5e-40, score: 180.4, acc: 0.99 }] } };
+`);
+
+// --- domain rows get a real tooltip, not the blank placeholder -------------
+const di = ctxRun(`buildDomainPredictorInfo('DM_GFP')`);
+assert(di.name.indexOf('GFP') === 0 && di.name.indexOf('Green fluorescent protein') !== -1, 'the tooltip names the family and its description');
+assert(di.category.indexOf('HMMER') !== -1 && di.category.indexOf('Pfam') !== -1, 'the tooltip attributes the source (HMMER/Pfam)');
+assert(di.description.indexOf('i-Evalue') !== -1 && di.description.indexOf('180') !== -1, 'the tooltip reports the hit statistics');
+assert(di.useCase.indexOf('17\u2013210') !== -1 || di.useCase.indexOf('17') !== -1, 'the tooltip explains the covered span');
+assert(di.citation.indexOf('10.1093/nar/gkaa913') !== -1, 'the tooltip carries the Pfam citation');
+assert(ctxRun(`getPredictorInfo('DM_GFP').category`).indexOf('HMMER') !== -1, 'getPredictorInfo routes DM_ rows to the domain tooltip');
+assert(ctxRun(`getPredictorInfo('DM_GFP').category !== 'Structural Prediction'`), 'DM_ rows no longer show the blank Structural Prediction placeholder');
+assert(ctxRun(`buildDomainPredictorInfo('DM_Unknown').name`) === 'Unknown', 'an unstatisticised domain row still names its family');
+// span semantics: a 238 aa sequence with a 17-210 hit is blank outside the span
+const span = ctxRun(`(function(){ var t = parsedTracks['DM_GFP']; return [t.slice(0,16).trim(), t.slice(16,210).replace(/ /g,'').length, t.slice(210).trim()]; })()`);
+assert(span[0] === '' && span[1] === 194 && span[2] === '', 'the row marks exactly the aligned span (blank before/after)');
+
+// --- one task at a time -----------------------------------------------------
+ctxRun(`guideTask = null;`);
+assert(ctxRun(`beginGuideTask('annotation', 'HMMER running')`) === true, 'the first task starts');
+assert(ctxRun(`guideTask && guideTask.stepId`) === 'annotation', 'the running task is recorded');
+assert(ctxRun(`beginGuideTask('foldseek', 'Foldseek running')`) === false, 'a second task is refused while one runs');
+assert(ctxRun(`guideTask.stepId`) === 'annotation', 'the refused task did not replace the running one');
+ctxRun(`endGuideTask('foldseek', 'nope', 'error');`);
+assert(ctxRun(`guideTask !== null`), 'a mismatched end does not clear the running task');
+ctxRun(`endGuideTask('annotation', 'done', 'success');`);
+assert(ctxRun(`guideTask === null`), 'the owning task clears it');
+assert(ctxRun(`beginGuideTask('annotation', 'again')`) === true && ctxRun(`guideTask !== null`), 'it can start again afterwards');
+ctxRun(`endGuideTask('annotation');`);
+assert(ctxRun(`guideTask === null`), 'a silent end clears the task');
+
+// --- timer toasts + button markers -----------------------------------------
+let toastThrew = null;
+try { ctxRun(`showTimerToast('t1', 'Working'); endTimerToast('t1', 'Done', 'success');`); } catch (e) { toastThrew = e.message; }
+assert(toastThrew === null, 'timer toasts can be shown and ended without throwing');
+assert(ctxRun(`typeof syncTaskButtons === 'function'`), 'task buttons can be synced');
+assert(ctxRun(`STEP_TASK_RUNS.annotation`) === 'runDomainScan()' && ctxRun(`STEP_TASK_RUNS.foldseek`) === 'runFoldseekSearch()', 'long-running steps declare their action');
+// the marker must match what the resolver actually offers for that answer
+ctxRun(`guideAnswers = {}; setStepAnswer('annotation', 'have', 'domains');`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0]).run`) === ctxRun(`STEP_TASK_RUNS.annotation`), 'the domains answer resolves to the task run (so the button gets locked)');
+ctxRun(`guideAnswers = {}; parsedTracks = {}; domainHitsInfo = {};`);
+
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [
     '# hmmscan :: search sequence(s) against a profile database',

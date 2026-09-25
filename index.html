@@ -1201,6 +1201,14 @@
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
         .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+        .task-running { opacity:0.85; cursor:progress; }
+        .task-running::after {
+            content:''; display:inline-block; width:9px; height:9px; margin-left:6px;
+            border:2px solid rgba(255,255,255,0.45); border-top-color:#fff; border-radius:50%;
+            vertical-align:-1px; animation:q2dv-spin 0.7s linear infinite;
+        }
+        .tb-btn-secondary.task-running::after { border-color:rgba(37,99,235,0.35); border-top-color:#2563eb; }
+        @keyframes q2dv-spin { to { transform: rotate(360deg); } }
         .import-pair { display:inline-flex; align-items:center; gap:0; }
         .import-pair > .tb-btn:first-child { border-top-right-radius:0; border-bottom-right-radius:0; }
         .import-pair > .tb-btn:last-child { border-top-left-radius:0; border-bottom-left-radius:0; margin-left:-1px; }
@@ -1943,9 +1951,9 @@
                     <span class="qa-new" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="autoLookupAccession()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
-                        <button type="button" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
+                        <button type="button" id="btnEsmfold" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Predict a 3D structure for the current sequence with ESMFold (≤400 aa) and attach it">Predict structure (ESMFold)</button>
-                        <button type="button" class="tb-btn tb-btn-secondary" onclick="runDomainScan()"
+                        <button type="button" id="btnDomainScan" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="runDomainScan()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Scan the sequence against Pfam with HMMER hmmscan (EBI) and add one track per domain family">Scan domains (HMMER/Pfam)</button>
                         <select id="foldseekDb" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Foldseek search database">
                             <option value="afdb50">afdb50 (AlphaFoldDB)</option>
@@ -1953,7 +1961,7 @@
                             <option value="swissprot">swissprot</option>
                             <option value="bfvd">bfvd (viral)</option>
                         </select>
-                        <button type="button" class="tb-btn tb-btn-secondary" onclick="runFoldseekSearch()"
+                        <button type="button" id="btnFoldseekSearch" data-task-step="foldseek" class="tb-btn tb-btn-secondary" onclick="runFoldseekSearch()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Search a structure database for structural homologs with Foldseek (uses the active/first attached model)">Find structural homologs (Foldseek)</button>
                     </span>
                 </div>
@@ -3373,13 +3381,15 @@ function applyDomainTracks(domains, database) {
 }
 
 async function runDomainScan() {
-    if (!(await ensureExternalServices())) return;
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     if (!seq) { showToast('Load a protein sequence first \u2014 hmmscan searches the sequence against Pfam.', 'error'); return; }
+    // Lock synchronously, before any await, so a double click cannot start two jobs.
+    if (!beginGuideTask('annotation', 'HMMER hmmscan (Pfam) search running')) return;
     const statusEl = document.getElementById('domainScanStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
-    setStatus('Submitting hmmscan job (Pfam) \u2014 this usually takes a minute or two\u2026');
     try {
+        if (!(await ensureExternalServices())) { endGuideTask('annotation'); return; }
+        setStatus('Submitting hmmscan job (Pfam) \u2014 this usually takes a minute or two\u2026');
         const text = await runCapability('domain_scan', { sequence: seq }, (m) => setStatus(m));
         const domains = parseHmmerDomains(text);
         const added = applyDomainTracks(domains, 'Pfam');
@@ -3392,11 +3402,13 @@ async function runDomainScan() {
         setStatus(added
             ? ('Pfam: ' + added + ' domain famil' + (added === 1 ? 'y' : 'ies') + ', ' + nSig + ' significant domain(s).')
             : 'No significant Pfam domains found.');
-        showToast(added ? ('hmmscan added ' + added + ' Pfam domain track(s).') : 'hmmscan found no significant domains.', added ? 'success' : 'info');
+        endGuideTask('annotation',
+            added ? ('Added ' + added + ' Pfam domain track(s) from hmmscan') : 'hmmscan found no significant domains',
+            added ? 'success' : 'info');
     } catch (err) {
         const m = err && err.message ? err.message : String(err);
         setStatus('hmmscan failed: ' + m);
-        showToast('hmmscan failed: ' + m, 'error');
+        endGuideTask('annotation', 'hmmscan failed: ' + m, 'error');
     }
 }
 
@@ -4531,6 +4543,98 @@ let lastPersistError = null;
 // Lightweight, non-blocking feedback (vs. alert()) for actions like the
 // clipboard paste flow below. aria-live="polite" on the container means
 // screen readers announce new toasts without needing focus to move.
+// --- Live-timer toasts -----------------------------------------------------
+// A long API call needs an "it is still running" signal that updates in place.
+// The toast is keyed by id so the caller can end/relabel it from wherever the
+// call completes, and it shows elapsed seconds while it runs.
+const timerToasts = {};
+function showTimerToast(id, text) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return null;
+    let el = timerToasts[id];
+    if (!el || !el.parentNode) {
+        el = document.createElement('div');
+        el.className = 'toast toast-info';
+        el.setAttribute('role', 'status');
+        container.appendChild(el);
+        timerToasts[id] = el;
+        el._start = Date.now();
+    }
+    el._base = text;
+    const tick = () => {
+        const secs = Math.round((Date.now() - el._start) / 1000);
+        el.textContent = el._base + ' — ' + secs + ' s';
+    };
+    tick();
+    if (el._timer) clearInterval(el._timer);
+    el._timer = setInterval(tick, 1000);
+    el.classList.add('toast-visible');
+    return el;
+}
+function endTimerToast(id, text, type) {
+    const el = timerToasts[id];
+    if (!el) return;
+    if (el._timer) clearInterval(el._timer);
+    delete timerToasts[id];
+    const secs = Math.round((Date.now() - el._start) / 1000);
+    if (!text) { // silent completion (e.g. the user cancelled the opt-in)
+        el.classList.remove('toast-visible');
+        setTimeout(() => el.remove(), 300);
+        return;
+    }
+    el.textContent = text + (secs ? ' (' + secs + ' s)' : '');
+    el.className = 'toast toast-' + (type || 'success') + ' toast-visible';
+    setTimeout(() => { el.classList.remove('toast-visible'); setTimeout(() => el.remove(), 300); }, 4500);
+}
+
+// --- One long-running task at a time ---------------------------------------
+// The Guide (and the Input Data buttons) drive network calls. Re-clicking while
+// one runs used to fire a second job; now the action is refused, its buttons
+// show a spinner and are disabled, and a timer toast says what is happening.
+// stepId -> the Guide step the task belongs to, so its card can show progress.
+let guideTask = null;
+function beginGuideTask(stepId, label) {
+    if (guideTask) {
+        showToast((guideTask.label || 'A task') + ' is already running — one moment.', 'info');
+        return false;
+    }
+    guideTask = { stepId, label, startedAt: Date.now() };
+    showTimerToast('guide-task', label);
+    refreshGuideIfVisible();
+    syncTaskButtons();
+    return true;
+}
+function endGuideTask(stepId, message, type) {
+    if (!guideTask || (stepId && guideTask.stepId !== stepId)) return;
+    guideTask = null;
+    endTimerToast('guide-task', message || '', type || 'success');
+    refreshGuideIfVisible();
+    syncTaskButtons();
+}
+// Keeps the static (Input Data) and rendered (Guide) buttons in step: any task
+// button is disabled while a task runs, and the running one is marked busy.
+function syncTaskButtons() {
+    if (!document.querySelectorAll) return;
+    const running = guideTask ? guideTask.stepId : null;
+    Array.prototype.slice.call(document.querySelectorAll('[data-task-step]')).forEach(btn => {
+        const step = btn.getAttribute && btn.getAttribute('data-task-step');
+        const busy = !!running && step === running;
+        const locked = !!running && !busy;
+        btn.disabled = !!running;
+        btn.classList.toggle('task-running', busy);
+        if (busy) { btn.setAttribute('aria-busy', 'true'); } else { btn.removeAttribute('aria-busy'); }
+        if (locked && btn.getAttribute('data-lock-note') !== '1') {
+            btn.setAttribute('title', 'Another task is running — finishes first');
+        }
+    });
+}
+// Which Guide steps own a long-running action (used to mark their buttons).
+const STEP_TASK_RUNS = {
+    annotation: 'runDomainScan()',
+    foldseek: 'runFoldseekSearch()',
+    structure: 'predictStructureESMFold()'
+};
+
 function showToast(message, type, options) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -5248,7 +5352,13 @@ function renderWorkflowGuide() {
     html += '<div class="guide-steps">';
     prog.rows.forEach(r => {
         const act = resolveStepAction(r.step);
-        const label = r.done ? ('Re-run: ' + act.label) : act.label;
+        const taskRun = STEP_TASK_RUNS[r.step.id] || '';
+        const isTaskBtn = !!taskRun && act.run === taskRun;
+        const busy = isTaskBtn && !!guideTask && guideTask.stepId === r.step.id;
+        const locked = isTaskBtn && !!guideTask && !busy;
+        const label = busy ? 'Working\u2026' : (r.done ? ('Re-run: ' + act.label) : act.label);
+        const taskAttrs = (isTaskBtn ? ' data-task-step="' + r.step.id + '"' : '') +
+            (busy ? ' disabled aria-busy="true"' : (locked ? ' disabled' : ''));
         const stepQs = STEP_QUESTIONS[r.step.id] || [];
         const status = r.manualDone ? 'Status: marked done by you (auto-detection says ' + (r.autoDone ? 'done' : 'not yet') + ').'
             : r.skipped ? 'Status: skipped by you — it stays out of the progress count.'
@@ -5271,7 +5381,7 @@ function renderWorkflowGuide() {
             guideRefsHTML(r.step) +
             '<div class="guide-state">' + status + '</div>' +
             '<div class="guide-actions">' +
-            '<button type="button" class="guide-run" onclick="' + act.run + '">' + label + '</button>' +
+            '<button type="button" class="guide-run' + (busy ? ' task-running' : '') + '"' + taskAttrs + ' onclick="' + act.run + '">' + label + '</button>' +
             (act.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + r.step.action.run + '">' + r.step.action.label + '</button>' : '') +
             (r.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
             (r.done && STEP_UNDO[r.step.id] ? '<button type="button" class="guide-mini guide-danger" onclick="undoGuideStep(\'' + r.step.id + '\')">' + (STEP_UNDO[r.step.id].label || 'Undo this step') + '</button>' : '') +
@@ -5295,6 +5405,7 @@ function renderWorkflowGuide() {
         const d = el.querySelector('details.guide-step[data-step="' + id + '"]');
         if (d) d.open = true;
     });
+    syncTaskButtons();
 }
 
 function renderInputDataModal() {
@@ -5821,6 +5932,7 @@ function getPredictorInfo(trackKey) {
     if (trackKey.endsWith('_RSA')) return PREDICTOR_INFO.RSA;
     if (trackKey.endsWith('_Cofactors')) return PREDICTOR_INFO.COFACTOR;
     if (trackKey.startsWith('HL_')) return buildHomologPredictorInfo(trackKey);
+    if (trackKey.startsWith('DM_')) return buildDomainPredictorInfo(trackKey);
     // Variant and conservation rows are not structure predictors: suppress the
     // synthesized fallback so their "Structural Prediction" ℹ tooltip is never
     // shown - those rows build their own tooltips (FASTA header/conservation).
@@ -5828,6 +5940,37 @@ function getPredictorInfo(trackKey) {
     // Fallback: synthesise a minimal entry so the info icon still appears.
     const name = trackKey.replace(/^[A-Z]+_/, '').replace(/_/g, ' ');
     return { name, category: getPredictorCategoryFromPrefix(trackKey), description: '', useCase: '', citation: '' };
+}
+
+// Domain rows come from HMMER hmmscan over Pfam, not from a structure
+// predictor, so build their ℹ tooltip from the parsed hit: family, source,
+// statistics and the covered spans. Without this they fell through to the
+// synthesised "Structural Prediction" placeholder with no details.
+function buildDomainPredictorInfo(trackKey) {
+    const d = domainHitsInfo[trackKey];
+    const model = (d && d.model) || trackKey.replace(/^DM_/, '').replace(/_/g, ' ');
+    if (!d) {
+        return {
+            name: model, category: 'Protein domain (Pfam)',
+            description: 'Pfam domain family row. Re-run Analyze → Scan Domains (HMMER) to repopulate its statistics.',
+            useCase: '', citation: ''
+        };
+    }
+    const db = d.database || 'Pfam';
+    const fmtEv = (v) => (v == null || isNaN(v)) ? 'n/a' : (v < 1e-3 ? Number(v).toExponential(1) : Number(v).toFixed(3));
+    const spans = (d.domains || []).map(x => x.start + '–' + x.end).join(', ');
+    const total = (d.domains || []).reduce((n, x) => n + Math.max(0, x.end - x.start + 1), 0);
+    return {
+        name: model + (d.description ? ' — ' + d.description : ''),
+        category: 'Protein domain (' + db + ', HMMER hmmscan)',
+        description: 'Significant match to the ' + db + ' family "' + model + '"' +
+            ((d.domains || []).length > 1 ? ' (' + d.domains.length + ' occurrences)' : '') +
+            '. Best i-Evalue ' + fmtEv(d.evalue) + ', best bit score ' + (d.score != null ? Math.round(d.score) : 'n/a') + '.',
+        useCase: 'One bar per ' + db + ' family, filled across the aligned span' +
+            (spans ? ' (' + spans + '; ' + total + ' aa total)' : '') +
+            '. A domain is a span rather than a per-residue feature, so the bar is solid where the family matches and blank elsewhere.',
+        citation: 'Mistry et al., Nucleic Acids Res 2021 (Pfam) — https://doi.org/10.1093/nar/gkaa913 · Finn, Clements & Eddy, Nucleic Acids Res 2011 (HMMER web server) — https://doi.org/10.1093/nar/gkr367'
+    };
 }
 
 function buildPredictorTooltipHTML(info) {
