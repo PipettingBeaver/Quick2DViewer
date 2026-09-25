@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-25
+
+### Added
+
+- **Rule presets** — the eight curated rules from `DESIGN.md` §11 ship in the Rules
+  panel (*Presets (curated rules)*), each with its rationale, a readable query, a
+  **needs …** note when an input is missing, and DOI-verified citations:
+  *Topology contradiction (QC)*, *Conserved buried residue*, *Conserved exposed
+  patch*, *Rigid, well-folded core*, *Flexible / disordered region*, *No-model-
+  confidence region*, *Conserved but poorly modelled*, *Signal / topology feature*.
+  One click adds the rule (deep-copied, so editing it never rewrites the preset);
+  re-adding gives a numbered name.
+- **Profile → presets.** Suggested presets are ranked to the top from the guide's
+  intake answers and the loaded data (membrane → topology/QC presets; variants +
+  conservation → conservation presets; a model → confidence presets), and the
+  guide's automated read-out names them when no rules exist yet.
+- **`group:<GROUP>` rule condition source** — "any track of this type is
+  annotated", so presets and hand-written rules survive re-running a predictor or
+  swapping a database instead of naming one specific track key. Group sources are
+  offered in the rule editor too.
+- **pLDDT `mean`/`min` aggregates now work from a single model** (they previously
+  required two or more), which the confidence presets depend on.
+
+### Changed
+
+- `WORKFLOW.md` now also documents the preset library (query, rationale,
+  citations); the harness asserts every preset name and DOI is present, so the
+  document cannot drift from the app.
+
 ## [0.21.0] - 2026-09-25
 
 ### Added

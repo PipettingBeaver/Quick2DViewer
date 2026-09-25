@@ -125,14 +125,27 @@ deposited entries).
 - Foldseek result semantics (TM-score color-coding) — confirm during build.
 - MPI proxy — deferred; revisit if clipboard friction is high.
 
-## 11. Rule preset draft (for review — not yet implemented)
+## 11. Rule presets (implemented v0.22.0)
 
-A curated set of named rules to seed the Rules panel. Each maps onto the existing
-condition model (numeric / categorical / ALL-ANY). **Note:** most presets should
-reference a *group* ("any TM track") rather than a specific predictor key, so a small
-extension is needed first — a `group:<GROUP>` condition source meaning "any track in
-that group is annotated" (and a group-numeric aggregate for conservation/pLDDT/RSA).
-Links are provided for checking; please verify before we lock them in.
+A curated set of named rules seeding the Rules panel. `RULE_PRESETS` in
+`index.html` is the source of truth; `tools/build-workflow-doc.js` renders the
+same library (query, rationale, citations) into `WORKFLOW.md`, and the harness
+asserts every preset name and DOI appears there, so the document cannot drift.
+
+**The group-source extension is in.** A categorical condition may name
+`group:<GROUP>` — "any track of that type is annotated" — so a preset survives
+re-running a predictor, attaching a second model, or swapping a Foldseek
+database. Numeric conditions use the `RSA:` (any model) pseudo-source or the
+`pLDDT_mean` / `pLDDT_min` aggregates, which now work from a single model up.
+A test enforces that **no preset references a `track:<key>` source**.
+
+`presetMissingSources(preset)` reports which inputs a preset still needs (shown
+as a *needs …* note on the card), and `suggestedRulePresets()` ranks the relevant
+ones to the top from `guideProfile` + the loaded data — the profile → presets
+link promised in §12. Applied rules are deep copies (`presetId` recorded), so
+editing a rule never rewrites the preset.
+
+| # | Preset | Conditions (implemented) | Rationale |
 
 | # | Preset | Conditions (sketch) | Rationale |
 |---|--------|--------------------|-----------|

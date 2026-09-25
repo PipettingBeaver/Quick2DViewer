@@ -1201,6 +1201,20 @@
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
         .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+        .rp-card { border:1px solid #e2e8f0; border-radius:6px; padding:7px 8px; margin-bottom:6px; background:#fff; }
+        .rp-suggested { border-color:#bfdbfe; background:#f8fbff; }
+        .rp-head { display:flex; align-items:center; gap:6px; font-size:0.75rem; color:#334155; }
+        .rp-swatch { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+        .rp-badge { margin-left:auto; font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; background:#dbeafe; color:#1d4ed8; padding:1px 5px; border-radius:999px; }
+        .rp-why { font-size:0.68rem; color:#64748b; line-height:1.4; margin:4px 0; }
+        .rp-cond { font-size:0.68rem; color:#475569; font-family:monospace; }
+        .rp-needs { font-size:0.66rem; color:#b45309; margin-top:3px; }
+        .rp-actions { display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
+        .rp-add { background:#2563eb; color:#fff; border:none; border-radius:4px; padding:3px 9px; font-size:0.68rem; font-weight:600; cursor:pointer; }
+        .rp-add:hover { background:#1d4ed8; }
+        .rp-refs { font-size:0.64rem; color:#94a3b8; line-height:1.35; }
+        .rp-refs a { color:#64748b; text-decoration:none; }
+        .rp-refs a:hover { text-decoration:underline; }
         .tctl-danger { color:#b91c1c; border-color:#fecaca; }
         .tctl-danger:hover { background:#fef2f2; }
         .tm-remove {
@@ -2154,6 +2168,13 @@
                     </p>
                     <button type="button" class="tb-btn tb-btn-secondary" onclick="openRuleEditor()" style="font-size:0.72rem; padding:3px 8px;">+ New rule</button>
                     <div id="rulesList" style="margin-top:8px;"></div>
+                    <details id="rulePresetsSection" style="margin-top:10px;">
+                        <summary style="font-size:0.75rem; font-weight:600; color:#334155; cursor:pointer;">Presets (curated rules)</summary>
+                        <p style="font-size:0.72rem; color:#64748b; margin:6px 0 8px; line-height:1.4;">
+                            Literature-backed rules, suggested from your guide answers and loaded data. Add one and tweak it in the editor.
+                        </p>
+                        <div id="rulePresetList"></div>
+                    </details>
                 </details>
 
                 <details class="workflow-section qa-new" id="interfaceSection" style="margin-top: 10px;">
@@ -3695,9 +3716,12 @@ function getRuleNumericSources() {
     if (parsedTracks.CONSERVATION && Array.isArray(parsedTracks.CONSERVATION.values)) out.push({ id: 'CONSERVATION', label: 'Conservation (0-1)' });
     const plddt = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT'));
     const rsa = Object.keys(parsedTracks).filter(k => k.endsWith('_RSA'));
-    if (plddt.length > 1) {
-        out.push({ id: 'pLDDT_mean', label: 'pLDDT (mean of ' + plddt.length + ' models)' });
-        out.push({ id: 'pLDDT_min', label: 'pLDDT (min of ' + plddt.length + ' models)' });
+    if (plddt.length) {
+        // Available from one model up: presets reference the aggregate so they
+        // keep working whether the user attached one model or an ensemble.
+        const of = plddt.length > 1 ? (' of ' + plddt.length + ' models') : (plddt.length ? ' of this model' : '');
+        out.push({ id: 'pLDDT_mean', label: 'pLDDT (mean' + of + ')' });
+        out.push({ id: 'pLDDT_min', label: 'pLDDT (min' + of + ')' });
     }
     plddt.forEach(k => out.push({ id: 'pLDDT:' + k, label: formatTrackLabel(k) + ' pLDDT' }));
     rsa.forEach(k => out.push({ id: 'RSA:' + k, label: formatTrackLabel(k) + ' RSA' }));
@@ -3719,11 +3743,29 @@ function ruleNumericValue(sourceId, i) {
     return null;
 }
 function getRuleCategoricalSources() {
-    return Object.keys(parsedTracks)
+    const out = Object.keys(parsedTracks)
         .filter(k => typeof parsedTracks[k] === 'string' && k !== 'AA')
         .map(k => ({ id: 'track:' + k, label: formatTrackLabel(k) }));
+    // Group sources mean "any track of this type is annotated", so a preset or
+    // rule keeps working when the user re-runs a predictor / swaps a database
+    // instead of naming one specific track key.
+    getTctlGroupsInOrder().forEach(g => {
+        const keys = getGroupTrackKeys(g).filter(k => typeof parsedTracks[k] === 'string');
+        if (keys.length) out.push({ id: 'group:' + g, label: trackGroupLabel(g) + ' (any of ' + keys.length + ')' });
+    });
+    return out;
 }
 function ruleCategoricalValue(sourceId, i) {
+    if (sourceId.startsWith('group:')) {
+        const keys = getGroupTrackKeys(sourceId.slice(6));
+        for (let n = 0; n < keys.length; n++) {
+            const t = parsedTracks[keys[n]];
+            if (typeof t !== 'string') continue;
+            const ch = t[i];
+            if (ch && ch !== ' ' && ch !== '-' && ch !== '\t') return ch;
+        }
+        return ' ';
+    }
     const t = parsedTracks[sourceId.slice(6)];
     return (typeof t === 'string') ? t[i] : undefined;
 }
@@ -3796,13 +3838,226 @@ function selectRuleMatches(id) {
     showToast('Selected residues matching "' + rule.name + '".', 'success');
 }
 
+// --- Rule presets ----------------------------------------------------------
+// Curated rules from the design doc (DESIGN.md §11). Conditions reference
+// *groups* wherever possible, so a preset survives re-running a predictor or
+// swapping a database. Rationales are the literature-backed reasoning; every
+// citation is DOI-verified and shared with WORKFLOW.md.
+const RULE_PRESETS = [
+    {
+        id: 'topology_contradiction', name: 'Topology contradiction (QC)', color: '#f97316', mode: 'all',
+        rationale: 'TM and disorder predictions should rarely overlap; a residue flagged as both is usually a hydrophobic segment misread as a helix, or a genuinely disordered membrane-proximal region.',
+        conditions: [
+            { kind: 'categorical', source: 'group:DO', op: 'annotated', value: '' },
+            { kind: 'categorical', source: 'group:TM', op: 'annotated', value: '' },
+            { kind: 'numeric', source: 'pLDDT_mean', op: '<', value: '50' }
+        ],
+        refs: [
+            { cite: 'Krogh et al., J Mol Biol 2001 (TMHMM)', doi: '10.1006/jmbi.2000.4315' },
+            { cite: 'Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A)', doi: '10.1093/nar/gky384' }
+        ]
+    },
+    {
+        id: 'conserved_buried', name: 'Conserved buried residue', color: '#7c3aed', mode: 'all',
+        rationale: 'Conservation plus burial enriches strongly for active-site and binding residues — the classic "look here first" flag.',
+        conditions: [
+            { kind: 'numeric', source: 'CONSERVATION', op: '>=', value: '0.85' },
+            { kind: 'numeric', source: 'RSA:', op: '<', value: '0.2', anyKey: true }
+        ],
+        refs: [
+            { cite: 'Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016)', doi: '10.1093/nar/gkw408' },
+            { cite: 'Capra & Singh, Bioinformatics 2007', doi: '10.1093/bioinformatics/btm270' }
+        ]
+    },
+    {
+        id: 'conserved_exposed', name: 'Conserved exposed patch', color: '#0891b2', mode: 'all',
+        rationale: 'Conserved surface residues often mark protein–protein interfaces and functional surfaces rather than a hydrophobic core.',
+        conditions: [
+            { kind: 'numeric', source: 'CONSERVATION', op: '>=', value: '0.8' },
+            { kind: 'numeric', source: 'RSA:', op: '>=', value: '0.5', anyKey: true }
+        ],
+        refs: [
+            { cite: 'Capra & Singh, Bioinformatics 2007', doi: '10.1093/bioinformatics/btm270' },
+            { cite: 'Valdar & Thornton, Proteins 2001 (interface conservation)', doi: '10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o' }
+        ]
+    },
+    {
+        id: 'rigid_core', name: 'Rigid, well-folded core', color: '#16a34a', mode: 'all',
+        rationale: 'High confidence everywhere in the ensemble plus burial identifies the rigid structural core a construct should keep.',
+        conditions: [
+            { kind: 'numeric', source: 'pLDDT_min', op: '>=', value: '90' },
+            { kind: 'numeric', source: 'RSA:', op: '<', value: '0.25', anyKey: true }
+        ],
+        refs: [{ cite: 'Jumper et al., Nature 2021 (AlphaFold2)', doi: '10.1038/s41586-021-03819-2' }]
+    },
+    {
+        id: 'flexible_disorder', name: 'Flexible / disordered region', color: '#eab308', mode: 'all',
+        rationale: 'Low structural confidence agreeing with a disorder prediction is the most reliable flexible-region signal — and a caveat on any fold-level claim there.',
+        conditions: [
+            { kind: 'numeric', source: 'pLDDT_mean', op: '<', value: '70' },
+            { kind: 'categorical', source: 'group:DO', op: 'annotated', value: '' }
+        ],
+        refs: [
+            { cite: 'Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs)', doi: '10.1016/j.jmb.2021.167208' },
+            { cite: 'Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A)', doi: '10.1093/nar/gky384' }
+        ]
+    },
+    {
+        id: 'no_confidence', name: 'No-model-confidence region', color: '#ef4444', mode: 'all',
+        rationale: 'Where no model in the ensemble is confident the region is likely flexible, unmodelled, or only ordered in a complex/ligand-bound state.',
+        conditions: [
+            { kind: 'numeric', source: 'pLDDT_min', op: '<', value: '50' }
+        ],
+        refs: [
+            { cite: 'Jumper et al., Nature 2021 (AlphaFold2)', doi: '10.1038/s41586-021-03819-2' },
+            { cite: 'Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs)', doi: '10.1016/j.jmb.2021.167208' }
+        ]
+    },
+    {
+        id: 'conserved_poorly_modelled', name: 'Conserved but poorly modelled', color: '#db2777', mode: 'all',
+        rationale: 'An evolutionarily constrained region the models fail on is a prime "look here" flag: ligand-bound, membrane-embedded, or otherwise context-dependent cores.',
+        conditions: [
+            { kind: 'numeric', source: 'CONSERVATION', op: '>=', value: '0.8' },
+            { kind: 'numeric', source: 'pLDDT_min', op: '<', value: '50' }
+        ],
+        refs: [
+            { cite: 'Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016)', doi: '10.1093/nar/gkw408' },
+            { cite: 'Jumper et al., Nature 2021 (AlphaFold2)', doi: '10.1038/s41586-021-03819-2' }
+        ]
+    },
+    {
+        id: 'signal_feature', name: 'Signal / topology feature', color: '#0ea5e9', mode: 'all',
+        rationale: 'Flags signal-peptide and topology features so they are considered explicitly in construct design instead of being trimmed by accident.',
+        conditions: [
+            { kind: 'categorical', source: 'group:TP', op: 'annotated', value: '' }
+        ],
+        refs: [
+            { cite: 'Teufel et al., Nat Biotechnol 2022 (SignalP 6.0)', doi: '10.1038/s41587-021-01156-3' },
+            { cite: 'Krogh et al., J Mol Biol 2001 (TMHMM)', doi: '10.1006/jmbi.2000.4315' }
+        ]
+    }
+];
+const RULE_SOURCE_LABELS = {
+    CONSERVATION: 'Conservation',
+    pLDDT_mean: 'pLDDT (mean)',
+    pLDDT_min: 'pLDDT (min)',
+    'RSA:': 'RSA (any model)',
+    'group:DO': 'Disorder',
+    'group:TM': 'Transmembrane',
+    'group:TP': 'Topology',
+    'group:HL': 'Homologs'
+};
+function ruleSourceLabel(sourceId) {
+    if (RULE_SOURCE_LABELS[sourceId]) return RULE_SOURCE_LABELS[sourceId];
+    const known = getRuleNumericSources().concat(getRuleCategoricalSources()).find(x => x.id === sourceId);
+    if (known) return known.label;
+    if (sourceId.startsWith('group:')) return trackGroupLabel(sourceId.slice(6));
+    if (sourceId.startsWith('track:')) return formatTrackLabel(sourceId.slice(6));
+    return sourceId;
+}
+// Human-readable condition, shared by the preset cards and (future) rule export.
+function describeRuleCondition(c) {
+    if (!c) return '';
+    const label = ruleSourceLabel(c.source);
+    if (c.kind === 'numeric') {
+        const op = { '<': '<', '<=': '≤', '>': '>', '>=': '≥', '==': '=', '!=': '≠' }[c.op] || c.op;
+        return label + ' ' + op + ' ' + c.value;
+    }
+    if (c.op === 'annotated') return label + ' annotated';
+    if (c.op === 'not_annotated') return label + ' not annotated';
+    return label + ' = ' + c.value;
+}
+// Which conditions a preset cannot satisfy with the data currently loaded.
+function presetMissingSources(preset) {
+    if (!preset || !preset.conditions) return [];
+    const avail = {};
+    getRuleNumericSources().forEach(x => { avail[x.id] = true; });
+    getRuleCategoricalSources().forEach(x => { avail[x.id] = true; });
+    // "any model" sources pass if at least one concrete track exists.
+    const anyRsa = Object.keys(parsedTracks).some(k => k.endsWith('_RSA'));
+    const rename = { 'RSA:': anyRsa };
+    const missing = [];
+    preset.conditions.forEach(c => {
+        if (rename[c.source] !== undefined) { if (!rename[c.source]) missing.push(c.source); return; }
+        if (!avail[c.source]) missing.push(c.source);
+    });
+    return missing.filter((v, i) => missing.indexOf(v) === i);
+}
+// Profile + data driven suggestions, so the guide's answers reach the rules.
+function suggestedRulePresets() {
+    const ids = [];
+    const keys = Object.keys(parsedTracks);
+    const has = (pred) => keys.some(pred);
+    const push = (id) => { if (ids.indexOf(id) === -1) ids.push(id); };
+    const membrane = guideProfile.membrane === 'yes';
+    const variants = guideProfile.variants === 'yes';
+    if (membrane || has(k => k.startsWith('TM_'))) push('topology_contradiction');
+    if (membrane) push('signal_feature');
+    if (parsedTracks.CONSERVATION) { push('conserved_buried'); push('conserved_exposed'); }
+    if (has(k => k.endsWith('_pLDDT'))) { push('rigid_core'); push('no_confidence'); }
+    if (has(k => k.endsWith('_pLDDT')) && has(k => k.startsWith('DO_'))) push('flexible_disorder');
+    if (parsedTracks.CONSERVATION && has(k => k.endsWith('_pLDDT'))) push('conserved_poorly_modelled');
+    if (variants && parsedTracks.CONSERVATION) push('conserved_buried');
+    return RULE_PRESETS.filter(p => ids.indexOf(p.id) !== -1);
+}
+function addRuleFromPreset(presetId) {
+    const preset = RULE_PRESETS.find(p => p.id === presetId);
+    if (!preset) return null;
+    let name = preset.name, n = 1;
+    while (analysisRules.some(r => r.name === name)) { n++; name = preset.name + ' (' + n + ')'; }
+    const rule = {
+        id: 'rule_' + preset.id + '_' + Date.now().toString(36),
+        name, color: preset.color, mode: preset.mode === 'any' ? 'any' : 'all', enabled: true,
+        presetId: preset.id,
+        conditions: preset.conditions.map(c => Object.assign({}, c))
+    };
+    analysisRules.push(rule);
+    applyRules();
+    renderRulesList();
+    refreshGuideIfVisible();
+    showToast('Added rule preset "' + name + '".', 'success');
+    return rule;
+}
+function renderRulePresets() {
+    const wrap = document.getElementById('rulePresetList');
+    if (!wrap) return;
+    const suggested = suggestedRulePresets().map(p => p.id);
+    const ordered = RULE_PRESETS.slice().sort((a, b) => {
+        const sa = suggested.indexOf(a.id) === -1 ? 1 : 0;
+        const sb = suggested.indexOf(b.id) === -1 ? 1 : 0;
+        return sa - sb;
+    });
+    let html = '';
+    ordered.forEach(preset => {
+        const missing = presetMissingSources(preset);
+        const isSuggested = suggested.indexOf(preset.id) !== -1;
+        html += '<div class="rp-card' + (isSuggested ? ' rp-suggested' : '') + '">' +
+            '<div class="rp-head"><span class="rp-swatch" style="background:' + structureEscapeHtml(preset.color) + ';"></span>' +
+            '<strong>' + structureEscapeHtml(preset.name) + '</strong>' +
+            (isSuggested ? '<span class="rp-badge">suggested</span>' : '') + '</div>' +
+            '<div class="rp-why">' + structureEscapeHtml(preset.rationale) + '</div>' +
+            '<div class="rp-cond">' + (preset.mode === 'any' ? 'ANY' : 'ALL') + ' — ' +
+            preset.conditions.map(c => structureEscapeHtml(describeRuleCondition(c))).join('  ·  ') + '</div>' +
+            (missing.length ? '<div class="rp-needs">needs ' + structureEscapeHtml(missing.map(ruleSourceLabel).join(', ')) + '</div>' : '') +
+            '<div class="rp-actions"><button type="button" class="rp-add" onclick="addRuleFromPreset(\'' + preset.id + '\')">Add rule</button>' +
+            (preset.refs && preset.refs.length ? '<span class="rp-refs">' + preset.refs.map(r =>
+                '<a href="https://doi.org/' + r.doi.replace(/</g, '%3C').replace(/>/g, '%3E') + '" target="_blank" rel="noopener" title="' + structureEscapeHtml(r.doi) + '">' + structureEscapeHtml(r.cite) + '</a>').join(' · ') + '</span>' : '') +
+            '</div></div>';
+    });
+    wrap.innerHTML = html;
+}
+
 // --- Rule list + editor UI -------------------------------------------------
 let ruleEditing = null; // working copy while the editor modal is open
 
 function renderRulesList() {
+    renderRulePresets();
     const wrap = document.getElementById('rulesList');
     if (!wrap) return;
-    if (!analysisRules.length) { wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.75rem;">No rules yet.</p>'; return; }
+    if (!analysisRules.length) {
+        wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.75rem;">No rules yet — add one from a preset below, or build one from scratch.</p>';
+        return;
+    }
     let html = '';
     analysisRules.forEach(r => {
         html += '<div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; margin-bottom:4px;">' +
@@ -4553,6 +4808,12 @@ function computeGuideInsights() {
     if (keys.some(k => k.startsWith('DM_')) && !uniprotFeatures) {
         out.push({ level: 'info', text: 'Pfam domains are in; fetching UniProt too would give curated boundaries to compare against.' });
     }
+    try {
+        const sug = suggestedRulePresets();
+        if (sug.length && !analysisRules.length) {
+            out.push({ level: 'info', text: 'Rule presets ready for this dataset: ' + sug.slice(0, 3).map(p => p.name).join(', ') + (sug.length > 3 ? ' (+' + (sug.length - 3) + ' more)' : '') + ' — open Analysis Rules to add one.' });
+        }
+    } catch (e) { /* suggestions are advisory */ }
     return out;
 }
 function refreshGuideIfVisible() {
@@ -5385,7 +5646,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.21.0';
+const APP_VERSION = '0.22.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

@@ -206,6 +206,94 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - Lichtarge, Bourne & Cohen, J Mol Biol 1996 (evolutionary trace) — <https://doi.org/10.1006/jmbi.1996.0167>
 - Valdar & Thornton, Proteins 2001 (interface conservation) — <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
 
+## Rule presets
+
+Curated rules shipped in the Rules panel (the guide suggests the relevant
+ones from your intake answers and loaded data). Each references a *group*
+("any TM track") rather than one predictor key, so re-running a predictor or
+swapping a Foldseek database does not break it. Conditions marked with a
+per-condition "needs" note in the app are simply unavailable until that data
+is loaded.
+
+### 1. Topology contradiction (QC)
+
+**Query (ALL).** Disorder annotated · Transmembrane annotated · pLDDT (mean) < 50
+
+**Rationale.** TM and disorder predictions should rarely overlap; a residue flagged as both is usually a hydrophobic segment misread as a helix, or a genuinely disordered membrane-proximal region.
+
+**Citations.**
+- Krogh et al., J Mol Biol 2001 (TMHMM) — <https://doi.org/10.1006/jmbi.2000.4315>
+- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A) — <https://doi.org/10.1093/nar/gky384>
+
+### 2. Conserved buried residue
+
+**Query (ALL).** Conservation ≥ 0.85 · RSA (any model) < 0.2
+
+**Rationale.** Conservation plus burial enriches strongly for active-site and binding residues — the classic "look here first" flag.
+
+**Citations.**
+- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016) — <https://doi.org/10.1093/nar/gkw408>
+- Capra & Singh, Bioinformatics 2007 — <https://doi.org/10.1093/bioinformatics/btm270>
+
+### 3. Conserved exposed patch
+
+**Query (ALL).** Conservation ≥ 0.8 · RSA (any model) ≥ 0.5
+
+**Rationale.** Conserved surface residues often mark protein–protein interfaces and functional surfaces rather than a hydrophobic core.
+
+**Citations.**
+- Capra & Singh, Bioinformatics 2007 — <https://doi.org/10.1093/bioinformatics/btm270>
+- Valdar & Thornton, Proteins 2001 (interface conservation) — <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
+
+### 4. Rigid, well-folded core
+
+**Query (ALL).** pLDDT (min) ≥ 90 · RSA (any model) < 0.25
+
+**Rationale.** High confidence everywhere in the ensemble plus burial identifies the rigid structural core a construct should keep.
+
+**Citations.**
+- Jumper et al., Nature 2021 (AlphaFold2) — <https://doi.org/10.1038/s41586-021-03819-2>
+
+### 5. Flexible / disordered region
+
+**Query (ALL).** pLDDT (mean) < 70 · Disorder annotated
+
+**Rationale.** Low structural confidence agreeing with a disorder prediction is the most reliable flexible-region signal — and a caveat on any fold-level claim there.
+
+**Citations.**
+- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs) — <https://doi.org/10.1016/j.jmb.2021.167208>
+- Mészáros, Erdős & Dosztányi, Nucleic Acids Res 2018 (IUPred2A) — <https://doi.org/10.1093/nar/gky384>
+
+### 6. No-model-confidence region
+
+**Query (ALL).** pLDDT (min) < 50
+
+**Rationale.** Where no model in the ensemble is confident the region is likely flexible, unmodelled, or only ordered in a complex/ligand-bound state.
+
+**Citations.**
+- Jumper et al., Nature 2021 (AlphaFold2) — <https://doi.org/10.1038/s41586-021-03819-2>
+- Ruff & Pappu, J Mol Biol 2021 (AlphaFold and IDPs) — <https://doi.org/10.1016/j.jmb.2021.167208>
+
+### 7. Conserved but poorly modelled
+
+**Query (ALL).** Conservation ≥ 0.8 · pLDDT (min) < 50
+
+**Rationale.** An evolutionarily constrained region the models fail on is a prime "look here" flag: ligand-bound, membrane-embedded, or otherwise context-dependent cores.
+
+**Citations.**
+- Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016) — <https://doi.org/10.1093/nar/gkw408>
+- Jumper et al., Nature 2021 (AlphaFold2) — <https://doi.org/10.1038/s41586-021-03819-2>
+
+### 8. Signal / topology feature
+
+**Query (ALL).** Topology annotated
+
+**Rationale.** Flags signal-peptide and topology features so they are considered explicitly in construct design instead of being trimmed by accident.
+
+**Citations.**
+- Teufel et al., Nat Biotechnol 2022 (SignalP 6.0) — <https://doi.org/10.1038/s41587-021-01156-3>
+- Krogh et al., J Mol Biol 2001 (TMHMM) — <https://doi.org/10.1006/jmbi.2000.4315>
+
 ---
 
 ## Citation status

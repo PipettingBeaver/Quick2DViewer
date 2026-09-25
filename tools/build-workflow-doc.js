@@ -24,6 +24,27 @@ function extractLiteral(name) {
 const WORKFLOW_STEPS = new Function(`${extractLiteral('WORKFLOW_STEPS')}; return WORKFLOW_STEPS;`)();
 const GUIDE_QUESTIONS = new Function(`${extractLiteral('GUIDE_QUESTIONS')}; return GUIDE_QUESTIONS;`)();
 const STEP_QUESTIONS = new Function(`${extractLiteral('STEP_QUESTIONS')}; return STEP_QUESTIONS;`)();
+const RULE_PRESETS = new Function(`${extractLiteral('RULE_PRESETS')}; return RULE_PRESETS;`)();
+const RULE_SOURCE_LABELS = new Function(`${extractLiteral('RULE_SOURCE_LABELS')}; return RULE_SOURCE_LABELS;`)();
+
+// Local mirror of the app's describeRuleCondition (the app version reads the
+// loaded tracks, which do not exist in this build context).
+function srcLabel(id) {
+  if (RULE_SOURCE_LABELS[id]) return RULE_SOURCE_LABELS[id];
+  if (id.indexOf('group:') === 0) return id.slice(6) + ' (any track)';
+  if (id.indexOf('track:') === 0) return id.slice(6);
+  return id;
+}
+function condText(c) {
+  const l = srcLabel(c.source);
+  if (c.kind === 'numeric') {
+    const op = { '<': '<', '<=': '≤', '>': '>', '>=': '≥', '==': '=', '!=': '≠' }[c.op] || c.op;
+    return `${l} ${op} ${c.value}`;
+  }
+  if (c.op === 'annotated') return `${l} annotated`;
+  if (c.op === 'not_annotated') return `${l} not annotated`;
+  return `${l} = ${c.value}`;
+}
 
 function doiUrl(doi) { return 'https://doi.org/' + doi; }
 
@@ -87,6 +108,28 @@ function render() {
     }
     lines.push('');
   });
+  lines.push('## Rule presets');
+  lines.push('');
+  lines.push('Curated rules shipped in the Rules panel (the guide suggests the relevant');
+  lines.push('ones from your intake answers and loaded data). Each references a *group*');
+  lines.push('("any TM track") rather than one predictor key, so re-running a predictor or');
+  lines.push('swapping a Foldseek database does not break it. Conditions marked with a');
+  lines.push('per-condition "needs" note in the app are simply unavailable until that data');
+  lines.push('is loaded.');
+  lines.push('');
+  RULE_PRESETS.forEach((p, i) => {
+    lines.push(`### ${i + 1}. ${p.name}`);
+    lines.push('');
+    lines.push(`**Query (${p.mode === 'any' ? 'ANY' : 'ALL'}).** ` + p.conditions.map(condText).join(' · '));
+    lines.push('');
+    lines.push(`**Rationale.** ${p.rationale}`);
+    lines.push('');
+    if ((p.refs || []).length) {
+      lines.push('**Citations.**');
+      p.refs.forEach(r => lines.push(`- ${r.cite} — <${doiUrl(r.doi)}>`));
+      lines.push('');
+    }
+  });
   lines.push('---');
   lines.push('');
   lines.push('## Citation status');
@@ -102,4 +145,4 @@ function render() {
 const out = render();
 fs.writeFileSync(path.join(ROOT, 'WORKFLOW.md'), out);
 const totalQs = WORKFLOW_STEPS.reduce((n, s) => n + ((STEP_QUESTIONS[s.id] || []).length), 0);
-console.log(`WORKFLOW.md written (${out.length} chars, ${WORKFLOW_STEPS.length} steps, ${GUIDE_QUESTIONS.length} intake + ${totalQs} step questions)`);
+console.log(`WORKFLOW.md written (${out.length} chars, ${WORKFLOW_STEPS.length} steps, ${GUIDE_QUESTIONS.length} intake + ${totalQs} step questions, ${RULE_PRESETS.length} rule presets)`);

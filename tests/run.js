@@ -330,6 +330,13 @@ steps.forEach(s => {
 assert(docDrift.length === 0, 'WORKFLOW.md contains every step title and DOI' + (docDrift.length ? ' (missing ' + docDrift.join(', ') + ')' : ''));
 assert(WORKFLOW_MD.indexOf('node tools/build-workflow-doc.js') !== -1, 'WORKFLOW.md documents how to regenerate itself');
 assert(WORKFLOW_MD.indexOf('Guided questions') !== -1, 'WORKFLOW.md documents the per-step questions');
+const presetNames = ctxRun(`RULE_PRESETS.map(p => p.name)`);
+let presetDrift = presetNames.filter(n => WORKFLOW_MD.indexOf(n) === -1);
+assert(presetDrift.length === 0, 'WORKFLOW.md documents every rule preset' + (presetDrift.length ? ' (missing ' + presetDrift.join(', ') + ')' : ''));
+const presetDois = [];
+ctxRun(`(function(){ var out = []; RULE_PRESETS.forEach(p => p.refs.forEach(r => out.push(r.doi))); return out; })()`).forEach(d => presetDois.push(d));
+const missingDois = presetDois.filter(d => WORKFLOW_MD.indexOf(d) === -1);
+assert(missingDois.length === 0, 'WORKFLOW.md carries every preset citation DOI' + (missingDois.length ? ' (missing ' + missingDois.join(', ') + ')' : ''));
 assert(WORKFLOW_MD.indexOf(ctxRun(`STEP_QUESTIONS.foldseek[0].options[1].label`)) !== -1, 'WORKFLOW.md lists the per-step options');
 assert(WORKFLOW_MD.indexOf('quick2dv') !== -1 || WORKFLOW_MD.indexOf('Quick2DViewer') !== -1, 'WORKFLOW.md is the Q2DV reference');
 
@@ -470,6 +477,80 @@ undoKeys = ctxRun(`guideStepUndoKeys('foldseek')`);
 assert(undoKeys.length === 1 && /foldseek/.test(undoKeys[0]), 'Foldseek undo only targets Foldseek hits');
 assert(ctxRun(`STEP_UNDO.sequence.reset`) === true, 'the sequence step undoes via a full reset');
 assert(ctxRun(`parsedTracks = {}; topologySources = []; keyedVariantsInfo = {}; uniprotFeatures = null; trackMeta = {};`), 'state reset for the next section');
+
+section('rule presets + group sources');
+ctxRun(`analysisRules = []; guideProfile = {}; guideOverrides = {}; parsedTracks = {};`);
+
+// --- group:<GROUP> categorical source -------------------------------------
+ctxRun(`parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE', 'DO_IUPred': '  E' };`);
+const catIds = ctxRun(`getRuleCategoricalSources().map(s => s.id)`);
+assert(catIds.indexOf('group:TM') !== -1 && catIds.indexOf('group:DO') !== -1, 'group sources appear once the type has string tracks');
+assert(ctxRun(`getRuleCategoricalSources().filter(s => s.id === 'group:TM')[0].label`).indexOf('any of') !== -1, 'the group label says it spans the type');
+assert(ctxRun(`ruleCategoricalValue('group:TM', 1)`) === 'E', 'a group source reports the first annotated track in the group');
+assert(ctxRun(`ruleCategoricalValue('group:TM', 8)`) === ' ', 'a group source reads blank when nothing in the group is annotated');
+const gmask = ctxRun(`evaluateRule({ mode: 'all', conditions: [
+    { kind: 'categorical', source: 'group:TM', op: 'annotated', value: '' },
+    { kind: 'categorical', source: 'group:DO', op: 'annotated', value: '' } ] })`);
+assert(gmask[2] === true && gmask[0] === false && gmask[1] === false, 'group conditions co-localize across different types');
+
+// --- readable condition text (used on the preset cards) --------------------
+assert(ctxRun(`describeRuleCondition({ kind: 'numeric', source: 'CONSERVATION', op: '>=', value: '0.85' })`) === 'Conservation ≥ 0.85', 'numeric conditions render a readable operator');
+assert(ctxRun(`describeRuleCondition({ kind: 'categorical', source: 'group:TM', op: 'annotated', value: '' })`) === 'Transmembrane annotated', 'group conditions render the group label');
+
+// --- pLDDT aggregates must exist for a single model ------------------------
+ctxRun(`parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 80 }, { val: 60 }, { val: 40 }] };`);
+const numIds = ctxRun(`getRuleNumericSources().map(s => s.id)`);
+assert(numIds.indexOf('pLDDT_mean') !== -1 && numIds.indexOf('pLDDT_min') !== -1, 'pLDDT mean/min exist with a single model (presets rely on them)');
+assert(ctxRun(`ruleNumericValue('pLDDT_min', 2)`) === 40, 'pLDDT_min reads the single attached model');
+
+// --- preset library integrity ---------------------------------------------
+assert(ctxRun(`RULE_PRESETS.length`) === 8, 'eight curated presets (DESIGN §11)');
+assert(ctxRun(`RULE_PRESETS.every(p => p.id && p.name && p.color && p.rationale && p.conditions.length && p.refs.length)`), 'every preset is complete');
+assert(ctxRun(`RULE_PRESETS.every(p => p.conditions.every(c => c.kind === 'numeric' || c.kind === 'categorical'))`), 'preset conditions use the supported kinds');
+assert(ctxRun(`RULE_PRESETS.every(p => p.conditions.every(c => c.kind !== 'numeric' || ['<','<=','>','>=','==','!='].indexOf(c.op) !== -1))`), 'numeric presets use valid operators');
+assert(ctxRun(`RULE_PRESETS.every(p => p.refs.every(r => r.doi.indexOf('10.') === 0 && r.cite))`), 'preset citations carry verified-shape DOIs');
+assert(ctxRun(`RULE_PRESETS.every(p => p.conditions.every(c => c.source.indexOf('track:') !== 0))`), 'presets never name one specific predictor key (group/aggregate sources only)');
+
+// --- availability reporting -------------------------------------------------
+ctxRun(`parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE' };`);
+let miss = ctxRun(`presetMissingSources(RULE_PRESETS.filter(p => p.id === 'conserved_buried')[0])`);
+assert(miss.indexOf('CONSERVATION') !== -1 && miss.indexOf('RSA:') !== -1, 'a preset reports its missing inputs');
+ctxRun(`parsedTracks = { AA: 'MKV', 'TP_TMHMM': 'iii' };`);
+assert(ctxRun(`presetMissingSources(RULE_PRESETS.filter(p => p.id === 'signal_feature')[0]).length`) === 0, 'a satisfied preset reports nothing missing');
+ctxRun(`parsedTracks = { AA: 'MKV', 'm_RSA': [{ val: 0.1 }] };`);
+miss = ctxRun(`presetMissingSources(RULE_PRESETS.filter(p => p.id === 'conserved_buried')[0])`);
+assert(miss.indexOf('RSA:') === -1, 'the any-model RSA source is satisfied by one RSA track');
+
+// --- suggestions from the guide profile + loaded data ----------------------
+ctxRun(`guideProfile = { membrane: 'yes' }; parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE' };`);
+let sug = ctxRun(`suggestedRulePresets().map(p => p.id)`);
+assert(sug.indexOf('topology_contradiction') !== -1 && sug.indexOf('signal_feature') !== -1, 'a membrane profile suggests the membrane presets');
+ctxRun(`guideProfile = {}; parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 80 }] };`);
+sug = ctxRun(`suggestedRulePresets().map(p => p.id)`);
+assert(sug.indexOf('rigid_core') !== -1 && sug.indexOf('no_confidence') !== -1, 'a model suggests the confidence presets');
+assert(sug.indexOf('signal_feature') === -1, 'unrelated presets are not suggested');
+ctxRun(`parsedTracks.CONSERVATION = { type: 'conservation', metric: 'shannon', values: [0.9, 0.2, 0.2] };`);
+sug = ctxRun(`suggestedRulePresets().map(p => p.id)`);
+assert(sug.indexOf('conserved_buried') !== -1 && sug.indexOf('conserved_poorly_modelled') !== -1, 'conservation + model suggest the conservation presets');
+
+// --- applying a preset ------------------------------------------------------
+ctxRun(`
+    analysisRules = [];
+    guideProfile = { membrane: 'yes' };
+    parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE', 'DO_IUPred': '  E', 'm_pLDDT': [{ val: 30 }, { val: 40 }, { val: 20 }] };
+`);
+ctxRun(`addRuleFromPreset('topology_contradiction');`);
+assert(ctxRun(`analysisRules.length`) === 1, 'the preset becomes a rule');
+assert(ctxRun(`analysisRules[0].presetId`) === 'topology_contradiction' && ctxRun(`analysisRules[0].mode`) === 'all', 'the rule records its preset and mode');
+assert(ctxRun(`analysisRules[0].conditions.length`) === 3, 'conditions are copied from the preset');
+assert(ctxRun(`(parsedTracks['RULE_' + analysisRules[0].id] || '')[2]`) === '\u25a0', 'the generated rule track marks the co-localized residue');
+assert(ctxRun(`(parsedTracks['RULE_' + analysisRules[0].id] || '')[0]`) === ' ', 'residues outside the query stay blank');
+ctxRun(`addRuleFromPreset('topology_contradiction');`);
+assert(ctxRun(`analysisRules.length`) === 2 && ctxRun(`analysisRules[1].name`).indexOf('(2)') !== -1, 're-adding a preset gets a numbered name');
+// mutation safety: editing the rule must not rewrite the preset
+ctxRun(`analysisRules[0].conditions[0].value = 'CHANGED';`);
+assert(ctxRun(`RULE_PRESETS.filter(p => p.id === 'topology_contradiction')[0].conditions[0].value`) === '', 'applied conditions are deep copies of the preset');
+ctxRun(`analysisRules = []; parsedTracks = {}; guideProfile = {};`);
 
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [
