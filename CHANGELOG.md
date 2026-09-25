@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-25
+
+### Added
+
+- **HMMER hmmscan (Pfam) domain scan.** Analyze → *Scan Domains (HMMER)…* (or the
+  Input Data button) submits the sequence to the EBI Job Dispatcher and adds **one
+  track per significant Pfam family**, grouped under a new **Domains** track type,
+  with provenance `HMMER (Pfam)`. Only domains above HMMER's inclusion threshold
+  (`!`) become tracks; per-family stats (best i-Evalue/score, domain count) are kept.
+  Runs through the existing `domain_scan` capability, so providers are swappable.
+
+### Fixed
+
+- The EBI HMMER endpoint moved: the old `/Tools/services/rest/hmmer3/` now answers
+  *"Tool 'hmmer3' was not found"*. The live tool id is **`hmmer3_hmmscan`**
+  (verified CORS-enabled, `access-control-allow-origin: *`). hmmer3 exposes **no JSON
+  renderer**, so the `ebiJob` adapter gained a `resultExt` option and parses the raw
+  HMMER text output.
+
+### Changed
+
+- **Track Control ↔ Tracks tab cross-links**: the per-type popover has a **Config…**
+  button (Conservation Scoring / cutoffs / predictor info in one click), and both
+  menus link to each other so there is a single manager home from either side.
+
 ## [0.16.0] - 2026-09-23
 
 ### Changed (design pass — see `UX_GUIDELINES.md`)

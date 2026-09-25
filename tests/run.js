@@ -250,6 +250,42 @@ assert(ctxRun(`graphMode.pLDDT`) === false && ctxRun(`getEffectiveGroupView('pLD
 const ssOpts = ctxRun(`(function(){ const s = buildGroupViewSelect('SS'); return (s.children || []).map(o => o.value); })()`);
 assert(ssOpts.indexOf('graph') === -1, 'non-numeric types have no Graph option');
 
+section('hmmer hmmscan (domain scan)');
+const hmmerOut = [
+    '# hmmscan :: search sequence(s) against a profile database',
+    'Query:       EMBOSS_001  [L=76]',
+    '',
+    'Domain annotation for each model (and alignments):',
+    '>> ubiquitin  Ubiquitin family',
+    '   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc',
+    ' ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----',
+    '   1 !  119.1   0.3   2.6e-38   5.5e-35       1      72 []       3      74 ..       3      74 .. 0.99',
+    '',
+    '>> DUF2407  DUF2407 ubiquitin-like domain',
+    '   1 ?   15.0   0.0      0.01      0.03      1      50 ..      10      60 ..      10      60 .. 0.50',
+    ''
+].join('\n');
+const doms = ctxRun(`parseHmmerDomains(${JSON.stringify(hmmerOut)})`);
+assert(doms.length === 2, 'hmmscan parser reads both domain blocks');
+assert(doms[0].model === 'ubiquitin' && doms[0].description === 'Ubiquitin family', 'model name + description captured');
+assert(doms[0].significant === true && doms[0].aliFrom === 3 && doms[0].aliTo === 74, 'domain alignment span captured');
+assert(Math.abs(doms[0].iEvalue - 5.5e-35) < 1e-45, 'per-domain i-Evalue captured');
+assert(doms[1].significant === false, "'?' domains flagged non-significant");
+
+ctxRun(`parsedTracks.AA = 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG';`);
+ctxRun(`Object.keys(parsedTracks).forEach(k => { if (k.indexOf('DM_') === 0) delete parsedTracks[k]; });`);
+const dmAdded = ctxRun(`applyDomainTracks(parseHmmerDomains(${JSON.stringify(hmmerOut)}), 'Pfam')`);
+assert(dmAdded === 1, 'only significant Pfam families become tracks');
+assert(ctxRun(`getTrackGroup('DM_ubiquitin')`) === 'DM', 'DM_ maps to the Domains group');
+assert(ctxRun(`trackGroupLabel('DM')`) === 'Domains', 'Domains group label');
+assert(ctxRun(`getTrackSource('DM_ubiquitin')`) === 'HMMER (Pfam)', 'domain tracks report HMMER provenance');
+assert(ctxRun(`(parsedTracks['DM_ubiquitin'] || '').slice(2, 4)`) === '\u2588\u2588', 'domain track marks the aligned span');
+assert(ctxRun(`(parsedTracks['DM_ubiquitin'] || '').slice(0, 2)`) === '  ', 'positions outside the domain stay blank');
+assert(ctxRun(`domainHitsInfo['DM_ubiquitin'].domains.length`) === 1, 'one domain recorded for ubiquitin');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers[0].enabled`) === true, 'domain_scan provider enabled');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers[0].url`).indexOf('hmmer3_hmmscan') !== -1, 'domain_scan points at the live hmmer3_hmmscan tool id');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers[0].resultExt`) === 'out', 'hmmer3 requests the raw text renderer');
+
 section('service registry + capability fallback');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.annotation.providers.length`) === 2, 'annotation capability has 2 providers (fallback chain)');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.fold.providers[0].id`) === 'esmfold', 'fold -> esmfold provider');

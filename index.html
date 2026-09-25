@@ -1482,6 +1482,24 @@
             align-items: center;
             padding: 2px 4px;
         }
+        .tctl-footer {
+            display: flex;
+            justify-content: flex-end;
+            padding: 6px 10px 8px;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 4px;
+        }
+        .tctl-link {
+            background: none;
+            border: none;
+            padding: 2px 4px;
+            color: #2563eb;
+            font-size: 0.68rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .tctl-link:hover { background: #eff6ff; text-decoration: underline; }
         .tctl-colheader {
             font-size: 0.6rem;
             font-weight: 800;
@@ -1766,6 +1784,7 @@
                     <button type="button" onclick="menuBarAction('data')">Data &amp; Structures…</button>
                     <button type="button" onclick="menuBarAction('rules')">Analysis Rules…</button>
                     <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
+                    <button type="button" onclick="menuBarAction('domains')">Scan Domains (HMMER)…</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -1827,6 +1846,8 @@
                             style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Predict a 3D structure for the current sequence with ESMFold (≤400 aa) and attach it">Predict structure (ESMFold)</button>
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="runDomainScan()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Scan the sequence against Pfam with HMMER hmmscan (EBI) and add one track per domain family">Scan domains (HMMER/Pfam)</button>
                         <select id="foldseekDb" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Foldseek search database">
                             <option value="afdb50">afdb50 (AlphaFoldDB)</option>
                             <option value="pdb100">pdb100 (PDB)</option>
@@ -1840,6 +1861,7 @@
                 <div id="inputDataSummary" class="data-box" style="font-size:0.78rem; white-space:pre-wrap; line-height:1.5;">No data loaded yet.</div>
                 <div id="esmfoldStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                 <div id="foldseekStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+                <div id="domainScanStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -2048,9 +2070,12 @@
             <div class="sidebar-panel" id="side-panel-tracks" hidden>
                 <details class="workflow-section qa-new" id="trackManagerSection" open>
                     <summary>Tracks</summary>
-                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-bottom:6px;">
-                        <button type="button" class="tm-mini" onclick="trackManagerExpandAll(true)" title="Expand all types">+</button>
-                        <button type="button" class="tm-mini" onclick="trackManagerExpandAll(false)" title="Collapse all types">−</button>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:6px;">
+                        <button type="button" class="tctl-link" onclick="openTrackControlsFromSidebar()" title="Open the compact Track Controls popover (View as + per-track filter)">Track Controls ↗</button>
+                        <span style="display:flex; gap:4px;">
+                            <button type="button" class="tm-mini" onclick="trackManagerExpandAll(true)" title="Expand all types">+</button>
+                            <button type="button" class="tm-mini" onclick="trackManagerExpandAll(false)" title="Collapse all types">−</button>
+                        </span>
                     </div>
                     <div id="trackManagerList"></div>
                 </details>
@@ -2760,9 +2785,14 @@ const SERVICE_REGISTRY = {
         domain_scan: {
             label: 'Domain architecture (HMMER hmmscan)',
             providers: [
-                { id: 'ebi_hmmer', label: 'EBI HMMER', adapter: 'ebiJob',
-                  url: 'https://www.ebi.ac.uk/Tools/services/rest/hmmer3/',
-                  params: { program: 'hmmscan', database: 'pfam' }, enabled: false }, // planned
+                // Verified 2026-09: the Job Dispatcher tool id is
+                // `hmmer3_hmmscan` (the old /rest/hmmer3/ returns "tool not
+                // found") and it is CORS-enabled. hmmer3 exposes no JSON
+                // renderer, so resultExt asks for the raw HMMER text output.
+                { id: 'ebi_hmmer', label: 'EBI HMMER hmmscan (Pfam)', adapter: 'ebiJob',
+                  url: 'https://www.ebi.ac.uk/Tools/services/rest/hmmer3_hmmscan/',
+                  params: { database: 'pfam', nhits: '25' },
+                  resultExt: 'out', enabled: true },
             ],
         },
     },
@@ -2838,7 +2868,12 @@ const SERVICE_ADAPTERS = {
             if (onProgress) onProgress('job ' + jobId + ' running… ' + elapsed() + 's (' + (status || 'queued') + ')');
         }
         if (status !== 'FINISHED') throw new Error('timed out after ' + elapsed() + 's');
-        return await (await fetchWithTimeout(base + 'result/' + jobId + '/json', {}, 60000)).json();
+        // Job Dispatcher tools expose different renderers (most have `json`;
+        // hmmer3 only ships the raw text `out`), so the provider declares one.
+        const ext = provider.resultExt || 'json';
+        const resultResp = await fetchWithTimeout(base + 'result/' + jobId + '/' + ext, {}, 60000);
+        if (!resultResp.ok) throw new Error('result HTTP ' + resultResp.status);
+        return ext === 'json' ? await resultResp.json() : await resultResp.text();
     },
     // ESMFold: POST text/plain sequence -> PDB text
     async esmfold(provider, args) {
@@ -3083,6 +3118,102 @@ async function runFoldseekSearch() {
         const m = err && err.message ? err.message : String(err);
         setStatus('Foldseek failed: ' + m);
         showToast('Foldseek search failed: ' + m, 'error');
+    }
+}
+
+// --- HMMER domain scan (Pfam) ---------------------------------------------
+// hmmscan's EBI service exposes only the raw HMMER3 text output (no JSON
+// renderer), so we parse the "Domain annotation for each model" sections: one
+// `>> model  description` block per Pfam family, then a domain table whose rows
+// end with the alignment coordinates and per-domain E-values.
+const HMMER_DOMAIN_LINE = /^\s*(\d+)\s+([!?])\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+([\d.]+)\s*$/;
+function parseHmmerDomains(text) {
+    const out = [];
+    let model = null, description = '';
+    String(text || '').split(/\r?\n/).forEach(line => {
+        const head = line.match(/^>>\s+(\S+)\s*(.*)$/);
+        if (head) { model = head[1]; description = (head[2] || '').trim(); return; }
+        if (!model) return;
+        const m = line.match(HMMER_DOMAIN_LINE);
+        if (!m) return;
+        out.push({
+            model, description,
+            significant: m[2] === '!', // HMMER flags: ! significant, ? not
+            score: parseFloat(m[3]),
+            cEvalue: parseFloat(m[5]),
+            iEvalue: parseFloat(m[6]),
+            hmmFrom: parseInt(m[7], 10), hmmTo: parseInt(m[8], 10),
+            aliFrom: parseInt(m[9], 10), aliTo: parseInt(m[10], 10),
+            envFrom: parseInt(m[11], 10), envTo: parseInt(m[12], 10),
+            acc: parseFloat(m[13]),
+        });
+    });
+    return out;
+}
+
+const DOMAIN_MARKER = '\u2588';
+const DOMAIN_COLORS = ['#bfdbfe', '#fbcfe8', '#bbf7d0', '#fde68a', '#ddd6fe', '#a5f3fc', '#fecdd3', '#e2e8f0'];
+let domainHitsInfo = {};
+
+// One track per Pfam family (like one track per UniProt feature type), so the
+// row label names the family and every domain instance of it shares a color.
+function applyDomainTracks(domains, database) {
+    const totalLength = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    Object.keys(parsedTracks).forEach(k => { if (k.startsWith('DM_')) delete parsedTracks[k]; });
+    domainHitsInfo = {};
+    if (!totalLength || !domains || !domains.length) return 0;
+    const byModel = new Map();
+    domains.forEach(d => {
+        if (!d.significant) return; // '?' domains are below the inclusion threshold
+        const start = Math.max(1, d.aliFrom), end = Math.min(totalLength, d.aliTo);
+        if (start > end) return;
+        if (!byModel.has(d.model)) byModel.set(d.model, { model: d.model, description: d.description, domains: [], best: d });
+        const rec = byModel.get(d.model);
+        rec.domains.push({ start, end, iEvalue: d.iEvalue, score: d.score, acc: d.acc });
+        if (d.iEvalue < rec.best.iEvalue) rec.best = d;
+    });
+    let added = 0;
+    byModel.forEach(rec => {
+        const track = new Array(totalLength).fill(' ');
+        rec.domains.forEach(dom => { for (let i = dom.start; i <= dom.end; i++) track[i - 1] = DOMAIN_MARKER; });
+        const key = 'DM_' + rec.model.replace(/[^A-Za-z0-9_-]/g, '_');
+        parsedTracks[key] = track.join('');
+        const color = DOMAIN_COLORS[added % DOMAIN_COLORS.length];
+        domainHitsInfo[key] = {
+            model: rec.model, description: rec.description, database: database || 'Pfam',
+            evalue: rec.best.iEvalue, score: rec.best.score, color, domains: rec.domains,
+        };
+        setTrackMeta(key, { source: 'HMMER (' + (database || 'Pfam') + ')', color });
+        added++;
+    });
+    return added;
+}
+
+async function runDomainScan() {
+    if (!(await ensureExternalServices())) return;
+    const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!seq) { showToast('Load a protein sequence first \u2014 hmmscan searches the sequence against Pfam.', 'error'); return; }
+    const statusEl = document.getElementById('domainScanStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    setStatus('Submitting hmmscan job (Pfam) \u2014 this usually takes a minute or two\u2026');
+    try {
+        const text = await runCapability('domain_scan', { sequence: seq }, (m) => setStatus(m));
+        const domains = parseHmmerDomains(text);
+        const added = applyDomainTracks(domains, 'Pfam');
+        renderViewer(parsedTracks);
+        populateCrossRefDropdown();
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        schedulePersist();
+        const nSig = domains.filter(d => d.significant).length;
+        setStatus(added
+            ? ('Pfam: ' + added + ' domain famil' + (added === 1 ? 'y' : 'ies') + ', ' + nSig + ' significant domain(s).')
+            : 'No significant Pfam domains found.');
+        showToast(added ? ('hmmscan added ' + added + ' Pfam domain track(s).') : 'hmmscan found no significant domains.', added ? 'success' : 'info');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('hmmscan failed: ' + m);
+        showToast('hmmscan failed: ' + m, 'error');
     }
 }
 
@@ -3996,6 +4127,12 @@ function showRulesPanel() {
     renderRulesList();
 }
 
+function openTrackControlsFromSidebar() {
+    switchSidebarTab('tracks');
+    const tab = Array.from(document.querySelectorAll('.sidebar-tab')).find(b => b.dataset.tab === 'tracks');
+    openTrackControlPopup(tab || document.getElementById('trackManagerSection'));
+}
+
 function switchSidebarTab(name) {
     document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('.sidebar-panel').forEach(p => { p.hidden = (p.id !== 'side-panel-' + name); });
@@ -4098,6 +4235,7 @@ function menuBarAction(action) {
         case 'options': openOptionsModal(); break;
         case 'rules': showRulesPanel(); break;
         case 'interfaces': showInterfacesPanel(); break;
+        case 'domains': runDomainScan(); break;
         case 'json': exportFullSave(); break;
         case 'tsv': exportMetricsTableTSV(); break;
         case 'csv': exportMetricsCSV(); break;
@@ -4630,7 +4768,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.16.0';
+const APP_VERSION = '0.17.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -5245,19 +5383,25 @@ function buildTctlMasterList(pop) {
 
     if (!groups.length) {
         pop.appendChild(mkEl('div', 'tctl-row-count', 'No typed tracks loaded yet.'));
-        return;
+    } else {
+        groups.forEach(g => {
+            const expanded = !!tctlExpandedGroups[g];
+            pop.appendChild(buildTctlMasterGroupRow(g, expanded));
+            if (!expanded) return;
+            const keys = getGroupTrackKeys(g);
+            keys.forEach((key, i) => pop.appendChild(buildTctlMasterTrackRow(g, key, i === keys.length - 1)));
+            if (!keys.length) {
+                pop.appendChild(mkEl('div', 'tctl-grid tctl-track-row tctl-track-empty', 'No individual tracks for this type.'));
+            }
+        });
     }
 
-    groups.forEach(g => {
-        const expanded = !!tctlExpandedGroups[g];
-        pop.appendChild(buildTctlMasterGroupRow(g, expanded));
-        if (!expanded) return;
-        const keys = getGroupTrackKeys(g);
-        keys.forEach((key, i) => pop.appendChild(buildTctlMasterTrackRow(g, key, i === keys.length - 1)));
-        if (!keys.length) {
-            pop.appendChild(mkEl('div', 'tctl-grid tctl-track-row tctl-track-empty', 'No individual tracks for this type.'));
-        }
-    });
+    const foot = mkEl('div', 'tctl-footer');
+    const mgrBtn = mkEl('button', 'tctl-link', 'Open Track Manager \u2192');
+    mgrBtn.title = 'Same visibility and view settings, as a persistent list in the right sidebar Tracks tab';
+    mgrBtn.addEventListener('click', () => { closeTctlPopup(); switchSidebarTab('tracks'); });
+    foot.appendChild(mgrBtn);
+    pop.appendChild(foot);
 }
 
 // Conservation Scoring config, shared by the Homolog (HH) and Conservation
@@ -5474,6 +5618,17 @@ function buildTctlContent() {
             });
             pop.appendChild(consBtn);
         }
+
+        const cfgBtn = mkEl('button', 'tctl-btn', 'Config\u2026');
+        cfgBtn.title = `Open the ${trackGroupLabel(g)} configuration (Conservation Scoring, cutoffs, predictor info)`;
+        cfgBtn.addEventListener('click', () => {
+            // The Config frames live in the master view; retarget this popup
+            // to it so the row's own chevron menu is the single entry point.
+            openTctlPopupFor = 'master';
+            tctlConfigGroup = g;
+            tctlRefreshPopup();
+        });
+        pop.appendChild(cfgBtn);
 
         const filterCount = getTrackFilterCount(g);
         const filterBtn = mkEl('button', 'tctl-btn' + (tctlFilterOpen ? ' tctl-on' : ''), 'Filter' + (filterCount ? ` (${filterCount})` : ''));
@@ -5979,14 +6134,15 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('VAR_')) return 6;
     if (key === 'CONSERVATION' || key.startsWith('CONS_')) return 7;
     if (key.startsWith('UP_')) return 8;
-    if (key.startsWith('RULE_')) return 9;
-    if (key.startsWith('IF_')) return 10;
+    if (key.startsWith('DM_')) return 9;
+    if (key.startsWith('RULE_')) return 10;
+    if (key.startsWith('IF_')) return 11;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
     // above the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 11;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 12;
-    return 13;
+    if (key.endsWith('_Cofactors')) return 12;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 13;
+    return 14;
 }
 
 // pLDDT/RSA graph-vs-heatmap is a type-level view choice (Track Control's
@@ -7215,6 +7371,7 @@ const TRACK_GROUP_LABELS = {
     TP: 'Topology',
     RULE: 'Rules',
     IF: 'Interfaces',
+    DM: 'Domains',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
@@ -7242,6 +7399,7 @@ function getTrackGroup(key) {
     if (key.startsWith('TP_')) return 'TP';
     if (key.startsWith('RULE_')) return 'RULE';
     if (key.startsWith('IF_')) return 'IF';
+    if (key.startsWith('DM_')) return 'DM';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
@@ -7271,6 +7429,7 @@ function getTrackSource(key) {
     if (key.startsWith('TP_')) return 'Topology';
     if (key.startsWith('RULE_')) return 'Rule';
     if (key.startsWith('IF_')) return 'Interface';
+    if (key.startsWith('DM_')) { const d = domainHitsInfo[key]; return 'HMMER (' + ((d && d.database) || 'Pfam') + ')'; }
     if (key.endsWith('_pLDDT') || key.endsWith('_RSA') || key.endsWith('_Cofactors')) return 'Structure';
     return 'Other';
 }
@@ -7372,7 +7531,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, RULE: 11, IF: 12, pLDDT: 13, RSA: 14, Cofactors: 15, other: 99 };
+    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, DM: 11, RULE: 12, IF: 13, pLDDT: 14, RSA: 15, Cofactors: 16, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
