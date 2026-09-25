@@ -156,3 +156,51 @@ Links are provided for checking; please verify before we lock them in.
 - Evolutionary trace (binding surfaces) — Lichtarge, Bourne, Cohen, *J Mol Biol* 1996 — https://doi.org/10.1006/jmbi.1996.0298
 - Interface conservation — Valdar & Thornton, *Proteins* 2002 — https://doi.org/10.1002/prot.10103
 - SignalP 6.0 — Teufel et al., *Nat Biotechnol* 2022 — https://doi.org/10.1038/s41587-021-01156-3
+
+## 12. Guided evaluation workflow ("Evaluation Guide", v0.18.0)
+
+Goal: turn the characterization pipeline from a static checklist into a **visible,
+adaptive framework** that helps a researcher stay on track — while leaving every
+metric and tool available for manual inspection.
+
+### Model
+
+- `WORKFLOW_STEPS` (`index.html`) is the single source of truth: 8 steps, each with
+  `why` (rationale), `action`/`extraActions` (the in-app call that satisfies it),
+  `how` (interpretation guidance), `check()` (live status from loaded tracks) and
+  `priority(profile)` (intake-driven ranking). The Input Data checklist and the
+  guide both render from it, so they cannot drift.
+- Pipeline order: sequence → primary-structure features → curated annotation &
+  domains → homologs & conservation → structural model → structural homology →
+  topology → integrate & export.
+- `GUIDE_QUESTIONS` (5) drive `guideProfile` (persisted): membrane/secreted,
+  structure available, homologs in hand, evaluating variants, function unknown.
+
+### Semi-autonomous behaviour
+
+1. **Adaptive ranking** — intake answers mark steps *recommended* vs *optional*,
+   and a **Next:** card always names the highest-value unfinished action.
+2. **Live status** — each step is `done` when its `check()` finds the corresponding
+   data in `parsedTracks` (so progress is measured against real loaded state).
+3. **Automated read-out** — `computeGuideInsights()` reads loaded tracks back and
+   warns before over-reading: mean pLDDT < 70, no homologs / best identity < 30%,
+   membrane flagged but no TM data, variants flagged but no variant FASTA, domains
+   present without curated UniProt boundaries.
+
+### Deliberate constraints
+
+- The guide never *replaces* the suite: each step's action is the same function the
+  menus call, and every track/panel stays reachable manually.
+- Insights are advisory and cite their basis ("mean pLDDT", "best homolog identity")
+  rather than asserting biology — they are flags to inspect, not conclusions.
+
+### Roadmap (next iterations)
+
+- **Citations per step**: surface the DOI(s) backing each `why` (reuse the §11
+  reference list) as a tooltip/footnote, so the framework is auditable.
+- **Profile → rule presets**: when variants/membrane are flagged, offer the
+  matching rule preset (needs the `group:<GROUP>` condition source from §11).
+- **Profile → topology/TM cross-check**: auto-run a "TM consensus vs Quick2D TM"
+  comparison when membrane = yes and both are present.
+- **Report export**: emit the guide state (answers, step status, insights) as a
+  methods-summary alongside the figure/table export.

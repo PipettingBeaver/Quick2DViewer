@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-25
+
+### Added
+
+- **Evaluation Guide** (Workflow tab) — the literature-backed characterization
+  pipeline as a visible, adaptive framework:
+  - **8 steps** (sequence → primary-structure features → curated annotation &
+    domains → homologs & conservation → structural model → structural homology →
+    topology → integrate & export), each with *why it matters*, the in-app action
+    that satisfies it, and *how to read it*.
+  - **Intake questions** (membrane/secreted, structure, homologs, variants,
+    unknown function) re-rank steps as **recommended** vs **optional** and are
+    persisted with the session.
+  - **Live status + Next:** — progress is measured against the actually-loaded
+    tracks, and the guide always names the highest-value unfinished action.
+  - **Automated read-out** — advisory warnings from the loaded data: low mean
+    pLDDT, no/low-identity homologs, membrane flagged without TM data, variants
+    flagged without a variant FASTA, domains without curated boundaries.
+- The Input Data checklist and the guide now render from one `WORKFLOW_STEPS`
+  definition, so the two views cannot drift.
+
+### Notes
+
+- Everything remains manually reachable: each guide action is the same function
+  the menus call, and the full track/metric/tool suite is unchanged.
+- See `DESIGN.md` §12 for the model and the next iterations (per-step citations,
+  profile-driven rule presets, topology cross-check, methods-report export).
+
 ## [0.17.0] - 2026-09-25
 
 ### Added

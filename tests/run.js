@@ -250,6 +250,44 @@ assert(ctxRun(`graphMode.pLDDT`) === false && ctxRun(`getEffectiveGroupView('pLD
 const ssOpts = ctxRun(`(function(){ const s = buildGroupViewSelect('SS'); return (s.children || []).map(o => o.value); })()`);
 assert(ssOpts.indexOf('graph') === -1, 'non-numeric types have no Graph option');
 
+section('guided workflow (evaluation guide)');
+assert(ctxRun(`WORKFLOW_STEPS.length`) === 8, 'guide has 8 pipeline steps');
+assert(ctxRun(`WORKFLOW_STEPS.every(s => s.id && s.title && s.desc && s.why && s.action && typeof s.action.run === 'string' && Array.isArray(s.how) && s.how.length && typeof s.check === 'function')`), 'every step carries why / action / how / check');
+assert(ctxRun(`WORKFLOW_STEPS.map(s => s.id).join(',')`) === 'sequence,features,annotation,homologs,structure,foldseek,topology,integration', 'steps follow the characterized pipeline order');
+assert(ctxRun(`GUIDE_QUESTIONS.length`) === 5 && ctxRun(`GUIDE_QUESTIONS.every(q => q.id && q.options.length === 3)`), '5 three-option intake questions');
+assert(ctxRun(`typeof setGuideAnswer === 'function' && typeof resetGuideProfile === 'function' && typeof renderWorkflowGuide === 'function' && typeof computeGuideInsights === 'function' && typeof nextGuideStep === 'function'`), 'guide helpers present');
+
+ctxRun(`resetGuideProfile();`);
+assert(ctxRun(`Object.keys(guideProfile).length`) === 0, 'reset clears the intake profile');
+ctxRun(`setGuideAnswer('membrane', 'yes');`);
+assert(ctxRun(`guideProfile.membrane`) === 'yes', 'answers are stored on the profile');
+assert(ctxRun(`guideStepStatus().filter(r => r.priority).map(r => r.step.id).indexOf('topology') !== -1`), 'membrane=yes promotes the topology step');
+ctxRun(`setGuideAnswer('membrane', 'no');`);
+assert(ctxRun(`guideStepStatus().filter(r => r.priority).map(r => r.step.id).indexOf('topology') === -1`), 'membrane=no demotes the topology step');
+ctxRun(`setGuideAnswer('unknownFunction', 'yes');`);
+const priFn = ctxRun(`guideStepStatus().filter(r => r.priority).map(r => r.step.id)`);
+assert(priFn.indexOf('annotation') !== -1 && priFn.indexOf('foldseek') !== -1, 'unknown function promotes domains + Foldseek');
+
+ctxRun(`guideProfile = {}; parsedTracks = { AA: 'MKV' };`);
+const nxt = ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`);
+assert(nxt && nxt !== 'sequence', 'completed steps are skipped in the recommendation');
+ctxRun(`parsedTracks = {};`);
+assert(ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) === 'sequence', 'empty state recommends loading the sequence first');
+
+ctxRun(`parsedTracks = { AA: 'MKV' };`);
+const ins = ctxRun(`computeGuideInsights()`);
+assert(ins.some(i => /No homologs/.test(i.text)), 'read-out flags missing homologs');
+ctxRun(`parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 40 }, { val: 50 }] };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => i.level === 'warn' && /Mean pLDDT is 45/.test(i.text)), 'low mean pLDDT raises a warning');
+ctxRun(`parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 90 }, { val: 88 }] };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => i.level === 'info' && /Mean pLDDT is 89/.test(i.text)), 'high mean pLDDT is reported as confidence');
+
+ctxRun(`guideProfile = { variants: 'yes' };`);
+let gPersist = null;
+try { gPersist = ctxRun(`gatherPersistableState().preferences.guideProfile.variants`); } catch (e) { gPersist = 'threw: ' + e.message; }
+assert(gPersist === 'yes', 'guide profile is persisted in preferences');
+ctxRun(`guideProfile = {}; parsedTracks = {};`);
+
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [
     '# hmmscan :: search sequence(s) against a profile database',
