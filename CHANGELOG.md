@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-25
+
+### Fixed
+
+- **UniProt name search did nothing.** The `text_search` provider pointed at the EBI
+  Proteins API (`/proteins/api/proteins`), which no longer responds — every request
+  timed out at 12 s in testing (verified 2026-09). Replaced with **EBI Search** over
+  the UniProt index (`/ebisearch/ws/rest/uniprot`), which returns the accession in
+  ~1 s; the dead provider stays registered but disabled, with the reason recorded.
+
+### Added
+
+- **Plain FASTA / sequence-only start.** Paste a `>header` plus sequence (via
+  *Show raw text* or *Paste Quick2D*) and Q2DV builds a sequence-only session — the
+  reference row plus the parsed identifier — so predictions, homologs and annotations
+  can be layered on afterwards. Quick2D output still takes precedence when present.
+- **Identifier-line parsing** (`sp|P42212|GFP_AEQVI Green fluorescent protein OS=…
+  GN=…`, i.e. Quick2D's Protein ID line or any FASTA header) into database, accession,
+  entry name, protein name, organism and gene.
+- **Lookup defaults + autocorrection.** With a parsed identifier the lookup lands on
+  **Accession** (pre-filled) when there is one, otherwise **Search (protein)** with the
+  name. A pasted header line — or an empty box while a label is loaded — is
+  autocorrected to the entry name (e.g. `GFP_AEQVI`), announced with a top-right toast:
+  *"Autocorrected EBI Search to "GFP_AEQVI". Running in the background — you can leave
+  this panel."*
+- **Lookup progress line** at the top of the UniProt section: mode, field, query, an
+  estimate (search 1–5 s, accession 1–3 s, sequence 3–8 min) and elapsed seconds.
+- **"Any field"** search option (bare query) — the form that actually matches entry
+  names and accessions.
+- **Data Sources accordion.** Conservation Scoring / Annotation Offload (UniProt) /
+  Topology (membrane) are now collapsible, with only UniProt open; opening it re-applies
+  the defaults, so *Find UniProt accession* lands on an expanded, pre-filled section.
+
+### Changed
+
+- *Show raw text ▾* now sits beside *Paste Quick2D* as a pair, and the Import section
+  carries the line "Copy and paste data from MPI's Quick2D or FASTA." with the Quick2D
+  page linked.
+- The raw-text placeholder mentions FASTA, and the parse failure message covers both
+  inputs.
+- Test harness: `getElementById` now returns a **stable** element per id (it used to
+  hand back a fresh stub per call, so `input.value` never persisted). That makes
+  input-driven code paths testable; the suite grew from 240 to 273 checks.
+
 ## [0.23.0] - 2026-09-25
 
 ### Added

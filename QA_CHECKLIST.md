@@ -121,6 +121,33 @@ not for confirming they work — each row says what to do and what would count a
 | 54 | Export with nothing loaded | Refused with a message (no empty file) |
 | 55 | Open the exported `.md` in a Markdown viewer | Table renders (pipes/headers), DOIs are links, no stray escaping |
 
+## 0.24.0 — import line, FASTA start, UniProt lookup
+
+Test this round with GFP as the reference system
+(`sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria GN=GFP`) — the
+EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) in ~1 s.
+
+| # | Try | Watch for |
+|---|---|---|
+| 56 | Open Input Data | The line under **Import** reads "Copy and paste data from MPI's Quick2D or FASTA." and *MPI's Quick2D* is a working link; *Paste Quick2D* and *Show raw text ▾* sit together as a pair |
+| 57 | Paste a bare FASTA (`>sp\|P42212\|GFP_AEQVI GFP` + sequence) into *Show raw text* | A sequence-only session (AA row only), label taken from the header, success toast; no "unable to parse" error |
+| 58 | Paste that same FASTA while a Quick2D dataset is loaded, then Cancel | Cancel must leave the existing session untouched |
+| 59 | Paste a multi-record FASTA | Only the first record is used — confirm that is what you expect |
+| 60 | Paste text that is neither (e.g. `hello world`) | Clear error, drawer stays open, nothing partially loaded |
+| 61 | Load the GFP header, then open **Options → Data Sources** | Conservation/Topology are collapsed, UniProt is open, **Lookup Mode = Accession** with `P42212` pre-filled |
+| 62 | Click a section summary (Conservation, Topology, UniProt) | Accordion opens/closes; only one open at a time is *not* enforced — check nothing looks broken if you open two |
+| 63 | Load the GFP header, switch Lookup Mode to **Search**, and put the *whole header line* in the term box, then Fetch | Term is autocorrected to `GFP_AEQVI` (visible in the box afterwards), a top-right toast says "Autocorrected EBI Search to "GFP_AEQVI". Running in the background — you can leave this panel.", and the result row is `P42212 — GFP_AEQVI · gene GFP · Aequorea victoria` |
+| 64 | Watch the progress line during the search | Names the mode, field and query, shows an estimate ("usually 1-5 s") and elapsed seconds; disappears or turns into "✓ N result(s)" when done |
+| 65 | Search with a normal term (`myoglobin`, `terC`, `GFP`) | Left alone (no spurious "autocorrected" toast); sensible hits appear |
+| 66 | Search **Any field** with `P42212` then with `GFP_AEQVI` | Both return the GFP entry — if either returns nothing, the field mapping regressed |
+| 67 | Search Protein / Gene / Organism fields with `Green fluorescent protein` / `GFP` / `Aequorea victoria` | Each returns the GFP entry near the top (verified: 38 / 30 / 28 hits) |
+| 68 | Fetch by Accession `P42212` | ~1 s; the progress line shows the estimate and elapsed time; `UP_` rows appear |
+| 69 | Click a search result | Loads that accession's annotations; the result list is replaced/cleared sensibly |
+| 70 | Turn the network off, then Fetch in each mode | Clean failure: status line clears, error toast, log entry — no spinner left running |
+| 71 | Click **Find UniProt accession** from Input Data | Lands on Options → Data Sources with UniProt expanded and pre-filled; the toast names what it set |
+| 72 | Fetch from the UniProt section, then close the Options modal mid-request | The request should still complete (or fail cleanly); re-opening shows the outcome — confirm nothing is left half-rendered |
+| 73 | Type a header with no accession (`>GFP Aequorea victoria green fluorescent protein`) | Lookup defaults to **Search (protein)** with that name — check the term is sensible and the search finds GFP |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -143,4 +170,5 @@ not for confirming they work — each row says what to do and what would count a
 2. 27–38 (removal — most destructive, most likely to leave debris).
 3. 13–26 (guide/wizard — most interactive).
 4. 39–46 (rules/presets), then 47–55 (cross-check/report).
-5. 1–12 (design pass + HMMER) last, as they are the most self-contained.
+5. 56–73 (import/FASTA/lookup — test this round with GFP as the reference system).
+6. 1–12 (design pass + HMMER) last, as they are the most self-contained.

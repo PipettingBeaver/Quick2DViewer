@@ -35,6 +35,7 @@ function makeEl() {
   };
   return el;
 }
+const elsById = {};
 const sandbox = {
   console, setTimeout, clearTimeout, setInterval, clearInterval,
   requestAnimationFrame: cb => setTimeout(cb, 16), cancelAnimationFrame: clearTimeout,
@@ -46,7 +47,7 @@ const sandbox = {
   Image: class Image { set src(v) {} },
   document: {
     addEventListener() {}, removeEventListener() {},
-    getElementById() { return makeEl(); },
+    getElementById(id) { return (elsById[id] = elsById[id] || makeEl()); },
     querySelector() { return makeEl(); }, querySelectorAll() { return []; },
     createElement() { return makeEl(); }, createElementNS() { return makeEl(); },
     createTextNode() { return { nodeType: 3 }; },
@@ -682,6 +683,77 @@ ctxRun(`removeTracks(['TP_TMHMM_run'], { silent: true });`);
 assert(ctxRun(`topologySources.length`) === 0, 'removing the restored topology row removes its source');
 assert(ctxRun(`Object.keys(parsedTracks).filter(k => k.indexOf('TP_') === 0).length`) === 0, 'the topology group is left empty rather than resurrected');
 ctxRun(`parsedTracks = {}; topologySources = []; uniprotFeatures = null; uniprotFeatureTracks = {}; domainHitsInfo = {}; guideProfile = {}; guideOverrides = {}; guideAnswers = {};`);
+
+section('identifier parsing + lookup defaults');
+const headerFull = 'sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria GN=GFP PE=1 SV=1';
+let ph = ctxRun(`parseProteinHeaderLine(${JSON.stringify(headerFull)})`);
+assert(ph.accession === 'P42212' && ph.entryName === 'GFP_AEQVI' && ph.database === 'sp', 'sp|accession|entry is parsed');
+assert(ph.proteinName === 'Green fluorescent protein', 'the protein name is split off the trailing tags');
+assert(ph.organism === 'Aequorea victoria' && ph.gene === 'GFP', 'OS= and GN= tags are extracted');
+
+ph = ctxRun(`parseProteinHeaderLine(${JSON.stringify('sp|P42212|GFP_AEQVI Green fluorescent protein OS=')})`);
+assert(ph.accession === 'P42212' && ph.organism === '' && ph.proteinName === 'Green fluorescent protein', 'an empty OS= tag is tolerated (the user-reported line)');
+ph = ctxRun(`parseProteinHeaderLine('>sp|P42212|GFP_AEQVI GFP')`);
+assert(ph.accession === 'P42212' && ph.entryName === 'GFP_AEQVI', 'a FASTA ">" header parses the same way');
+ph = ctxRun(`parseProteinHeaderLine('P42212')`);
+assert(ph && ph.accession === 'P42212', 'a bare accession is recognised');
+assert(ctxRun(`parseProteinHeaderLine('')`) === null, 'an empty label parses to null');
+
+// --- defaults derived from the loaded label --------------------------------
+ctxRun(`currentProteinLabel = ${JSON.stringify(headerFull)};`);
+let d = ctxRun(`deriveLookupDefaults()`);
+assert(d.mode === 'accession' && d.accession === 'P42212', 'a labelled accession defaults the mode to Accession');
+assert(d.searchField === 'any' && d.searchTerm === 'GFP_AEQVI', 'the search fallback uses the entry name on the "any field" query');
+ctxRun(`currentProteinLabel = '>GFP Aequorea victoria green fluorescent protein';`);
+d = ctxRun(`deriveLookupDefaults()`);
+assert(d.mode === 'search' && d.searchField === 'protein', 'without an accession it defaults to Search (protein)');
+assert(ctxRun(`deriveLookupDefaults()`) !== null, 'a free-text FASTA header still yields a search term');
+ctxRun(`currentProteinLabel = null;`);
+assert(ctxRun(`deriveLookupDefaults()`) === null, 'no label -> no defaults');
+
+// --- term autocorrection ---------------------------------------------------
+ctxRun(`
+    currentProteinLabel = ${JSON.stringify(headerFull)};
+    uniprotAnnotationMode = 'search';
+    document.getElementById('uniprotSearchField').value = 'protein';
+    document.getElementById('uniprotSearchInput').value = ${JSON.stringify(headerFull)};
+`);
+let r = ctxRun(`resolveUniProtSearchTerm()`);
+assert(r.term === 'GFP_AEQVI' && r.field === 'any', 'a pasted identifier line is corrected to the entry name');
+assert(r.correctedFrom.indexOf('sp|') === 0, 'the correction records what it replaced (for the toast)');
+ctxRun(`document.getElementById('uniprotSearchInput').value = 'myoglobin';`);
+r = ctxRun(`resolveUniProtSearchTerm()`);
+assert(r.term === 'myoglobin' && r.correctedFrom === '', 'a normal search term is left alone');
+ctxRun(`document.getElementById('uniprotSearchInput').value = '';`);
+r = ctxRun(`resolveUniProtSearchTerm()`);
+assert(r.term === 'GFP_AEQVI' && r.field === 'any', 'an empty box is filled from the loaded identifier');
+ctxRun(`currentProteinLabel = null; uniprotAnnotationMode = 'accession';`);
+
+// --- plain FASTA / sequence-only start -------------------------------------
+assert(ctxRun(`JSON.stringify(parsePlainFasta('>sp|P42212|GFP_AEQVI GFP\\nMSKGEELFTGVVPILVELDGDVNGHKF') )`) !== 'null', 'a plain FASTA parses');
+let pf = ctxRun(`parsePlainFasta('>id desc\\nMSKGEEL-FT.GV\\nVPILVEL')`);
+assert(pf.label === 'id desc' && pf.sequence === 'MSKGEELFTGVVPILVEL', 'gaps/dots and newlines are stripped from the sequence');
+pf = ctxRun(`parsePlainFasta('>one\\nMKV\\n>two\\nAAA')`);
+assert(pf.sequence === 'MKV', 'only the first record is used');
+assert(ctxRun(`parsePlainFasta('MKV')`) === null, 'sequence with no header is not treated as FASTA');
+assert(ctxRun(`isPlainFastaInput('>x\\nMKV')`) === true, '">" input is detected as FASTA');
+assert(ctxRun(`isPlainFastaInput('AA_QUERY 1 MSGR 5')`) === false, 'Quick2D output is never mistaken for FASTA');
+assert(ctxRun(`isPlainFastaInput('MKV')`) === false, 'a bare sequence is not detected as FASTA');
+// and it builds a sequence-only session
+ctxRun(`parsedTracks = {}; trackMeta = {}; guideProfile = {};`);
+assert(ctxRun(`buildFromPlainFasta('>sp|P42212|GFP_AEQVI GFP\\nMSKGEELFTGVVPILVELDGDVNG')`) === true, 'a plain FASTA builds a session');
+assert(ctxRun(`(parsedTracks.AA || '').length`) === 24, 'the FASTA sequence becomes the reference row');
+assert(ctxRun(`currentProteinLabel`) === 'sp|P42212|GFP_AEQVI GFP', 'the FASTA header becomes the protein label');
+assert(ctxRun(`Object.keys(parsedTracks).length`) === 1, 'a sequence-only session has no other tracks');
+ctxRun(`parsedTracks = {}; currentProteinLabel = null;`);
+
+// --- registry + adapter wiring --------------------------------------------
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.text_search.providers[0].id`) === 'ebi_search_uniprot', 'EBI Search is the primary text-search provider');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.text_search.providers[0].url`).indexOf('ebisearch/ws/rest/uniprot') !== -1, 'it points at the EBI Search UniProt index');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.text_search.providers[1].enabled`) === false, 'the unresponsive EBI Proteins provider is disabled');
+assert(ctxRun(`typeof SERVICE_ADAPTERS.ebiSearchUniprot === 'function'`), 'the EBI Search adapter is registered');
+assert(ctxRun(`EBI_SEARCH_FIELDS.protein`) === 'descRecName' && ctxRun(`EBI_SEARCH_FIELDS.any`) === '', 'field prefixes map to real EBI Search fields (any = bare query)');
+assert(ctxRun(`typeof beginLookupStatus === 'function' && typeof endLookupStatus === 'function' && LOOKUP_ESTIMATES.search.indexOf('s') !== -1`), 'lookup progress helpers exist with estimates');
 
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [

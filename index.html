@@ -1201,6 +1201,21 @@
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
         .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+        .import-pair { display:inline-flex; align-items:center; gap:0; }
+        .import-pair > .tb-btn:first-child { border-top-right-radius:0; border-bottom-right-radius:0; }
+        .import-pair > .tb-btn:last-child { border-top-left-radius:0; border-bottom-left-radius:0; margin-left:-1px; }
+        .options-accordion > summary {
+            font-size:0.95rem; font-weight:600; color:#0f172a; cursor:pointer;
+            list-style:none; display:flex; align-items:center; gap:6px;
+        }
+        .options-accordion > summary::-webkit-details-marker { display:none; }
+        .options-accordion > summary::before { content:'▸'; color:#94a3b8; font-size:0.8rem; }
+        .options-accordion[open] > summary::before { content:'▾'; }
+        .options-accordion > summary:hover { color:#2563eb; }
+        .lookup-status {
+            font-size:0.72rem; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe;
+            border-radius:5px; padding:5px 8px; margin:8px 0 2px; line-height:1.4;
+        }
         .rp-card { border:1px solid #e2e8f0; border-radius:6px; padding:7px 8px; margin-bottom:6px; background:#fff; }
         .rp-suggested { border-color:#bfdbfe; background:#f8fbff; }
         .rp-head { display:flex; align-items:center; gap:6px; font-size:0.75rem; color:#334155; }
@@ -1895,21 +1910,26 @@
 
             <div style="margin-top: 16px;">
                 <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Import</h4>
+                <p style="font-size:0.78rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                    Copy and paste data from <a href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener" style="color:#2563eb;">MPI's Quick2D</a> or FASTA.
+                </p>
                 <div class="toolbar-group toolbar-group-input" style="display:flex; gap:6px; flex-wrap:wrap;">
                     <button type="button" class="tb-btn tb-btn-primary" onclick="document.getElementById('structureUpload').click()">
                         Attach Structure(s) or JSON
                     </button>
-                    <button type="button" class="tb-btn tb-btn-primary" onclick="handlePasteFromClipboard()">
-                        Paste Quick2D
-                    </button>
+                    <span class="import-pair">
+                        <button type="button" class="tb-btn tb-btn-primary" onclick="handlePasteFromClipboard()">
+                            Paste Quick2D
+                        </button>
+                        <button type="button" id="btnToggleDrawer" class="tb-btn tb-btn-text"
+                            aria-expanded="false" aria-controls="rawInputDrawer" onclick="toggleRawInputDrawer()">
+                            Show raw text ▾
+                        </button>
+                    </span>
                     <button type="button" class="tb-btn tb-btn-secondary" onclick="loadSampleData()">Load Sample Data</button>
-                    <button type="button" id="btnToggleDrawer" class="tb-btn tb-btn-text"
-                        aria-expanded="false" aria-controls="rawInputDrawer" onclick="toggleRawInputDrawer()">
-                        Show raw text ▾
-                    </button>
                 </div>
                 <div id="rawInputDrawer" class="raw-input-drawer" hidden style="margin-top: 8px;">
-                    <textarea id="rawInput" placeholder="Paste raw Quick2D text output here..." aria-label="Raw Quick2D text input"></textarea>
+                    <textarea id="rawInput" placeholder="Paste Quick2D output, a FASTA header + sequence, or a plain protein sequence..." aria-label="Raw Quick2D or FASTA input"></textarea>
                     <div class="drawer-actions">
                         <button type="button" class="tb-btn tb-btn-primary" onclick="confirmDrawerParse()">Confirm &amp; Parse</button>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="cancelRawInputDrawer()">Cancel</button>
@@ -2356,8 +2376,8 @@
         </div>
 
         <div class="options-tab-panel" id="opt-tab-data" hidden>
-        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Conservation Scoring</h4>
+        <details class="options-accordion" id="optSecConservation" style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <summary>Conservation Scoring</summary>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 How the CONSERVATION row is computed (1 = fully conserved, 0 = fully divergent) from the variant FASTA sequences uploaded via Attach, and how those sequences are aligned onto the reference AA sequence. Changes apply to the heatmap row immediately and are saved with the session.
             </p>
@@ -2379,10 +2399,11 @@
                 <input type="checkbox" id="conservationIncludeHHRCheck" onchange="onConservationIncludeHHRChange()" style="width:auto;">
                 Include HHR homolog sequences in the tallies
             </label>
-        </div>
+        </details>
 
-        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Annotation Offload (UniProt)</h4>
+        <details class="options-accordion" id="optSecUniprot" open ontoggle="if (this.open) applyLookupDefaults(false);" style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <summary>Annotation Offload (UniProt)</summary>
+            <div id="uniprotLookupStatus" class="lookup-status" hidden></div>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Pull curated residue-level annotations (domains, topology, active/binding sites, PTMs, variants) from UniProt and show them as rows in the viewer.<br><br>
                 <strong>Accession</strong> looks up a known UniProt accession directly. <strong>Search</strong> finds an accession by gene, protein, or organism name first (fast). <strong>Sequence</strong> resolves the current sequence to an accession via BLAST (slow, ~5 min). Fetching requires a network connection and nothing is uploaded except the requested term/sequence/accession.
@@ -2403,8 +2424,9 @@
                 <label for="uniprotSearchField" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">Search Field</label>
                 <select id="uniprotSearchField" class="q2dv-select"
                     style="width: 100%; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    <option value="protein">Protein / entry name</option>
+                    <option value="any">Any field (accession / entry name / name)</option>
                     <option value="gene">Gene name</option>
-                    <option value="protein">Protein name</option>
                     <option value="organism">Organism</option>
                 </select>
                 <label for="uniprotSearchInput" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin:10px 0 4px;">Search Term</label>
@@ -2421,10 +2443,10 @@
                 </div>
                 <pre id="uniprotAnnotationLog" class="data-box" style="font-size:0.7rem; max-height:160px; overflow:auto; white-space:pre-wrap; margin:0; color:#334155;">(log appears here)</pre>
             </div>
-        </div>
+        </details>
 
-        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Topology (membrane)</h4>
+        <details class="options-accordion" id="optSecTopology" style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <summary>Topology (membrane)</summary>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Paste the output of a topology predictor (TMHMM segments like <code>inside 1 11</code> / <code>TMhelix 12 30</code>, or a DeepTMHMM JSON) to add it as a per-residue inside / TM-helix / outside track. Add two or more sources to also get a majority-vote <strong>Consensus</strong> track.
             </p>
@@ -2433,7 +2455,7 @@
             <button onclick="addTopologySource(document.getElementById('topologyPasteInput').value)" style="margin-top: 8px;">➕ Add Topology Source</button>
             <button onclick="clearTopologySources()" style="margin-top: 8px; margin-left: 6px; background: #64748b;">Clear</button>
             <div id="topologySourceList" style="margin-top: 10px;"></div>
-        </div>
+        </details>
         </div>
 
         <div class="options-tab-panel" id="opt-tab-storage" hidden>
@@ -2871,8 +2893,14 @@ const SERVICE_REGISTRY = {
         text_search: {
             label: 'UniProt text search',
             providers: [
+                // Verified 2026-09: the EBI Proteins API (/proteins/api/proteins)
+                // no longer responds (every request timed out at 12-120 s), which
+                // is why name searches appeared to do nothing. EBI Search serves
+                // the same UniProt index in ~1 s and returns the accession.
+                { id: 'ebi_search_uniprot', label: 'EBI Search (UniProt)', adapter: 'ebiSearchUniprot',
+                  url: 'https://www.ebi.ac.uk/ebisearch/ws/rest/uniprot', enabled: true },
                 { id: 'ebi_proteins_search', label: 'EBI Proteins search', adapter: 'ebiSearch',
-                  url: 'https://www.ebi.ac.uk/proteins/api/proteins', enabled: true },
+                  url: 'https://www.ebi.ac.uk/proteins/api/proteins', enabled: false },
             ],
         },
         sequence_search: {
@@ -2956,6 +2984,35 @@ const SERVICE_ADAPTERS = {
             return { accession: p.accession, name: p.name || '', gene, organism, protein };
         });
     },
+    // EBI Search over the UniProt index. One request returns everything the
+    // result list needs (fields=...), so there is no per-hit follow-up fetch.
+    async ebiSearchUniprot(provider, args) {
+        const prefix = Object.prototype.hasOwnProperty.call(EBI_SEARCH_FIELDS, args.field) ? EBI_SEARCH_FIELDS[args.field] : '';
+        const term = String(args.query || '').trim();
+        if (!term) throw new Error('empty query');
+        const url = provider.url + '?' + new URLSearchParams({
+            query: prefix ? (prefix + ':' + term) : term,
+            format: 'json',
+            size: '20',
+            fields: 'acc,id,gene_primary_name,organism_scientific_name'
+        }).toString();
+        const resp = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 30000);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        const entries = (data && data.entries) || [];
+        if (!entries.length) throw new Error('no hits');
+        const first = (v) => Array.isArray(v) ? (v[0] || '') : (v || '');
+        return entries.map(e => {
+            const f = e.fields || {};
+            return {
+                accession: first(e.acc) || first(f.acc),
+                name: e.id || first(f.id),
+                gene: first(f.gene_primary_name),
+                organism: first(f.organism_scientific_name),
+                protein: e.id || ''
+            };
+        }).filter(r => r.accession);
+    },
     // EBI Job Dispatcher: submit -> poll -> result JSON (BLAST, HMMER, …)
     async ebiJob(provider, args, onProgress) {
         const base = provider.url;
@@ -3032,6 +3089,15 @@ const SERVICE_ADAPTERS = {
         if (!res.ok) throw new Error('result HTTP ' + res.status);
         return await res.json();
     },
+};
+
+// EBI Search field prefixes. `any` sends the bare term, which is what matches
+// entry names / accessions / short names best; the named fields are precise.
+const EBI_SEARCH_FIELDS = {
+    protein: 'descRecName',
+    gene: 'gene_primary_name',
+    organism: 'organism_scientific_name',
+    any: ''
 };
 
 // Runs a capability's providers in order until one succeeds.
@@ -3519,19 +3585,36 @@ async function fetchUniProtAnnotations() {
     if (uniprotAnnotationMode === 'sequence') {
         const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
         if (!seq) { showToast('Load a sequence first, then try Sequence mode.', 'error'); return; }
+        beginLookupStatus('sequence', 'BLAST (sequence) for a ' + seq.length + ' aa query');
         const acc = await resolveAccessionFromSequence(seq);
-        if (!acc) return;
+        if (!acc) { endLookupStatus(''); return; }
+        beginLookupStatus('accession', 'UniProt entry ' + acc);
         await useUniProtAccession(acc);
+        endLookupStatus('loaded annotations for ' + acc + '.');
     } else if (uniprotAnnotationMode === 'search') {
-        const field = (document.getElementById('uniprotSearchField') || {}).value || 'gene';
-        const q = ((document.getElementById('uniprotSearchInput') || {}).value || '').trim();
-        if (!q) { showToast('Enter a search term first.', 'error'); return; }
-        const results = await uniprotSearchEntries(field, q);
-        renderUniProtSearchResults(results, q);
+        const resolved = resolveUniProtSearchTerm();
+        if (!resolved.term) { showToast('Enter a search term first.', 'error'); return; }
+        // Reflect the correction in the controls before running it, so what
+        // actually ran is visible after the fact.
+        const fieldEl = document.getElementById('uniprotSearchField');
+        const termEl = document.getElementById('uniprotSearchInput');
+        if (fieldEl) fieldEl.value = resolved.field;
+        if (termEl) termEl.value = resolved.term;
+        uniprotLog('search: field=' + resolved.field + ' term="' + resolved.term + '"' +
+            (resolved.correctedFrom ? ' (autocorrected from "' + resolved.correctedFrom + '")' : ''));
+        if (resolved.correctedFrom) {
+            showToast('Autocorrected EBI Search to "' + resolved.term + '". Running in the background — you can leave this panel.', 'info');
+        }
+        beginLookupStatus('search', 'EBI Search (' + (LOOKUP_FIELD_LABELS[resolved.field] || resolved.field) + ') for "' + resolved.term + '"');
+        const results = await uniprotSearchEntries(resolved.field, resolved.term);
+        endLookupStatus(results && results.length ? (results.length + ' result(s) — pick one to load') : '');
+        renderUniProtSearchResults(results, resolved.term);
     } else {
         const acc = ((document.getElementById('uniprotAccessionInput') || {}).value || '').trim();
         if (!acc) { showToast('Enter a UniProt accession first.', 'error'); return; }
+        beginLookupStatus('accession', 'UniProt entry ' + acc);
         await useUniProtAccession(acc);
+        endLookupStatus('loaded annotations for ' + acc + '.');
     }
 }
 
@@ -5272,11 +5355,11 @@ function autoLookupAccession() {
     closeInputDataModal();
     openOptionsModal();
     switchOptionsTab('data');
-    if (currentProteinLabel) {
-        const inp = document.getElementById('uniprotSearchInput');
-        if (inp) inp.value = currentProteinLabel;
-    }
-    showToast('Use "Search" (name/gene/organism) or "Sequence (BLAST)" to find the UniProt accession.', 'info');
+    // Land on the section that does the work, expanded, with the mode and terms
+    // the loaded identifier line already implies.
+    focusUniProtSection();
+    const d = applyLookupDefaults(true);
+    if (!d) showToast('Set the Lookup Mode, then enter an accession or search term (or use Sequence / BLAST).', 'info');
 }
 
 // --- Sidebar tabs (Selection / Tracks / Workflow) -------------------------
@@ -5950,7 +6033,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.23.0';
+const APP_VERSION = '0.24.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -8222,6 +8305,163 @@ function recomputeConservationScores() {
     setP3DConservationDefault();
 }
 
+// --- Plain FASTA / identifier-line helpers ---------------------------------
+// Quick2D's own output is the primary input, but a bare FASTA (or a pasted
+// identifier line) is a supported starting point: it gives the reference
+// sequence, and predictions/annotations can be layered on afterwards.
+function parsePlainFasta(text) {
+    const lines = String(text == null ? '' : text).replace(/\r/g, '').split('\n');
+    let label = null, seq = '';
+    for (let i = 0; i < lines.length; i++) {
+        const t = lines[i].trim();
+        if (!t) continue;
+        if (t.charAt(0) === '>') {
+            if (label === null) { label = t.slice(1).trim(); continue; }
+            break; // a second record: keep the first
+        }
+        if (label === null) return null;      // sequence before any header
+        if (!/^[A-Za-z*.\-]+$/.test(t)) break; // not sequence -> stop cleanly
+        seq += t.replace(/[^A-Za-z]/g, '');
+    }
+    seq = seq.toUpperCase();
+    return seq ? { label, sequence: seq } : null;
+}
+function isPlainFastaInput(text) {
+    const t = String(text == null ? '' : text).trim();
+    if (!t || t.indexOf('AA_QUERY') !== -1) return false;
+    return t.charAt(0) === '>';
+}
+// Parses an identifier line such as
+//   sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria GN=GFP
+// (Quick2D's Protein ID line, or a FASTA header) so the lookup UI can pick the
+// right mode and term instead of asking the user to retype what it was given.
+function parseProteinHeaderLine(label) {
+    let raw = String(label == null ? '' : label).trim();
+    if (!raw) return null;
+    if (raw.charAt(0) === '>') raw = raw.slice(1).trim();
+    const out = { raw, database: '', accession: '', entryName: '', proteinName: '', organism: '', gene: '' };
+    let tail = raw;
+    const pipe = raw.match(/^([A-Za-z]{2,3})\|([A-Za-z0-9]{5,10})\|([A-Za-z0-9_.-]+)\s*(.*)$/);
+    if (pipe) {
+        out.database = pipe[1].toLowerCase();
+        out.accession = pipe[2];
+        out.entryName = pipe[3];
+        tail = pipe[4] || '';
+    } else {
+        const bare = raw.match(/^([A-Z][A-Z0-9]{4,9}[0-9])\b\s*(.*)$/);
+        if (bare) { out.accession = bare[1]; tail = bare[2] || ''; }
+    }
+    const takeTag = (tag) => {
+        const m = tail.match(new RegExp('(?:^|\\s)' + tag + '=([^=]+?)(?=\\s(?:[A-Z]{2}=)|$)'));
+        return m ? m[1].trim() : '';
+    };
+    out.organism = takeTag('OS');
+    out.gene = takeTag('GN');
+    const stop = tail.search(/\s(?:OS|GN|PE|SV|OX|OG)=/);
+    out.proteinName = (stop === -1 ? tail : tail.slice(0, stop)).trim().replace(/[,;]$/, '');
+    if (!out.proteinName && out.entryName) out.proteinName = out.entryName;
+    return (out.accession || out.entryName || out.proteinName) ? out : null;
+}
+// The mode + terms the loaded identifier line suggests.
+function deriveLookupDefaults() {
+    const parsed = parseProteinHeaderLine(currentProteinLabel);
+    if (!parsed) return null;
+    if (parsed.accession) {
+        return {
+            mode: 'accession', accession: parsed.accession, searchField: 'any',
+            searchTerm: parsed.entryName || parsed.proteinName || parsed.accession, parsed
+        };
+    }
+    return {
+        mode: 'search', accession: '', searchField: 'protein',
+        searchTerm: parsed.proteinName || parsed.entryName || '', parsed
+    };
+}
+let appliedLookupKey = null;
+// Pre-fills the lookup controls. Called after a successful parse and whenever
+// the UniProt section is opened, so the mode always reflects what is loaded.
+function applyLookupDefaults(announce) {
+    const d = deriveLookupDefaults();
+    if (!d) return null;
+    const modeEl = document.getElementById('uniprotModeSelect');
+    const accEl = document.getElementById('uniprotAccessionInput');
+    const fieldEl = document.getElementById('uniprotSearchField');
+    const termEl = document.getElementById('uniprotSearchInput');
+    if (modeEl) modeEl.value = d.mode;
+    uniprotAnnotationMode = d.mode;
+    if (accEl && d.accession && !accEl.value.trim()) accEl.value = d.accession;
+    if (fieldEl) fieldEl.value = d.searchField;
+    if (termEl && d.searchTerm && !termEl.value.trim()) termEl.value = d.searchTerm;
+    updateUniProtModeVisibility();
+    const key = (d.parsed.accession || '') + '|' + d.searchTerm;
+    const changed = appliedLookupKey !== key;
+    appliedLookupKey = key;
+    if (announce && changed) {
+        showToast(d.accession
+            ? ('Lookup set to Accession ' + d.accession + ' from the loaded identifier.')
+            : ('Lookup set to Search (protein) for "' + d.searchTerm + '".'), 'info');
+    }
+    return d;
+}
+// Opens Options > Data Sources with only the UniProt section expanded.
+function focusUniProtSection() {
+    ['optSecConservation', 'optSecTopology'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.open = false;
+    });
+    const sec = document.getElementById('optSecUniprot');
+    if (sec) {
+        sec.open = true;
+        if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'start' });
+    }
+    applyLookupDefaults(false);
+}
+// The term actually sent: a pasted identifier line (or an empty box with a
+// loaded protein) is corrected to the entry name / protein name, which is what
+// the index matches reliably - a whole header line never matches anything.
+function resolveUniProtSearchTerm() {
+    const fieldEl = document.getElementById('uniprotSearchField');
+    const termEl = document.getElementById('uniprotSearchInput');
+    const field = (fieldEl && fieldEl.value) || 'protein';
+    const typed = ((termEl && termEl.value) || '').trim();
+    const parsed = parseProteinHeaderLine(typed);
+    const looksLikeHeader = !!parsed && (!!parsed.accession || /\b(?:OS|GN|PE|SV|OX)=/.test(typed));
+    if (typed && !looksLikeHeader) return { field, term: typed, correctedFrom: '' };
+    const d = deriveLookupDefaults();
+    const better = (d && d.searchTerm) ? d.searchTerm : '';
+    if (better && better !== typed) {
+        return { field: d.searchField || 'protein', term: better, correctedFrom: typed || currentProteinLabel || '' };
+    }
+    return { field, term: typed, correctedFrom: '' };
+}
+
+// --- Lookup progress (mode, query, estimate, elapsed) ----------------------
+const LOOKUP_ESTIMATES = { search: 'usually 1-5 s', accession: 'usually 1-3 s', sequence: 'usually 3-8 min (BLAST)' };
+const LOOKUP_FIELD_LABELS = { protein: 'protein name', any: 'any field', gene: 'gene name', organism: 'organism' };
+let lookupStatusTimer = null, lookupStatusStart = 0, lookupStatusBase = '';
+function renderLookupStatus(kind) {
+    const el = document.getElementById('uniprotLookupStatus');
+    if (!el) return;
+    const secs = Math.round((Date.now() - lookupStatusStart) / 1000);
+    el.hidden = false;
+    el.textContent = lookupStatusBase + ' — ' + (LOOKUP_ESTIMATES[kind] || '') + (secs > 0 ? ' · ' + secs + ' s elapsed' : '') +
+        (secs > 20 ? ' (safe to leave this panel — it keeps running)' : '');
+}
+function beginLookupStatus(kind, detail) {
+    lookupStatusStart = Date.now();
+    lookupStatusBase = detail;
+    renderLookupStatus(kind);
+    if (lookupStatusTimer) clearInterval(lookupStatusTimer);
+    lookupStatusTimer = setInterval(() => renderLookupStatus(kind), 1000);
+}
+function endLookupStatus(message) {
+    if (lookupStatusTimer) { clearInterval(lookupStatusTimer); lookupStatusTimer = null; }
+    const el = document.getElementById('uniprotLookupStatus');
+    if (!el) return;
+    if (message) { el.hidden = false; el.textContent = '✓ ' + message; }
+    else { el.hidden = true; el.textContent = ''; }
+}
+
 // --- Options > Conservation Scoring -----------------------------------------
 // The three settings backing the CONSERVATION row (metric, whether HHR
 // homologs participate, and how variant FASTA is aligned onto the reference).
@@ -8526,7 +8766,10 @@ function parseAndBuildViewer() {
         }
     }
 
-    if (!fullAA) { showToast('Unable to parse AA_QUERY sequences - check the pasted text.', 'error'); return; }
+    if (!fullAA && isPlainFastaInput(rawText)) {
+        if (buildFromPlainFasta(rawText)) return; // sequence-only session
+    }
+    if (!fullAA) { showToast('Unable to parse AA_QUERY or FASTA sequences - check the pasted text.', 'error'); return; }
 
     const newParsedTracks = { 'AA': fullAA };
     knownTracks.forEach(t => {
@@ -8551,8 +8794,33 @@ function parseAndBuildViewer() {
     setMetricsBase('Select a region or graph point for statistics.');
     lastRanges = null; refreshChimeraxDisplay();
     populateCrossRefDropdown();
+    applyLookupDefaults(false);
 
     renderViewer(parsedTracks);
+}
+
+// A bare FASTA (or a pasted ">id" header plus sequence) becomes a sequence-only
+// session: the reference row is enough to start, and predictions, homologs and
+// annotations can be layered on afterwards.
+function buildFromPlainFasta(rawText) {
+    const parsed = parsePlainFasta(rawText);
+    if (!parsed || !parsed.sequence) return false;
+    currentProteinLabel = parsed.label || null;
+    parsedTracks = { AA: parsed.sequence };
+    selectStart = null; selectEnd = null; selectionMode = 'point';
+    activeRowKey = null; rowRanges = [];
+    document.getElementById('rangeDisplay').textContent = 'No selection active';
+    document.getElementById('fastaDisplay').textContent = '-';
+    updateHomologFastaSection();
+    setMetricsBase('Select a region or graph point for statistics.');
+    lastRanges = null; refreshChimeraxDisplay();
+    populateCrossRefDropdown();
+    applyLookupDefaults(false);
+    renderViewer(parsedTracks);
+    schedulePersist();
+    showToast('Loaded a ' + parsed.sequence.length + ' aa FASTA sequence' +
+        (parsed.label ? ' (' + parsed.label + ')' : '') + '. Predictions can be added whenever you are ready.', 'success');
+    return true;
 }
 
 // --- Track Control (per-type view options) ------------------------------

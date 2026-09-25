@@ -316,3 +316,38 @@ stay independent signals. The sequence step has no row to remove and routes to
 row as all-zeros (`computeConservationScores([])` returns a zero-filled array of
 the right width) instead of dropping it; `recomputeConservationScores()` now
 deletes the row when there are no input sequences.
+
+## 14. UniProt lookup: identifier parsing + the search provider fix (v0.24.0)
+
+**Why lookups appeared to do nothing.** `text_search` pointed at the EBI Proteins API
+(`https://www.ebi.ac.uk/proteins/api/proteins`). Re-tested 2026-09: every request
+timed out (12 s → 120 s), so the search path never returned. EBI Search's UniProt
+index (`https://www.ebi.ac.uk/ebisearch/ws/rest/uniprot`) serves the same data in
+~1 s and needs a single request for the whole result list (`fields=acc,id,
+gene_primary_name,organism_scientific_name`). The dead provider stays registered but
+`enabled: false` with the reason, so the fall-through chain still documents it.
+
+**Field prefixes matter.** EBI Search has no `protein:` field; the verified mapping is
+`protein → descRecName`, `gene → gene_primary_name`,
+`organism → organism_scientific_name`, and `any → ''` (bare query). A bare query is
+what matches *entry names* (`GFP_AEQVI` → 1 hit) and accessions; `descRecName:GFP_AEQVI`
+returns 0 hits, which is exactly why the corrected term must use the bare form.
+
+**Identifier lines are parsed, not re-typed.** Quick2D's `Protein ID` line and FASTA
+headers share a shape (`sp|P42212|GFP_AEQVI Green fluorescent protein OS=… GN=…`), so
+`parseProteinHeaderLine()` extracts database / accession / entry name / protein name /
+organism / gene. `deriveLookupDefaults()` turns that into a mode + terms:
+
+| Parsed | Mode | Search fallback |
+|---|---|---|
+| accession present | **Accession**, pre-filled | field `any`, term = entry name |
+| name only | **Search** | field `protein`, term = protein name |
+
+`resolveUniProtSearchTerm()` autocorrects at fetch time: a pasted header line (or an
+empty box with a label loaded) becomes the entry name, announced with a top-right toast
+so it is obvious what ran and that the panel can be left. A progress line
+(`beginLookupStatus`/`endLookupStatus`) shows mode, query, estimate and elapsed time.
+
+**Plain FASTA is a valid start.** `parsePlainFasta()` accepts a `>header` plus sequence
+(and is deliberately not fooled by Quick2D output), producing a sequence-only session
+via `buildFromPlainFasta()`, so predictions/annotations can be layered on afterwards.
