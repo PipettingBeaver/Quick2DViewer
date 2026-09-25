@@ -1201,6 +1201,16 @@
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
         .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+        .tctl-danger { color:#b91c1c; border-color:#fecaca; }
+        .tctl-danger:hover { background:#fef2f2; }
+        .tm-remove {
+            margin-left:auto; flex-shrink:0; background:none; border:none; color:#cbd5e1;
+            font-size:0.85rem; line-height:1; padding:0 3px; cursor:pointer; border-radius:3px;
+        }
+        .tm-group-head .tm-remove:hover, .tm-track .tm-remove:hover { color:#b91c1c; background:#fef2f2; }
+        .tm-remove:focus-visible { outline:2px solid #2563eb; outline-offset:1px; }
+        .guide-danger { color:#b91c1c; border-color:#fecaca; }
+        .guide-danger:hover { background:#fef2f2; border-color:#fca5a5; }
         .guide-step-qs { border-top:1px dashed #e2e8f0; border-bottom:1px dashed #e2e8f0; padding:6px 0; margin:2px 0 7px; }
         .guide-step-qs .guide-q:last-child { margin-bottom:0; }
         .guide-hint { font-size:0.68rem; color:#475569; margin-top:5px; line-height:1.4; }
@@ -4385,6 +4395,45 @@ function resolveStepAction(step) {
     if (!resolved) return Object.assign({ custom: false }, base);
     return { label: resolved.label, run: resolved.run, hint: resolved.hint || '', custom: resolved.run !== step.action.run || resolved.label !== step.action.label };
 }
+// Undoing a step from the guide. Unlike hiding, this removes the data the step
+// added, in the units the step thinks in - the groups it populated, and for
+// Foldseek only its own hits. Removal is what makes a step read as not-done
+// again; manual done/skip overrides are deliberately left untouched.
+const STEP_UNDO = {
+    sequence: { reset: true, label: 'Reset all data…' },
+    features: { groups: ['SS', 'TM', 'DO', 'CC', 'SP'] },
+    annotation: { groups: ['UP', 'DM'] },
+    homologs: { groups: ['HL', 'CONSERVATION'] },
+    structure: { groups: ['pLDDT', 'RSA', 'Cofactors'] },
+    foldseek: { groups: ['HL'], filter: (k) => /Foldseek/i.test((homologHitsInfo[k] || {}).source || '') },
+    topology: { groups: ['TP'] },
+    integration: { groups: ['RULE', 'IF'] }
+};
+function guideStepUndoKeys(stepId) {
+    const spec = STEP_UNDO[stepId];
+    if (!spec || !spec.groups) return [];
+    let keys = [];
+    spec.groups.forEach(g => { getGroupTrackKeys(g).forEach(k => keys.push(k)); });
+    if (spec.filter) keys = keys.filter(spec.filter);
+    return keys;
+}
+async function undoGuideStep(stepId) {
+    const spec = STEP_UNDO[stepId];
+    if (!spec) return;
+    if (spec.reset) {
+        if (await confirmDialog('Reset the whole session? Every loaded track, attached structure and selection is cleared.',
+            { okLabel: 'Reset', danger: true })) resetAllData();
+        return;
+    }
+    const keys = guideStepUndoKeys(stepId);
+    if (!keys.length) { showToast('Nothing to remove for this step.', 'info'); return; }
+    const ok = await confirmDialog('Remove the ' + keys.length + ' track(s) this step added? This cannot be undone.',
+        { okLabel: 'Remove', danger: true });
+    if (!ok) return;
+    const n = removeTracks(keys);
+    showToast('Removed ' + n + ' track(s) — the step no longer counts as covered.', 'success');
+}
+
 function openTopologyPanel() {
     openOptionsModal();
     switchOptionsTab('data');
@@ -4585,6 +4634,7 @@ function renderWorkflowGuide() {
             '<button type="button" class="guide-run" onclick="' + act.run + '">' + label + '</button>' +
             (act.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + r.step.action.run + '">' + r.step.action.label + '</button>' : '') +
             (r.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
+            (r.done && STEP_UNDO[r.step.id] ? '<button type="button" class="guide-mini guide-danger" onclick="undoGuideStep(\'' + r.step.id + '\')">' + (STEP_UNDO[r.step.id].label || 'Undo this step') + '</button>' : '') +
             (r.done && !r.manualDone ? '' : '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.manualDone ? 'clear' : 'done') + '\')">' + (r.manualDone ? 'Clear "done"' : 'Mark done') + '</button>') +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.skipped ? 'clear' : 'skipped') + '\')">' + (r.skipped ? 'Unskip' : 'Skip') + '</button>' +
             (r.override ? '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'clear\')">Reset</button>' : '') +
@@ -4727,6 +4777,7 @@ function renderTrackManager() {
             '<button type="button" class="tm-chevron" data-g="' + gEsc + '" onclick="toggleTrackManagerExpand(this.dataset.g)" title="' + (expanded ? 'Collapse' : 'Expand') + ' individual tracks">' + (expanded ? '▾' : '▸') + '</button>' +
             '<button type="button" class="tm-eye" data-g="' + gEsc + '" onclick="toggleTrackManagerGroup(this.dataset.g)" title="Show/hide all ' + structureEscapeHtml(trackGroupLabel(g)) + '">' + (groupHidden ? '○' : '●') + '</button>' +
             '<span class="tm-group-name" style="cursor:pointer;" onclick="toggleTrackManagerExpand(\'' + gEsc + '\')">' + structureEscapeHtml(trackGroupLabel(g)) + ' <span style="color:#94a3b8;">(' + keys.length + ')</span></span>' +
+            '<button type="button" class="tm-remove" data-g="' + gEsc + '" onclick="confirmRemoveGroup(this.dataset.g)" title="Remove all ' + structureEscapeHtml(trackGroupLabel(g)) + ' tracks and their data">×</button>' +
             '</div>';
         if (expanded) {
             keys.forEach(k => {
@@ -4734,6 +4785,7 @@ function renderTrackManager() {
                 html += '<div class="tm-track">' +
                     '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
                     '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) + ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
+                    '<button type="button" class="tm-remove" data-k="' + structureEscapeHtml(k) + '" onclick="confirmRemoveTrack(this.dataset.k)" title="Remove this track and its data">×</button>' +
                     '</div>';
             });
         }
@@ -5333,7 +5385,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.20.0';
+const APP_VERSION = '0.21.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -6184,6 +6236,11 @@ function buildTctlContent() {
             pop.appendChild(consBtn);
         }
 
+        const remBtn = mkEl('button', 'tctl-btn tctl-danger', 'Remove type…');
+        remBtn.title = 'Delete every ' + trackGroupLabel(g) + ' track and the data behind it (not undoable)';
+        remBtn.addEventListener('click', () => { closeTctlPopup(); confirmRemoveGroup(g); });
+        pop.appendChild(remBtn);
+
         const cfgBtn = mkEl('button', 'tctl-btn', 'Config\u2026');
         cfgBtn.title = `Open the ${trackGroupLabel(g)} configuration (Conservation Scoring, cutoffs, predictor info)`;
         cfgBtn.addEventListener('click', () => {
@@ -6405,6 +6462,15 @@ function openTrackCtxMenu(key, clientX, clientY) {
         const anchor = trackCtxAnchorEl(key);
         closeTrackCtxMenu();
         openTrackControlPopup(anchor);
+    });
+
+    menu.appendChild(mkEl('div', 'tctx-divider'));
+    const removeItem = addTrackCtxItem(menu, 'Remove this track…', '');
+    removeItem.style.color = '#b91c1c';
+    removeItem.title = 'Delete this track and the data behind it (not undoable)';
+    removeItem.addEventListener('click', () => {
+        closeTrackCtxMenu();
+        confirmRemoveTrack(key);
     });
 
     menu.hidden = false;
@@ -7571,9 +7637,16 @@ function getConservationAlignedSequences() {
 function recomputeConservationScores() {
     const metric = (typeof conservationMetric === 'string' && conservationMetric) ? conservationMetric : 'shannon';
     const seqs = getConservationAlignedSequences();
-    const scores = computeConservationScores(seqs, metric);
     const width = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
-    if (!width || !scores.length) {
+    // No inputs left (e.g. the last variant was removed, or HHR participation is
+    // off) -> drop the row instead of leaving an all-zero track behind.
+    if (!width || !seqs.length) {
+        if (parsedTracks) delete parsedTracks.CONSERVATION;
+        if (typeof updateConservationSection === 'function') updateConservationSection();
+        return;
+    }
+    const scores = computeConservationScores(seqs, metric);
+    if (!scores.length) {
         if (parsedTracks) delete parsedTracks.CONSERVATION;
         return;
     }
@@ -8107,6 +8180,114 @@ function getTctlGroupsInOrder() {
 }
 function getTctlGroupCount(group) {
     return Object.keys(parsedTracks).filter(k => getTrackGroup(k) === group).length;
+}
+
+// --- Removing tracks -------------------------------------------------------
+// Hiding a track is a view choice; removing one has to unpick the data that
+// produced it, or the next re-parse/recompute would silently bring it back. So
+// each group declares its own cleanup below; anything without an entry is a
+// plain session-level removal.
+const TRACK_REMOVERS = {
+    // Homolog rows carry a parallel info map (templates table, tooltips).
+    HL: (keys) => keys.forEach(k => { delete homologHitsInfo[k]; }),
+    // Pfam domains keep their per-family stats here.
+    DM: (keys) => keys.forEach(k => { delete domainHitsInfo[k]; }),
+    // UniProt rows mirror uniprotFeatureTracks; removing the last one clears the
+    // fetch itself (the annotation step then reports "not done" again).
+    UP: (keys) => keys.forEach(k => { delete uniprotFeatureTracks[k]; }),
+    // Rules are edited objects, not just rows: drop the rule definition too.
+    RULE: (keys) => {
+        const ids = keys.map(k => k.slice(5));
+        analysisRules = analysisRules.filter(r => ids.indexOf(String(r.id)) === -1);
+        ids.forEach(id => { delete trackMeta['RULE_' + id]; });
+    },
+    // Topology rows are derived from the pasted sources, so remove the source
+    // each row came from; the rows are rebuilt from what is left.
+    TP: (keys) => {
+        keys.forEach(k => {
+            if (k === 'TP_Consensus') return; // consensus has no source of its own
+            const name = k.slice(3);
+            const idx = topologySources.findIndex(src => src.name.replace(/[^A-Za-z0-9]+/g, '_') === name);
+            if (idx !== -1) topologySources.splice(idx, 1);
+        });
+    },
+    // Variant rows mirror keyedVariantsInfo; conservation is recomputed from
+    // whatever inputs remain (it may legitimately survive via HHR homologs).
+    VAR: (keys) => keys.forEach(k => { delete keyedVariantsInfo[k.slice(4)]; }),
+};
+
+// Removes the given track keys plus their backing data, and repaints.
+// `opts.silent` skips the repaint (used when batching).
+function removeTracks(keys, opts) {
+    opts = opts || {};
+    const list = (keys || []).filter(k => k && k !== 'AA' && Object.prototype.hasOwnProperty.call(parsedTracks, k));
+    if (!list.length) return 0;
+    const byGroup = {};
+    list.forEach(k => { const g = getTrackGroup(k); (byGroup[g] = byGroup[g] || []).push(k); });
+
+    // 1) unpick the backing data
+    Object.keys(byGroup).forEach(g => {
+        const fn = TRACK_REMOVERS[g];
+        if (!fn) return;
+        try { fn(byGroup[g]); } catch (e) { console.warn('track cleanup failed for ' + g, e); }
+    });
+
+    // 2) drop the rows and their provenance
+    list.forEach(k => { delete parsedTracks[k]; delete trackMeta[k]; });
+
+    // 3) group post-steps that rebuild or invalidate other state
+    if (byGroup.TP) { try { applyTopologySources(); } catch (e) { /* rebuild best-effort */ } }
+    if (byGroup.RULE) { try { renderRulesList(); } catch (e) { /* panel may be closed */ } }
+    if (byGroup.VAR) {
+        try { recomputeConservationScores(); } catch (e) { /* no reference sequence */ }
+        if (typeof updateVariantFastaSection === 'function') updateVariantFastaSection();
+    }
+    if (byGroup.UP && !Object.keys(parsedTracks).some(k => k.startsWith('UP_'))) uniprotFeatures = null;
+
+    // 4) control state must not outlive the tracks it referred to
+    ['hidden', 'hideSymbols', 'fullBar', 'filtered', 'aaSeq', 'consColor', 'viewOverride'].forEach(bag => {
+        if (!trackControlState[bag]) return;
+        list.forEach(k => { delete trackControlState[bag][k]; });
+    });
+    Object.keys(byGroup).forEach(g => {
+        if (!getGroupTrackKeys(g).length && trackControlState.hidden) delete trackControlState.hidden[g];
+    });
+
+    // 5) repaint everything that mirrors the track list
+    if (!opts.silent) {
+        renderViewer(parsedTracks);
+        populateCrossRefDropdown();
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        refreshGuideIfVisible();
+        schedulePersist();
+    }
+    return list.length;
+}
+
+function removeTrackGroup(group, opts) {
+    return removeTracks(getGroupTrackKeys(group), opts);
+}
+
+// UI entry points (confirm first - removal is not undoable from here).
+async function confirmRemoveGroup(group) {
+    const keys = getGroupTrackKeys(group);
+    if (!keys.length) { showToast('No ' + trackGroupLabel(group) + ' tracks to remove.', 'info'); return 0; }
+    const ok = await confirmDialog('Remove all ' + keys.length + ' ' + trackGroupLabel(group) + ' track(s) and the data behind them? This cannot be undone.',
+        { okLabel: 'Remove', danger: true });
+    if (!ok) return 0;
+    const n = removeTracks(keys);
+    showToast('Removed ' + n + ' ' + trackGroupLabel(group) + ' track(s).', 'success');
+    return n;
+}
+async function confirmRemoveTrack(key) {
+    if (!Object.prototype.hasOwnProperty.call(parsedTracks, key)) return 0;
+    const ok = await confirmDialog('Remove "' + formatTrackLabel(key) + '" and the data behind it? This cannot be undone.',
+        { okLabel: 'Remove', danger: true });
+    if (!ok) return 0;
+    const n = removeTracks([key]);
+    if (n) showToast('Removed ' + formatTrackLabel(key) + '.', 'success');
+    return n;
 }
 function getHomologDisplayName(key) {
     const m = key.match(/^HL_\d+_(.+)$/);

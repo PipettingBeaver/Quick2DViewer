@@ -378,6 +378,99 @@ try { ansPersist = ctxRun(`gatherPersistableState().preferences.guideAnswers['ho
 assert(ansPersist === 'no', 'step answers are persisted in preferences');
 ctxRun(`guideAnswers = {}; guideProfile = {}; guideOverrides = {}; parsedTracks = {};`);
 
+section('track removal + guide undo');
+ctxRun(`parsedTracks = {}; trackMeta = {}; guideProfile = {}; guideOverrides = {}; guideAnswers = {}; analysisRules = [];`);
+
+// --- single track: row + backing registry + control state ------------------
+ctxRun(`
+    parsedTracks.AA = 'MKV';
+    parsedTracks['UP_Active_site'] = '\u25a0  ';
+    uniprotFeatureTracks['UP_Active_site'] = { type: 'Active site' };
+    uniprotFeatures = { accession: 'P00001', features: [] };
+    homologHitsInfo['HL_01_hit'] = { source: 'HHpred' };
+    parsedTracks['HL_01_hit'] = 'EE ';
+    trackControlState.filtered['UP_Active_site'] = true;
+    trackControlState.viewOverride['UP_Active_site'] = 'glyphs';
+`);
+let removed = ctxRun(`removeTracks(['UP_Active_site'], { silent: true })`);
+assert(removed === 1, 'removeTracks reports the number of rows removed');
+assert(ctxRun(`parsedTracks['UP_Active_site']`) === undefined, 'the row is gone');
+assert(ctxRun(`uniprotFeatureTracks['UP_Active_site']`) === undefined, 'the UniProt feature registry entry is gone');
+assert(ctxRun(`trackControlState.filtered['UP_Active_site']`) === undefined && ctxRun(`trackControlState.viewOverride['UP_Active_site']`) === undefined, 'per-track control state is cleaned up');
+ctxRun(`removeTracks(['HL_01_hit'], { silent: true });`);
+assert(ctxRun(`homologHitsInfo['HL_01_hit']`) === undefined, 'homolog info map is cleaned up');
+
+// --- removing the last UniProt row clears the fetch ------------------------
+assert(ctxRun(`uniprotFeatures`) === null, 'removing every UP_ row clears the UniProt fetch');
+// --- AA is the dataset itself and is protected ----------------------------
+assert(ctxRun(`removeTracks(['AA'], { silent: true })`) === 0, 'AA cannot be removed as a track');
+assert(ctxRun(`typeof parsedTracks.AA`) === 'string', 'the sequence survives a refused removal');
+// --- unknown keys are ignored ---------------------------------------------
+assert(ctxRun(`removeTracks(['NOPE_1'], { silent: true })`) === 0, 'unknown keys are ignored');
+
+// --- type-level removal ----------------------------------------------------
+ctxRun(`
+    parsedTracks['DM_ubiquitin'] = '\u2588\u2588\u2588';
+    parsedTracks['DM_Rad60'] = ' \u2588\u2588';
+    domainHitsInfo['DM_ubiquitin'] = { model: 'ubiquitin' };
+    domainHitsInfo['DM_Rad60'] = { model: 'Rad60' };
+`);
+assert(ctxRun(`removeTrackGroup('DM', { silent: true })`) === 2, 'type-level removal takes every row of the type');
+assert(ctxRun(`getGroupTrackKeys('DM').length`) === 0, 'no DM rows remain');
+assert(ctxRun(`Object.keys(domainHitsInfo).length`) === 0, 'domain stats are dropped with the rows');
+
+// --- rules drop their definition too --------------------------------------
+ctxRun(`
+    analysisRules = [{ id: 'r1', name: 'A', color: '#f00', mode: 'all', enabled: true, conditions: [] }];
+    parsedTracks['RULE_r1'] = '\u2588  ';
+    setTrackMeta('RULE_r1', { source: 'Rule', color: '#f00' });
+`);
+ctxRun(`removeTracks(['RULE_r1'], { silent: true });`);
+assert(ctxRun(`analysisRules.length`) === 0, 'removing a RULE_ row also removes its rule definition');
+
+// --- variants: registry + derived conservation -----------------------------
+ctxRun(`
+    keyedVariantsInfo = { v1: { aligned: 'MKV', raw: 'MKV' } };
+    parsedTracks['VAR_v1'] = 'MKV';
+    parsedTracks.CONSERVATION = { type: 'conservation', metric: 'shannon', values: [1, 1, 1] };
+`);
+ctxRun(`removeTracks(['VAR_v1'], { silent: true });`);
+assert(ctxRun(`keyedVariantsInfo.v1`) === undefined, 'variant registry entry removed');
+assert(ctxRun(`parsedTracks.CONSERVATION`) === undefined, 'conservation is recomputed away with its variants');
+
+// --- topology: the pasted source is what actually goes --------------------
+ctxRun(`
+    parsedTracks.AA = 'MKV';
+    topologySources = [{ name: 'TMHMM run', state: 'iii' }];
+    applyTopologySources();
+`);
+assert(ctxRun(`getGroupTrackKeys('TP').length`) >= 1, 'topology source produced a TP_ row');
+ctxRun(`removeTracks(getGroupTrackKeys('TP'), { silent: true });`);
+assert(ctxRun(`topologySources.length`) === 0, 'removing the TP_ rows removes the pasted topology source');
+
+// --- guide undo ------------------------------------------------------------
+assert(stepIds.every(id => ctxRun(`typeof STEP_UNDO['` + id + `'] === 'object'`)), 'every step declares how to undo itself');
+ctxRun(`
+    parsedTracks.AA = 'MKV';
+    parsedTracks['SS_PSIPRED'] = 'HHH';
+    parsedTracks['TM_Quick2D'] = '   ';
+`);
+let undoKeys = ctxRun(`guideStepUndoKeys('features')`);
+assert(undoKeys.length === 2, 'features undo targets the prediction groups');
+assert(ctxRun(`guideStepStatus().filter(r => r.step.id === 'features')[0].done`) === true, 'features step reads as covered');
+ctxRun(`removeTracks(guideStepUndoKeys('features'), { silent: true });`);
+assert(ctxRun(`guideStepStatus().filter(r => r.step.id === 'features')[0].done`) === false, 'undoing the step makes it read as not covered again');
+ctxRun(`
+    parsedTracks['HL_01_hhpred'] = 'EE ';
+    homologHitsInfo['HL_01_hhpred'] = { source: 'HHpred' };
+    parsedTracks['HL_02_foldseek'] = 'EE ';
+    homologHitsInfo['HL_02_foldseek'] = { source: 'Foldseek' };
+`);
+undoKeys = ctxRun(`guideStepUndoKeys('foldseek')`);
+assert(undoKeys.length === 1 && /foldseek/.test(undoKeys[0]), 'Foldseek undo only targets Foldseek hits');
+assert(ctxRun(`STEP_UNDO.sequence.reset`) === true, 'the sequence step undoes via a full reset');
+assert(ctxRun(`parsedTracks = {}; topologySources = []; keyedVariantsInfo = {}; uniprotFeatures = null; trackMeta = {};`), 'state reset for the next section');
+
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [
     '# hmmscan :: search sequence(s) against a profile database',

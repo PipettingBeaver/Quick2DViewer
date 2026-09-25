@@ -257,3 +257,41 @@ the card as a secondary button whenever an answer overrides it.
   comparison when membrane = yes and both are present.
 - **Report export**: emit the guide state (answers, step status, insights) as a
   methods-summary alongside the figure/table export.
+
+## 13. Track removal (v0.21.0)
+
+**Hide vs remove.** `trackControlState.hidden/filtered` are view choices and are
+reversible; removal deletes the data. Because almost every track is *derived*, a
+raw `delete parsedTracks[key]` would be undone by the next re-parse, so removal
+runs a per-group cleanup first. `TRACK_REMOVERS` is keyed by **`getTrackGroup`
+result** (group names such as `UP`, not key prefixes):
+
+| Group | Cleanup on removal |
+|---|---|
+| `HL` | `homologHitsInfo[key]` |
+| `DM` | `domainHitsInfo[key]` |
+| `UP` | `uniprotFeatureTracks[key]`; removing the last row clears `uniprotFeatures` |
+| `RULE` | drops the matching `analysisRules` entry + its `trackMeta` |
+| `TP` | splices the matching `topologySources` entry, then `applyTopologySources()` rebuilds the rows (consensus included) |
+| `VAR` | `keyedVariantsInfo[name]`, then `recomputeConservationScores()` |
+| others | session-level row removal (a re-import can restore them — this is why the SCI/SS/pLDDT groups have no registry cleanup) |
+
+`removeTracks(keys, { silent })` also clears the per-track entries in all seven
+`trackControlState` bags (and a group's `hidden` flag once its last row is gone),
+then repaints viewer / cross-refs / Input Data / Tracks tab / guide and persists.
+`AA` is refused — that *is* the dataset, so it routes to `resetAllData()`.
+
+**Surface area.** Per-track: right-click → *Remove this track…*, or the `×` in the
+Tracks tab. Per-type: *Remove type…* in the per-type popover, or the `×` on the
+type row. All routes confirm first (`confirmDialog`, danger).
+
+**Guide Undo.** The same engine expressed per step in `STEP_UNDO` (groups to
+remove, plus an optional `filter` — Foldseek only removes its own hits). Undo
+deliberately does **not** touch `guideOverrides`, so "marked done" and "has data"
+stay independent signals. The sequence step has no row to remove and routes to
+`resetAllData()` instead.
+
+**Bug found while building it.** Removing the last conservation input rebuilt the
+row as all-zeros (`computeConservationScores([])` returns a zero-filled array of
+the right width) instead of dropping it; `recomputeConservationScores()` now
+deletes the row when there are no input sequences.

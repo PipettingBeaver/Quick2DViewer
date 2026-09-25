@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-25
+
+### Added
+
+- **Remove tracks** — hiding is a view choice, removal deletes data. Until now only
+  `Reset Data` could clear a stray fetch. You can now remove:
+  - **one track** — right-click it → *Remove this track…*, or the **×** next to it
+    in the Tracks tab;
+  - **a whole type** — *Remove type…* in the per-type popover, or the **×** on the
+    type row in the Tracks tab.
+  Removal unpicks the backing data as well as the row, so a later re-parse or
+  recompute cannot silently resurrect it: homolog hit info, Pfam domain stats,
+  the UniProt feature registry (removing the last row clears the fetch), rule
+  definitions, the pasted topology source, and variant records plus the derived
+  conservation row. Per-track view/filter/hide state is cleaned up too. The
+  sequence (`AA`) is refused — that routes to Reset Data. Every route confirms.
+- **Guide "Undo"** — once a step reads as done, the guide offers *Undo this step*,
+  which removes exactly what that step added (Foldseek undo removes only its own
+  hits; the sequence step routes to *Reset all data…*). Manual done/skip overrides
+  are left untouched, so "marked done" and "has data" stay independent.
+
+### Fixed
+
+- Removing the last conservation input rebuilt the row as all-zeros instead of
+  dropping it. `recomputeConservationScores()` now deletes the row when there are
+  no input sequences left (e.g. the last variant was removed).
+
 ## [0.20.0] - 2026-09-25
 
 ### Added
