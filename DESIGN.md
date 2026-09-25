@@ -262,14 +262,22 @@ degrades to the generic action rather than blocking. Re-clicking a selected
 option clears it; `resetStepAnswers()` clears all. The generic action stays on
 the card as a secondary button whenever an answer overrides it.
 
-### Roadmap (next iterations)
+### Roadmap (status)
 
-- **Profile → rule presets**: when variants/membrane are flagged, offer the
-  matching rule preset (needs the `group:<GROUP>` condition source from §11).
-- **Profile → topology/TM cross-check**: auto-run a "TM consensus vs Quick2D TM"
-  comparison when membrane = yes and both are present.
-- **Report export**: emit the guide state (answers, step status, insights) as a
-  methods-summary alongside the figure/table export.
+- ~~**Profile → rule presets**~~ — **done v0.22.0** (`suggestedRulePresets()` +
+  the `group:<GROUP>` source from §11).
+- ~~**Profile → topology/TM cross-check**~~ — **done v0.23.0**
+  (`computeTmCrossCheck()`; the guide read-out names the disagreement count, and
+  the topology step carries a *Cross-check TM* action). The comparison is pure and
+  client-side; it writes one `XC_TM` row in the new **Cross-checks** group plus a
+  segment table whose rows can be turned into selections.
+- ~~**Report export**~~ — **done v0.23.0** (`buildMethodsReport()` /
+  `exportMethodsReport()`): intake answers, coverage table with the per-step
+  answers, loaded evidence, rules (readable queries + preset ids), the TM
+  cross-check, the automated read-out, and the citations for covered steps only.
+  Reached from Export → *Methods summary (.md)* and the Guide tab.
+- Still open: a **`group:<GROUP>` numeric aggregate** (e.g. mean over a type) if a
+  future preset needs it; migrating pre-0.23.0 saves (see `QA_CHECKLIST.md` X1).
 
 ## 13. Track removal (v0.21.0)
 

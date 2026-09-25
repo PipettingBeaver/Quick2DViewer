@@ -17,7 +17,7 @@ function makeEl() {
   const el = {
     style: { setProperty() {}, removeProperty() {}, getPropertyValue() { return ''; } },
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    dataset: {}, attrs: {}, children: [], _text: '',
+    dataset: {}, attrs: {}, children: [], options: [], selectedIndex: -1, _text: '',
     set textContent(v) { this._text = String(v); },
     get textContent() { return this._text; },
     innerHTML: '', value: '', checked: false, type: '', disabled: false, hidden: false,
@@ -551,6 +551,137 @@ assert(ctxRun(`analysisRules.length`) === 2 && ctxRun(`analysisRules[1].name`).i
 ctxRun(`analysisRules[0].conditions[0].value = 'CHANGED';`);
 assert(ctxRun(`RULE_PRESETS.filter(p => p.id === 'topology_contradiction')[0].conditions[0].value`) === '', 'applied conditions are deep copies of the preset');
 ctxRun(`analysisRules = []; parsedTracks = {}; guideProfile = {};`);
+
+section('TM cross-check');
+ctxRun(`
+    analysisRules = []; guideProfile = {}; guideOverrides = {}; trackMeta = {};
+    parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE', 'TP_TMHMM': 'MM ' };
+    topologySources = [{ name: 'TMHMM', state: 'MM ' }];
+`);
+assert(ctxRun(`topologyTmText()`) === 'MM ', 'the topology text falls back to the single source');
+let xc = ctxRun(`computeTmCrossCheck()`);
+assert(xc.ok === true && xc.classes.join('') === '==q', 'concordance classes: both, both, Quick2D-only');
+assert(xc.agree === 2 && xc.topoOnly === 0 && xc.q2dOnly === 1 && xc.pct === 67, 'counts and percentage are computed');
+assert(xc.q2dSegments.length === 1 && xc.q2dSegments[0][0] === 2 && xc.q2dSegments[0][1] === 2, 'disagreement runs are 0-based inclusive ranges (selection convention)');
+
+assert(ctxRun(`runTmCrossCheck() !== null`), 'running the cross-check succeeds when both inputs exist');
+assert(ctxRun(`parsedTracks['XC_TM']`) === '==q', 'the cross-check writes the concordance track');
+assert(ctxRun(`getTrackGroup('XC_TM')`) === 'XC' && ctxRun(`trackGroupLabel('XC')`) === 'Cross-checks', 'XC_ rows form the Cross-checks group');
+assert(ctxRun(`getTrackSource('XC_TM')`) === 'Cross-check', 'the cross-check track reports its provenance');
+
+// consensus is preferred over a single source
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'TM_Quick2D': ' EE', 'TP_Consensus': 'M  ', 'TP_A': 'M  ', 'TP_B': 'M  ' };
+    topologySources = [{ name: 'A', state: 'M  ' }, { name: 'B', state: 'M  ' }];
+`);
+assert(ctxRun(`topologyTmText()`) === 'M  ', 'the consensus is used when it exists');
+xc = ctxRun(`computeTmCrossCheck()`);
+const cls2 = ctxRun(`computeTmCrossCheck().classes.join('')`);
+assert(xc.consensus === true && cls2 === 'tqq', 'topology-only and Quick2D-only are distinguished (got "' + cls2 + '")');
+assert(xc.topoOnly === 1 && xc.q2dOnly === 2, 'per-class counts match the synthetic data');
+assert(xc.q2dSegments.length === 1 && xc.q2dSegments[0][0] === 1 && xc.q2dSegments[0][1] === 2, 'a contiguous Quick2D-only run is one segment');
+
+// guard rails
+ctxRun(`parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE' }; topologySources = [];`);
+xc = ctxRun(`computeTmCrossCheck()`);
+assert(xc.ok === false && xc.message.indexOf('topology') !== -1, 'missing topology is reported');
+ctxRun(`parsedTracks = { AA: 'MKV', 'TP_X': 'M  ' };`);
+assert(ctxRun(`computeTmCrossCheck()`).message.indexOf('transmembrane') !== -1, 'missing Quick2D TM is reported');
+ctxRun(`parsedTracks = {};`);
+assert(ctxRun(`computeTmCrossCheck()`).message.indexOf('sequence') !== -1, 'missing sequence is reported');
+
+section('methods summary report');
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE', 'TP_TMHMM': 'MM ' };
+    topologySources = [{ name: 'TMHMM', state: 'MM ' }];
+    analysisRules = []; guideProfile = { membrane: 'yes' }; guideOverrides = {}; guideAnswers = {};
+`);
+ctxRun(`runTmCrossCheck();`);
+let report = ctxRun(`buildMethodsReport()`);
+assert(report.indexOf('# Quick2DViewer methods summary') === 0, 'the report opens with a title');
+assert(report.indexOf('## Intake') !== -1 && report.indexOf('Is it membrane-associated or secreted? — Yes') !== -1, 'the report records the intake answers');
+assert(report.indexOf('## Workflow coverage') !== -1 && report.indexOf('| # | Step | Status | Answer(s) |') !== -1, 'the report has a coverage table');
+assert(report.indexOf('Coverage: ' + ctxRun(`guideProgress().covered`) + ' of ' + ctxRun(`guideProgress().denominator`)) !== -1,
+    'the report states the coverage count (' + ctxRun(`guideProgress().covered`) + '/' + ctxRun(`guideProgress().denominator`) + ')');
+assert(report.indexOf('## Loaded evidence') !== -1 && report.indexOf('Transmembrane: 1 track(s)') !== -1, 'the report lists the loaded evidence by type');
+assert(report.indexOf('## TM cross-check') !== -1 && report.indexOf('67%') !== -1, 'the report includes the TM cross-check once run');
+assert(report.indexOf('## References') !== -1 && report.indexOf('10.1093/nar/gkac1052') !== -1, 'the report cites the covered steps by DOI');
+assert(report.indexOf('v' + ctxRun(`APP_VERSION`)) !== -1, 'the report stamps the app version');
+
+ctxRun(`analysisRules = [{ id: 'r1', name: 'My rule', color: '#f00', mode: 'all', enabled: true, conditions: [{ kind: 'categorical', source: 'group:TM', op: 'annotated', value: '' }] }];`);
+report = ctxRun(`buildMethodsReport()`);
+assert(report.indexOf('## Analysis rules') !== -1 && report.indexOf('Transmembrane annotated') !== -1, 'the report lists rules in readable form');
+ctxRun(`analysisRules = [];`);
+
+let threw = null;
+try { ctxRun(`exportMethodsReport()`); } catch (e) { threw = e.message; }
+assert(threw === null, 'the export runs without throwing when data is loaded');
+ctxRun(`parsedTracks = {};`);
+threw = null;
+try { ctxRun(`exportMethodsReport()`); } catch (e) { threw = e.message; }
+assert(threw === null, 'the export refuses gracefully with no data');
+ctxRun(`parsedTracks = { AA: 'MKV' }; guideProfile = {}; topologySources = [];`);
+
+section('rules re-evaluate when data changes');
+ctxRun(`
+    analysisRules = []; parsedTracks = {}; guideProfile = {}; guideOverrides = {}; guideAnswers = {};
+    analysisRules.push({ id: 'rx', name: 'TM probe', color: '#f00', mode: 'all', enabled: true,
+        conditions: [{ kind: 'categorical', source: 'group:TM', op: 'annotated', value: '' }] });
+`);
+ctxRun(`applyRules();`);
+assert(ctxRun(`parsedTracks['RULE_rx']`) === undefined, 'a rule with no inputs produces no track');
+// loading the missing input must re-evaluate the rule without an explicit re-apply
+ctxRun(`parsedTracks.AA = 'MKV'; parsedTracks['TM_Quick2D'] = ' E ';`);
+// the harness stubs renderViewer (the real one needs layout APIs the stub DOM
+// lacks), so exercise the same entry point it calls, and assert the call site.
+assert(HTML.indexOf('reevaluateRulesIfNeeded(tracks);') !== -1, 'renderViewer calls the rule re-evaluation hook');
+ctxRun(`reevaluateRulesIfNeeded(parsedTracks);`);
+const rxVal = ctxRun(`(parsedTracks['RULE_rx'] || '')`);
+assert(rxVal === ' ■ ', 'a data change re-evaluates existing rules (got "' + rxVal + '", rules=' + ctxRun(`analysisRules.length`) + ', tmKeys=' + ctxRun(`getGroupTrackKeys('TM').length`) + ')');
+// and removing the input drops the stale row
+// (removal is exercised silent here; the app's own path repaints through
+// renderViewer, which calls the same hook)
+ctxRun(`removeTracks(['TM_Quick2D'], { silent: true });`);
+ctxRun(`reevaluateRulesIfNeeded(parsedTracks);`);
+assert(ctxRun(`parsedTracks['RULE_rx']`) === undefined, 'removing the queried track drops the stale rule row');
+// re-entrancy guard: applyRules must not recurse through renderViewer
+let guardOk = true;
+try { ctxRun(`applyRules(); applyRules();`); } catch (e) { guardOk = false; }
+assert(guardOk, 'applyRules is safe to call repeatedly (re-entrancy guard)');
+ctxRun(`analysisRules = []; parsedTracks = {};`);
+
+section('session round-trip (registries persist)');
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'TP_TMHMM_run': 'M  ', 'UP_Sites': '\u25a0  ', 'DM_ubiquitin': '\u2588\u2588 ' };
+    topologySources = [{ name: 'TMHMM run', state: 'M  ' }];
+    uniprotFeatures = { accession: 'P00001', features: [] };
+    uniprotFeatureTracks = { UP_Sites: { type: 'Site' } };
+    domainHitsInfo = { DM_ubiquitin: { model: 'ubiquitin', database: 'Pfam' } };
+    guideProfile = { membrane: 'yes' }; guideOverrides = { foldseek: 'skipped' }; guideAnswers = { 'structure.model': 'esmfold' };
+`);
+const saved = ctxRun(`gatherPersistableState()`);
+assert(saved.topologySources && saved.topologySources.length === 1, 'topology sources are persisted');
+assert(saved.uniprotFeatures && saved.uniprotFeatures.accession === 'P00001', 'the UniProt fetch is persisted');
+assert(saved.domainHitsInfo && saved.domainHitsInfo.DM_ubiquitin, 'domain stats are persisted');
+assert(saved.preferences.guideAnswers['structure.model'] === 'esmfold' && saved.preferences.guideOverrides.foldseek === 'skipped', 'guide answers + overrides are persisted');
+
+// simulate a reload into a fresh context state
+ctxRun(`
+    parsedTracks = {}; topologySources = []; uniprotFeatures = null; uniprotFeatureTracks = {}; domainHitsInfo = {};
+    guideProfile = {}; guideOverrides = {}; guideAnswers = {};
+`);
+ctxRun(`applyPersistedState(${JSON.stringify(saved)})`);
+assert(ctxRun(`topologySources.length`) === 1, 'topology sources are restored');
+assert(ctxRun(`uniprotFeatures.accession`) === 'P00001', 'the UniProt fetch is restored');
+assert(ctxRun(`domainHitsInfo.DM_ubiquitin.model`) === 'ubiquitin', 'domain stats are restored');
+assert(ctxRun(`guideAnswers['structure.model']`) === 'esmfold', 'step answers are restored');
+assert(ctxRun(`guideStepStatus().filter(r => r.step.id === 'topology')[0].done`) === true, 'the restored topology data satisfies its guide step');
+
+// and removal after a restore behaves (the bug this persistence fixes)
+ctxRun(`removeTracks(['TP_TMHMM_run'], { silent: true });`);
+assert(ctxRun(`topologySources.length`) === 0, 'removing the restored topology row removes its source');
+assert(ctxRun(`Object.keys(parsedTracks).filter(k => k.indexOf('TP_') === 0).length`) === 0, 'the topology group is left empty rather than resurrected');
+ctxRun(`parsedTracks = {}; topologySources = []; uniprotFeatures = null; uniprotFeatureTracks = {}; domainHitsInfo = {}; guideProfile = {}; guideOverrides = {}; guideAnswers = {};`);
 
 section('hmmer hmmscan (domain scan)');
 const hmmerOut = [

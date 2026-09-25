@@ -1862,6 +1862,7 @@
                     <button type="button" onclick="menuBarAction('rules')">Analysis Rules…</button>
                     <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
                     <button type="button" onclick="menuBarAction('domains')">Scan Domains (HMMER)…</button>
+                    <button type="button" onclick="menuBarAction('crosschecks')">Cross-checks…</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -1872,6 +1873,7 @@
                     <button type="button" onclick="menuBarAction('csv')">Data as CSV</button>
                     <button type="button" onclick="menuBarAction('svg')">Viewport as SVG</button>
                     <button type="button" onclick="menuBarAction('png')">Viewport as PNG</button>
+                    <button type="button" onclick="menuBarAction('methods')">Methods summary (.md)</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -2191,6 +2193,18 @@
                     <div id="interfaceStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                     <div id="interfaceResults" style="margin-top:8px; overflow-x:auto;"></div>
                 </details>
+
+                <details class="workflow-section qa-new" id="crossCheckSection" style="margin-top: 10px;">
+                    <summary>Cross-checks (independent predictions)</summary>
+                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                        Compares two independent reads of the same question. <strong>TM consensus vs Quick2D TM</strong>
+                        flags every residue where the pasted topology consensus and the Quick2D transmembrane call
+                        disagree — inspect those before trusting either. Runs client-side.
+                    </p>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="runTmCrossCheck()" style="font-size:0.72rem; padding:3px 8px;">Run TM cross-check</button>
+                    <div id="crossCheckStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                    <div id="crossCheckResults" style="margin-top:8px; overflow-x:auto;"></div>
+                </details>
             </div>
 
             <div class="sidebar-panel" id="side-panel-guide" hidden>
@@ -2203,6 +2217,8 @@
                 step can be marked done, skipped, or re-run. Every tool stays available manually.
             </p>
             <div id="guidePanel"></div>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="exportMethodsReport()" style="font-size:0.72rem; padding:3px 8px; margin-top:8px; width:100%;"
+                title="Download a Markdown methods summary: intake answers, step coverage, loaded evidence, rules, read-out and references">Export methods summary (.md)</button>
             </details>
             </div>
 
@@ -3701,6 +3717,108 @@ function renderTopologySourceList() {
     wrap.innerHTML = html;
 }
 
+// --- TM cross-check (topology consensus vs Quick2D TM) --------------------
+// Two independent reads on the same question: the pasted topology consensus
+// (TMHMM/Phobius/DeepTMHMM) and the Quick2D transmembrane prediction. Where they
+// disagree is what deserves an inspection before either is trusted, so this
+// produces a per-residue concordance track plus a segment table. Runs entirely
+// client-side, and needs no external service.
+const TM_XC_CHARS = { agree: '=', topo: 't', q2d: 'q' };
+const TM_XC_LABELS = { agree: 'Both predict TM', topo: 'Topology only', q2d: 'Quick2D only' };
+// Contiguous runs of one class as 0-based inclusive [start, end] ranges (the
+// range convention selectSeqSearchRanges expects).
+function segmentsOfRuns(chars, cls) {
+    const out = [];
+    let start = -1;
+    for (let i = 0; i < chars.length; i++) {
+        const on = chars[i] === cls;
+        if (on && start === -1) start = i;
+        else if (!on && start !== -1) { out.push([start, i - 1]); start = -1; }
+    }
+    if (start !== -1) out.push([start, chars.length - 1]);
+    return out;
+}
+function topologyTmText() {
+    if (typeof parsedTracks['TP_Consensus'] === 'string') return parsedTracks['TP_Consensus'];
+    const keys = getGroupTrackKeys('TP').filter(k => k !== 'TP_Consensus' && typeof parsedTracks[k] === 'string');
+    return keys.length ? parsedTracks[keys[0]] : null;
+}
+function computeTmCrossCheck() {
+    const total = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!total) return { ok: false, message: 'Load a sequence first.' };
+    const topo = topologyTmText();
+    if (!topo) return { ok: false, message: 'Add a membrane topology source first (Options → Data Sources → Topology).' };
+    const tmKeys = getGroupTrackKeys('TM').filter(k => typeof parsedTracks[k] === 'string');
+    if (!tmKeys.length) return { ok: false, message: 'No Quick2D transmembrane track is loaded to compare against.' };
+    const classes = new Array(total).fill('');
+    let agree = 0, topoOnly = 0, q2dOnly = 0;
+    for (let i = 0; i < total; i++) {
+        const topoTm = topo[i] === 'M';
+        let q2dTm = false;
+        for (let n = 0; n < tmKeys.length; n++) {
+            const ch = parsedTracks[tmKeys[n]][i];
+            if (ch && ch !== ' ' && ch !== '-' && ch !== '\t') { q2dTm = true; break; }
+        }
+        if (topoTm && q2dTm) { classes[i] = TM_XC_CHARS.agree; agree++; }
+        else if (topoTm) { classes[i] = TM_XC_CHARS.topo; topoOnly++; }
+        else if (q2dTm) { classes[i] = TM_XC_CHARS.q2d; q2dOnly++; }
+    }
+    const denom = agree + topoOnly + q2dOnly;
+    return {
+        ok: true, total, classes, tmKeys,
+        consensus: typeof parsedTracks['TP_Consensus'] === 'string',
+        sources: topologySources.length,
+        agree, topoOnly, q2dOnly, denom,
+        pct: denom ? Math.round((agree / denom) * 100) : 0,
+        topoSegments: segmentsOfRuns(classes, TM_XC_CHARS.topo),
+        q2dSegments: segmentsOfRuns(classes, TM_XC_CHARS.q2d)
+    };
+}
+function runTmCrossCheck() {
+    const res = computeTmCrossCheck();
+    const statusEl = document.getElementById('crossCheckStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    if (!res.ok) { setStatus(res.message); showToast('TM cross-check: ' + res.message, 'error'); return null; }
+    parsedTracks['XC_TM'] = res.classes.map(c => c || ' ').join('');
+    setTrackMeta('XC_TM', { source: 'Cross-check', color: '#94a3b8', detail: 'Topology vs Quick2D TM' });
+    renderViewer(parsedTracks);
+    refreshTrackManagerIfVisible();
+    refreshGuideIfVisible();
+    renderTmCrossCheckSummary(res);
+    schedulePersist();
+    setStatus('TM cross-check: ' + res.pct + '% agreement — ' + res.agree + ' agree, ' + res.topoOnly + ' topology-only, ' + res.q2dOnly + ' Quick2D-only.');
+    showToast('TM cross-check: ' + res.pct + '% agreement.', res.pct >= 80 ? 'success' : 'info');
+    return res;
+}
+function renderTmCrossCheckSummary(res) {
+    const wrap = document.getElementById('crossCheckResults');
+    if (!wrap) return;
+    if (!res || !res.ok) { wrap.innerHTML = ''; return; }
+    const fmt = (list) => list.length
+        ? list.slice(0, 8).map(r => (r[0] + 1) + '–' + (r[1] + 1)).join(', ') + (list.length > 8 ? ' …' : '')
+        : 'none';
+    let html = '<table class="metrics-table" style="font-size:0.7rem;"><thead><tr><th>Class</th><th>Residues</th><th>Segments (1-based)</th><th></th></tr></thead><tbody>';
+    [['agree', res.agree, []], ['topo', res.topoOnly, res.topoSegments], ['q2d', res.q2dOnly, res.q2dSegments]].forEach(row => {
+        const cls = row[0], count = row[1], segs = row[2];
+        html += '<tr><td><strong>' + structureEscapeHtml(TM_XC_LABELS[cls]) + '</strong></td><td>' + count + '</td><td>' + structureEscapeHtml(fmt(segs)) + '</td><td>' +
+            (segs.length ? '<button type="button" class="copy-btn" onclick="selectTmCrossCheckSegments(\'' + cls + '\')" style="padding:1px 6px;">select</button>' : '') +
+            '</td></tr>';
+    });
+    html += '</tbody></table><div style="font-size:0.68rem; color:#64748b; margin-top:4px;">Track <code>XC_TM</code>: ' +
+        '<code>=</code> both, <code>t</code> topology only, <code>q</code> Quick2D only — against ' +
+        (res.consensus ? ('the ' + res.sources + '-source consensus') : 'the single topology source') +
+        ' and ' + res.tmKeys.length + ' Quick2D TM track(s).</div>';
+    wrap.innerHTML = html;
+}
+function selectTmCrossCheckSegments(cls) {
+    const res = computeTmCrossCheck();
+    if (!res.ok) { showToast('TM cross-check: ' + res.message, 'error'); return; }
+    const segs = cls === 'topo' ? res.topoSegments : (cls === 'q2d' ? res.q2dSegments : []);
+    if (!segs.length) { showToast('No ' + (TM_XC_LABELS[cls] || cls).toLowerCase() + ' segments.', 'info'); return; }
+    selectSeqSearchRanges(segs, 'all');
+    showToast('Selected ' + segs.length + ' ' + (TM_XC_LABELS[cls] || cls).toLowerCase() + ' segment(s).', 'success');
+}
+
 // --- Analysis rules (contradiction / co-localization engine) --------------
 // A rule is a boolean query across per-residue tracks. Each enabled rule becomes
 // a RULE_ track (matching residues flagged in the rule's colour) and can be
@@ -3802,14 +3920,35 @@ function evaluateRule(rule) {
     }
     return out;
 }
-// Rebuilds all RULE_ tracks from analysisRules and re-renders.
+// A rule is a query over the tracks, so any data change must re-evaluate it -
+// otherwise a preset added before its inputs existed never appears, and a stale
+// RULE_ row survives the removal of the track it queried. Called from
+// renderViewer (hence the guard in applyRules against re-entering through it).
+function reevaluateRulesIfNeeded(tracks) {
+    try {
+        if (analysisRules.length && tracks && tracks.AA) applyRules();
+    } catch (e) { console.warn('rule re-evaluation failed:', e && e.message); }
+}
+
+// Rebuilds all RULE_ tracks from analysisRules and re-renders. Guarded against
+// re-entry: renderViewer re-evaluates rules after a data change, and applyRules
+// itself renders, so without the guard the two would recurse.
+let applyingRules = false;
 function applyRules() {
+    if (applyingRules) return;
+    applyingRules = true;
+    try { applyRulesInner(); } finally { applyingRules = false; }
+}
+function applyRulesInner() {
     Object.keys(parsedTracks).forEach(k => { if (k.startsWith('RULE_')) delete parsedTracks[k]; });
     const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     if (totalLength) {
         analysisRules.forEach(rule => {
             if (rule.enabled === false) return;
             const mask = evaluateRule(rule);
+            // A rule that matches nothing gets no row at all: an empty bar would
+            // just add noise, and it keeps a stale row from outliving its data.
+            if (!mask.some(Boolean)) return;
             const track = new Array(totalLength).fill(' ');
             mask.forEach((m, i) => { if (m) track[i] = RULE_MARKER; });
             const key = 'RULE_' + rule.id;
@@ -4477,7 +4616,8 @@ const WORKFLOW_STEPS = [
         id: 'topology', title: 'Membrane topology',
         desc: 'Paste TMHMM/Phobius/DeepTMHMM output for a consensus topology bar.',
         why: 'Orientation decides which loops face the cytosol: it changes which residues are accessible to ligands, antibodies and variants.',
-        action: { label: 'Paste topology…', run: 'openInputDataModal()' },
+        action: { label: 'Paste topology…', run: 'openTopologyPanel()' },
+        extraActions: [{ label: 'Cross-check TM', run: 'runTmCrossCheck()' }],
         how: ['Build a consensus across predictors; a segment that flips orientation between tools is not settled.',
               'Compare the consensus with the Quick2D TM call to judge how robust the TM prediction is.'],
         refs: [{ cite: 'Krogh et al., J Mol Biol 2001 (TMHMM)', doi: '10.1006/jmbi.2000.4315' }],
@@ -4809,6 +4949,18 @@ function computeGuideInsights() {
         out.push({ level: 'info', text: 'Pfam domains are in; fetching UniProt too would give curated boundaries to compare against.' });
     }
     try {
+        const xc = computeTmCrossCheck();
+        if (xc.ok) {
+            if (parsedTracks['XC_TM']) {
+                out.push({ level: xc.pct >= 80 ? 'info' : 'warn', text: 'TM cross-check: ' + xc.pct + '% agreement between the topology consensus and Quick2D TM.' });
+            } else if (xc.topoOnly + xc.q2dOnly) {
+                out.push({ level: 'warn', text: 'Topology consensus and Quick2D TM disagree on ' + (xc.topoOnly + xc.q2dOnly) + ' residue(s) (' + xc.topoOnly + ' topology-only, ' + xc.q2dOnly + ' Quick2D-only) — run the TM cross-check to see the segments.' });
+            } else {
+                out.push({ level: 'info', text: 'Topology consensus and Quick2D TM agree on every TM residue.' });
+            }
+        }
+    } catch (e) { /* cross-check is advisory */ }
+    try {
         const sug = suggestedRulePresets();
         if (sug.length && !analysisRules.length) {
             out.push({ level: 'info', text: 'Rule presets ready for this dataset: ' + sug.slice(0, 3).map(p => p.name).join(', ') + (sug.length > 3 ? ' (+' + (sug.length - 3) + ' more)' : '') + ' — open Analysis Rules to add one.' });
@@ -4816,6 +4968,150 @@ function computeGuideInsights() {
     } catch (e) { /* suggestions are advisory */ }
     return out;
 }
+// --- Methods summary export ------------------------------------------------
+// The guide state as a reproducible methods paragraph + coverage table: what was
+// evaluated, with which inputs, how the steps were satisfied, and the citations
+// for the covered steps. Plain Markdown so it pastes into a lab notebook,
+// supplementary text, or a repo README.
+function methodsReportDate() { return new Date().toISOString().slice(0, 10); }
+function getTrackCategoryRank(group) {
+    return getTrackCategoryOrder(group === 'XC' ? 'XC_TM' : group + '_x');
+}
+function buildMethodsReport() {
+    const app = (typeof APP_VERSION === 'string') ? APP_VERSION : '?';
+    const len = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const prog = guideProgress();
+    const keys = Object.keys(parsedTracks);
+    const L = [];
+
+    L.push('# Quick2DViewer methods summary');
+    L.push('');
+    L.push('Generated ' + methodsReportDate() + ' · Quick2DViewer v' + app +
+        (len ? ' · ' + len + ' aa' : '') + (currentProteinLabel ? ' · ' + currentProteinLabel : ''));
+    L.push('');
+
+    // Intake answers are the researcher's own framing, so the report leads with
+    // them rather than with the data.
+    L.push('## Intake');
+    L.push('');
+    GUIDE_QUESTIONS.forEach(q => {
+        const a = guideProfile[q.id];
+        const opt = a ? (q.options.find(o => o.value === a) || {}) : null;
+        L.push('- ' + q.label + ' — ' + (opt && opt.label ? opt.label : 'not answered'));
+    });
+    L.push('');
+
+    L.push('## Workflow coverage');
+    L.push('');
+    L.push('| # | Step | Status | Answer(s) |');
+    L.push('|---|------|--------|-----------|');
+    prog.rows.forEach(r => {
+        const status = r.skipped ? 'skipped'
+            : r.manualDone ? 'done (marked by user)'
+            : r.autoDone ? 'done (detected)' : 'not done';
+        const notes = [];
+        (STEP_QUESTIONS[r.step.id] || []).forEach(q => {
+            const a = getStepAnswer(r.step.id, q.id);
+            if (!a) return;
+            const opt = q.options.find(o => o.value === a) || {};
+            notes.push(q.label + ': ' + (opt.label || a));
+        });
+        L.push('| ' + (r.index + 1) + ' | ' + r.step.title + ' | ' + status + ' | ' + (notes.join('; ') || '—') + ' |');
+    });
+    L.push('');
+    L.push('Coverage: ' + prog.covered + ' of ' + prog.denominator + ' steps' + (prog.skipped ? ' (' + prog.skipped + ' skipped)' : '') + '.');
+    L.push('');
+
+    L.push('## Loaded evidence');
+    L.push('');
+    if (!len) {
+        L.push('No data loaded.');
+    } else {
+        const counts = {};
+        keys.forEach(k => { if (k === 'AA') return; const g = getTrackGroup(k); counts[g] = (counts[g] || 0) + 1; });
+        Object.keys(counts)
+            .sort((a, b) => getTrackCategoryRank(a) - getTrackCategoryRank(b))
+            .forEach(g => L.push('- ' + trackGroupLabel(g) + ': ' + counts[g] + ' track(s)'));
+        const plddtVals = [];
+        keys.filter(k => k.endsWith('_pLDDT')).forEach(k => {
+            const t = parsedTracks[k];
+            if (Array.isArray(t)) t.forEach(x => { if (x && x.val != null) plddtVals.push(x.val); });
+        });
+        if (plddtVals.length) {
+            const mean = plddtVals.reduce((a, b) => a + b, 0) / plddtVals.length;
+            L.push('- Mean pLDDT: ' + mean.toFixed(1) + ' over ' + plddtVals.length + ' modelled residues');
+        }
+        let bestIdent = 0, bestHit = '';
+        try {
+            homologTemplateMetrics().forEach(r => {
+                const v = parseFloat(r.ident);
+                if (isFinite(v) && v > bestIdent) { bestIdent = v; bestHit = r.hitId || ''; }
+            });
+        } catch (e) { /* metrics are best-effort */ }
+        if (bestIdent) L.push('- Best homolog identity: ' + bestIdent.toFixed(0) + '%' + (bestHit ? ' (' + bestHit + ')' : ''));
+        if (parsedTracks.CONSERVATION) L.push('- Conservation metric: ' + (parsedTracks.CONSERVATION.metric || 'shannon') + (conservationIncludeHHR ? ' (incl. HHR homologs)' : ''));
+        if (topologySources.length) L.push('- Topology sources: ' + topologySources.map(s => s.name).join(', '));
+        if (uniprotFeatures && uniprotFeatures.accession) L.push('- UniProt entry: ' + uniprotFeatures.accession);
+        if (uploadedStructureFiles && uploadedStructureFiles.length) L.push('- Structures attached: ' + uploadedStructureFiles.join(', '));
+    }
+    L.push('');
+
+    if (analysisRules.length) {
+        L.push('## Analysis rules');
+        L.push('');
+        analysisRules.forEach(r => {
+            L.push('- **' + r.name + '** (' + (r.mode === 'any' ? 'ANY' : 'ALL') + (r.enabled === false ? ', disabled' : '') + ')' +
+                (r.presetId ? ' [preset: ' + r.presetId + ']' : '') + ' — ' + (r.conditions || []).map(describeRuleCondition).join(' · '));
+        });
+        L.push('');
+    }
+
+    let xc = null;
+    try { xc = computeTmCrossCheck(); } catch (e) { xc = null; }
+    if (xc && xc.ok && parsedTracks['XC_TM']) {
+        L.push('## TM cross-check');
+        L.push('');
+        L.push('- Agreement: ' + xc.pct + '% (' + xc.agree + ' both / ' + xc.topoOnly + ' topology-only / ' + xc.q2dOnly + ' Quick2D-only)');
+        L.push('');
+    }
+
+    let insights = [];
+    try { insights = computeGuideInsights(); } catch (e) { insights = []; }
+    if (insights.length) {
+        L.push('## Automated read-out');
+        L.push('');
+        insights.forEach(i => L.push('- ' + i.text));
+        L.push('');
+    }
+
+    // Cite only the steps that were actually covered, with their DOIs.
+    const refs = [];
+    prog.rows.forEach(r => {
+        if (!r.done) return;
+        (r.step.refs || []).forEach(ref => { if (!refs.some(x => x.doi === ref.doi)) refs.push(ref); });
+    });
+    if (refs.length) {
+        L.push('## References');
+        L.push('');
+        refs.forEach(ref => L.push('- ' + ref.cite + ' — https://doi.org/' + ref.doi));
+        L.push('');
+    }
+    L.push('---');
+    L.push('');
+    L.push('Generated by Quick2DViewer v' + app + '. Step status reflects the app\'s auto-detection plus any');
+    L.push('manual done/skip overrides; the full reference document (pipeline, interpretation, citations)');
+    L.push('is WORKFLOW.md.');
+    return L.join('\n');
+}
+function exportMethodsReport() {
+    if (!parsedTracks.AA) { showToast('Load data first — the methods summary reports what has been evaluated.', 'error'); return; }
+    const text = buildMethodsReport();
+    const safe = (currentProteinLabel || 'session').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'session';
+    downloadTextFile('q2dv-methods-' + safe + '-' + methodsReportDate() + '.md', text, 'text/markdown');
+    schedulePersist();
+    showToast('Methods summary exported.', 'success');
+}
+
 function refreshGuideIfVisible() {
     const panel = document.getElementById('side-panel-guide');
     if (panel && !panel.hidden) renderWorkflowGuide();
@@ -4985,6 +5281,12 @@ function autoLookupAccession() {
 
 // --- Sidebar tabs (Selection / Tracks / Workflow) -------------------------
 // Jumps to a Tracks-tab section (right sidebar) and expands it.
+function showCrossCheckPanel() {
+    switchSidebarTab('tracks');
+    const sec = document.getElementById('crossCheckSection');
+    if (sec) { sec.open = true; if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' }); }
+}
+
 function showInterfacesPanel() {
     switchSidebarTab('tracks');
     const sec = document.getElementById('interfaceSection');
@@ -5114,7 +5416,9 @@ function menuBarAction(action) {
         case 'rules': showRulesPanel(); break;
         case 'interfaces': showInterfacesPanel(); break;
         case 'domains': runDomainScan(); break;
+        case 'crosschecks': showCrossCheckPanel(); break;
         case 'json': exportFullSave(); break;
+        case 'methods': exportMethodsReport(); break;
         case 'tsv': exportMetricsTableTSV(); break;
         case 'csv': exportMetricsCSV(); break;
         case 'svg': exportViewportSVG(); break;
@@ -5646,7 +5950,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.22.0';
+const APP_VERSION = '0.23.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -7029,12 +7333,13 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('DM_')) return 9;
     if (key.startsWith('RULE_')) return 10;
     if (key.startsWith('IF_')) return 11;
+    if (key.startsWith('XC_')) return 12;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
     // above the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 12;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 13;
-    return 14;
+    if (key.endsWith('_Cofactors')) return 13;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 14;
+    return 15;
 }
 
 // pLDDT/RSA graph-vs-heatmap is a type-level view choice (Track Control's
@@ -8271,6 +8576,7 @@ const TRACK_GROUP_LABELS = {
     RULE: 'Rules',
     IF: 'Interfaces',
     DM: 'Domains',
+    XC: 'Cross-checks',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
@@ -8299,6 +8605,7 @@ function getTrackGroup(key) {
     if (key.startsWith('RULE_')) return 'RULE';
     if (key.startsWith('IF_')) return 'IF';
     if (key.startsWith('DM_')) return 'DM';
+    if (key.startsWith('XC_')) return 'XC';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
@@ -8329,6 +8636,7 @@ function getTrackSource(key) {
     if (key.startsWith('RULE_')) return 'Rule';
     if (key.startsWith('IF_')) return 'Interface';
     if (key.startsWith('DM_')) { const d = domainHitsInfo[key]; return 'HMMER (' + ((d && d.database) || 'Pfam') + ')'; }
+    if (key.startsWith('XC_')) return 'Cross-check';
     if (key.endsWith('_pLDDT') || key.endsWith('_RSA') || key.endsWith('_Cofactors')) return 'Structure';
     return 'Other';
 }
@@ -8430,7 +8738,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, DM: 11, RULE: 12, IF: 13, pLDDT: 14, RSA: 15, Cofactors: 16, other: 99 };
+    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, DM: 11, RULE: 12, IF: 13, XC: 14, pLDDT: 15, RSA: 16, Cofactors: 17, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -8589,6 +8897,7 @@ function renderViewer(tracks) {
     grid.innerHTML = ''; 
     applyGridZoom();
     refreshGuideIfVisible();
+    reevaluateRulesIfNeeded(tracks);
     const totalLength = tracks.AA ? tracks.AA.length : 0;
     if (totalLength === 0) return;
 
@@ -12254,6 +12563,14 @@ function gatherPersistableState() {
         homologHitsInfo: homologHitsInfo,
         keyedVariantsInfo: keyedVariantsInfo,
         graphHighlights: graphHighlights,
+        // These back derived tracks (TP_/UP_/DM_), so without them a restored
+        // session would disagree with its own tracks: the guide would read the
+        // step as not-done, Options would show no sources, and removing one
+        // topology row would rebuild the group from an empty source list.
+        topologySources: topologySources,
+        uniprotFeatures: uniprotFeatures,
+        uniprotFeatureTracks: uniprotFeatureTracks,
+        domainHitsInfo: domainHitsInfo,
         selection: {
             selectStart, selectEnd, selectionMode, activeRowKey, activeRowType,
             rowRanges, dragOriginTrackKey, crossRefTrackKey, lastRanges
@@ -12623,6 +12940,10 @@ function applyPersistedState(state) {
     homologHitsInfo = state.homologHitsInfo || {};
     keyedVariantsInfo = state.keyedVariantsInfo || {};
     graphHighlights = state.graphHighlights || {};
+    topologySources = Array.isArray(state.topologySources) ? state.topologySources : [];
+    uniprotFeatures = state.uniprotFeatures || null;
+    uniprotFeatureTracks = state.uniprotFeatureTracks || {};
+    domainHitsInfo = state.domainHitsInfo || {};
 
     const sel = state.selection || {};
     selectStart = sel.selectStart !== undefined ? sel.selectStart : null;

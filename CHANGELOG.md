@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-25
+
+### Added
+
+- **TM cross-check** (Analyze → *Cross-checks…*, or the topology step's
+  *Cross-check TM* action). Compares the pasted topology consensus against the
+  Quick2D transmembrane call and writes one **Cross-checks** (`XC_TM`) row:
+  `=` both predict TM, `t` topology only, `q` Quick2D only. The panel reports
+  per-class counts, 1-based segment ranges and an agreement percentage, and each
+  disagreement class can be turned into a selection. Pure client-side; refuses
+  clearly when either input (or the sequence) is missing. The guide's read-out
+  names the disagreement count when both inputs exist but the cross-check has not
+  been run.
+- **Methods summary export** (Export → *Methods summary (.md)*, and a button in
+  the Guide tab): a Markdown methods record with the intake answers, a workflow
+  coverage table (status + the per-step answers), the loaded evidence grouped by
+  type, analysis rules in readable form (with preset ids), the TM cross-check when
+  run, the automated read-out, and the citations for **covered steps only**.
+
+### Fixed
+
+- **Rules never re-evaluated when data changed.** A preset added before its inputs
+  existed produced no row, and a `RULE_` row could outlive the track it queried.
+  `renderViewer()` now calls `reevaluateRulesIfNeeded()`, with a re-entrancy guard
+  in `applyRules()`.
+- **A rule matching nothing added an empty row**; such rules now produce no track
+  (consistent with the conservation zero-input fix in 0.21.0).
+- **Session restore disagreed with its own tracks.** `topologySources`,
+  `uniprotFeatures`, `uniprotFeatureTracks` and `domainHitsInfo` were not
+  persisted, so after a reload the guide read steps as not-done, Options showed no
+  topology sources, and removing one restored `TP_` row rebuilt the group from an
+  empty source list (wiping them all). All four are now saved and restored.
+
+### Added — QA
+
+- `QA_CHECKLIST.md`: a breakage-oriented checklist for everything added this
+  session (v0.16.0 → v0.23.0), including cross-cutting state risks and the known
+  gaps, since the harness runs against a stubbed DOM and no UI has been verified
+  in a real browser.
+
 ## [0.22.0] - 2026-09-25
 
 ### Added

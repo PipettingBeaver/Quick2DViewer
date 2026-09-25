@@ -173,7 +173,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - Build a consensus across predictors; a segment that flips orientation between tools is not settled.
 - Compare the consensus with the Quick2D TM call to judge how robust the TM prediction is.
 
-**In-app action.** `Paste topology…`
+**In-app action.** `Paste topology…` · `Cross-check TM`
 
 **Guided questions** (the answers choose the concrete action offered).
 
