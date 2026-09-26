@@ -379,3 +379,20 @@ uses (`qAln`/`dbAln` -> `foldseekQualityChar`), fall back to
 BLOSUM62 (`blosum62Score` already exists) rather than HHpred posterior
 probabilities, so the rows must be labelled with their own source, e.g.
 "BLAST (aligned)", to keep provenance honest.
+
+### Guide layout: short form vs step card (v0.28.0)
+
+The guide has three layers, and each now has exactly one job:
+
+| Layer | Role | Contains |
+|---|---|---|
+| **Protein Background** (accordion) | global framing | the 5 intake questions; re-ranks steps, rules a step out |
+| **Next:** card (short form) | the active prompt | the current step's *unanswered question* (answerable inline), or, once answered, the tailored action + hint, plus the overrides |
+| **Step cards** (below) | the reference | description, why it matters, how to read it, citations, the question as an editable record, every action |
+
+Before v0.28.0 the short form restated the step description while the step card
+asked the question, so the two could read as different instructions. Now the short
+form *is* the questionnaire for the current step: answering there is what produces
+the action it offers, so the two views cannot disagree. The description is only in
+the step card (no duplication), and an answered question collapses the short form
+to `action + hint`, which is what makes it feel reactive.

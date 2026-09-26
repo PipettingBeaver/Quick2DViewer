@@ -792,6 +792,30 @@ assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as
 assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
 assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
 
+section('short form hosts the current question');
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
+let gHtml2 = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+const sliceNext = (h) => h.slice(h.indexOf('guide-next-action'), h.indexOf('guide-steps'));
+let nextBlk = sliceNext(gHtml2);
+assert(ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) === 'homologs', 'with only a sequence loaded the homologs step is next (matches the reported case)');
+assert(nextBlk.indexOf('Is the HHpred .hhr ready?') !== -1, 'the short form asks the current step question');
+assert(nextBlk.indexOf('Yes, ready to attach') !== -1 && nextBlk.indexOf('Not yet') !== -1, 'the options are answerable from the short form');
+assert(nextBlk.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') === -1, 'the long description is NOT repeated in the short form (was the redundancy)');
+assert(gHtml2.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') !== -1, 'the description still lives in the step card below');
+
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'ready');`);
+gHtml2 = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+nextBlk = sliceNext(gHtml2);
+assert(nextBlk.indexOf('Is the HHpred .hhr ready?') === -1, 'answering collapses the question away');
+assert(nextBlk.indexOf('Attach the .hhr') !== -1, 'the tailored hint replaces it');
+assert(nextBlk.indexOf('Load .hhr / variant FASTA') !== -1, 'the tailored action is offered');
+assert(gHtml2.indexOf('guide-opt-on') !== -1, 'the step card keeps the question as the editable record of the answer');
+
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
+nextBlk = sliceNext(ctxRun(`document.getElementById('guidePanel').innerHTML`));
+assert(nextBlk.indexOf('Open HHpred') !== -1 && nextBlk.indexOf('Run HHpred on the sequence') !== -1, 'the other answer yields its own action + hint');
+ctxRun(`guideAnswers = {}; parsedTracks = {};`);
+
 section('guide focus, re-scan state + structure evidence');
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
 let gHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);

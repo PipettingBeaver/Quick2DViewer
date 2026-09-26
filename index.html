@@ -1231,6 +1231,11 @@
         .guide-actions .guide-run { margin-top:0; }
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
+        .guide-next-q { margin:7px 0 3px; }
+        .guide-next-q .guide-q { margin-bottom:5px; }
+        .guide-next-q .guide-q:last-child { margin-bottom:0; }
+        .guide-next-btns { display:flex; flex-wrap:wrap; gap:4px; }
+        .guide-next-btns .guide-run { margin-top:0; }
         .guide-next-meta { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
         .guide-coachmark {
             background:#f5f3ff; border:1px solid #ddd6fe; color:#4c1d95;
@@ -5067,6 +5072,7 @@ const STEP_ACTION_RESOLVERS = {
     },
     homologs(a) {
         if (a.hhpred === 'no') return { label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')", hint: 'Run HHpred on the sequence, then attach the resulting .hhr here.' };
+        if (a.hhpred === 'ready') return { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()', hint: 'Attach the .hhr (and any variant FASTA) in Input Data. The hits become homolog rows and feed the templates table.' };
         return null;
     },
     structure(a) {
@@ -5507,11 +5513,26 @@ function renderWorkflowGuide() {
         (Object.keys(guideAnswers).length ? ' <button type="button" class="guide-reset" onclick="resetStepAnswers()">reset answers</button>' : '') + '</div>';
     if (next) {
         const nextAct = resolveStepAction(next.step);
-        html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title + ': ' + next.step.desc +
-            (nextAct.hint ? '<br><span class="guide-next-hint">' + nextAct.hint + '</span>' : '') + '<br>' +
-            '<button type="button" class="guide-run" onclick="' + nextAct.run + '">' + nextAct.label + '</button>' +
+        // The short form IS the questionnaire for the current step. Its answers
+        // are what pick the action, so asking here (rather than restating the
+        // description) is what keeps the short and long views from disagreeing:
+        // an unanswered question is the prompt, an answered one collapses to the
+        // tailored action + hint. The full context stays in the step card below.
+        const nextQs = (STEP_QUESTIONS[next.step.id] || []).filter(q => !getStepAnswer(next.step.id, q.id));
+        html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title;
+        if (nextQs.length) {
+            html += '<div class="guide-next-q">' + nextQs.map(q =>
+                '<div class="guide-q"><div class="guide-q-label">' + q.label + '</div><div class="guide-q-opts">' +
+                q.options.map(o => '<button type="button" class="guide-opt" onclick="setStepAnswer(\'' + next.step.id + '\',\'' + q.id + '\',\'' + o.value + '\')">' + o.label + '</button>').join('') +
+                '</div></div>').join('') + '</div>';
+        } else if (nextAct.hint) {
+            html += '<br><span class="guide-next-hint">' + nextAct.hint + '</span>';
+        }
+        html += '<div class="guide-next-btns">' +
+            '<button type="button" class="guide-run' + (nextAct.done ? ' guide-run-done' : '') + '" onclick="' + nextAct.run + '">' + nextAct.label + '</button>' +
             (nextAct.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' : '') +
             (next.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
+            '</div>' +
             '<div class="guide-next-meta">' +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + next.step.id + '\',\'done\')">Mark done</button>' +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + next.step.id + '\',\'skipped\')">Skip this step</button>' +
@@ -6434,7 +6455,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.27.0';
+const APP_VERSION = '0.28.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

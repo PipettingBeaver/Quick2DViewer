@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-25
+
+### Changed
+
+- **The guide's short form ("Next:") is now the questionnaire for the current step**
+  instead of a second copy of the step description. It shows the step's
+  *unanswered* question with its options inline; answering it collapses the card to
+  the tailored action + hint. That removes the redundancy where the short form said
+  one thing while the step card below asked a leading question, and makes the short
+  form reactive by construction: both views read the same question state, so they
+  cannot disagree.
+- The step description now appears only in the step card (full context: description,
+  why it matters, how to read it, citations, and the question as an editable record).
+- The "ready" answer for the homologs step now gets its own guidance
+  (*"Attach the .hhr (and any variant FASTA) in Input Data..."*) rather than falling
+  back to a bare button.
+- `DESIGN.md` records the three-layer model (Protein Background / short form / step
+  cards) and what each layer is for.
+
 ## [0.27.0] - 2026-09-25
 
 ### Fixed

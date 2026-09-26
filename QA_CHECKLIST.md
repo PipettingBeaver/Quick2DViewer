@@ -207,6 +207,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 116 | Open the Foldseek step with no structure attached | Exactly one Attach Structure(s) button (this was duplicated) |
 | 117 | Check the AlphaFold DB link/entry for a non-UniProt id (e.g. a made-up label) | Clear error saying the DB is keyed by UniProt accession, with ESMFold suggested |
 
+## 0.28.0 - guide short form vs step card
+
+| # | Try | Watch for |
+|---|---|---|
+| 118 | Load only a sequence, open the Guide | The "Next:" card asks the current step's **question** with its options inline (no repeated description) |
+| 119 | Answer from the short form | It collapses to the tailored action + hint; the question is gone from the short form |
+| 120 | Look at the step card below | The same question is still there with your answer selected (editable record) and the full description/citations |
+| 121 | Change the answer in the step card | The short form's action + hint update to match (the two cannot disagree) |
+| 122 | Answer "Not yet" for HHpred, then press the offered action | Opens the HHpred tool page; the card hints to attach the .hhr afterwards |
+| 123 | Answer "Yes, ready to attach" | The card switches to Load .hhr / variant FASTA with attach guidance |
+| 124 | Read the short form for a step with no sub-question | Falls back to the generic action + hint (no empty question block) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -233,4 +245,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6. 74–91 (task lockout, domain tooltips, relevance, Foldseek, coachmarks).
 6b. 92–104 (layout/hover/copy polish - check 92/93 first, they are the reported bug).
 6c. 105–117 (guide focus, re-scan state, structure evidence, AlphaFold/ESMFold).
+6d. 118–124 (short form = questionnaire; check 118/119/121 together).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
