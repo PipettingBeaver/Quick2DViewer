@@ -868,6 +868,28 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('3D scheme + removal consistency');
+ctxRun(`
+    parsedTracks = { AA: 'MKV' }; graphHighlights = {}; analysisRules = []; guideProfile = {}; guideOverrides = {};
+    p3dBaseSchemeIdx = P3D_BASE_SCHEMES.indexOf('conservation');
+`);
+assert(ctxRun(`isP3DConservationMode()`) === true && ctxRun(`hasConservationData()`) === false, 'the scheme can be active with no data (the reported gap)');
+assert(ctxRun(`syncP3DConservationMode()`) === true, 'the sync notices the scheme has nothing to read');
+assert(ctxRun(`P3D_BASE_SCHEMES[p3dBaseSchemeIdx]`) === 'white', 'it falls back to the default scheme');
+assert(ctxRun(`syncP3DConservationMode()`) === false, 'a second call is a no-op');
+// with data present the scheme is left alone
+ctxRun(`parsedTracks.CONSERVATION = { type: 'conservation', metric: 'shannon', values: [1, 0.5, 0] };`);
+ctxRun(`p3dBaseSchemeIdx = P3D_BASE_SCHEMES.indexOf('conservation');`);
+assert(ctxRun(`syncP3DConservationMode()`) === false && ctxRun(`isP3DConservationMode()`) === true, 'a real conservation row keeps the scheme');
+// removing the row resets the scheme through the removal path too
+ctxRun(`removeTracks(['CONSERVATION'], { silent: true });`);
+assert(ctxRun(`isP3DConservationMode()`) === false, 'removing the conservation row resets the 3D scheme');
+// removal also clears the graph-highlight flag for the removed key
+ctxRun(`parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 90 }] }; graphHighlights = { 'm_pLDDT': false };`);
+ctxRun(`removeTracks(['m_pLDDT'], { silent: true });`);
+assert(ctxRun(`graphHighlights['m_pLDDT']`) === undefined, 'the graph highlight flag does not outlive the track');
+ctxRun(`parsedTracks = {}; graphHighlights = {};`);
+
 section('variant FASTA panel (was dead code)');
 // The panel the code has always guarded on now exists
 ['variantFastaSection', 'variantFastaLabel', 'variantFastaDisplay', 'copyVariantTrackBtn'].forEach(id => {

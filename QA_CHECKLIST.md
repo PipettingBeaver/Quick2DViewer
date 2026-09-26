@@ -258,6 +258,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 147 | Topology → "None yet" | Same pair (Open DeepTMHMM ↗ + Copy sequence) |
 | 148 | Check the homologs step card | Copy sequence appears once (not duplicated by the step's own FASTA action) |
 
+## 0.33.0 - Phase 1 loose ends (variant FASTA panel, 3D scheme)
+
+| # | Try | Watch for |
+|---|---|---|
+| 149 | Select a Variant (`VAR_`) row | The FASTA Segment section shows "Variant sequence (name)" with the aligned sequence; **Copy Variant** becomes enabled |
+| 150 | Select a residue range on that variant row | The panel narrows to just that segment |
+| 151 | Press **Copy Variant** | The aligned sequence lands on the clipboard |
+| 152 | Select a Homolog row, then a Variant row, then a normal row | Each swap shows/hides the right panel and disables the other's button |
+| 153 | Colour the 3D view by conservation, then remove the CONSERVATION row | The colour resets to the default and the toolbar no longer says "conservation" |
+| 154 | Remove a pLDDT/RSA row with the 3D viewer open | The model stays attached and still renders (removing the row does not detach the model) |
+| 155 | Remove a graph-mode row, then re-open the graph | No stale highlight state for the removed key |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -267,8 +279,6 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 - **Older saves** (pre-0.23.0) have no `topologySources`/`uniprotFeatures`/`domainHitsInfo`,
   so a restored old session can still show the inconsistency in X1. Worth deciding whether
   to migrate or to warn.
-- **3D viewer + removal** has not been reasoned through: removing a `_pLDDT`/`_RSA` row
-  leaves the model attached, so the viewer may still color by a metric whose row is gone.
 - **`prefers-reduced-motion`** is implemented as a blanket transition/animation reset; check
   it does not freeze something that relies on a transition to become visible.
 - **HMMER/Foldseek/ESMFold are live services**: a failure there is not necessarily an app bug.
@@ -288,4 +298,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6e. 125–131 (question/action separation + undo).
 6f. 132–140 (clipboard hand-off; 132/133 are the HHpred flow).
 6g. 141–148 (copy split from open; 142 is the fixed copy).
+6h. 149–155 (Phase 1 loose ends).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

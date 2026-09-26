@@ -6612,7 +6612,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.32.1';
+const APP_VERSION = '0.33.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9659,7 +9659,7 @@ function removeTracks(keys, opts) {
     });
 
     // 2) drop the rows and their provenance
-    list.forEach(k => { delete parsedTracks[k]; delete trackMeta[k]; });
+    list.forEach(k => { delete parsedTracks[k]; delete trackMeta[k]; delete graphHighlights[k]; });
 
     // 3) group post-steps that rebuild or invalidate other state
     if (byGroup.TP) { try { applyTopologySources(); } catch (e) { /* rebuild best-effort */ } }
@@ -9669,6 +9669,8 @@ function removeTracks(keys, opts) {
         if (typeof updateVariantFastaSection === 'function') updateVariantFastaSection();
     }
     if (byGroup.UP && !Object.keys(parsedTracks).some(k => k.startsWith('UP_'))) uniprotFeatures = null;
+    // A removed conservation row can invalidate the 3D colour scheme.
+    try { syncP3DConservationMode(); } catch (e) { /* 3D state is optional */ }
 
     // 4) control state must not outlive the tracks it referred to
     ['hidden', 'hideSymbols', 'fullBar', 'filtered', 'aaSeq', 'consColor', 'viewOverride'].forEach(bag => {
@@ -12838,7 +12840,20 @@ function applyP3DColoring(resiColors, statusLabel) {
     p3dView.render();
 }
 // Runs on every selection change (wired into refreshChimeraxDisplay below).
+// The conservation colour scheme reads the CONSERVATION row, so removing that
+// row leaves a mode selected that can no longer colour anything. Fall back to
+// the default and keep the toolbar honest (this runs even with the viewer
+// closed, so the button label cannot lie).
+function syncP3DConservationMode() {
+    if (!isP3DConservationMode()) return false;
+    if (hasConservationData()) return false;
+    p3dBaseSchemeIdx = Math.max(0, P3D_BASE_SCHEMES.indexOf('white'));
+    updateP3DToolbar();
+    return true;
+}
+
 function updateP3DColoring() {
+    syncP3DConservationMode();
     if (!p3dViewerOpen || p3dLocked) return;
     refreshP3DModelOptions();
     if (!p3dLoaded || !p3dView || !p3dModel) return;

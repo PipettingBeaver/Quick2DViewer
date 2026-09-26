@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-09-25
+
+### Fixed
+
+- **The variant FASTA panel was dead code.** `updateVariantFastaSection()` guarded on
+  `#variantFastaSection`, `#variantFastaLabel`, `#variantFastaDisplay` and
+  `#copyVariantTrackBtn`, none of which existed in the HTML, so it always returned
+  early. The panel and its **Copy Variant** button now exist inside the FASTA Segment
+  section (mirroring the homolog panel), and selecting a variant row shows its aligned
+  sequence, narrowed to the selected residue range when there is one.
+- **The latent `VAR_` keying bug** in that function: `keyedVariantsInfo` is keyed by
+  the variant *name* while the track key carries the `VAR_` prefix, so the lookup
+  always missed. It now strips the prefix (matching `getVariantAATrack`).
+- **The 3D conservation colour scheme could outlive its data.** Removing the
+  `CONSERVATION` row left the scheme selected with nothing to read, so the viewer
+  showed an uncoloured model while the toolbar still claimed "Color: conservation".
+  `syncP3DConservationMode()` now falls back to the default scheme and updates the
+  toolbar, both when the scheme is next used and immediately on removal.
+- Track removal also clears the removed key's `graphHighlights` entry, so no per-track
+  state outlives its row.
+
+### Notes
+
+- Phase 1 of the agreed plan (loose ends). Old pre-0.23.0 saves are deliberately left
+  alone per review: they only affect sessions saved before the registry persistence
+  landed.
+
 ## [0.32.1] - 2026-09-25
 
 ### Changed
