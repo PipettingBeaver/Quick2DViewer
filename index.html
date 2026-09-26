@@ -1212,6 +1212,13 @@
         .guide-insight { font-size:0.72rem; line-height:1.4; padding:5px 7px; border-radius:5px; margin-bottom:4px; border-left:3px solid #94a3b8; background:#f8fafc; color:#475569; }
         .guide-insight-warn { border-left-color:#f59e0b; background:#fffbeb; color:#92400e; }
         .guide-chip-skip { background:#f1f5f9; color:#94a3b8; }
+        /* The step the "Next:" card is pointing at. */
+        .guide-step-current { border-color:#93c5fd; box-shadow:0 0 0 1px #bfdbfe; }
+        .guide-step-current > summary { background:#eff6ff; }
+        .guide-step-current .guide-title { color:#1d4ed8; }
+        .guide-step-current .guide-chip-pri { background:#dbeafe; color:#1d4ed8; }
+        .guide-run-done { background:#e2e8f0; color:#475569; }
+        .guide-run-done:hover { background:#cbd5e1; }
         .guide-chip-rel { background:#f1f5f9; color:#64748b; font-style:italic; }
         .guide-step-skip > summary { opacity:0.65; }
         .guide-step-skip .guide-title { text-decoration: line-through; }
@@ -3099,7 +3106,10 @@ const SERVICE_ADAPTERS = {
     async esmfold(provider, args) {
         const seq = String(args.sequence || '');
         if (provider.maxLength && seq.length > provider.maxLength) throw new Error('sequence too long (max ' + provider.maxLength + ' aa)');
-        const resp = await fetch(provider.url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: seq });
+        // No explicit Content-Type: a string body is sent as text/plain, which
+        // is CORS-safelisted, so the request stays "simple" and can never be
+        // blocked by a failed preflight (the API answers OPTIONS with 403).
+        const resp = await fetchWithTimeout(provider.url, { method: 'POST', body: seq }, 90000);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const text = await resp.text();
         if (!text || text.length < 60 || !/^(ATOM|HEADER|MODEL)/m.test(text)) throw new Error('empty/invalid prediction');
@@ -3217,11 +3227,12 @@ function toggleQaHighlights() {
 async function predictStructureESMFold() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     if (!seq) { showToast('Load a sequence first, then predict a structure.', 'error'); return; }
-    if (!(await ensureExternalServices())) return;
+    if (!beginGuideTask('structure', 'ESMFold prediction for a ' + seq.length + ' aa sequence')) return;
     const statusEl = document.getElementById('esmfoldStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
-    setStatus('Predicting with ESMFold…');
     try {
+        if (!(await ensureExternalServices())) { endGuideTask('structure'); return; }
+        setStatus('Predicting with ESMFold…');
         const result = await runCapability('fold', { sequence: seq }, (m) => setStatus(m));
         const base = 'ESMFold_' + (currentProteinLabel ? currentProteinLabel.replace(/[^A-Za-z0-9]+/g, '_') : 'model');
         await attachStructureText(base + '.pdb', result.pdbText, 'pdb', { source: 'ESMFold' });
@@ -3232,11 +3243,60 @@ async function predictStructureESMFold() {
         refreshTrackManagerIfVisible();
         schedulePersist();
         setStatus('ESMFold model attached.');
-        showToast('ESMFold model attached. pLDDT, RSA and 3D are available.', 'success');
+        endGuideTask('structure', 'ESMFold model attached', 'success');
     } catch (err) {
         const m = err && err.message ? err.message : String(err);
+        const blocked = /networkerror|failed to fetch|load failed|network request failed/i.test(m);
         setStatus('ESMFold failed: ' + m);
-        showToast('ESMFold prediction failed: ' + m, 'error');
+        endGuideTask('structure', 'ESMFold failed: ' + m, 'error');
+        if (blocked) {
+            showToast('ESMFold could not be reached from the browser. The API itself is up (verified), so a privacy extension, tracking protection or an offline network is the likely cause. Test https://api.esmatlas.com/foldSequence/v1/pdb/ in a new tab.', 'error', { dismissible: true });
+        }
+    }
+}
+
+// AlphaFold DB fetch. The API and the model files are CORS-enabled (verified
+// 2026-09), so this can attach the real model instead of just opening a panel.
+// Needs a UniProt accession: the DB is keyed by it, not by sequence.
+async function fetchAlphaFoldModel() {
+    const derived = deriveLookupDefaults();
+    const acc = uniprotAccession || (derived && derived.accession) || '';
+    if (!acc) {
+        showToast('AlphaFold DB is keyed by UniProt accession. Load a protein with one, or set the accession in Options > Annotation Offload first.', 'error');
+        return;
+    }
+    if (!beginGuideTask('structure', 'AlphaFold DB fetch for ' + acc)) return;
+    const statusEl = document.getElementById('esmfoldStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('structure'); return; }
+        setStatus('Looking up AlphaFold DB for ' + acc + '…');
+        const metaResp = await fetchWithTimeout('https://alphafold.ebi.ac.uk/api/prediction/' + encodeURIComponent(acc), { headers: { Accept: 'application/json' } }, 30000);
+        if (!metaResp.ok) throw new Error('AlphaFold DB lookup HTTP ' + metaResp.status);
+        const meta = await metaResp.json();
+        const entry = Array.isArray(meta) ? meta[0] : meta;
+        const url = entry && (entry.pdbUrl || entry.cifUrl);
+        if (!url) throw new Error('no model URL for ' + acc);
+        const file = url.split('/').pop();
+        setStatus('Downloading ' + file + '…');
+        const fileResp = await fetchWithTimeout(url, {}, 60000);
+        if (!fileResp.ok) throw new Error('model download HTTP ' + fileResp.status);
+        const text = await fileResp.text();
+        const ext = /\.cif$/i.test(url) ? 'cif' : 'pdb';
+        await attachStructureText('AlphaFold_' + acc + '.' + ext, text, ext, { source: 'AlphaFold DB' });
+        renderViewer(parsedTracks);
+        populateCrossRefDropdown();
+        if (p3dViewerOpen) { refreshP3DModelOptions(); updateP3DColoring(); }
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        schedulePersist();
+        setStatus('AlphaFold model attached (' + acc + ').');
+        endGuideTask('structure', 'Attached the AlphaFold model for ' + acc, 'success');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('AlphaFold fetch failed: ' + m);
+        endGuideTask('structure', 'AlphaFold fetch failed: ' + m, 'error');
+        showToast('Could not fetch the AlphaFold model for ' + acc + ' (' + m + '). AlphaFold DB only covers UniProt entries; try ESMFold for a sequence-only model.', 'error');
     }
 }
 
@@ -4827,15 +4887,17 @@ const WORKFLOW_STEPS = [
             { cite: 'Kabsch & Sander, Biopolymers 1983 (DSSP)', doi: '10.1002/bip.360221211' }
         ],
         check: () => (uploadedStructureFiles && uploadedStructureFiles.length > 0) || Object.keys(parsedTracks).some(k => k.endsWith('_pLDDT') || k.endsWith('_RSA')),
-        priority: (p) => p.structure === 'yes' || p.structure === 'unsure',
-        priorityNote: 'Promoted when a structure is available or planned, or the answer is unsure.'
+        // Always on the critical path: structural homology and interfaces both
+        // need a model, so this step is never "optional" regardless of what the
+        // structure-evidence answer says.
+        priority: () => true,
+        priorityNote: 'Always. The structural homology and interface steps both need a model.'
     },
     {
         id: 'foldseek', title: 'Structural homology',
         desc: 'Search Foldseek for remote relatives that sequence search misses. Needs at least one structure attached first (an AlphaFold/PDB/CIF model, or an ESMFold prediction).',
         why: 'Structure is more conserved than sequence: Foldseek finds the remote homologs that decide a fold assignment when BLAST/HMMER come up empty.',
         action: { label: 'Run Foldseek', run: 'runFoldseekSearch()' },
-        extraActions: [{ label: 'Attach Structure(s)', run: 'attachStructures()' }],
         how: ['Attach at least one structure: Foldseek searches by 3D coordinates, not by sequence.',
               'The search uses the active (or first attached) model. Attaching more models does NOT widen the search, so pull one representative structure per state you care about and run that.',
               'High probability + low E-value with good query coverage is a credible structural relative.',
@@ -4887,8 +4949,11 @@ const WORKFLOW_STEPS = [
 const GUIDE_QUESTIONS = [
     { id: 'membrane', label: 'Is it membrane-associated or secreted?', options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] },
-    { id: 'structure', label: 'Is a 3D structure available or planned?', options: [
-        { value: 'yes', label: 'Yes' }, { value: 'no', label: 'Not yet' }, { value: 'unsure', label: 'Not sure' }] },
+    { id: 'structure', label: 'What structure evidence do you have?', options: [
+        { value: 'experimental', label: 'Experimental (X-ray / cryo-EM / NMR)' },
+        { value: 'predicted', label: 'Predicted only (AlphaFold / ESMFold)' },
+        { value: 'none', label: 'None yet' },
+        { value: 'unsure', label: 'Not sure' }] },
     { id: 'homologs', label: 'Are homologs / an HHpred MSA in hand?', options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] },
     { id: 'variants', label: 'Are you evaluating sequence variants?', options: [
@@ -4984,7 +5049,18 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     annotation(a) {
-        if (a.have === 'domains') return { label: 'Scan HMMER/Pfam', run: 'runDomainScan()', hint: 'Adds domain architecture only, no UniProt fetch.' };
+        if (a.have === 'domains') {
+            const scanned = Object.keys(domainHitsInfo).length > 0 ||
+                Object.keys(parsedTracks).some(k => k.startsWith('DM_'));
+            return {
+                label: scanned ? 'Re-scan HMMER/Pfam' : 'Scan HMMER/Pfam',
+                run: 'runDomainScan()',
+                done: scanned,
+                hint: scanned
+                    ? 'Replaces the current domain rows with a fresh hmmscan result.'
+                    : 'Adds domain architecture only, no UniProt fetch.'
+            };
+        }
         if (a.have === 'search') return { label: 'Search UniProt…', run: 'autoLookupAccession()', hint: 'Opens the UniProt search with the current protein label pre-filled.' };
         if (a.have === 'accession') return { label: 'Fetch UniProt entry', run: 'autoLookupAccession()' };
         return null;
@@ -4994,9 +5070,19 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     structure(a) {
-        if (a.model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (≤400 aa) and attaches the model.' };
-        if (a.model === 'afdb') return { label: 'Fetch AlphaFold model…', run: 'openDataModal()', hint: 'Data & Structures lists AlphaFold entries for the current accession.' };
-        if (a.model === 'pdb') return { label: 'Attach PDB / CIF…', run: 'openInputDataModal()', hint: 'Attach the experimental model; pLDDT/RSA follow from it.' };
+        const derived = deriveLookupDefaults();
+        const acc = uniprotAccession || (derived && derived.accession) || '';
+        // The step's own answer wins; otherwise the intake's evidence type
+        // decides (experimental -> attach a file, predicted -> AlphaFold DB).
+        const model = a.model || (guideProfile.structure === 'experimental' ? 'pdb'
+            : (guideProfile.structure === 'predicted' ? 'afdb'
+            : (guideProfile.structure === 'none' ? 'esmfold' : '')));
+        if (model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (max 400 aa) and attaches the model.' };
+        if (model === 'afdb') {
+            if (acc) return { label: 'Fetch AlphaFold model (' + acc + ')', run: 'fetchAlphaFoldModel()', hint: 'Downloads the AlphaFold DB model for ' + acc + ' and attaches it.' };
+            return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'No UniProt accession is loaded, so AlphaFold DB cannot be queried. ESMFold folds the sequence directly instead.' };
+        }
+        if (model === 'pdb') return { label: 'Attach PDB / CIF…', run: 'openInputDataModal()', hint: 'Attach the experimental model; pLDDT/RSA follow from it.' };
         return null;
     },
     foldseek(a) {
@@ -5042,8 +5128,12 @@ function resolveStepAction(step) {
     } catch (e) { resolved = null; }
     // Fall back to the step's own action, and report whether the answer changed it.
     const base = { label: step.action.label, run: step.action.run, hint: '' };
-    if (!resolved) return Object.assign({ custom: false }, base);
-    return { label: resolved.label, run: resolved.run, hint: resolved.hint || '', custom: resolved.run !== step.action.run || resolved.label !== step.action.label };
+    if (!resolved) return Object.assign({ custom: false, done: false }, base);
+    return {
+        label: resolved.label, run: resolved.run, hint: resolved.hint || '',
+        done: !!resolved.done,
+        custom: resolved.run !== step.action.run || resolved.label !== step.action.label
+    };
 }
 // Undoing a step from the guide. Unlike hiding, this removes the data the step
 // added, in the units the step thinks in - the groups it populated, and for
@@ -5188,6 +5278,9 @@ function computeGuideInsights() {
         out.push(mean < 70
             ? { level: 'warn', text: 'Mean pLDDT is ' + mean.toFixed(0) + '. Treat fold-level conclusions (domain edges, interface detail) as tentative.' }
             : { level: 'info', text: 'Mean pLDDT is ' + mean.toFixed(0) + '. The backbone is confident, so inspect local dips individually.' });
+    }
+    if (guideProfile.structure === 'predicted') {
+        out.push({ level: 'info', text: 'Structure evidence is predicted only. Corroborate fold-level claims with Foldseek, or with an experimental model where one exists.' });
     }
     const hlKeys = keys.filter(k => k.startsWith('HL_'));
     if (!hlKeys.length) {
@@ -5385,6 +5478,7 @@ function renderWorkflowGuide() {
     const openIds = Array.prototype.slice.call(el.querySelectorAll('details.guide-step[open]')).map(d => d.dataset.step);
     const prog = guideProgress();
     const next = nextGuideStep();
+    const nextId = next ? next.step.id : null;
     const answered = Object.keys(guideProfile).length;
     const overrideCount = Object.keys(guideOverrides).length;
     let html = '';
@@ -5436,7 +5530,9 @@ function renderWorkflowGuide() {
         const isTaskBtn = !!taskRun && act.run === taskRun;
         const busy = isTaskBtn && !!guideTask && guideTask.stepId === r.step.id;
         const locked = isTaskBtn && !!guideTask && !busy;
-        const label = busy ? 'Working\u2026' : (r.done ? ('Re-run: ' + act.label) : act.label);
+        // A resolved action that reports itself done already says "Re-scan …",
+        // so it must not also get the generic "Re-run:" prefix.
+        const label = busy ? 'Working\u2026' : (act.done ? act.label : (r.done ? ('Re-run: ' + act.label) : act.label));
         const taskAttrs = (isTaskBtn ? ' data-task-step="' + r.step.id + '"' : '') +
             (busy ? ' disabled aria-busy="true"' : (locked ? ' disabled' : ''));
         const stepQs = STEP_QUESTIONS[r.step.id] || [];
@@ -5445,7 +5541,8 @@ function renderWorkflowGuide() {
             : r.notRelevant ? 'Status: not relevant for this protein. ' + (r.step.relevantNote ? r.step.relevantNote + ' ' : '') + 'Mark done or skip to settle it.'
             : r.autoDone ? 'Status: detected from the loaded data.'
             : 'Status: not detected yet.';
-        html += '<details class="guide-step' + (r.done ? ' guide-step-done' : '') + (r.skipped ? ' guide-step-skip' : '') + '" data-step="' + r.step.id + '">' +
+        html += '<details class="guide-step' + (r.done ? ' guide-step-done' : '') + (r.skipped ? ' guide-step-skip' : '') +
+            (r.step.id === nextId ? ' guide-step-current' : '') + '" data-step="' + r.step.id + '">' +
             '<summary><span class="guide-num">' + (r.index + 1) + '</span><span class="guide-title">' + r.step.title + '</span>' + guideChip(r) + '</summary>' +
             '<div class="guide-body">' +
             '<p class="guide-desc">' + r.step.desc + '</p>' +
@@ -5462,7 +5559,7 @@ function renderWorkflowGuide() {
             guideRefsHTML(r.step) +
             '<div class="guide-state">' + status + '</div>' +
             '<div class="guide-actions">' +
-            '<button type="button" class="guide-run' + (busy ? ' task-running' : '') + '"' + taskAttrs + ' onclick="' + act.run + '">' + label + '</button>' +
+            '<button type="button" class="guide-run' + (act.done ? ' guide-run-done' : '') + (busy ? ' task-running' : '') + '"' + taskAttrs + ' onclick="' + act.run + '">' + label + '</button>' +
             (act.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + r.step.action.run + '">' + r.step.action.label + '</button>' : '') +
             (r.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
             (r.done && STEP_UNDO[r.step.id] ? '<button type="button" class="guide-mini guide-danger" onclick="undoGuideStep(\'' + r.step.id + '\')">' + (STEP_UNDO[r.step.id].label || 'Undo this step') + '</button>' : '') +
@@ -5490,6 +5587,11 @@ function renderWorkflowGuide() {
 }
 
 function renderInputDataModal() {
+    const dmBtn = document.getElementById('btnDomainScan');
+    if (dmBtn) {
+        const scanned = Object.keys(parsedTracks).some(k => k.startsWith('DM_'));
+        dmBtn.textContent = scanned ? 'Re-scan domains (HMMER/Pfam)' : 'Scan domains (HMMER/Pfam)';
+    }
     const sum = document.getElementById('inputDataSummary');
     if (sum) {
         if (!parsedTracks.AA) {
@@ -6332,7 +6434,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.26.0';
+const APP_VERSION = '0.27.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

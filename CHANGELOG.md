@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-09-25
+
+### Fixed
+
+- **"Fetch AlphaFold model…" did nothing but open the Data window.** The action was
+  never implemented, only labelled. It now really fetches: the AlphaFold DB API and
+  its model files are CORS-enabled (verified 2026-09), so it looks up
+  `/api/prediction/<accession>`, downloads the returned `pdbUrl` and attaches the
+  model like any other structure. Without an accession it falls back to ESMFold and
+  says why (the DB is keyed by UniProt accession, not by sequence).
+- **ESMFold "NetworkError".** The API is up (a 238 aa job returned 200 in 0.7 s,
+  155 KB). The request now sends **no explicit Content-Type**, so a string body goes
+  as `text/plain` (CORS-safelisted) and the call stays a "simple" request that can
+  never be blocked by a failed preflight (the API answers OPTIONS with 403). If a
+  browser still blocks it, the error is now dismissible and names the likely cause
+  (privacy extension / tracking protection) plus the URL to test in a new tab.
+  ESMFold also takes the task lock now (spinner + timer toast, one job at a time).
+
+### Changed
+
+- **The structure question asks for evidence type, not availability**:
+  *Experimental (X-ray / cryo-EM / NMR)*, *Predicted only (AlphaFold / ESMFold)*,
+  *None yet*, *Not sure*. The structure step is now **always on the critical path**
+  (it was marked optional on a "Not yet" answer, even though structural homology and
+  interfaces both depend on a model), and the offered action is tailored: attach a
+  file for experimental, fetch AlphaFold for predicted, predict with ESMFold for
+  none. Predicted-only evidence adds a read-out caveat.
+- **The step the "Next:" card points at is highlighted** in the guide (blue summary
+  fill + border, and a distinct recommended chip).
+- **"Scan HMMER/Pfam" becomes "Re-scan HMMER/Pfam"** once a scan has run, greyed to
+  read as done while staying clickable (the Input Data button follows too).
+- Removed the duplicate *Attach Structure(s)* button in the Foldseek step (it is
+  offered by the resolver only when no structure is attached).
+- `DESIGN.md` §15 records the homolog-source analysis: what could replace HHpred
+  (EBI phmmer, NCBI-BLAST, Foldseek), and why an MSA, not just hits, is the gap.
+
 ## [0.26.0] - 2026-09-25
 
 ### Fixed

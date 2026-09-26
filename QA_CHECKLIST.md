@@ -189,6 +189,24 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 103 | Finish every step (or mark them done) | The Next card reads "**All steps covered** (N of M)." with no advice sentence |
 | 104 | Check the homolog table and methods report for empty values | Placeholders render as `-` (not an em-dash) |
 
+## 0.27.0 - guide focus, re-scan state, structure evidence, AlphaFold fetch
+
+| # | Try | Watch for |
+|---|---|---|
+| 105 | Open the Guide with nothing loaded | The step named in "Next:" is highlighted (blue summary fill + border); only one step is highlighted |
+| 106 | Complete that step | The highlight moves to the new "Next:" step |
+| 107 | Run a domain scan, then look at the guide's annotation step | The button reads **Re-scan HMMER/Pfam** and is greyed (still clickable); the Input Data button reads "Re-scan domains (HMMER/Pfam)" |
+| 108 | Re-scan | Replaces the DM_ rows rather than duplicating them; the timer toast runs again |
+| 109 | With an accession loaded (e.g. GFP), set Structure to "AlphaFold DB" and press the action | Button says *Fetch AlphaFold model (P42212)*; the model downloads and attaches; pLDDT/RSA/3D become available |
+| 110 | Same, with no accession at all | Falls back to *Predict with ESMFold* and explains that AlphaFold DB needs an accession |
+| 111 | Press ESMFold (or AlphaFold) twice quickly | One job only; spinner + timer toast; the other task buttons are disabled |
+| 112 | Force a network failure (devtools offline), then press ESMFold | Dismissible error naming the likely cause + the URL to test; the lock clears |
+| 113 | Answer the structure question with each of the four options | Experimental offers attaching a file, Predicted offers the AlphaFold fetch, None offers ESMFold, Not sure falls back sensibly |
+| 114 | Answer "Predicted only" and read the read-out | A caveat about fold-level claims appears (and does not appear for experimental) |
+| 115 | Answer "None yet" and check the structure step | It is still **recommended**, never optional (structural homology depends on it) |
+| 116 | Open the Foldseek step with no structure attached | Exactly one Attach Structure(s) button (this was duplicated) |
+| 117 | Check the AlphaFold DB link/entry for a non-UniProt id (e.g. a made-up label) | Clear error saying the DB is keyed by UniProt accession, with ESMFold suggested |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -214,4 +232,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 5. 56–73 (import/FASTA/lookup — test this round with GFP as the reference system).
 6. 74–91 (task lockout, domain tooltips, relevance, Foldseek, coachmarks).
 6b. 92–104 (layout/hover/copy polish - check 92/93 first, they are the reported bug).
+6c. 105–117 (guide focus, re-scan state, structure evidence, AlphaFold/ESMFold).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

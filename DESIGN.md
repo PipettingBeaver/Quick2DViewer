@@ -351,3 +351,31 @@ so it is obvious what ran and that the panel can be left. A progress line
 **Plain FASTA is a valid start.** `parsePlainFasta()` accepts a `>header` plus sequence
 (and is deliberately not fooled by Quick2D output), producing a sequence-only session
 via `buildFromPlainFasta()`, so predictions/annotations can be layered on afterwards.
+
+## 15. Homolog sources: what can replace HHpred? (v0.27.0)
+
+Asked in review: "is there really no alternative to HHpred, none with API?"
+
+**What the guide needs from a homolog source is not just hits, but an MSA.**
+Conservation, the per-column match-quality glyphs, the homolog template table and
+the HMM-derived metrics all read from an alignment of homolog sequences onto the
+reference. HHpred/HHblits deliver that in one step (MSA + HMM + per-column
+posterior probabilities).
+
+API-available alternatives, in increasing order of work:
+
+| Source | API | Gives | Gap |
+|---|---|---|---|
+| EBI HMMER **phmmer** | `Tools/services/rest/hmmer3_phmmer` (Job Dispatcher, so the existing `ebiJob` adapter and CORS story apply exactly as for hmmscan) | hits with per-domain alignment coordinates and E-values | no per-column match quality; we would build the MSA and score columns ourselves |
+| EBI **NCBI-BLAST** | already wired as the `sequence_search` capability | HSP alignments (query/target strings per alignment) | pairwise HSPs only; hits need aligning onto the reference |
+| **Foldseek** | already wired as `structure_search` | structural hits with aligned query/target strings | needs a structure, and it is structural rather than evolutionary evidence |
+
+So HHpred remains the only *curated MSA* source, but a phmmer/BLAST path is
+feasible with what already exists. Sketch: run `sequence_search`, build `HL_` rows
+from each HSP's aligned query/target pair using the same mapping Foldseek already
+uses (`qAln`/`dbAln` -> `foldseekQualityChar`), fall back to
+`alignVariantToReference` for hits that need realignment, then let
+`recomputeConservationScores()` pick the rows up. The glyphs would come from
+BLOSUM62 (`blosum62Score` already exists) rather than HHpred posterior
+probabilities, so the rows must be labelled with their own source, e.g.
+"BLAST (aligned)", to keep provenance honest.

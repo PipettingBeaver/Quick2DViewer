@@ -256,7 +256,9 @@ section('guided workflow (evaluation guide)');
 assert(ctxRun(`WORKFLOW_STEPS.length`) === 8, 'guide has 8 pipeline steps');
 assert(ctxRun(`WORKFLOW_STEPS.every(s => s.id && s.title && s.desc && s.why && s.action && typeof s.action.run === 'string' && Array.isArray(s.how) && s.how.length && typeof s.check === 'function')`), 'every step carries why / action / how / check');
 assert(ctxRun(`WORKFLOW_STEPS.map(s => s.id).join(',')`) === 'sequence,features,annotation,homologs,structure,foldseek,topology,integration', 'steps follow the characterized pipeline order');
-assert(ctxRun(`GUIDE_QUESTIONS.length`) === 5 && ctxRun(`GUIDE_QUESTIONS.every(q => q.id && q.options.length === 3)`), '5 three-option intake questions');
+assert(ctxRun(`GUIDE_QUESTIONS.length`) === 5 && ctxRun(`GUIDE_QUESTIONS.every(q => q.id && q.options.length >= 3)`), '5 intake questions with at least three options each');
+const structQ = ctxRun(`GUIDE_QUESTIONS.filter(q => q.id === 'structure')[0]`);
+assert(structQ.options.map(o => o.value).join(',') === 'experimental,predicted,none,unsure', 'the structure question asks for the evidence type, not availability');
 assert(ctxRun(`typeof setGuideAnswer === 'function' && typeof resetGuideProfile === 'function' && typeof renderWorkflowGuide === 'function' && typeof computeGuideInsights === 'function' && typeof nextGuideStep === 'function'`), 'guide helpers present');
 
 ctxRun(`resetGuideProfile();`);
@@ -356,8 +358,13 @@ ctxRun(`setStepAnswer('structure', 'model', 'esmfold');`);
 act = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
 assert(act.run === 'predictStructureESMFold()' && act.custom === true, 'ESMFold answer offers the prediction action');
 assert(/400 aa/.test(act.hint), 'the resolved action carries a hint');
-ctxRun(`setStepAnswer('structure', 'model', 'afdb');`);
-assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]).run`) === 'openDataModal()', 'AlphaFold answer offers the data modal');
+ctxRun(`setStepAnswer('structure', 'model', 'afdb'); uniprotAccession = null; currentProteinLabel = null;`);
+let afAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(afAct.run === 'predictStructureESMFold()' && /No UniProt accession/.test(afAct.hint), 'AlphaFold answer without an accession falls back to ESMFold and says why');
+ctxRun(`uniprotAccession = 'P42212';`);
+afAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(afAct.run === 'fetchAlphaFoldModel()' && /P42212/.test(afAct.label), 'with an accession it offers the real AlphaFold DB fetch');
+ctxRun(`uniprotAccession = null;`);
 
 ctxRun(`setStepAnswer('foldseek', 'db', 'pdb100');`);
 act = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0])`);
@@ -785,6 +792,38 @@ assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as
 assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
 assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
 
+section('guide focus, re-scan state + structure evidence');
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
+let gHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+const nextId = ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`);
+assert(gHtml.indexOf('guide-step-current') !== -1, 'the current step is highlighted');
+assert(gHtml.indexOf('data-step="' + nextId + '"') !== -1 && gHtml.indexOf('guide-step-current') !== -1, 'the highlight is on the step the Next card names');
+assert((gHtml.match(/guide-step-current/g) || []).length === 1, 'only one step is marked current');
+
+// Re-scan label + done styling once a domain scan exists
+ctxRun(`domainHitsInfo = {}; parsedTracks = { AA: 'MKV' };`);
+ctxRun(`setStepAnswer('annotation', 'have', 'domains');`);
+let annAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0])`);
+assert(annAct.label === 'Scan HMMER/Pfam' && annAct.done === false, 'a first scan reads Scan HMMER/Pfam');
+ctxRun(`domainHitsInfo = { DM_GFP: { model: 'GFP', domains: [] } };`);
+annAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0])`);
+assert(annAct.label === 'Re-scan HMMER/Pfam' && annAct.done === true, 'after a scan it reads Re-scan HMMER/Pfam and reports done (greyed button)');
+assert(annAct.run === 'runDomainScan()', 'the re-scan still runs the same action');
+ctxRun(`domainHitsInfo = {}; guideAnswers = {};`);
+
+// Structure evidence tailors the offered action and the read-out
+ctxRun(`guideProfile = { structure: 'experimental' };`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]).run`) === 'openInputDataModal()', 'experimental evidence offers attaching a file');
+ctxRun(`guideProfile = { structure: 'none' };`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]).run`) === 'predictStructureESMFold()', 'no structure offers a prediction');
+ctxRun(`parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 90 }] }; guideProfile = { structure: 'predicted' };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /predicted only/.test(i.text)), 'predicted-only evidence adds a read-out caveat');
+ctxRun(`parsedTracks = { AA: 'MKV' }; guideProfile = { structure: 'experimental' };`);
+assert(!ctxRun(`computeGuideInsights()`).some(i => /predicted only/.test(i.text)), 'the caveat is specific to predicted-only');
+// the structure step is never optional (structural homology depends on it)
+assert(ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'structure')[0].priority({})`) === true, 'the structure step is always on the critical path');
+ctxRun(`guideProfile = {}; parsedTracks = {};`);
+
 section('layout, hover + copy polish');
 // --- 1/2. heatmap rows span the full scroll width (the "doesn't reach the
 // right / looks duplicated" report): block boxes in a horizontal scroller are
@@ -870,7 +909,7 @@ ctxRun(`guideCoachmark = null;`);
 section('foldseek prerequisite + lockout');
 const fsStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0]`);
 assert(fsStep.desc.indexOf('at least one structure') !== -1, 'the foldseek step states the structure prerequisite');
-assert(fsStep.extraActions && fsStep.extraActions.some(a => a.run === 'attachStructures()'), 'the step offers Attach Structure(s)');
+assert(!fsStep.extraActions || !fsStep.extraActions.some(a => a.run === 'attachStructures()'), 'Attach Structure(s) is not duplicated as a permanent extra action (the resolver offers it only when needed)');
 assert(typeof ctxRun(`attachStructures`) === 'function', 'the attach action is shared with the Input Data button');
 
 // no structure attached -> the prerequisite is what gets offered
