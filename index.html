@@ -5122,8 +5122,8 @@ const STEP_ACTION_RESOLVERS = {
     homologs(a) {
         if (a.hhpred === 'no') return {
             label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')",
-            accessory: { label: 'Copy sequence', run: 'copySequenceFasta()' },
-            hint: 'Use Copy sequence first, then paste it into HHpred and run the search. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Attach the resulting .hhr here afterwards.'
+            accessory: { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
+            hint: 'Use Copy sequence (FASTA) first, then paste it into HHpred and run the search. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Attach the resulting .hhr here afterwards.'
         };
         if (a.hhpred === 'ready') return { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()', hint: 'Attach the .hhr (and any variant FASTA) in Input Data. The hits become homolog rows and feed the templates table.' };
         return null;
@@ -5165,8 +5165,8 @@ const STEP_ACTION_RESOLVERS = {
     topology(a) {
         if (a.predictor === 'none') return {
             label: 'Open DeepTMHMM ↗', run: "window.open('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/','_blank')",
-            accessory: { label: 'Copy sequence', run: 'copySequenceFasta()' },
-            hint: 'Use Copy sequence first, then paste it into DeepTMHMM and run the prediction. Paste its output into Options → Data Sources → Topology afterwards.'
+            accessory: { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
+            hint: 'Use Copy sequence (FASTA) first, then paste it into DeepTMHMM and run the prediction. Paste its output into Options → Data Sources → Topology afterwards.'
         };
         const names = { tmhmm: 'TMHMM', phobius: 'Phobius', deeptmhmm: 'DeepTMHMM' };
         if (names[a.predictor]) return { label: 'Paste ' + names[a.predictor] + ' output…', run: 'openTopologyPanel()', hint: 'Opens the topology paste box; two or more sources give a consensus bar.' };
@@ -6607,7 +6607,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.32.0';
+const APP_VERSION = '0.32.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

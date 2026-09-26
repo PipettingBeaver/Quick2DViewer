@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.1] - 2026-09-25
+
+### Changed
+
+- The HHpred / DeepTMHMM hand-off button is named consistently: the action only
+  **opens** the tool (no clipboard interaction at all) and the button beside it is
+  labelled **Copy sequence (FASTA)**, matching the same button on the step card
+  rather than introducing a second name for the same thing. The short description
+  points at that button by name.
+
 ## [0.32.0] - 2026-09-25
 
 ### Fixed

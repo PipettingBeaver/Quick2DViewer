@@ -378,7 +378,7 @@ assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')
 ctxRun(`setStepAnswer('topology', 'predictor', 'none');`);
 let topoAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0])`);
 assert(topoAct.run.indexOf('window.open') === 0, 'no-predictor answer opens the predictor');
-assert(topoAct.accessory && topoAct.accessory.run === 'copySequenceFasta()', 'with Copy sequence as an accessory beside it');
+assert(topoAct.accessory && topoAct.accessory.label === 'Copy sequence (FASTA)' && topoAct.accessory.run === 'copySequenceFasta()', 'with Copy sequence (FASTA) as an accessory beside it');
 ctxRun(`setStepAnswer('annotation', 'have', 'domains');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0]).run`) === 'runDomainScan()', 'annotation "domains only" resolves to the Pfam scan');
 
@@ -860,8 +860,9 @@ ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
 const hhAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0])`);
 assert(hhAct.run.indexOf('window.open') === 0, 'the not-ready answer opens HHpred');
-assert(hhAct.accessory && hhAct.accessory.label === 'Copy sequence' && hhAct.accessory.run === 'copySequenceFasta()', 'and offers Copy sequence as an accessory beside it');
-assert(/Use Copy sequence first/.test(hhAct.hint), 'the short description tells the user to use the copy button');
+assert(hhAct.accessory && hhAct.accessory.label === 'Copy sequence (FASTA)' && hhAct.accessory.run === 'copySequenceFasta()', 'and offers Copy sequence (FASTA) as an accessory beside it, named like the step card button');
+assert(/Use Copy sequence \(FASTA\) first/.test(hhAct.hint), 'the short description tells the user to use the copy button');
+assert(hhAct.run.indexOf('copySequence') === -1 && hhAct.run.indexOf('clipboard') === -1, 'the open button itself does not touch the clipboard');
 assert(/A3M\/CLUSTAL\/FASTA\/STOCKHOLM/.test(hhAct.hint) && /PDB_mmCIF70/.test(hhAct.hint), 'the hint names the accepted formats and the modelling databases');
 const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
@@ -904,7 +905,7 @@ assert(gHtml2.indexOf('guide-opt-on') !== -1, 'the step card keeps the question 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
 nextBlk = sliceNext(ctxRun(`document.getElementById('guidePanel').innerHTML`));
 assert(nextBlk.indexOf('Open HHpred') !== -1 && nextBlk.indexOf('PDB_mmCIF70') !== -1, 'the other answer yields its own action + hint');
-assert(nextBlk.indexOf('Copy sequence') !== -1, 'the short form shows the Copy sequence accessory beside the action');
+assert(nextBlk.indexOf('Copy sequence (FASTA)') !== -1, 'the short form shows the Copy sequence (FASTA) accessory beside the action');
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
 
 section('guide focus, re-scan state + structure evidence');
