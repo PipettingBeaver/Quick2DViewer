@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-09-25
+
+### Added
+
+- **Clipboard hand-off to external tools.** A third-party tool cannot be pre-filled
+  from here (cross-origin, and HHpred has no sequence query parameter), so the useful
+  thing is to hand the input over:
+  - **Copy sequence & open HHpred** is what the homologs step now offers when the
+    `.hhr` is not ready: it opens HHpred inside the click gesture (so popup blockers
+    allow it) and copies the current sequence as FASTA, with a toast saying to paste
+    it with Ctrl+V. The hint also names what HHpred accepts (A3M/CLUSTAL/FASTA/
+    STOCKHOLM) and the databases to pick for template-based modelling
+    (PDB_mmCIF70 / PDB_mmCIF30).
+  - **Copy sequence & open DeepTMHMM** does the same for the topology step's
+    "no predictor yet" answer.
+  - **Copy sequence (FASTA)** and **Download FASTA** are always available on the
+    homologs step, for pasting into any other tool or keeping a record.
+  - The FASTA writer uses the loaded identifier as the header (newlines collapsed so
+    the header stays a single valid line) and wraps at 60 residues; with no sequence
+    loaded the actions refuse rather than opening an empty tool.
+
 ## [0.30.0] - 2026-09-25
 
 ### Fixed

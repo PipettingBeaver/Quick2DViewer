@@ -4896,6 +4896,10 @@ const WORKFLOW_STEPS = [
         desc: 'Run <a href="https://toolkit.tuebingen.mpg.de/tools/hhpred" target="_blank" rel="noopener">MPI\'s HHpred</a> and attach the .hhr; attach a variant FASTA for per-residue conservation.',
         why: 'Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.',
         action: { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()' },
+        extraActions: [
+            { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
+            { label: 'Download FASTA', run: 'downloadSequenceFasta()' }
+        ],
         how: ['Probability > 90% with coverage near 100% makes a template a solid model.',
               'Conservation is only as good as the alignment depth, so check how many sequences went in.'],
         refs: [
@@ -5115,7 +5119,10 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     homologs(a) {
-        if (a.hhpred === 'no') return { label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')", hint: 'Run HHpred on the sequence, then attach the resulting .hhr here.' };
+        if (a.hhpred === 'no') return {
+            label: 'Copy sequence & open HHpred', run: 'copySequenceAndOpenHHpred()',
+            hint: 'Copies the sequence as FASTA and opens HHpred. Paste it there, run the search, then attach the resulting .hhr here. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling.'
+        };
         if (a.hhpred === 'ready') return { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()', hint: 'Attach the .hhr (and any variant FASTA) in Input Data. The hits become homolog rows and feed the templates table.' };
         return null;
     },
@@ -5154,7 +5161,10 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     topology(a) {
-        if (a.predictor === 'none') return { label: 'Open a predictor ↗', run: "window.open('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/','_blank')", hint: 'Run the predictor, then paste its output into Options → Data Sources → Topology.' };
+        if (a.predictor === 'none') return {
+            label: 'Copy sequence & open DeepTMHMM', run: 'copySequenceAndOpenDeepTMHMM()',
+            hint: 'Copies the sequence as FASTA and opens DeepTMHMM. Paste it there, run the prediction, then paste its output into Options → Data Sources → Topology.'
+        };
         const names = { tmhmm: 'TMHMM', phobius: 'Phobius', deeptmhmm: 'DeepTMHMM' };
         if (names[a.predictor]) return { label: 'Paste ' + names[a.predictor] + ' output…', run: 'openTopologyPanel()', hint: 'Opens the topology paste box; two or more sources give a consensus bar.' };
         return null;
@@ -5222,6 +5232,64 @@ async function undoGuideStep(stepId) {
     if (!ok) return;
     const n = removeTracks(keys);
     showToast('Removed ' + n + ' track(s). The step no longer counts as covered.', 'success');
+}
+
+// --- Clipboard hand-off to external tools ----------------------------------
+// A third-party tool cannot be pre-filled from here (cross-origin, and HHpred
+// has no sequence query parameter), so the useful thing is to hand the input
+// over: copy the current sequence as FASTA and open the tool, then tell the user
+// to paste it. FASTA is one of the formats HHpred accepts (A3M/CLUSTAL/FASTA/
+// STOCKHOLM), and it is the format every other tool here accepts too.
+function sequenceFastaText() {
+    const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!seq) return '';
+    const raw = (currentProteinLabel || '').trim();
+    const header = raw ? raw.replace(/\s+/g, ' ').slice(0, 120) : 'Q2DV_sequence';
+    const lines = [];
+    for (let i = 0; i < seq.length; i += 60) lines.push(seq.slice(i, i + 60));
+    return '>' + header + '\n' + lines.join('\n') + '\n';
+}
+async function copySequenceText() {
+    const text = sequenceFastaText();
+    if (!text) return false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* blocked */ }
+    }
+    return false;
+}
+function sequenceLength() {
+    return (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+}
+async function copySequenceFasta() {
+    if (!sequenceFastaText()) { showToast('Load a protein sequence first.', 'error'); return; }
+    const ok = await copySequenceText();
+    showToast(ok
+        ? ('Sequence copied as FASTA (' + sequenceLength() + ' aa). Paste it with Ctrl+V.')
+        : 'Could not write to the clipboard. Use Show raw text to copy the sequence manually.', ok ? 'success' : 'error');
+}
+function downloadSequenceFasta() {
+    const text = sequenceFastaText();
+    if (!text) { showToast('Load a protein sequence first.', 'error'); return; }
+    const label = (currentProteinLabel || 'sequence').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'sequence';
+    downloadTextFile(label + '.fasta', text, 'text/plain');
+    showToast('FASTA downloaded.', 'success');
+}
+// Opens the tool inside the click gesture (so popup blockers allow it) and only
+// then awaits the clipboard write.
+async function copySequenceAndOpen(url, toolName, note) {
+    if (!sequenceFastaText()) { showToast('Load a protein sequence first.', 'error'); return; }
+    try { window.open(url, '_blank', 'noopener'); } catch (e) { /* popup blocked or stubbed */ }
+    const ok = await copySequenceText();
+    showToast(ok
+        ? ('Sequence copied (' + sequenceLength() + ' aa). Paste it into ' + toolName + ' with Ctrl+V.' + (note ? ' ' + note : ''))
+        : ('Opened ' + toolName + '. The clipboard write was blocked, so copy the sequence from Show raw text.', ok ? 'success' : 'info'), ok ? 'success' : 'info');
+}
+function copySequenceAndOpenHHpred() {
+    return copySequenceAndOpen('https://toolkit.tuebingen.mpg.de/tools/hhpred', 'HHpred',
+        'For template-based modelling choose the PDB_mmCIF70 or PDB_mmCIF30 database.');
+}
+function copySequenceAndOpenDeepTMHMM() {
+    return copySequenceAndOpen('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/', 'DeepTMHMM');
 }
 
 function openTopologyPanel() {
@@ -6532,7 +6600,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.30.0';
+const APP_VERSION = '0.31.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

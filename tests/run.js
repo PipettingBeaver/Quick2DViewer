@@ -376,7 +376,7 @@ assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integratio
 ctxRun(`setStepAnswer('topology', 'predictor', 'tmhmm');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`) === 'openTopologyPanel()', 'topology answer opens the paste panel');
 ctxRun(`setStepAnswer('topology', 'predictor', 'none');`);
-assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`).indexOf('window.open') === 0, 'no-predictor answer offers an external runner');
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`) === 'copySequenceAndOpenDeepTMHMM()', 'no-predictor answer offers copy + open DeepTMHMM');
 ctxRun(`setStepAnswer('annotation', 'have', 'domains');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0]).run`) === 'runDomainScan()', 'annotation "domains only" resolves to the Pfam scan');
 
@@ -821,6 +821,41 @@ ctxRun(`clearStepAnswers('structure');`);
 assert(ctxRun(`Object.keys(guideAnswers).length`) === 0, 'clearing the last answer empties the map');
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
 
+section('clipboard hand-off to external tools');
+ctxRun(`currentProteinLabel = null; parsedTracks = { AA: 'M'.repeat(130) };`);
+let fasta = ctxRun(`sequenceFastaText()`);
+assert(fasta.indexOf('>Q2DV_sequence') === 0, 'a missing label still yields a valid FASTA header');
+const fastaLines = fasta.trim().split('\n');
+assert(fastaLines.length === 4 && fastaLines[1].length === 60 && fastaLines[2].length === 60 && fastaLines[3].length === 10, 'the sequence is wrapped at 60 residues per line');
+ctxRun(`currentProteinLabel = 'sp|P42212|GFP_AEQVI Green fluorescent protein';`);
+assert(ctxRun(`sequenceFastaText()`).indexOf('>sp|P42212|GFP_AEQVI Green fluorescent protein') === 0, 'the loaded identifier becomes the header');
+ctxRun(`currentProteinLabel = 'line one\\nline two';`);
+assert(ctxRun(`sequenceFastaText()`).split('\n')[0] === '>line one line two', 'newlines in a label cannot break the single-line header');
+ctxRun(`parsedTracks = {};`);
+assert(ctxRun(`sequenceFastaText()`) === '', 'no sequence, no FASTA');
+
+ctxRun(`parsedTracks = { AA: 'MKV' }; currentProteinLabel = 'GFP';`);
+let clipboardThrew = null;
+try { ctxRun(`copySequenceFasta(); downloadSequenceFasta();`); } catch (e) { clipboardThrew = e.message; }
+assert(clipboardThrew === null, 'copying and downloading the FASTA do not throw');
+let opened = null;
+try { ctxRun(`copySequenceAndOpenHHpred(); copySequenceAndOpenDeepTMHMM();`); } catch (e) { opened = e.message; }
+assert(opened === null, 'the copy-and-open hand-offs do not throw even when window.open is unavailable');
+// without a sequence the hand-off refuses instead of opening an empty tool
+ctxRun(`parsedTracks = {};`);
+try { ctxRun(`copySequenceAndOpenHHpred();`); } catch (e) { opened = e.message; }
+assert(opened === null, 'the hand-off refuses gracefully with no sequence');
+
+// the guide offers the hand-off and the FASTA helpers
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' };`);
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
+const hhAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0])`);
+assert(hhAct.run === 'copySequenceAndOpenHHpred()', 'the not-ready answer offers copy + open HHpred');
+assert(/A3M\/CLUSTAL\/FASTA\/STOCKHOLM/.test(hhAct.hint) && /PDB_mmCIF70/.test(hhAct.hint), 'the hint names the accepted formats and the modelling databases');
+const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
+assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
+ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
+
 section('in-app reference documents');
 assert(typeof ctxRun(`renderDocMarkdown`) === 'function', 'the shared markdown renderer exists');
 assert(typeof ctxRun(`openWorkflowDoc`) === 'function' && typeof ctxRun(`closeWorkflowDoc`) === 'function', 'the workflow reference opens in-app');
@@ -857,7 +892,7 @@ assert(gHtml2.indexOf('guide-opt-on') !== -1, 'the step card keeps the question 
 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
 nextBlk = sliceNext(ctxRun(`document.getElementById('guidePanel').innerHTML`));
-assert(nextBlk.indexOf('Open HHpred') !== -1 && nextBlk.indexOf('Run HHpred on the sequence') !== -1, 'the other answer yields its own action + hint');
+assert(nextBlk.indexOf('Copy sequence & open HHpred') !== -1 && nextBlk.indexOf('PDB_mmCIF70') !== -1, 'the other answer yields its own action + hint');
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
 
 section('guide focus, re-scan state + structure evidence');

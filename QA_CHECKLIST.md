@@ -231,6 +231,20 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 130 | Undo from the step card's "↺ Undo answer" | Same effect as the short-form undo |
 | 131 | Undo, then reload | The cleared answer stays cleared |
 
+## 0.31.0 - clipboard hand-off to external tools
+
+| # | Try | Watch for |
+|---|---|---|
+| 132 | Load a sequence, answer "Not yet" for HHpred, press the offered action | HHpred opens in a new tab **and** a toast confirms the sequence was copied with the length; no popup-blocker warning |
+| 133 | In HHpred, paste (Ctrl+V) into the sequence box | A valid FASTA with the loaded identifier as the header and 60-residue lines |
+| 134 | Try it with the browser's clipboard permission denied | The tab still opens; the toast says the write was blocked and points at Show raw text |
+| 135 | Press it with no sequence loaded | Refused with a message, and no tab opens |
+| 136 | Use "Copy sequence (FASTA)" on the homologs step | Clipboard holds the FASTA (paste somewhere to confirm); no tab opens |
+| 137 | Use "Download FASTA" | A `.fasta` file downloads, named from the protein label |
+| 138 | Check a label containing spaces/pipes (e.g. the `sp|P42212|GFP_AEQVI ...` line) | Header is a single valid line, no stray newlines |
+| 139 | Topology step → "None yet" → press the action | Same hand-off, opening DeepTMHMM |
+| 140 | Open the app over `file://` and use a copy action | Clipboard still works (file:// is a secure context in Chrome/Firefox); if not, the fallback message appears |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -259,4 +273,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6c. 105–117 (guide focus, re-scan state, structure evidence, AlphaFold/ESMFold).
 6d. 118–124 (short form = questionnaire; check 118/119/121 together).
 6e. 125–131 (question/action separation + undo).
+6f. 132–140 (clipboard hand-off; 132/133 are the HHpred flow).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
