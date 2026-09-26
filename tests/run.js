@@ -868,6 +868,37 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('variant FASTA panel (was dead code)');
+// The panel the code has always guarded on now exists
+['variantFastaSection', 'variantFastaLabel', 'variantFastaDisplay', 'copyVariantTrackBtn'].forEach(id => {
+  assert(HTML.indexOf('id="' + id + '"') !== -1, 'the ' + id + ' element exists');
+});
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'VAR_v1': 'MKY' };
+    keyedVariantsInfo = { v1: { aligned: 'MKY', raw: 'MKY', file: 'v.fa', desc: '' } };
+    activeRowKey = 'VAR_v1'; activeRowType = null; selectionMode = 'row'; rowRanges = [[0, 2]];
+    updateVariantFastaSection();
+`);
+assert(ctxRun(`document.getElementById('variantFastaSection').style.display`) === 'block', 'selecting a variant track shows the panel');
+assert(ctxRun(`document.getElementById('variantFastaLabel').textContent`).indexOf('v1') !== -1, 'the label names the variant');
+assert(ctxRun(`document.getElementById('variantFastaDisplay').textContent`) === 'MKY', 'the aligned sequence is displayed');
+assert(ctxRun(`document.getElementById('copyVariantTrackBtn').disabled`) === false, 'the copy button becomes available');
+// this is the bug: the registry is keyed by name, the track key has the VAR_ prefix
+assert(ctxRun(`keyedVariantsInfo['VAR_v1']`) === undefined && ctxRun(`keyedVariantsInfo['v1'] !== undefined`), 'the registry really is keyed without the prefix (so the old lookup always missed)');
+// a partial selection copies just that segment
+ctxRun(`rowRanges = [[1, 2]]; updateVariantFastaSection();`);
+assert(ctxRun(`document.getElementById('variantFastaDisplay').textContent`) === 'KY', 'a residue range narrows the copied segment');
+assert(ctxRun(`variantCopyText`) === 'KY', 'the copy buffer holds the same text');
+let varCopyThrew = null;
+try { ctxRun(`copyVariantTrack();`); } catch (e) { varCopyThrew = e.message; }
+assert(varCopyThrew === null, 'copying the variant sequence does not throw');
+// other rows and cleared selections hide it again
+ctxRun(`activeRowKey = 'HL_01_x'; rowRanges = [[0, 2]]; updateVariantFastaSection();`);
+assert(ctxRun(`document.getElementById('variantFastaSection').style.display`) === 'none', 'a homolog selection hides the variant panel');
+ctxRun(`activeRowKey = null; rowRanges = []; updateVariantFastaSection();`);
+assert(ctxRun(`document.getElementById('copyVariantTrackBtn').disabled`) === true && ctxRun(`variantCopyText`) === null, 'clearing the selection disables the button and the buffer');
+ctxRun(`parsedTracks = {}; keyedVariantsInfo = {};`);
+
 section('in-app reference documents');
 assert(typeof ctxRun(`renderDocMarkdown`) === 'function', 'the shared markdown renderer exists');
 assert(typeof ctxRun(`openWorkflowDoc`) === 'function' && typeof ctxRun(`closeWorkflowDoc`) === 'function', 'the workflow reference opens in-app');

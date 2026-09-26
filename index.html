@@ -2201,16 +2201,21 @@
                     <strong>FASTA Segment</strong><br>
                     The amino acid sequence for the selected residue range(s).<br>
                     For piecewise selections, each contiguous segment's sequence is joined by a comma, matching the residue ranges above.<br>
-                    When a Homolog track is selected, its own aligned sequence is shown beneath, divided by a line, and &quot;Copy Track&quot; copies that homolog's sequence.
+                    When a Homolog or Variant track is selected, its own aligned sequence is shown beneath, divided by a line, and &quot;Copy Track&quot; / &quot;Copy Variant&quot; copies that sequence.
                 </span></span></summary>
                 <div class="data-box" id="fastaDisplay" style="max-height: 70px; overflow-y: auto; margin-top: 6px;">-</div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="copy-btn" onclick="copyText('fastaDisplay')" title="Copy the main AA sequence of the selection">Copy Sequence</button>
                     <button class="copy-btn" id="copyTrackBtn" onclick="copyHomologTrack()" disabled title="Select a Homolog track to copy its aligned sequence">Copy Track</button>
+                    <button class="copy-btn" id="copyVariantTrackBtn" onclick="copyVariantTrack()" disabled title="Select a Variant track to copy its aligned sequence">Copy Variant</button>
                 </div>
                 <div id="homologFastaSection" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid #e2e8f0;">
                     <strong id="homologFastaLabel">Homolog sequence:</strong>
                     <div class="data-box" id="fastaHomologDisplay" style="max-height: 70px; overflow-y: auto; margin-top: 4px;">-</div>
+                </div>
+                <div id="variantFastaSection" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid #e2e8f0;">
+                    <strong id="variantFastaLabel">Variant sequence:</strong>
+                    <div class="data-box" id="variantFastaDisplay" style="max-height: 70px; overflow-y: auto; margin-top: 4px;">-</div>
                 </div>
             </details>
 
@@ -9129,35 +9134,43 @@ function getVariantDescription(trackKey) {
 }
 
 // Mirror of updateHomologFastaSection: shows the currently-selected variant's
-// aligned sequence in the FASTA-segment panel so it can be copied.
+// aligned sequence in the FASTA-segment panel so it can be copied. Note the
+// registry is keyed by the variant *name*, while the track key carries the VAR_
+// prefix, so the lookup strips it (getVariantAATrack does the same).
+let variantCopyText = null;
 function updateVariantFastaSection() {
     const section = document.getElementById('variantFastaSection');
     const label = document.getElementById('variantFastaLabel');
     const display = document.getElementById('variantFastaDisplay');
     const btn = document.getElementById('copyVariantTrackBtn');
     if (!section || !label || !display || !btn) return;
-    const isVariant = typeof activeRowKey === 'string' && activeRowKey.startsWith('VAR_');
-    if (isVariant && keyedVariantsInfo && keyedVariantsInfo[activeRowKey]) {
-        const aa = getVariantAATrack(activeRowKey);
-        const ranges = (typeof rowRanges === 'object' && rowRanges) ? rowRanges : [];
-        const segs = (Array.isArray(ranges) && ranges.length)
-            ? ranges.map(([s, e]) => aa.substring(s, e + 1))
-            : [aa];
-        const textToCopy = segs.join(',');
-        display.textContent = textToCopy;
-        label.textContent = `Variant sequence (${(typeof formatTrackLabel === 'function') ? formatTrackLabel(activeRowKey) : activeRowKey}):`;
+    const key = (typeof activeRowKey === 'string' && activeRowKey.startsWith('VAR_')) ? activeRowKey : '';
+    const info = key && keyedVariantsInfo ? keyedVariantsInfo[key.slice(4)] : null;
+    if (key && info) {
+        const aa = getVariantAATrack(key);
+        const ranges = (Array.isArray(rowRanges) && rowRanges.length) ? rowRanges : [];
+        variantCopyText = ranges.length
+            ? ranges.map(([s, e]) => aa.substring(s, e + 1)).join(',')
+            : aa;
+        display.textContent = variantCopyText;
+        label.textContent = 'Variant sequence (' + formatTrackLabel(key) + '):';
         section.style.display = 'block';
         btn.disabled = false;
-        btn.onclick = () => {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(textToCopy).then(() => showToast('Variant sequence copied to clipboard.', 'success'));
-            } else {
-                showToast('Clipboard access is not available in this browser.', 'error');
-            }
-        };
     } else {
+        variantCopyText = null;
         section.style.display = 'none';
         btn.disabled = true;
+    }
+}
+// Copies the selected Variant track's aligned sequence to the clipboard.
+function copyVariantTrack() {
+    if (!variantCopyText) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(variantCopyText)
+            .then(() => showToast('Variant sequence copied to clipboard.', 'success'),
+                  () => showToast('Could not copy the variant sequence.', 'error'));
+    } else {
+        showToast('Clipboard access is not available in this browser.', 'error');
     }
 }
 
