@@ -120,10 +120,18 @@ deposited entries).
   on the first row of a track type reads as visually messy; the track rows overall
   should be cleaner and more reactive (hover/active affordances). Revisit the
   chevron placement/styling + row hover states after the service integrations.
-- Contradiction **presets** — need literature backing before finalizing.
-- Co-localization UI shape (track + table) — confirm during build.
-- Foldseek result semantics (TM-score color-coding) — confirm during build.
-- MPI proxy — deferred; revisit if clipboard friction is high.
+- ~~Contradiction **presets**~~ — **done (0.22.0)**, literature-backed (see §11).
+- Co-localization UI shape (track + table) — still open; the Rules engine covers the
+  boolean query, the separate Data table is not built (see §7.2).
+- Foldseek result semantics (TM-score color-coding) — still open; results are ranked
+  by probability today.
+- MPI proxy — deferred; revisit if clipboard friction is high. The clipboard hand-off
+  (0.31.0 / 0.32.1) covers the practical need for HHpred and DeepTMHMM.
+- ~~Variant FASTA panel~~ — **done (0.33.0)**: the panel and its Copy Variant button
+  were built (the code had been guarding on elements that did not exist) and the
+  `VAR_` registry keying fixed.
+- ~~3D viewer + removal~~ — **done (0.33.0)**: `syncP3DConservationMode()` resets the
+  colour scheme when its row is removed, and removal clears `graphHighlights`.
 
 ## 11. Rule presets (implemented v0.22.0)
 
