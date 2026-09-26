@@ -219,6 +219,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 123 | Answer "Yes, ready to attach" | The card switches to Load .hhr / variant FASTA with attach guidance |
 | 124 | Read the short form for a step with no sub-question | Falls back to the generic action + hint (no empty question block) |
 
+## 0.29.0 - question/action separation + undo
+
+| # | Try | Watch for |
+|---|---|---|
+| 125 | Open the Guide with an unanswered current question | The option pills are closed off by a dashed rule and an "or go straight to:" divider; the action buttons clearly sit below, not merged into the options |
+| 126 | Answer it | The divider disappears and the tailored action + hint replace it |
+| 127 | Look at the "Protein Background" intake with several questions | Each question is separated by a rule (label + options can't read as the next question) |
+| 128 | Answer, then press **↺ Undo** in the short form | The question comes back, the generic action is offered again, and only that step's answer is cleared |
+| 129 | Answer two different steps, then undo one | The other step's answer survives (check the step card still shows it selected) |
+| 130 | Undo from the step card's "↺ Undo answer" | Same effect as the short-form undo |
+| 131 | Undo, then reload | The cleared answer stays cleared |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -246,4 +258,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6b. 92–104 (layout/hover/copy polish - check 92/93 first, they are the reported bug).
 6c. 105–117 (guide focus, re-scan state, structure evidence, AlphaFold/ESMFold).
 6d. 118–124 (short form = questionnaire; check 118/119/121 together).
+6e. 125–131 (question/action separation + undo).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

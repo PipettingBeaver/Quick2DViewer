@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-09-25
+
+### Fixed
+
+- **Question options and action buttons read as one merged cluster** in the guide's
+  short form: both are rows of pill buttons sitting next to each other. An
+  unanswered question is now closed off with a dashed rule and a labelled divider
+  ("or go straight to:") before the actions, and stacked questions (intake and step
+  cards) get a rule between them so one question's options can never look like part
+  of the next question.
+
+### Added
+
+- **Undo for a step's answer.** Picking an option was reversible only by clicking it
+  again, which is not discoverable. The short form now offers **↺ Undo** next to the
+  action, and the step card offers **↺ Undo answer** next to the question record.
+  Both clear just that step's picks, so the question comes back and the generic
+  action is offered again; other steps' answers are untouched.
+
 ## [0.28.0] - 2026-09-25
 
 ### Changed

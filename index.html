@@ -1231,7 +1231,15 @@
         .guide-actions .guide-run { margin-top:0; }
         .guide-mini { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:4px; padding:3px 7px; font-size:0.68rem; cursor:pointer; }
         .guide-mini:hover { background:#f1f5f9; border-color:#94a3b8; }
-        .guide-next-q { margin:7px 0 3px; }
+        .guide-next-q { margin:7px 0 0; padding-bottom:5px; border-bottom:1px dashed #dbeafe; }
+        /* Separate stacked questions so one question's label + options can never
+           read as part of the next question (or of the buttons below). */
+        .guide-intake .guide-q + .guide-q,
+        .guide-step-qs .guide-q + .guide-q { border-top:1px dashed #e2e8f0; padding-top:6px; }
+        .guide-next-or { font-size:0.66rem; color:#64748b; margin:6px 0 3px; }
+        .guide-undo { color:#475569; }
+        .guide-undo:hover { color:#1d4ed8; border-color:#93c5fd; background:#eff6ff; }
+        .guide-undo-row { margin-top:5px; }
         .guide-next-q .guide-q { margin-bottom:5px; }
         .guide-next-q .guide-q:last-child { margin-bottom:0; }
         .guide-next-btns { display:flex; flex-wrap:wrap; gap:4px; }
@@ -5037,6 +5045,21 @@ function setStepAnswer(stepId, qid, value) {
     renderWorkflowGuide();
 }
 function resetStepAnswers() { guideAnswers = {}; schedulePersist(); renderWorkflowGuide(); }
+// Undo a single step's picks: the question comes back and the offered action
+// reverts to the generic one. (Clicking the selected option again also clears
+// it, but that is not discoverable, hence the explicit affordance.)
+function guideHasStepAnswer(stepId) {
+    const prefix = stepId + '.';
+    return Object.keys(guideAnswers).some(k => k.indexOf(prefix) === 0);
+}
+function clearStepAnswers(stepId) {
+    const prefix = stepId + '.';
+    let changed = false;
+    Object.keys(guideAnswers).forEach(k => { if (k.indexOf(prefix) === 0) { delete guideAnswers[k]; changed = true; } });
+    if (!changed) return;
+    schedulePersist();
+    renderWorkflowGuide();
+}
 // Answers that map onto an existing control also drive that control, so the
 // action the wizard offers and the tool's own defaults agree.
 function applyStepAnswerDefaults(stepId, qid, value) {
@@ -5525,6 +5548,9 @@ function renderWorkflowGuide() {
                 '<div class="guide-q"><div class="guide-q-label">' + q.label + '</div><div class="guide-q-opts">' +
                 q.options.map(o => '<button type="button" class="guide-opt" onclick="setStepAnswer(\'' + next.step.id + '\',\'' + q.id + '\',\'' + o.value + '\')">' + o.label + '</button>').join('') +
                 '</div></div>').join('') + '</div>';
+            // The option pills and the action buttons are both rows of buttons;
+            // without a labelled divider they read as one merged cluster.
+            html += '<div class="guide-next-or">or go straight to:</div>';
         } else if (nextAct.hint) {
             html += '<br><span class="guide-next-hint">' + nextAct.hint + '</span>';
         }
@@ -5532,6 +5558,7 @@ function renderWorkflowGuide() {
             '<button type="button" class="guide-run' + (nextAct.done ? ' guide-run-done' : '') + '" onclick="' + nextAct.run + '">' + nextAct.label + '</button>' +
             (nextAct.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' : '') +
             (next.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
+            (guideHasStepAnswer(next.step.id) ? '<button type="button" class="guide-mini guide-undo" onclick="clearStepAnswers(\'' + next.step.id + '\')" title="Undo this answer and pick again">\u21ba Undo</button>' : '') +
             '</div>' +
             '<div class="guide-next-meta">' +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + next.step.id + '\',\'done\')">Mark done</button>' +
@@ -5573,7 +5600,9 @@ function renderWorkflowGuide() {
                     q.options.map(o => '<button type="button" class="guide-opt' + (cur === o.value ? ' guide-opt-on' : '') +
                         '" onclick="setStepAnswer(\'' + r.step.id + '\',\'' + q.id + '\',\'' + o.value + '\')">' + o.label + '</button>').join('') +
                     '</div></div>';
-            }).join('') + '</div>' : '') +
+            }).join('') +
+                (guideHasStepAnswer(r.step.id) ? '<div class="guide-undo-row"><button type="button" class="guide-mini guide-undo" onclick="clearStepAnswers(\'' + r.step.id + '\')" title="Clear this answer and pick again">\u21ba Undo answer</button></div>' : '') +
+                '</div>' : '') +
             '<p><strong>Why it matters:</strong> ' + r.step.why + '</p>' +
             '<p><strong>How to read it:</strong></p><ul>' + (r.step.how || []).map(h => '<li>' + h + '</li>').join('') + '</ul>' +
             (r.step.priorityNote ? '<p class="guide-pri-note">' + (r.priority ? '<strong>Recommended</strong>: ' : 'Optional: ') + r.step.priorityNote + '</p>' : '') +
@@ -6455,7 +6484,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.28.0';
+const APP_VERSION = '0.29.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

@@ -792,6 +792,35 @@ assert(WORKFLOW_MD.indexOf('[MPI\'s HHpred]') !== -1, 'WORKFLOW.md renders it as
 assert(WORKFLOW_MD.indexOf('<a href') === -1, 'WORKFLOW.md has no raw HTML anchors');
 assert(WORKFLOW_MD.indexOf('Ruled out when') !== -1, 'WORKFLOW.md documents when the intake rules a step out');
 
+section('answer separation + undo');
+const UNDO = String.fromCharCode(0x21ba);
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
+let undoHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+const sliceNext2 = (h) => h.slice(h.indexOf('guide-next-action'), h.indexOf('guide-steps'));
+let ub = sliceNext2(undoHtml);
+assert(ub.indexOf('or go straight to:') !== -1, 'an unanswered question is separated from the action buttons by a labelled divider');
+assert(ub.indexOf(UNDO) === -1, 'no undo is offered before anything is picked');
+
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'ready'); setStepAnswer('structure', 'model', 'esmfold');`);
+undoHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+ub = sliceNext2(undoHtml);
+assert(ub.indexOf('or go straight to:') === -1, 'the divider goes away once the question is answered');
+assert(ub.indexOf(UNDO) !== -1, 'the short form offers an undo once an answer exists');
+assert(ub.indexOf('Undo') !== -1, 'the undo is labelled, not icon-only');
+assert(undoHtml.indexOf('Undo answer') !== -1, 'the step card offers the undo next to the answer record');
+
+// undo clears only that step
+assert(ctxRun(`guideHasStepAnswer('homologs')`) === true && ctxRun(`guideHasStepAnswer('structure')`) === true, 'both steps report answers');
+ctxRun(`clearStepAnswers('homologs');`);
+assert(ctxRun(`guideHasStepAnswer('homologs')`) === false, 'undo clears the chosen step');
+assert(ctxRun(`guideHasStepAnswer('structure')`) === true, 'undo leaves other steps alone');
+assert(ctxRun(`getStepAnswer('structure', 'model')`) === 'esmfold', 'the other step answer survives');
+undoHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(sliceNext2(undoHtml).indexOf('or go straight to:') !== -1 || ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) !== 'homologs', 'the question comes back after undo');
+ctxRun(`clearStepAnswers('structure');`);
+assert(ctxRun(`Object.keys(guideAnswers).length`) === 0, 'clearing the last answer empties the map');
+ctxRun(`guideAnswers = {}; parsedTracks = {};`);
+
 section('short form hosts the current question');
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
 let gHtml2 = ctxRun(`document.getElementById('guidePanel').innerHTML`);
