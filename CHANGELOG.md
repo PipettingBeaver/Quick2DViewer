@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-09-25
+
+### Fixed
+
+- **Copying the sequence failed in the HHpred hand-off.** The combined action
+  opened the tool first, and an auto-opened tab takes focus away, so
+  `navigator.clipboard.writeText` rejected with "document is not focused". The copy
+  is now a separate button (see below), so it runs while the page still has focus.
+  As a second line of defence the copy falls back to a synchronous
+  `document.execCommand('copy')` via a hidden textarea when the async Clipboard API
+  is unavailable or refuses.
+
+### Changed
+
+- **"Copy sequence & open HHpred" is split into an open action plus a Copy sequence
+  accessory**, per review: the primary button opens the tool, `Copy sequence` sits
+  beside it, and the short description says to use it ("Use Copy sequence first, then
+  paste it into HHpred..."). The same treatment applies to the topology step's
+  DeepTMHMM hand-off. The accessory renders in both the short form and the step card,
+  deduplicated against the step's own extra actions.
+
 ## [0.31.0] - 2026-09-25
 
 ### Added

@@ -376,7 +376,9 @@ assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integratio
 ctxRun(`setStepAnswer('topology', 'predictor', 'tmhmm');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`) === 'openTopologyPanel()', 'topology answer opens the paste panel');
 ctxRun(`setStepAnswer('topology', 'predictor', 'none');`);
-assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`) === 'copySequenceAndOpenDeepTMHMM()', 'no-predictor answer offers copy + open DeepTMHMM');
+let topoAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0])`);
+assert(topoAct.run.indexOf('window.open') === 0, 'no-predictor answer opens the predictor');
+assert(topoAct.accessory && topoAct.accessory.run === 'copySequenceFasta()', 'with Copy sequence as an accessory beside it');
 ctxRun(`setStepAnswer('annotation', 'have', 'domains');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0]).run`) === 'runDomainScan()', 'annotation "domains only" resolves to the Pfam scan');
 
@@ -822,6 +824,11 @@ assert(ctxRun(`Object.keys(guideAnswers).length`) === 0, 'clearing the last answ
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
 
 section('clipboard hand-off to external tools');
+// the step card shows the accessory once, not twice (it also has a FASTA extraAction)
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' };`);
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'no'); renderWorkflowGuide();`);
+const cardHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert((cardHtml.match(/Copy sequence<\/button>/g) || []).length <= 2, 'Copy sequence appears at most once per view (short form + step card), never duplicated within one card');
 ctxRun(`currentProteinLabel = null; parsedTracks = { AA: 'M'.repeat(130) };`);
 let fasta = ctxRun(`sequenceFastaText()`);
 assert(fasta.indexOf('>Q2DV_sequence') === 0, 'a missing label still yields a valid FASTA header');
@@ -838,19 +845,23 @@ ctxRun(`parsedTracks = { AA: 'MKV' }; currentProteinLabel = 'GFP';`);
 let clipboardThrew = null;
 try { ctxRun(`copySequenceFasta(); downloadSequenceFasta();`); } catch (e) { clipboardThrew = e.message; }
 assert(clipboardThrew === null, 'copying and downloading the FASTA do not throw');
-let opened = null;
-try { ctxRun(`copySequenceAndOpenHHpred(); copySequenceAndOpenDeepTMHMM();`); } catch (e) { opened = e.message; }
-assert(opened === null, 'the copy-and-open hand-offs do not throw even when window.open is unavailable');
-// without a sequence the hand-off refuses instead of opening an empty tool
+assert(typeof ctxRun(`legacyCopyText`) === 'function', 'a synchronous copy fallback exists (the async API needs focus, which an auto-opened tab steals)');
+let legacyOk = null;
+try { legacyOk = ctxRun(`legacyCopyText('abc')`); } catch (e) { legacyOk = 'threw: ' + e.message; }
+assert(legacyOk === true || legacyOk === false, 'the fallback returns a boolean rather than throwing (got ' + legacyOk + ')');
+// without a sequence the copy refuses instead of copying an empty string
 ctxRun(`parsedTracks = {};`);
-try { ctxRun(`copySequenceAndOpenHHpred();`); } catch (e) { opened = e.message; }
-assert(opened === null, 'the hand-off refuses gracefully with no sequence');
+let noSeqThrew = null;
+try { ctxRun(`copySequenceFasta();`); } catch (e) { noSeqThrew = e.message; }
+assert(noSeqThrew === null, 'copying with no sequence refuses gracefully');
 
 // the guide offers the hand-off and the FASTA helpers
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' };`);
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
 const hhAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0])`);
-assert(hhAct.run === 'copySequenceAndOpenHHpred()', 'the not-ready answer offers copy + open HHpred');
+assert(hhAct.run.indexOf('window.open') === 0, 'the not-ready answer opens HHpred');
+assert(hhAct.accessory && hhAct.accessory.label === 'Copy sequence' && hhAct.accessory.run === 'copySequenceFasta()', 'and offers Copy sequence as an accessory beside it');
+assert(/Use Copy sequence first/.test(hhAct.hint), 'the short description tells the user to use the copy button');
 assert(/A3M\/CLUSTAL\/FASTA\/STOCKHOLM/.test(hhAct.hint) && /PDB_mmCIF70/.test(hhAct.hint), 'the hint names the accepted formats and the modelling databases');
 const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
@@ -892,7 +903,8 @@ assert(gHtml2.indexOf('guide-opt-on') !== -1, 'the step card keeps the question 
 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
 nextBlk = sliceNext(ctxRun(`document.getElementById('guidePanel').innerHTML`));
-assert(nextBlk.indexOf('Copy sequence & open HHpred') !== -1 && nextBlk.indexOf('PDB_mmCIF70') !== -1, 'the other answer yields its own action + hint');
+assert(nextBlk.indexOf('Open HHpred') !== -1 && nextBlk.indexOf('PDB_mmCIF70') !== -1, 'the other answer yields its own action + hint');
+assert(nextBlk.indexOf('Copy sequence') !== -1, 'the short form shows the Copy sequence accessory beside the action');
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
 
 section('guide focus, re-scan state + structure evidence');

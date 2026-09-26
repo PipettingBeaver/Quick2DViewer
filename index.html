@@ -1244,6 +1244,7 @@
         .guide-intake .guide-q + .guide-q,
         .guide-step-qs .guide-q + .guide-q { border-top:1px dashed #e2e8f0; padding-top:6px; }
         .guide-next-or { font-size:0.66rem; color:#64748b; margin:6px 0 3px; }
+        .guide-accessory { font-weight:500; }
         .guide-undo { color:#475569; }
         .guide-undo:hover { color:#1d4ed8; border-color:#93c5fd; background:#eff6ff; }
         .guide-undo-row { margin-top:5px; }
@@ -5120,8 +5121,9 @@ const STEP_ACTION_RESOLVERS = {
     },
     homologs(a) {
         if (a.hhpred === 'no') return {
-            label: 'Copy sequence & open HHpred', run: 'copySequenceAndOpenHHpred()',
-            hint: 'Copies the sequence as FASTA and opens HHpred. Paste it there, run the search, then attach the resulting .hhr here. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling.'
+            label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')",
+            accessory: { label: 'Copy sequence', run: 'copySequenceFasta()' },
+            hint: 'Use Copy sequence first, then paste it into HHpred and run the search. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Attach the resulting .hhr here afterwards.'
         };
         if (a.hhpred === 'ready') return { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()', hint: 'Attach the .hhr (and any variant FASTA) in Input Data. The hits become homolog rows and feed the templates table.' };
         return null;
@@ -5162,8 +5164,9 @@ const STEP_ACTION_RESOLVERS = {
     },
     topology(a) {
         if (a.predictor === 'none') return {
-            label: 'Copy sequence & open DeepTMHMM', run: 'copySequenceAndOpenDeepTMHMM()',
-            hint: 'Copies the sequence as FASTA and opens DeepTMHMM. Paste it there, run the prediction, then paste its output into Options → Data Sources → Topology.'
+            label: 'Open DeepTMHMM ↗', run: "window.open('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/','_blank')",
+            accessory: { label: 'Copy sequence', run: 'copySequenceFasta()' },
+            hint: 'Use Copy sequence first, then paste it into DeepTMHMM and run the prediction. Paste its output into Options → Data Sources → Topology afterwards.'
         };
         const names = { tmhmm: 'TMHMM', phobius: 'Phobius', deeptmhmm: 'DeepTMHMM' };
         if (names[a.predictor]) return { label: 'Paste ' + names[a.predictor] + ' output…', run: 'openTopologyPanel()', hint: 'Opens the topology paste box; two or more sources give a consensus bar.' };
@@ -5188,10 +5191,11 @@ function resolveStepAction(step) {
     } catch (e) { resolved = null; }
     // Fall back to the step's own action, and report whether the answer changed it.
     const base = { label: step.action.label, run: step.action.run, hint: '' };
-    if (!resolved) return Object.assign({ custom: false, done: false }, base);
+    if (!resolved) return Object.assign({ custom: false, done: false, accessory: null }, base);
     return {
         label: resolved.label, run: resolved.run, hint: resolved.hint || '',
         done: !!resolved.done,
+        accessory: resolved.accessory || null,
         custom: resolved.run !== step.action.run || resolved.label !== step.action.label
     };
 }
@@ -5249,13 +5253,32 @@ function sequenceFastaText() {
     for (let i = 0; i < seq.length; i += 60) lines.push(seq.slice(i, i + 60));
     return '>' + header + '\n' + lines.join('\n') + '\n';
 }
+// Synchronous fallback for when the async Clipboard API is unavailable or
+// refuses (it needs the document focused, which a click gives us, but a blocked
+// permission or an older browser still fails). execCommand is deprecated yet
+// synchronous and widely supported, which is exactly what a click handler wants.
+function legacyCopyText(text) {
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        if (typeof ta.select === 'function') ta.select();
+        const ok = !!(document.execCommand && document.execCommand('copy'));
+        if (typeof ta.remove === 'function') ta.remove();
+        return ok;
+    } catch (e) { return false; }
+}
 async function copySequenceText() {
     const text = sequenceFastaText();
     if (!text) return false;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* blocked */ }
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fall through */ }
     }
-    return false;
+    return legacyCopyText(text);
 }
 function sequenceLength() {
     return (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
@@ -5274,24 +5297,6 @@ function downloadSequenceFasta() {
     downloadTextFile(label + '.fasta', text, 'text/plain');
     showToast('FASTA downloaded.', 'success');
 }
-// Opens the tool inside the click gesture (so popup blockers allow it) and only
-// then awaits the clipboard write.
-async function copySequenceAndOpen(url, toolName, note) {
-    if (!sequenceFastaText()) { showToast('Load a protein sequence first.', 'error'); return; }
-    try { window.open(url, '_blank', 'noopener'); } catch (e) { /* popup blocked or stubbed */ }
-    const ok = await copySequenceText();
-    showToast(ok
-        ? ('Sequence copied (' + sequenceLength() + ' aa). Paste it into ' + toolName + ' with Ctrl+V.' + (note ? ' ' + note : ''))
-        : ('Opened ' + toolName + '. The clipboard write was blocked, so copy the sequence from Show raw text.', ok ? 'success' : 'info'), ok ? 'success' : 'info');
-}
-function copySequenceAndOpenHHpred() {
-    return copySequenceAndOpen('https://toolkit.tuebingen.mpg.de/tools/hhpred', 'HHpred',
-        'For template-based modelling choose the PDB_mmCIF70 or PDB_mmCIF30 database.');
-}
-function copySequenceAndOpenDeepTMHMM() {
-    return copySequenceAndOpen('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/', 'DeepTMHMM');
-}
-
 function openTopologyPanel() {
     openOptionsModal();
     switchOptionsTab('data');
@@ -5645,6 +5650,7 @@ function renderWorkflowGuide() {
         }
         html += '<div class="guide-next-btns">' +
             '<button type="button" class="guide-run' + (nextAct.done ? ' guide-run-done' : '') + '" onclick="' + nextAct.run + '">' + nextAct.label + '</button>' +
+            (nextAct.accessory ? '<button type="button" class="guide-run guide-run-alt guide-accessory" onclick="' + nextAct.accessory.run + '">' + nextAct.accessory.label + '</button>' : '') +
             (nextAct.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' : '') +
             (next.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
             (guideHasStepAnswer(next.step.id) ? '<button type="button" class="guide-mini guide-undo" onclick="clearStepAnswers(\'' + next.step.id + '\')" title="Undo this answer and pick again">\u21ba Undo</button>' : '') +
@@ -5701,6 +5707,7 @@ function renderWorkflowGuide() {
             '<button type="button" class="guide-run' + (act.done ? ' guide-run-done' : '') + (busy ? ' task-running' : '') + '"' + taskAttrs + ' onclick="' + act.run + '">' + label + '</button>' +
             (act.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + r.step.action.run + '">' + r.step.action.label + '</button>' : '') +
             (r.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
+            ((act.accessory && (r.step.extraActions || []).every(a => a.run !== act.accessory.run)) ? '<button type="button" class="guide-run guide-run-alt guide-accessory" onclick="' + act.accessory.run + '">' + act.accessory.label + '</button>' : '') +
             (r.done && STEP_UNDO[r.step.id] ? '<button type="button" class="guide-mini guide-danger" onclick="undoGuideStep(\'' + r.step.id + '\')">' + (STEP_UNDO[r.step.id].label || 'Undo this step') + '</button>' : '') +
             (r.done && !r.manualDone ? '' : '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.manualDone ? 'clear' : 'done') + '\')">' + (r.manualDone ? 'Clear "done"' : 'Mark done') + '</button>') +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.skipped ? 'clear' : 'skipped') + '\')">' + (r.skipped ? 'Unskip' : 'Skip') + '</button>' +
@@ -6600,7 +6607,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.31.0';
+const APP_VERSION = '0.32.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

@@ -245,6 +245,19 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 139 | Topology step → "None yet" → press the action | Same hand-off, opening DeepTMHMM |
 | 140 | Open the app over `file://` and use a copy action | Clipboard still works (file:// is a secure context in Chrome/Firefox); if not, the fallback message appears |
 
+## 0.32.0 - copy split from open (HHpred clipboard fix)
+
+| # | Try | Watch for |
+|---|---|---|
+| 141 | Answer "Not yet" for HHpred | Two buttons: **Open HHpred ↗** and **Copy sequence** beside it; the description says to use Copy sequence first |
+| 142 | Press **Copy sequence**, then paste anywhere | The full FASTA arrives (this was the broken case: the copy used to run after a tab stole focus) |
+| 143 | Press **Open HHpred ↗** | Opens the tool; no clipboard interaction attempted |
+| 144 | Copy, then paste into HHpred's sequence box and search | HHpred accepts it; the .hhr can then be attached back in Q2DV |
+| 145 | Deny clipboard permission (or use a browser without the async API) | The fallback path still copies; if both fail the toast says to copy from Show raw text |
+| 146 | Press **Copy sequence** with no sequence loaded | Refused with a message, nothing copied |
+| 147 | Topology → "None yet" | Same pair (Open DeepTMHMM ↗ + Copy sequence) |
+| 148 | Check the homologs step card | Copy sequence appears once (not duplicated by the step's own FASTA action) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -274,4 +287,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6d. 118–124 (short form = questionnaire; check 118/119/121 together).
 6e. 125–131 (question/action separation + undo).
 6f. 132–140 (clipboard hand-off; 132/133 are the HHpred flow).
+6g. 141–148 (copy split from open; 142 is the fixed copy).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
