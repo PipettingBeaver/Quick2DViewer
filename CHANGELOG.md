@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-09-25
+
+### Fixed
+
+- **The workflow reference opened as raw Markdown.** The guide header linked
+  `WORKFLOW.md` directly, which GitHub Pages serves as plain text. It now opens in
+  an in-app **Workflow reference** modal that fetches and renders the document with
+  the same Markdown renderer the changelog uses (headings, lists, bold, code,
+  links). If the fetch is blocked (browsers refuse to read local files over
+  `file://`), the fallback points at GitHub's **rendered** view rather than the raw
+  file. The changelog's fallback had the same raw-file problem and now uses the same
+  rendered link.
+- The renderer was changelog-specific (`renderChangelogMarkdown`); it is now the
+  shared `renderDocMarkdown`.
+
+### Added
+
+- **Help** now lists the two documents (Workflow reference, Changelog), so they are
+  reachable without hunting for the header link.
+
 ## [0.29.0] - 2026-09-25
 
 ### Fixed

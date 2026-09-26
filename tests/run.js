@@ -160,7 +160,7 @@ const escStruct = ctxRun(`structureEscapeHtml('<script>')`);
 assert(escStruct === '&lt;script&gt;', 'structureEscapeHtml escapes angle brackets');
 
 section('changelog markdown renderer');
-const mdHtml = ctxRun(`renderChangelogMarkdown('## [1.0.0] - x\\n\\n### Added\\n\\n- a **b**\\n')`);
+const mdHtml = ctxRun(`renderDocMarkdown('## [1.0.0] - x\\n\\n### Added\\n\\n- a **b**\\n')`);
 assert(/<h3 class="cl-ver">\[1\.0\.0\]/.test(mdHtml) && /<strong>b<\/strong>/.test(mdHtml), 'changelog markdown renders headings + bold');
 
 section('confirm dialog (headless-safe)');
@@ -820,6 +820,21 @@ assert(sliceNext2(undoHtml).indexOf('or go straight to:') !== -1 || ctxRun(`(fun
 ctxRun(`clearStepAnswers('structure');`);
 assert(ctxRun(`Object.keys(guideAnswers).length`) === 0, 'clearing the last answer empties the map');
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
+
+section('in-app reference documents');
+assert(typeof ctxRun(`renderDocMarkdown`) === 'function', 'the shared markdown renderer exists');
+assert(typeof ctxRun(`openWorkflowDoc`) === 'function' && typeof ctxRun(`closeWorkflowDoc`) === 'function', 'the workflow reference opens in-app');
+assert(HTML.indexOf("fetch('WORKFLOW.md')") !== -1, 'it fetches the doc beside the app');
+assert(HTML.indexOf('id="workflowDocModal"') !== -1 && HTML.indexOf('id="workflowDocBody"') !== -1, 'it has its own modal + body');
+assert(HTML.indexOf('href="WORKFLOW.md"') === -1, 'nothing links to the raw markdown file any more');
+assert(HTML.indexOf('openWorkflowDoc()') !== -1, 'the guide header opens it');
+// the fallback points at the rendered GitHub view, not the raw file
+assert(ctxRun(`docFallbackHtml('WORKFLOW.md', 'workflow reference')`).indexOf('github.com/PipettingBeaver/Quick2DViewer/blob/main/WORKFLOW.md') !== -1, 'the fallback links the rendered doc');
+assert(ctxRun(`docFallbackHtml('CHANGELOG.md', 'changelog')`).indexOf('blob/main/CHANGELOG.md') !== -1, 'the changelog fallback does too (same raw-file problem)');
+assert(HTML.indexOf('openWorkflowDoc();"') !== -1 || HTML.indexOf('openWorkflowDoc()') !== -1, 'the documents are reachable from Help too');
+// the renderer handles what WORKFLOW.md contains
+const mdOut = ctxRun(`renderDocMarkdown('# Title\\n\\n## Section\\n\\n### Sub\\n\\n- a **b** and [x](https://e.com)\\n\\nplain')`);
+assert(mdOut.indexOf('<h3') !== -1 && mdOut.indexOf('<h4') !== -1 && mdOut.indexOf('<strong>b</strong>') !== -1 && mdOut.indexOf('<a href="https://e.com"') !== -1, 'headings, bold and links render');
 
 section('short form hosts the current question');
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);

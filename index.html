@@ -447,13 +447,20 @@
         }
         .app-version:hover { background: #e2e8f0; color: #334155; }
         /* Changelog modal rendering. */
-        #changelogBody h3.cl-ver { font-size: 0.95rem; color: #0f172a; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
-        #changelogBody h3.cl-ver:first-child { margin-top: 0; padding-top: 0; border-top: none; }
-        #changelogBody h4.cl-cat { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin: 8px 0 4px; }
-        #changelogBody ul { margin: 4px 0 8px; padding-left: 20px; }
-        #changelogBody li { font-size: 0.8rem; color: #334155; line-height: 1.5; margin-bottom: 3px; }
-        #changelogBody p { font-size: 0.8rem; color: #334155; line-height: 1.5; margin: 4px 0; }
-        #changelogBody code { background: #f1f5f9; padding: 0 3px; border-radius: 3px; font-size: 0.75rem; }
+        #changelogBody h3.cl-ver, .doc-body h3.cl-ver { font-size: 0.95rem; color: #0f172a; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+        #changelogBody h3.cl-ver:first-child, .doc-body h3.cl-ver:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+        #changelogBody h4.cl-cat, .doc-body h4.cl-cat { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin: 8px 0 4px; }
+        #changelogBody ul, .doc-body ul { margin: 4px 0 8px; padding-left: 20px; }
+        #changelogBody li, .doc-body li { font-size: 0.8rem; color: #334155; line-height: 1.5; margin-bottom: 3px; }
+        #changelogBody p, .doc-body p { font-size: 0.8rem; color: #334155; line-height: 1.5; margin: 4px 0; }
+        #changelogBody code, .doc-body code { background: #f1f5f9; padding: 0 3px; border-radius: 3px; font-size: 0.75rem; }
+        .doc-body { max-height: 60vh; overflow-y: auto; }
+        .doc-body a { color: #2563eb; }
+        .guide-link {
+            background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+            color: #2563eb; font-size: inherit; font-family: inherit; text-decoration: underline;
+        }
+        .guide-link:hover { color: #1d4ed8; }
         .box { width: 15px; height: 15px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); }
         
         .alignment-grid {
@@ -2298,7 +2305,7 @@
             <summary>Evaluation Guide</summary>
             <p style="font-size:0.72rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                 The literature-backed characterization pipeline
-                (<a href="WORKFLOW.md" target="_blank" rel="noopener" style="color:#2563eb;">reference doc</a>),
+                (<button type="button" class="guide-link" onclick="openWorkflowDoc()">reference doc</button>),
                 with a live status per step. Answer the questions to re-rank the steps for your protein; each
                 step can be marked done, skipped, or re-run. Every tool stays available manually.
             </p>
@@ -2620,11 +2627,25 @@
             <p style="font-size: 0.85rem; color: #64748b; line-height: 1.5;">
                 In the meantime, every ⓘ icon throughout the page (legend, row labels, sidebar fields) explains that specific piece in place.
             </p>
+            <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openWorkflowDoc();" style="font-size:0.78rem; padding:4px 10px;">Workflow reference</button>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openChangelogModal();" style="font-size:0.78rem; padding:4px 10px;">Changelog</button>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Changelog Modal -->
+<div class="modal-overlay" id="workflowDocModal" role="dialog" aria-modal="true" aria-labelledby="workflowDocTitle">
+    <div class="modal-content" style="width: 680px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="workflowDocTitle" style="margin: 0; color: #0f172a;">Workflow reference</h3>
+            <button onclick="closeWorkflowDoc()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <div id="workflowDocBody" class="doc-body" style="margin-top: 14px;">Loading…</div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="changelogModal" role="dialog" aria-modal="true" aria-labelledby="changelogModalTitle">
     <div class="modal-content" style="width: 680px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
@@ -6053,6 +6074,33 @@ document.addEventListener('keydown', (e) => {
 // --- Changelog modal (click the version badge) ----------------------------
 let changelogLoaded = false;
 function closeChangelogModal() { closeModalAsDialog('changelogModal'); }
+// Where the raw documents live on GitHub, rendered. Used only as a fallback:
+// browsers refuse to read local files over file://, and a raw .md is not much
+// use to read, so the fallback points at GitHub's rendered view.
+const REPO_DOC_URL = 'https://github.com/PipettingBeaver/Quick2DViewer/blob/main/';
+function docFallbackHtml(file, label) {
+    return '<p style="color:#64748b; font-size:0.85rem;">Could not load <code>' + file + '</code> from this page ' +
+        '(browsers block reading local files over <code>file://</code>; it loads on GitHub Pages or any local web server). ' +
+        '<a href="' + REPO_DOC_URL + file + '" target="_blank" rel="noopener">Open the rendered ' + label + ' on GitHub</a>.</p>';
+}
+let workflowDocLoaded = false;
+function openWorkflowDoc() {
+    openModalAsDialog('workflowDocModal');
+    const body = document.getElementById('workflowDocBody');
+    if (!body || workflowDocLoaded) return;
+    body.textContent = 'Loading reference document…';
+    fetch('WORKFLOW.md').then(resp => {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.text();
+    }).then(md => {
+        body.innerHTML = renderDocMarkdown(md);
+        workflowDocLoaded = true;
+    }).catch(() => {
+        body.innerHTML = docFallbackHtml('WORKFLOW.md', 'workflow reference');
+    });
+}
+function closeWorkflowDoc() { closeModalAsDialog('workflowDocModal'); }
+
 function openChangelogModal() {
     openModalAsDialog('changelogModal');
     const body = document.getElementById('changelogBody');
@@ -6062,15 +6110,15 @@ function openChangelogModal() {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.text();
     }).then(md => {
-        body.innerHTML = renderChangelogMarkdown(md);
+        body.innerHTML = renderDocMarkdown(md);
         changelogLoaded = true;
     }).catch(() => {
-        body.innerHTML = '<p style="color:#64748b; font-size:0.85rem;">Could not load <code>CHANGELOG.md</code> ' +
-            '(it ships alongside this file on GitHub Pages). <a href="CHANGELOG.md" target="_blank" rel="noopener">Open it directly</a>.</p>';
+        body.innerHTML = docFallbackHtml('CHANGELOG.md', 'changelog');
     });
 }
-// Minimal Markdown renderer for the changelog (headings, lists, bold, code, links).
-function renderChangelogMarkdown(md) {
+// Minimal Markdown renderer shared by the in-app documents (changelog, workflow
+// reference): headings, lists, bold, code, links.
+function renderDocMarkdown(md) {
     const inline = (s) => structureEscapeHtml(s)
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/`(.+?)`/g, '<code>$1</code>')
@@ -6484,7 +6532,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.29.0';
+const APP_VERSION = '0.30.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
