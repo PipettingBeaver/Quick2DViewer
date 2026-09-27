@@ -868,6 +868,29 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('feature -> guide taxonomy (retroactive pass)');
+const structStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]`);
+assert(structStep.extraActions.some(a => a.run === 'showEnsemblePanel()'), 'the structure step offers the ensemble variance');
+assert(structStep.how.join(' ').indexOf('Ensemble variance') !== -1, 'and its how-to-read explains what RMSF means for the fold');
+const integStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'integration')[0]`);
+assert(integStep.extraActions.some(a => a.run === 'openDataModal()'), 'the Integrate step offers the co-localization table');
+assert(integStep.extraActions.some(a => a.run === 'exportMethodsReport()'), 'and the methods summary');
+
+// an attached ensemble is surfaced as the next thing to do on that step
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; cachedStructureTexts = {};`);
+ctxRun(`cachedStructureTexts = { 'a.pdb': 'ATOM', 'b.pdb': 'ATOM' };`);
+let stAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(stAct.run === 'showEnsemblePanel()' && /2 models are attached/.test(stAct.hint), 'two models with no variance computed is offered as the next action');
+ctxRun(`parsedTracks.EV_RMSF = [{ val: 0.2, type: 'rmsf' }];`);
+stAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(stAct.run !== 'showEnsemblePanel()', 'once computed it stops being the suggestion');
+// the read-out reports it, and suggests it when missing
+ctxRun(`parsedTracks = { AA: 'MKV', EV_RMSF: [{ val: 0.5, type: 'rmsf' }, { val: 4.5, type: 'rmsf' }] };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /Ensemble RMSF: mean 2.50 A, max 4.50 A/.test(i.text)), 'the read-out reports the ensemble spread');
+ctxRun(`parsedTracks = { AA: 'MKV', 'a_pLDDT': [{ val: 90 }], 'b_pLDDT': [{ val: 80 }] };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /2 models are attached but not compared/.test(i.text)), 'the read-out suggests the comparison when models are uncompared');
+ctxRun(`cachedStructureTexts = {}; parsedTracks = {};`);
+
 section('co-localization table');
 assert(HTML.indexOf('id="colocSourceSelect"') !== -1 && HTML.indexOf('id="dataColocWrap"') !== -1, 'the Data modal has the section and its container');
 ctxRun(`

@@ -419,3 +419,54 @@ form *is* the questionnaire for the current step: answering there is what produc
 the action it offers, so the two views cannot disagree. The description is only in
 the step card (no duplication), and an answered question collapses the short form
 to `action + hint`, which is what makes it feel reactive.
+
+## 16. Feature → guide taxonomy (v0.36.0)
+
+Every feature lands in one of these categories, and the category decides whether (and
+where) it appears in the Evaluation Guide. This exists so a new feature is never added
+without answering "how does a researcher actually use this?", and so the guide stays a
+workflow rather than a feature list.
+
+| Category | Meaning | Guide treatment |
+|---|---|---|
+| **Background** | design choice, plumbing, accessibility, layout, persistence | none. Invisible to the researcher on purpose |
+| **Evidence source** | produces tracks/data that satisfy a step | a step action, and it counts toward that step's status |
+| **Step extension** | deepens an existing step's evidence | a hint/action on that step, shown when it applies |
+| **Interpretation** | reads loaded data back and advises | the automated read-out, and/or a cross-check action |
+| **Analysis input** | feeds the Rules / co-localization machinery | the Integrate step's hints plus the Rules panel |
+| **Deliverable** | produces an output (report, constructs, figures, commands) | an action on the Integrate step |
+| **Step candidate** | significant enough to become its own pipeline stage | would need a `WORKFLOW_STEPS` entry (a deliberate decision, not a default) |
+
+### Retroactive mapping (features shipped before this section)
+
+| Feature | Category | Guide home |
+|---|---|---|
+| HMMER hmmscan | Evidence source | Annotation step action (`runDomainScan`) |
+| AlphaFold fetch / ESMFold | Evidence source | Structure step action |
+| Foldseek | Evidence source | Structural homology step |
+| Interfaces | Evidence source | Integrate step action |
+| Rules + presets | Analysis input + Interpretation | Integrate step action; read-out suggestions |
+| TM cross-check | Interpretation | Topology step action; read-out disagreement count |
+| Copy-FASTA hand-off | Step extension | Homologs + Topology steps (accessory) |
+| UniProt lookup / identifier parsing | Evidence source | Annotation step action; lookup defaults |
+| **Ensemble variance (RMSF)** | Step extension + Analysis input | *Added 0.36.0*: Structure step hint + action, read-out line, `RMSF:` rule source |
+| **Co-localization table** | Deliverable | *Added 0.36.0*: Integrate step action |
+| Methods summary report | Deliverable | *Added 0.36.0*: Integrate step action |
+| Variant FASTA panel | Background (utility) | none |
+| Track removal / Undo / overrides | Background | none |
+| Legend + scroll fix, layout, a11y | Background | none |
+| Feature test cards | Process | n/a |
+
+### How to place a new feature (the checklist)
+
+1. Which category? If **Background**, stop: no guide work needed.
+2. If **Evidence source**, which step does its output satisfy? Add it as that step's
+   action (or an extra action) and make sure the step's `check()` sees the data.
+3. If **Step extension**, add a hint (and an action when it applies) to that step, and a
+   read-out line when the data is present.
+4. If **Analysis input**, add the source to the Rules engine and mention it in the
+   Integrate step's hints.
+5. If **Deliverable**, add an action to the Integrate step.
+6. If **Step candidate**, do not sneak it in: add a `WORKFLOW_STEPS` entry (with why /
+   how-to-read / citations) and regenerate `WORKFLOW.md`.
+7. Write the feature test card either way.

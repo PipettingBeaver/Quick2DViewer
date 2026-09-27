@@ -5224,7 +5224,9 @@ const WORKFLOW_STEPS = [
         desc: 'Attach AlphaFold/PDB/CIF (or predict with ESMFold) for pLDDT, RSA, cofactors and the 3D view.',
         why: 'A model converts sequence annotations into spatial context: buried vs exposed, domain packing, and which residues form interfaces.',
         action: { label: 'Attach / predict structure…', run: 'openInputDataModal()' },
-        how: ['pLDDT > 70 is confident, 50-70 tentative and < 50 unreliable. Read it per region, not per protein.',
+        extraActions: [{ label: 'Ensemble variance…', run: 'showEnsemblePanel()' }],
+        how: ['With two or more models attached, Ensemble variance measures where they disagree per residue (RMSF). Treat the mobile regions as tentative and the rigid core as settled.',
+              'pLDDT > 70 is confident, 50-70 tentative and < 50 unreliable. Read it per region, not per protein.',
               'RSA says whether a residue is buried; a variant in a buried position is usually more disruptive.'],
         refs: [
             { cite: 'Jumper et al., Nature 2021 (AlphaFold2)', doi: '10.1038/s41586-021-03819-2' },
@@ -5275,7 +5277,11 @@ const WORKFLOW_STEPS = [
         desc: 'Combine evidence with Rules, check interfaces, then export figures and commands.',
         why: 'The last step is where evidence becomes a claim: co-localization and contradiction rules keep the reasoning explicit, inspectable and reproducible.',
         action: { label: 'Open Analysis Rules…', run: "openGuideCoachmark('rules')" },
-        extraActions: [{ label: 'Interfaces…', run: "openGuideCoachmark('interfaces')" }],
+        extraActions: [
+            { label: 'Interfaces…', run: "openGuideCoachmark('interfaces')" },
+            { label: 'Co-localization table…', run: 'openDataModal()' },
+            { label: 'Methods summary (.md)', run: 'exportMethodsReport()' }
+        ],
         how: ['A rule hit is a hypothesis to inspect, not a conclusion. Click through its matches.',
               'Export the figure plus table so the track state behind the claim is archived.'],
         refs: [
@@ -5448,6 +5454,13 @@ const STEP_ACTION_RESOLVERS = {
             return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'No UniProt accession is loaded, so AlphaFold DB cannot be queried. ESMFold folds the sequence directly instead.' };
         }
         if (model === 'pdb') return { label: 'Attach PDB / CIF…', run: 'openInputDataModal()', hint: 'Attach the experimental model; pLDDT/RSA follow from it.' };
+        // An ensemble already attached is worth comparing, so say so rather than
+        // leaving the variance tool undiscovered.
+        const models = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
+        if (models.length > 1 && !Object.keys(parsedTracks).some(k => k.endsWith('_RMSF'))) {
+            return { label: 'Compute ensemble variance', run: 'showEnsemblePanel()',
+                hint: models.length + ' models are attached. Compute the ensemble variance to see which regions they agree on.' };
+        }
         return null;
     },
     foldseek(a) {
@@ -5708,6 +5721,21 @@ function computeGuideInsights() {
             ? { level: 'warn', text: 'Mean pLDDT is ' + mean.toFixed(0) + '. Treat fold-level conclusions (domain edges, interface detail) as tentative.' }
             : { level: 'info', text: 'Mean pLDDT is ' + mean.toFixed(0) + '. The backbone is confident, so inspect local dips individually.' });
     }
+    try {
+        const rmsfKeys = keys.filter(k => k.endsWith('_RMSF'));
+        const models = keys.filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
+        if (rmsfKeys.length) {
+            const vals = [];
+            rmsfKeys.forEach(k => { const t = parsedTracks[k]; if (Array.isArray(t)) t.forEach(x => { if (x && x.val != null) vals.push(x.val); }); });
+            if (vals.length) {
+                const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+                const max = Math.max.apply(null, vals);
+                out.push({ level: mean > 2 ? 'warn' : 'info', text: 'Ensemble RMSF: mean ' + mean.toFixed(2) + ' A, max ' + max.toFixed(2) + ' A. Mobile regions are where the models disagree, so treat fold-level claims there as tentative.' });
+            }
+        } else if (models.length > 1) {
+            out.push({ level: 'info', text: models.length + ' models are attached but not compared yet. Compute the ensemble variance to see where they agree.' });
+        }
+    } catch (e) { /* ensemble read-out is advisory */ }
     if (guideProfile.structure === 'predicted') {
         out.push({ level: 'info', text: 'Structure evidence is predicted only. Corroborate fold-level claims with Foldseek, or with an experimental model where one exists.' });
     }
