@@ -1938,6 +1938,7 @@
                 <div class="menubar-menu" id="menubar-view" hidden>
                     <button type="button" onclick="menuBarAction('graphPlddt')">Toggle pLDDT graph</button>
                     <button type="button" onclick="menuBarAction('graphRsa')">Toggle RSA graph</button>
+                    <button type="button" onclick="menuBarAction('graphEns')">Toggle Ensemble RMSF graph</button>
                     <button type="button" onclick="menuBarAction('legend')">Show / Hide Legend</button>
                     <button type="button" onclick="menuBarAction('p3d')">Toggle 3D Viewer</button>
                 </div>
@@ -2088,6 +2089,18 @@
             <div class="box" style="background:#ffd700;" title="50-70 - Low confidence"></div>
             <div class="box" style="background:#ff7d45;" title="&lt;50 - Very low confidence"></div>
             <span class="info-icon" id="plddtLegendIcon">ⓘ<span class="tooltip-content"></span></span>
+        </div>
+        <div class="legend-item" id="legendRmsfRow" hidden>
+            <span style="font-weight:600; font-size:0.8rem;">RMSF:</span>
+            <div class="box" style="background:#3b82f6;" title="&lt;1 A - rigid across the ensemble"></div>
+            <div class="box" style="background:#22d3ee;" title="1-2 A"></div>
+            <div class="box" style="background:#facc15;" title="2-3 A"></div>
+            <div class="box" style="background:#fb923c;" title="3-5 A"></div>
+            <div class="box" style="background:#ef4444;" title="&ge;5 A - very mobile"></div>
+            <span class="info-icon">ⓘ<span class="tooltip-content">
+                <strong>Ensemble variance (RMSF)</strong><br>
+                Per-residue fluctuation across the attached models, after superposing each model onto the first over the residues they share. High values mark the regions the models disagree about, so fold-level claims there are tentative.
+            </span></span>
         </div>
         <div class="legend-item" id="legendRsaRow" hidden>
             <span style="font-weight:600; font-size:0.8rem;">RSA:</span>
@@ -2864,7 +2877,10 @@ let p3dRemotePending = false; // one RCSB fetch at a time (guard against re-entr
 let cachedStructureIndex = {}; // fileName -> { hash, ext, size }
 let missingStructureRefs = []; // structure files referenced but not in the cache
 
-let graphMode = { pLDDT: false, RSA: false }; // per-type graph view: pLDDT and/or RSA rendered as overlaid graphs instead of heatmap rows
+let graphMode = { pLDDT: false, RSA: false, EV: false }; // per-type graph view: these types render as overlaid graphs instead of heatmap rows
+// Types that *can* be shown as a graph. Adding one here (plus a scale in
+// graphScaleForGroup and a legend row) is all the plotting code needs.
+const GRAPH_TYPES = ['pLDDT', 'RSA', 'EV'];
 window.addEventListener('mouseup', handleMouseUp);
 
 // --- Modal dialog helpers ---------------------------------------------------
@@ -6503,6 +6519,7 @@ function menuBarAction(action) {
         case 'toggleQa': toggleQaHighlights(); break;
         case 'graphPlddt': toggleGraphMode('pLDDT'); break;
         case 'graphRsa': toggleGraphMode('RSA'); break;
+        case 'graphEns': toggleGraphMode('EV'); break;
         case 'legend': toggleLegend(); break;
         case 'p3d': toggleP3DViewer(); break;
         case 'data': openDataModal(); break;
@@ -7111,7 +7128,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.36.0';
+const APP_VERSION = '0.37.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -7570,7 +7587,7 @@ function buildGroupViewSelect(g) {
     const sel = mkEl('select', 'tctl-view-select');
     const opts = [['glyphs', 'Glyphs'], ['noletters', 'No letters'], ['bar', 'Bar']];
     if (g === 'HL') opts.push(['aa', 'AA']);
-    if (g === 'pLDDT' || g === 'RSA') opts.unshift(['graph', 'Graph']);
+    if (isGraphCapable(g)) opts.unshift(['graph', 'Graph']);
     opts.push(['hidden', 'Hidden']);
     opts.forEach(([v, t]) => {
         const o = document.createElement('option');
@@ -8452,6 +8469,10 @@ function formatTrackLabel(fullKey) {
         const label = fullKey.slice(3).replace(/_/g, ' ');
         return /^topology\b/i.test(label) ? label : 'Topology ' + label;
     }
+    if (fullKey.endsWith('_RMSF')) {
+        const base = fullKey.replace(/_RMSF$/, '');
+        return (base && base !== 'EV') ? (base + ' RMSF') : 'Ensemble RMSF';
+    }
     const isPlddt = fullKey.endsWith('_pLDDT');
     const isRsa = fullKey.endsWith('_RSA');
     const isCofactors = fullKey.endsWith('_Cofactors');
@@ -8506,9 +8527,34 @@ function getTrackCategoryOrder(key) {
 
 // pLDDT/RSA graph-vs-heatmap is a type-level view choice (Track Control's
 // "View as" for those types); this toggles it from the View menu too.
-function isGraphType(g) { return g === 'pLDDT' ? !!graphMode.pLDDT : (g === 'RSA' ? !!graphMode.RSA : false); }
+function isGraphCapable(g) { return GRAPH_TYPES.indexOf(g) !== -1; }
+function isGraphType(g) { return isGraphCapable(g) && !!graphMode[g]; }
+// Per-type graph scale: the value range, tick formatting and axis title. An
+// `auto` max is rounded up to the next whole unit from the data.
+function graphScaleForGroup(g) {
+    if (g === 'pLDDT') return { max: 100, tick: (v) => String(Math.round(v)), title: 'pLDDT (0-100)' };
+    if (g === 'RSA') return { max: 1, tick: (v) => v.toFixed(2), title: 'RSA (0-1)' };
+    if (g === 'EV') return { max: null, tick: (v) => v.toFixed(1), title: 'RMSF (A)' };
+    return { max: 1, tick: (v) => v.toFixed(2), title: '' };
+}
+function graphMaxForGroup(g, keys) {
+    const scale = graphScaleForGroup(g);
+    if (scale.max != null) return scale.max;
+    let max = 0;
+    (keys || []).forEach(k => {
+        const t = parsedTracks[k];
+        if (Array.isArray(t)) t.forEach(x => { if (x && x.val != null && x.val > max) max = x.val; });
+    });
+    return Math.max(1, Math.ceil(max));
+}
+function graphTitleForGroup(g) {
+    if (g === 'pLDDT') return 'pLDDT Confidence';
+    if (g === 'RSA') return 'Relative Solvent Accessibility (RSA)';
+    if (g === 'EV') return 'Ensemble variance (RMSF)';
+    return trackGroupLabel(g);
+}
 function toggleGraphMode(g) {
-    if (g !== 'pLDDT' && g !== 'RSA') return;
+    if (!isGraphCapable(g)) return;
     setGroupView(g, isGraphType(g) ? 'glyphs' : 'graph');
     tctlAfterChange();
 }
@@ -8525,11 +8571,13 @@ function syncGraphModeControls() {
     const r = document.getElementById('graphRsaCheck');
     if (p) p.checked = !!graphMode.pLDDT;
     if (r) r.checked = !!graphMode.RSA;
-    // The legend's pLDDT/RSA rows only apply when that type is shown as a graph.
+    // The legend's per-type rows only apply when that type is shown as a graph.
     const pRow = document.getElementById('legendPlddtRow');
     const rRow = document.getElementById('legendRsaRow');
+    const eRow = document.getElementById('legendRmsfRow');
     if (pRow) pRow.hidden = !graphMode.pLDDT;
     if (rRow) rRow.hidden = !graphMode.RSA;
+    if (eRow) eRow.hidden = !graphMode.EV;
 }
 
 // Structure File Upload Handler
@@ -10019,7 +10067,7 @@ function getTrackViewOverride(key) {
 // independent flags: hidden > bar > AA > no-letters > glyphs.
 function getEffectiveGroupView(g) {
     // pLDDT/RSA can be shown as an overlaid graph instead of heatmap rows.
-    if ((g === 'pLDDT' || g === 'RSA') && graphMode[g]) return 'graph';
+    if (isGraphCapable(g) && graphMode[g]) return 'graph';
     if (isTrackGroupHidden(g)) return 'hidden';
     if (isTrackGroupFullBar(g)) return 'bar';
     if (isTrackGroupAASeq(g)) return 'aa';
@@ -10030,7 +10078,7 @@ function getEffectiveGroupView(g) {
 // group, clearing the other mutually-exclusive flags.
 function setGroupView(g, v) {
     // "Graph" is a pLDDT/RSA-only type view (overlaid graph vs heatmap rows).
-    if (g === 'pLDDT' || g === 'RSA') graphMode[g] = (v === 'graph');
+    if (isGraphCapable(g)) graphMode[g] = (v === 'graph');
     if (v === 'graph') { trackControlState.hidden[g] = false; return; }
     if (v === 'hidden') { trackControlState.hidden[g] = true; return; }
     trackControlState.hidden[g] = false;
@@ -10263,7 +10311,7 @@ function renderViewer(tracks) {
     const totalLength = tracks.AA ? tracks.AA.length : 0;
     if (totalLength === 0) return;
 
-    const anyGraph = graphMode.pLDDT || graphMode.RSA;
+    const anyGraph = GRAPH_TYPES.some(g => !!graphMode[g]);
 
     // The AA sequence line (with the residue-position markers) is pinned to the
     // top of the scrollable viewer so it stays visible while scrolling.
@@ -10285,20 +10333,21 @@ function renderViewer(tracks) {
     }).filter(k => !isTrackGroupHidden(getTrackGroup(k)) && !isTrackFiltered(k));
 
     const firstOfGroup = getFirstOfGroupSet(trackKeys);
-    const graphPlddtKeys = [], graphRsaKeys = [];
+    const graphKeysByGroup = {};
     trackKeys.forEach(key => {
         if (key === 'AA') return; // already rendered in the pinned header
-        if (key.endsWith('_pLDDT') && graphMode.pLDDT) { graphPlddtKeys.push(key); return; }
-        if (key.endsWith('_RSA') && graphMode.RSA) { graphRsaKeys.push(key); return; }
+        const group = getTrackGroup(key);
+        if (isGraphCapable(group) && graphMode[group]) {
+            (graphKeysByGroup[group] = graphKeysByGroup[group] || []).push(key);
+            return;
+        }
         grid.appendChild(buildTrackRow(key, tracks, totalLength, firstOfGroup.has(key)));
     });
 
-    if (graphPlddtKeys.length) {
-        grid.appendChild(createOverlayGraphSection("pLDDT Confidence", graphPlddtKeys, totalLength, true));
-    }
-    if (graphRsaKeys.length) {
-        grid.appendChild(createOverlayGraphSection("Relative Solvent Accessibility (RSA)", graphRsaKeys, totalLength, false));
-    }
+    GRAPH_TYPES.forEach(group => {
+        const keys = graphKeysByGroup[group];
+        if (keys && keys.length) grid.appendChild(createOverlayGraphSection(graphTitleForGroup(group), keys, totalLength, group));
+    });
 
     updateSelectionUI();
     refreshTrackManagerIfVisible();
@@ -10852,7 +10901,7 @@ cellsContainer.appendChild(overlay);
 }
 // Create Overlaid Graph Section with interactive toggle pills, a y-axis, and
 // selectable points (columns line up with the annotation rows rendered above).
-function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
+function createOverlayGraphSection(titleText, trackKeys, totalLength, graphGroup) {
     const wrapper = document.createElement('div');
     wrapper.className = 'graph-section-wrapper';
 
@@ -10867,7 +10916,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     title.textContent = titleText;
     titleWrap.appendChild(title);
 
-    const overlayInfo = isPlddt ? PREDICTOR_INFO.PLDDT : PREDICTOR_INFO.RSA;
+    const overlayInfo = getPredictorInfo(graphGroup === 'pLDDT' ? 'x_pLDDT' : (graphGroup === 'RSA' ? 'x_RSA' : 'EV_RMSF'));
     titleWrap.appendChild(buildInfoIcon(buildPredictorTooltipHTML(overlayInfo), !!(overlayInfo.bands && overlayInfo.bands.length)));
     header.appendChild(titleWrap);
     wrapper.appendChild(header);
@@ -10922,7 +10971,8 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     const plotWidth = totalLength * cellWidth;
     const width = axisWidth + plotWidth;
     const height = GRAPH_HEIGHT;
-    const maxVal = isPlddt ? 100.0 : 1.0;
+    const scale = graphScaleForGroup(graphGroup);
+    const maxVal = graphMaxForGroup(graphGroup, trackKeys);
     const plotTop = GRAPH_TOP_PAD, plotBottom = height - GRAPH_BOTTOM_PAD;
 
     const valueToY = (val) => plotBottom - (Math.min(Math.max(val, 0), maxVal) / maxVal) * (plotBottom - plotTop);
@@ -10960,7 +11010,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
         label.setAttribute("y", y + 3);
         label.setAttribute("text-anchor", "end");
         label.setAttribute("class", "graph-axis-tick");
-        label.textContent = isPlddt ? Math.round(val) : val.toFixed(2);
+        label.textContent = scale.tick(val);
         axisGroup.appendChild(label);
     });
 
@@ -10974,7 +11024,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, isPlddt) {
     axisTitle.setAttribute("class", "graph-axis-title");
     axisTitle.setAttribute("text-anchor", "middle");
     axisTitle.setAttribute("transform", `translate(14, ${height / 2}) rotate(-90)`);
-    axisTitle.textContent = isPlddt ? "pLDDT (0-100)" : "RSA (0-1)";
+    axisTitle.textContent = scale.title;
     axisGroup.appendChild(axisTitle);
 
     svg.appendChild(axisGroup);
@@ -12654,7 +12704,7 @@ function calculateTrackMetrics(trackKey, startIdx, endIdx) {
 }
 
 function computeMetricsForInterval(startIdx, endIdx) {
-    const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
+    const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA') || k.endsWith('_RMSF'));
     if (structuralKeys.length === 0) {
         setMetricsBase("No PDB structural data attached.");
         return;
@@ -12672,7 +12722,7 @@ let lastMetricsTableRegion = '';
 // (or the full sequence when nothing is selected). Shared by the Metrics Table
 // modal and the Export menu's TSV/CSV so the two can never disagree.
 function computeMetricsRows() {
-    const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA'));
+    const structuralKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT') || k.endsWith('_RSA') || k.endsWith('_RMSF'));
     const aaLen = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     if (structuralKeys.length === 0) return { rows: [], region: '', hasData: false };
 
@@ -12684,18 +12734,23 @@ function computeMetricsRows() {
     structuralKeys.forEach(key => {
         const data = parsedTracks[key];
         const isPlddt = key.endsWith('_pLDDT');
+        const isRmsf = key.endsWith('_RMSF');
+        // The "notable fraction" differs per metric: confident residues for
+        // pLDDT, buried for RSA, mobile for RMSF.
+        const metricLabel = isPlddt ? 'pLDDT' : (isRmsf ? 'RMSF (A)' : 'RSA');
         let sum = 0, count = 0, metricCount = 0;
         for (let i = startIdx; i <= endIdx; i++) {
             if (data[i] && data[i].val !== undefined && data[i].val !== null) {
                 sum += data[i].val;
                 count++;
                 if (isPlddt && data[i].val >= 70) metricCount++;
-                else if (!isPlddt && data[i].val < 0.20) metricCount++;
+                else if (isRmsf && data[i].val >= 3) metricCount++;
+                else if (!isPlddt && !isRmsf && data[i].val < 0.20) metricCount++;
             }
         }
         const mean = count > 0 ? (sum / count).toFixed(2) : 'N/A';
         const pct = count > 0 ? ((metricCount / count) * 100).toFixed(1) + '%' : 'N/A';
-        rows.push({ model: formatTrackLabel(key), metric: isPlddt ? 'pLDDT' : 'RSA', mean, pct });
+        rows.push({ model: formatTrackLabel(key), metric: metricLabel, mean, pct });
     });
     return { rows, region, hasData: true };
 }
@@ -13979,7 +14034,7 @@ function gatherPersistableState() {
             rowRanges, dragOriginTrackKey, crossRefTrackKey, lastRanges
         },
         preferences: {
-            graphMode: { pLDDT: graphMode.pLDDT, RSA: graphMode.RSA },
+            graphMode: { pLDDT: graphMode.pLDDT, RSA: graphMode.RSA, EV: graphMode.EV },
             externalServicesEnabled,
             qaHighlightsEnabled,
             analysisRules,

@@ -156,6 +156,49 @@ export or copy the construct as FASTA.
 
 ---
 
+### Ensemble RMSF line plot — 0.37.0
+
+**Should do.** Render the ensemble variance as a **line plot** (auto-scaled Y axis in Å)
+instead of a heatmap row, through the same graph machinery as pLDDT/RSA — so selection,
+hover, the legend, export and persistence all behave identically to the existing graphs.
+
+**Try (normal use).**
+1. Compute the variance (Tracks → Ensemble variance → Compute), then set that type's
+   View as = **Graph** (Track Control → Ensemble variance → Graph, or View → *Toggle
+   Ensemble RMSF graph*).
+   *Expect:* the heatmap row is replaced by a section titled "Ensemble variance (RMSF)",
+   with a Y axis labelled **RMSF (A)**, ticks at whole-Å steps, and the line in the model
+   colour.
+2. Hover a point.
+   *Expect:* the shared cell tooltip names the residue and the value, and the grey column
+   highlight follows the cursor as it does over the heatmap.
+3. Click or drag on the graph.
+   *Expect:* the selection behaves exactly as in the heatmap — the points carry the same
+   `col-<idx>` classes, so the existing selection/hover/column machinery drives them.
+4. Show the legend.
+   *Expect:* an "RMSF:" row with the five colour bands appears (only while graph mode is on).
+5. Export → SVG and PNG, then Export → TSV/CSV.
+   *Expect:* the graph section serializes like the other graphs; the metrics row is labelled
+   **RMSF (A)** with the mean and the % mobile (≥ 3 Å).
+6. Reload the page.
+   *Expect:* the graph mode persists per type.
+
+**Edge cases (symptom → likely cause).**
+- **The Y axis max looks arbitrary** (e.g. 3 when the data max is 2.4). By design: auto-max
+  rounds up to the next whole Å, minimum 1.
+- **The line has gaps.** Uncovered residues (null value) break the line — that is "no data",
+  not zero. Compute over more models to fill it in.
+- **The line is flat along the bottom.** With one model there is no fluctuation to plot;
+  RMSF needs at least two.
+- **Toggling the graph seems to remove the row.** It is *replaced* by the graph section, not
+  hidden. Switch View as back to Glyphs to restore the heatmap row.
+- **The legend has no RMSF row.** The row is tied to graph mode *and* the legend must be
+  shown (View → Legend).
+- **A single model's name appears in the metrics export.** Expected: the export lists one row
+  per structural key, and the ensemble row is one key.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -457,6 +500,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 177 | Integrate step in the Guide | Offers Co-localization table, Methods summary and Construct FASTA actions |
 | 178 | Structure step with two models attached | Offers Compute ensemble variance; the read-out reports the spread once computed |
 
+## 0.37.0 - RMSF line plot (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 179 | Track Control → Ensemble variance → View as → Graph | The heatmap row becomes a line plot with an "RMSF (A)" axis and whole-Å ticks |
+| 180 | View → Toggle Ensemble RMSF graph | Same toggle from the menu; persists across reload |
+| 181 | Hover / drag on the plot | Shared tooltip + grey column highlight + drag selection behave as in the heatmap |
+| 182 | Show the legend in graph mode | An "RMSF:" row with five colour bands appears (hidden otherwise) |
+| 183 | Export SVG/PNG then TSV/CSV | The plot serializes; the metrics row reads "RMSF (A)" with the mean and % mobile |
+| 184 | Switch back to Glyphs | The heatmap row returns |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -489,4 +543,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6i. 166/156–165 (ensemble variance; 157/158 are the superposition checks).
 6j. 167–172 (co-localization table; its full card is at the top).
 6k. 173–178 (construct designer + taxonomy pass; full card at the top).
+6l. 179–184 (RMSF line plot; full card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

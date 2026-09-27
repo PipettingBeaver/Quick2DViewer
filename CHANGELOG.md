@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-09-25
+
+### Added
+
+- **Ensemble RMSF line plot.** The ensemble variance can now be shown as a graph instead of
+  a heatmap row, like pLDDT/RSA: Track Control's *View as* offers **Graph** for the type, the
+  View menu has *Toggle Ensemble RMSF graph*, and the mode persists per type.
+
+### Changed (the graph machinery is now type-driven)
+
+- `GRAPH_TYPES` + `graphScaleForGroup` / `graphMaxForGroup` / `graphTitleForGroup` replace the
+  hardcoded pLDDT-vs-RSA branches, so a fourth graph type is a three-line change (declare it,
+  give it a scale, give it a legend row). The RMSF scale is **auto-max** (rounded up to the
+  next whole Å, minimum 1) with one-decimal ticks and a "RMSF (A)" axis.
+- `renderViewer` partitions graph keys by type group instead of two named arrays, so the graph
+  sections are built in `GRAPH_TYPES` order.
+- The legend gained an **RMSF** row (the five colour bands), shown only while that type is a
+  graph — the same rule as the pLDDT/RSA rows.
+- Export parity: the SVG/PNG path already serialized `.graph-section-wrapper` generically, so
+  the new graph exports for free; the metrics panel and the TSV/CSV export now include the
+  `_RMSF` row, labelled **RMSF (A)** with the mean and the % mobile (≥ 3 Å) — previously the
+  label was hardcoded to pLDDT/RSA.
+- `formatTrackLabel` learned the `_RMSF` suffix, so the graph pill, legend and metrics rows
+  read "Ensemble RMSF" rather than a mangled key.
+- The graph's hover/selection integration needed no changes: the plotted points already carry
+  the `col-<idx>` class convention, so the shared tooltip, column highlight, drag selection,
+  cofactor rings and saved-selection rings all apply.
+
+`QA_CHECKLIST.md` gained the feature card for the plot.
+
 ## [0.36.0] - 2026-09-25
 
 ### Added

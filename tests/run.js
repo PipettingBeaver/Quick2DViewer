@@ -868,6 +868,71 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('RMSF line plot (third graph type)');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(5), EV_RMSF: [{ val: 0.4, type: 'rmsf' }, { val: 1.2, type: 'rmsf' }, { val: 2.4, type: 'rmsf' }, { val: null, type: 'rmsf' }, { val: 0.9, type: 'rmsf' }] };
+    graphMode = { pLDDT: false, RSA: false, EV: false }; graphHighlights = {};
+`);
+assert(ctxRun(`GRAPH_TYPES.join(',')`) === 'pLDDT,RSA,EV', 'the ensemble type is declared graph-capable');
+assert(ctxRun(`isGraphCapable('EV')`) === true && ctxRun(`isGraphCapable('SS')`) === false, 'capability is explicit, not implicit');
+assert(ctxRun(`isGraphType('EV')`) === false, 'graph mode is off by default');
+// the scale drives the axis (auto max, one decimal, RMSF label)
+const evScale = ctxRun(`graphScaleForGroup('EV')`);
+assert(evScale.max === null && evScale.title === 'RMSF (A)' && evScale.tick(1.25) === '1.3', 'the EV scale is auto-max with one-decimal ticks');
+assert(ctxRun(`graphScaleForGroup('pLDDT').max`) === 100 && ctxRun(`graphScaleForGroup('RSA').max`) === 1, 'the existing scales are unchanged');
+assert(ctxRun(`graphMaxForGroup('EV', ['EV_RMSF'])`) === 3, 'the auto max rounds the data max up to a whole unit');
+assert(ctxRun(`graphMaxForGroup('EV', [])`) === 1, 'an empty ensemble still gets a sane axis');
+assert(ctxRun(`graphTitleForGroup('EV')`) === 'Ensemble variance (RMSF)', 'the section is titled for the type');
+// Track Control offers Graph for the EV type, and selecting it flips the mode
+const evOpts = ctxRun(`(function(){ var s = buildGroupViewSelect('EV'); return (s.children || []).map(o => o.value); })()`);
+assert(evOpts[0] === 'graph' && evOpts.indexOf('hidden') !== -1, 'the EV View-as leads with Graph');
+ctxRun(`setGroupView('EV', 'graph');`);
+assert(ctxRun(`graphMode.EV`) === true && ctxRun(`getEffectiveGroupView('EV')`) === 'graph', 'setGroupView(EV, graph) enables it');
+ctxRun(`toggleGraphMode('EV');`);
+assert(ctxRun(`graphMode.EV`) === false, 'the View menu toggle turns it off');
+ctxRun(`toggleGraphMode('SS');`);
+assert(ctxRun(`graphMode.SS`) === undefined, 'a non-graph type is ignored by the toggle');
+// the legend row exists and follows the mode
+assert(HTML.indexOf('id="legendRmsfRow"') !== -1, 'the legend has an RMSF row');
+ctxRun(`graphMode.EV = true; syncGraphModeControls();`);
+assert(ctxRun(`document.getElementById('legendRmsfRow').hidden`) === false, 'the legend row shows in graph mode');
+ctxRun(`graphMode.EV = false; syncGraphModeControls();`);
+assert(ctxRun(`document.getElementById('legendRmsfRow').hidden`) === true, 'and hides otherwise');
+// the mode persists
+ctxRun(`graphMode.EV = true;`);
+assert(ctxRun(`gatherPersistableState().preferences.graphMode.EV`) === true, 'graph mode is persisted per type');
+ctxRun(`graphMode.EV = false;`);
+// the builder runs for the new type, with the scale-driven axis title
+let graphThrew = null;
+let evAxisTitle = '';
+try {
+  evAxisTitle = ctxRun(`
+    (function () {
+      var wrapper = createOverlayGraphSection('Ensemble variance (RMSF)', ['EV_RMSF'], 5, 'EV');
+      // The builder returns the section wrapper; the SVG (and its axis) is nested
+      // inside it, so search the tree rather than assuming a shape.
+      function find(el, needle, depth) {
+        if (!el || depth > 8) return '';
+        if (el._text === needle) return needle;
+        var kids = el.children || [];
+        for (var i = 0; i < kids.length; i++) { var r = find(kids[i], needle, depth + 1); if (r) return r; }
+        return '';
+      }
+      return find(wrapper, 'RMSF (A)', 0);
+    })()
+  `);
+} catch (e) { graphThrew = e.message; }
+assert(graphThrew === null, 'the graph builder runs for the ensemble type (' + (graphThrew || 'ok') + ')');
+assert(evAxisTitle === 'RMSF (A)', 'the axis title is taken from the EV scale');
+// the metrics panel and the export both see the RMSF row
+ctxRun(`selectStart = null; selectEnd = null;`);
+const metricRows = ctxRun(`computeMetricsRows()`);
+assert(metricRows.hasData === true && metricRows.rows.some(r => String(r.key).indexOf('RMSF') !== -1 || String(r.metric).indexOf('RMSF') !== -1), 'the metrics export includes the RMSF row');
+assert(HTML.indexOf("menuBarAction('graphEns')") !== -1, 'the View menu has the RMSF graph toggle');
+assert(ctxRun(`formatTrackLabel('EV_RMSF')`) === 'Ensemble RMSF', 'the graph pill and metrics row read as "Ensemble RMSF"');
+assert(ctxRun(`formatTrackLabel('model_1_RMSF')`) === 'model_1 RMSF', 'a per-model RMSF key still reads sensibly');
+ctxRun(`parsedTracks = {}; graphMode = { pLDDT: false, RSA: false, EV: false };`);
+
 section('construct designer (truncated FASTA)');
 ['constructSection','constructMode','constructMinRun','constructStripN','constructStripC','constructStatus','constructPreview'].forEach(id => {
   assert(HTML.indexOf('id="' + id + '"') !== -1, 'the ' + id + ' control exists');

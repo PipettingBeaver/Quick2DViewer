@@ -94,13 +94,14 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
 3. **Ensemble Structural Variance Analyzer** — column-wise coordinate variance
    across models. Output: a **graph** (RMSF-style line plot). Scope: **all
    loaded models or a user-picked subset**.
-   **Computation done (0.34.0)** — `computeEnsembleVariance()` + Kabsch
-   superposition (`kabschSuperpose` / `largestEigenvector4`, Jacobi eigensolver,
-   no dependencies); writes the `EV_RMSF` row (heatmap colours + tooltip), reports
-   per-model RMSD and the most mobile residues, and exposes `RMSF:` as a rule
-   numeric source. **Remaining:** the line plot itself — `createOverlayGraphSection`
-   is still pLDDT/RSA-specific (scale + bands), so a third graph type needs the
-   graph-mode plumbing (graphMode keys, Track Control View-as, legend rows, export).
+   **Done (0.34.0 + 0.37.0)** — `computeEnsembleVariance()` + Kabsch superposition
+   (`kabschSuperpose` / `largestEigenvector4`, Jacobi eigensolver, no dependencies);
+   writes the `EV_RMSF` row (heatmap colours + tooltip), reports per-model RMSD and the
+   most mobile residues, and exposes `RMSF:` as a rule numeric source. The **line plot**
+   shipped in 0.37.0 by making the graph machinery type-driven: `GRAPH_TYPES` +
+   `graphScaleForGroup` / `graphMaxForGroup` / `graphTitleForGroup`, a legend row, the
+   View menu toggle, per-type persistence, and metrics-export parity. The plot inherits
+   hover/selection/export for free because the points use the `col-<idx>` convention.
 4. **Downstream Script Compiler** — ChimeraX/PyMOL/VMD (done) + wet-lab
    **truncated FASTA constructs** (strip disordered termini). Primer design
    scoped out for now.
@@ -129,7 +130,7 @@ deposited entries).
 4. Contradiction engine (Rules panel)
 5. Client-side interface analysis — **done (0.15.0)**: `IF_<chain>` tracks + chain-pair table
 6. HMMER hmmscan
-7. ~~Ensemble variance~~ — **computation + row done (0.34.0)**, line plot remaining;
+7. ~~Ensemble variance~~ — **done (0.34.0 + 0.37.0)**, including the line plot;
    ~~co-localization table~~ — **done (0.35.0)**; ~~wet-lab constructs~~ — **done (0.36.0)**
 
 ## 10. Open items / to discuss
