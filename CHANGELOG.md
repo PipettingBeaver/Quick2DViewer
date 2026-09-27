@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-09-25
+
+### Fixed
+
+- **The graph axis scrolled away with the data, and the plot showed through the label column.**
+  Two symptoms of one layout gap: a graph's axis is drawn *inside* the SVG (so it scrolls with the
+  data), and the sticky pills overlay was zero-height, so nothing covered the 195 px axis strip —
+  scrolled plot content and the SVG's own axis appeared in the region the pinned row labels occupy.
+  - The overlay now carries a **pinned, opaque axis strip** (`graph-axis-side`) sized to the graph
+    height, mirroring the axis: the vertical title, the tick labels and the tick marks, positioned
+    from the same scale (so pLDDT/RSA and the auto-scaled RMSF each get their own).
+  - It is painted **behind** the pills, so the model pills stay readable and clickable.
+  - The SVG keeps its own axis, because an exported SVG has to be self-contained; on screen that one
+    is simply hidden behind the strip.
+  - The pills container is narrower than the strip now (max-width 128 px) so the right-aligned tick
+    labels stay clear of it.
+
 ## [0.46.0] - 2026-09-25
 
 ### Fixed

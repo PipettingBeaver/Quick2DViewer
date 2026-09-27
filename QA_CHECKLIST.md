@@ -855,6 +855,16 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 247 | Run the interface analysis on a renumbered model | IF_ tracks land at the aligned reference indices |
 | 248 | Scroll horizontally across the RMSF graph and the grids | The columns line up (this was the "offset" report; the geometry was already correct) |
 
+## 0.47.0 - pinned graph axis strip (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 249 | Show pLDDT (or RSA/RMSF) as a graph and scroll right | The axis title and tick labels stay pinned at the left; the plot no longer appears in the label column |
+| 250 | Scroll right, then click a model pill | Pills stay visible and clickable above the strip |
+| 251 | Check the tick values per type | pLDDT 0-100, RSA 0.00-1.00, RMSF from its auto max |
+| 252 | Export the viewport as SVG | The exported file still carries its own axis (the strip is on-screen only) |
+| 253 | Hover the strip's tick labels | They are decorative text (the interactive axis is the SVG's, for selection) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -902,4 +912,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6t. 235–240 (characterizing an unresolved fold; card at the top).
 6u. 241–243 (rule toggle naming).
 6v. 244–248 (model numbering vs the reference).
+6w. 249–253 (pinned graph axis strip).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

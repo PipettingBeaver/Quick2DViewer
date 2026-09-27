@@ -949,6 +949,64 @@ assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
 
+section('pinned graph axis strip (scrolling)');
+ctxRun(`parsedTracks = { AA: 'M'.repeat(40), 'm_pLDDT': Array.from({length: 40}, (_, i) => ({ val: 90, type: 'plddt' })), 'EV_RMSF': Array.from({length: 40}, (_, i) => ({ val: 1.5, type: 'rmsf' })) }; gridCellW = 11.5;`);
+const axisStrip = ctxRun(`
+    (function () {
+        function stripOf(group, key) {
+            var section = createOverlayGraphSection('T', [key], 40, group);
+            var found = null;
+            function walk(el, depth) {
+                if (!el || depth > 8 || found) return;
+                var cls = String(el.className || (el.attrs && el.attrs.class) || '');
+                if (cls.indexOf('graph-axis-side') !== -1) { found = el; return; }
+                (el.children || []).forEach(function (c) { walk(c, depth + 1); });
+            }
+            walk(section, 0);
+            if (!found) return { missing: true };
+            var ticks = [], marks = 0, title = '';
+            (found.children || []).forEach(function (c) {
+                var cl = String(c.className || (c.attrs && c.attrs.class) || '');
+                if (cl.indexOf('graph-axis-tick') !== -1) ticks.push(c._text);
+                else if (cl.indexOf('graph-axis-mark') !== -1) marks++;
+                else if (cl.indexOf('graph-axis-title') !== -1) title = c._text;
+            });
+            return { height: found.style.height, ticks: ticks.join(','), marks: marks, title: title };
+        }
+        return { plddt: stripOf('pLDDT', 'm_pLDDT'), ev: stripOf('EV', 'EV_RMSF') };
+    })()
+`);
+assert(axisStrip.plddt.missing !== true && axisStrip.ev.missing !== true, 'both graph types render a pinned axis strip');
+assert(axisStrip.plddt.ticks === '0,25,50,75,100', 'the strip mirrors the pLDDT ticks (' + axisStrip.plddt.ticks + ')');
+assert(axisStrip.plddt.title === 'pLDDT (0-100)', 'and its axis title');
+assert(axisStrip.ev.title === 'RMSF (A)', 'the ensemble strip carries its own scale');
+assert(axisStrip.ev.ticks.split(',').length === 5, 'with five ticks from the auto scale (' + axisStrip.ev.ticks + ')');
+assert(axisStrip.plddt.marks === 5 && axisStrip.ev.marks === 5, 'each tick has a mark');
+assert(/px$/.test(String(axisStrip.plddt.height)), 'the strip is sized to the graph height');
+// paint order: the opaque strip must sit behind the pills
+const stripOrder = ctxRun(`
+    (function () {
+        var section = createOverlayGraphSection('T', ['m_pLDDT'], 40, 'pLDDT');
+        var overlay = null;
+        function walk(el, depth) {
+            if (!el || depth > 8 || overlay) return;
+            var cls = String(el.className || (el.attrs && el.attrs.class) || '');
+            if (cls.indexOf('graph-pills-overlay') !== -1) { overlay = el; return; }
+            (el.children || []).forEach(function (c) { walk(c, depth + 1); });
+        }
+        walk(section, 0);
+        if (!overlay) return 'no overlay';
+        return (overlay.children || []).map(function (c) { return String(c.className || (c.attrs && c.attrs.class) || '?'); }).join('|');
+    })()
+`);
+assert(stripOrder.indexOf('graph-axis-side') !== -1 && stripOrder.indexOf('graph-axis-side') < stripOrder.indexOf('graph-pills-inner'), 'the strip paints behind the pills (' + stripOrder + ')');
+// the strip is opaque, which is what stops the plot showing through
+const stripCss = HTML.slice(HTML.indexOf('.graph-axis-side {'), HTML.indexOf('.graph-axis-side {') + 260);
+assert(stripCss.indexOf('background: #fafafa') !== -1, 'the strip has an opaque background');
+assert(stripCss.indexOf('border-right') !== -1, 'and the axis line as its right border');
+assert(HTML.indexOf('.graph-axis-title') !== -1 && HTML.indexOf('writing-mode: vertical-rl') !== -1, 'the title is vertical, like the SVG axis');
+ctxRun(`parsedTracks = {};`);
+
 section('model numbering vs reference (the RMSF offset bug)');
 // A model's residue numbering is not trustworthy: an assembly numbered from its
 // own mature chain, or a domain-only model numbered from 1, lands shifted. The
