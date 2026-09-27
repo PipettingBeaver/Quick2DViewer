@@ -19,9 +19,10 @@ defaults to offer. Everything is advisory: any step can be marked done,
 skipped or re-run at any time, and all tools stay reachable from the menus.
 
 - **Is it membrane-associated or secreted?**: Yes / No / Not sure
-- **Is a 3D structure available or planned?**: Yes / Not yet / Not sure
+- **What structure evidence do you have?**: Experimental (X-ray / cryo-EM / NMR) / Predicted only (AlphaFold / ESMFold) / None yet / Not sure
 - **Are homologs / an HHpred MSA in hand?**: Yes / No / Not sure
 - **Are you evaluating sequence variants?**: Yes / No / Not sure
+- **What is its oligomeric state?**: Monomer / Homodimer / Homotrimer / Homotetramer or larger / Hetero-oligomer / Unknown
 - **Is the function / domain architecture unknown?**: Yes / No / Not sure
 
 ## Steps
@@ -105,7 +106,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - Probability > 90% with coverage near 100% makes a template a solid model.
 - Conservation is only as good as the alignment depth, so check how many sequences went in.
 
-**In-app action.** `Load .hhr / variant FASTA…`
+**In-app action.** `Load .hhr / variant FASTA…` · `Copy sequence (FASTA)` · `Download FASTA`
 
 **Guided questions** (the answers choose the concrete action offered).
 
@@ -126,16 +127,17 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 **Why it matters.** A model converts sequence annotations into spatial context: buried vs exposed, domain packing, and which residues form interfaces.
 
 **How to read it.**
+- With two or more models attached, Ensemble variance measures where they disagree per residue (RMSF). Treat the mobile regions as tentative and the rigid core as settled.
 - pLDDT > 70 is confident, 50-70 tentative and < 50 unreliable. Read it per region, not per protein.
 - RSA says whether a residue is buried; a variant in a buried position is usually more disruptive.
 
-**In-app action.** `Attach / predict structure…`
+**In-app action.** `Attach / predict structure…` · `Ensemble variance…`
 
 **Guided questions** (the answers choose the concrete action offered).
 
 - Where should the model come from?: AlphaFold DB / PDB / CIF file / Predict (ESMFold)
 
-**Promoted when.** Promoted when a structure is available or planned, or the answer is unsure.
+**Promoted when.** Always. The structural homology and interface steps both need a model.
 
 **Citations.**
 - Jumper et al., Nature 2021 (AlphaFold2). <https://doi.org/10.1038/s41586-021-03819-2>
@@ -154,7 +156,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - High probability + low E-value with good query coverage is a credible structural relative.
 - Use it to sanity-check the family assignment, not to overrule curated data.
 
-**In-app action.** `Run Foldseek` · `Attach Structure(s)`
+**In-app action.** `Run Foldseek`
 
 **Guided questions** (the answers choose the concrete action offered).
 
@@ -198,7 +200,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - A rule hit is a hypothesis to inspect, not a conclusion. Click through its matches.
 - Export the figure plus table so the track state behind the claim is archived.
 
-**In-app action.** `Open Analysis Rules…` · `Interfaces…`
+**In-app action.** `Open Analysis Rules…` · `Interfaces…` · `Co-localization table…` · `Methods summary (.md)` · `Construct FASTA…`
 
 **Guided questions** (the answers choose the concrete action offered).
 

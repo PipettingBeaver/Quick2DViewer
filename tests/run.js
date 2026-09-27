@@ -256,7 +256,9 @@ section('guided workflow (evaluation guide)');
 assert(ctxRun(`WORKFLOW_STEPS.length`) === 8, 'guide has 8 pipeline steps');
 assert(ctxRun(`WORKFLOW_STEPS.every(s => s.id && s.title && s.desc && s.why && s.action && typeof s.action.run === 'string' && Array.isArray(s.how) && s.how.length && typeof s.check === 'function')`), 'every step carries why / action / how / check');
 assert(ctxRun(`WORKFLOW_STEPS.map(s => s.id).join(',')`) === 'sequence,features,annotation,homologs,structure,foldseek,topology,integration', 'steps follow the characterized pipeline order');
-assert(ctxRun(`GUIDE_QUESTIONS.length`) === 5 && ctxRun(`GUIDE_QUESTIONS.every(q => q.id && q.options.length >= 3)`), '5 intake questions with at least three options each');
+assert(ctxRun(`GUIDE_QUESTIONS.length`) === 6 && ctxRun(`GUIDE_QUESTIONS.every(q => q.id && q.options.length >= 3)`), '6 intake questions with at least three options each');
+const chainQ = ctxRun(`GUIDE_QUESTIONS.filter(q => q.id === 'chains')[0]`);
+assert(chainQ.options.length === 6 && chainQ.options.map(o => o.value).join(',') === 'monomer,homo2,homo3,homo4,hetero,unknown', 'the oligomeric-state question covers monomer through hetero-oligomer');
 const structQ = ctxRun(`GUIDE_QUESTIONS.filter(q => q.id === 'structure')[0]`);
 assert(structQ.options.map(o => o.value).join(',') === 'experimental,predicted,none,unsure', 'the structure question asks for the evidence type, not availability');
 assert(ctxRun(`typeof setGuideAnswer === 'function' && typeof resetGuideProfile === 'function' && typeof renderWorkflowGuide === 'function' && typeof computeGuideInsights === 'function' && typeof nextGuideStep === 'function'`), 'guide helpers present');
@@ -867,6 +869,61 @@ assert(/A3M\/CLUSTAL\/FASTA\/STOCKHOLM/.test(hhAct.hint) && /PDB_mmCIF70/.test(h
 const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
+
+section('declared oligomeric state (chains)');
+// the state model
+ctxRun(`guideProfile = {};`);
+assert(ctxRun(`declaredOligomerState()`) === null, 'no answer means no declared state');
+ctxRun(`guideProfile = { chains: 'homo3' };`);
+const declared3 = ctxRun(`declaredOligomerState()`);
+assert(declared3.label === 'Homotrimer' && declared3.chains === 3, 'a homotrimer declares three chains');
+ctxRun(`guideProfile = { chains: 'nonsense' };`);
+assert(ctxRun(`declaredOligomerState()`) === null, 'an unknown value is ignored rather than trusted');
+// what the coordinates show
+const twoChainPdb = ctxRun(`
+  (function () {
+    function line(serial, chain, resSeq) {
+      var L = new Array(80).fill(' ');
+      var put = function (s, str) { for (var k = 0; k < str.length; k++) L[s + k] = str[k]; };
+      put(0, 'ATOM'); put(6, String(serial).padStart(5)); put(12, 'CA'); put(17, 'ALA');
+      put(21, chain); put(22, String(resSeq).padStart(4));
+      put(30, '0.000'.padStart(8)); put(38, '0.000'.padStart(8)); put(46, String(resSeq).padStart(8));
+      return L.join('');
+    }
+    var out = '';
+    for (var i = 1; i <= 3; i++) out += line(i, 'A', i) + '\\n';
+    for (var j = 1; j <= 3; j++) out += line(10 + j, 'B', j) + '\\n';
+    return out;
+  })()
+`);
+ctxRun(`parsedTracks = { AA: 'MKV' }; cachedStructureTexts = { 'two.pdb': ${JSON.stringify(twoChainPdb)} };`);
+assert(ctxRun(`attachedChainCounts().length`) === 1 && ctxRun(`attachedChainCounts()[0].chains`) === 2, 'the chain count comes from the coordinates');
+// the claim is compared against the model
+ctxRun(`guideProfile = { chains: 'homo3' };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /largest attached model has only 2 chains/.test(i.text)), 'a declared trimer against a dimer model is flagged as a partial assembly');
+// and a single-chain model is the hard case (no interfaces at all)
+ctxRun(`cachedStructureTexts = { 'one.pdb': ${JSON.stringify(twoChainPdb)}.split('\\n').slice(0, 3).join('\\n') };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /You declared a homotrimer, but the attached model has a single chain/.test(i.text)), 'a declared trimer with a single-chain model is flagged');
+ctxRun(`cachedStructureTexts = { 'two.pdb': ${JSON.stringify(twoChainPdb)} };`);
+ctxRun(`guideProfile = { chains: 'homo2' };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /Declared homodimer; an attached model has 2 chains, so the interface analysis can be run/.test(i.text)), 'a claim the model supports is reported as runnable');
+ctxRun(`guideProfile = { chains: 'monomer' };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /You declared a monomer, but an attached model has 2 chains/.test(i.text)), 'a monomer claim against a multimer is questioned');
+ctxRun(`guideProfile = {};`);
+assert(!ctxRun(`computeGuideInsights()`).some(i => /declared/i.test(i.text)), 'no claim, no comment');
+// the interface action and panel carry it
+ctxRun(`guideProfile = { chains: 'homo3' }; guideAnswers = {};`);
+ctxRun(`setStepAnswer('integration', 'goal', 'interface');`);
+assert(/You declared a homotrimer\./.test(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0]).hint`) || ''), 'the interface hint names the declared state');
+ctxRun(`guideAnswers = {};`);
+ctxRun(`syncInterfaceDeclared();`);
+assert(ctxRun(`document.getElementById('interfaceDeclared').textContent`) === 'Declared: Homotrimer', 'the interface panel shows it beside the analysis');
+ctxRun(`guideProfile = { chains: 'monomer' }; syncInterfaceDeclared();`);
+assert(ctxRun(`document.getElementById('interfaceDeclared').textContent`) === '', 'a monomer declaration adds nothing there');
+// it is recorded in the write-up
+ctxRun(`guideProfile = { chains: 'homo3' };`);
+assert(ctxRun(`buildMethodsReport()`).indexOf('Homotrimer') !== -1, 'the methods summary records the declared state');
+ctxRun(`guideProfile = {}; cachedStructureTexts = {}; parsedTracks = {};`);
 
 section('conservation includes HHR homologs by default');
 assert(/id="conservationIncludeHHRCheck"[^>]*checked/.test(HTML), 'the checkbox is checked before any state is restored');

@@ -295,6 +295,48 @@ View as and Config. Homologs: **Match quality** (default) / **Conservation** / *
 
 ---
 
+### Declared oligomeric state — 0.41.0
+
+**Should do.** Let a sequence-only session (FASTA or Quick2D) declare its oligomeric state, so
+the biology is recorded and the interface step knows what to expect — previously the state
+could only be *inferred* from attached structures.
+
+**Try (normal use).**
+1. Guide → **Protein Background**.
+   *Expect:* a sixth question, "What is its oligomeric state?", with Monomer / Homodimer /
+   Homotrimer / Homotetramer or larger / Hetero-oligomer / Unknown.
+2. Answer **Homotrimer** with no structure attached.
+   *Expect:* no claim about interfaces yet (nothing to compare), and the methods summary
+   records "Homotrimer".
+3. Attach a **single-chain** model.
+   *Expect:* the read-out warns *"You declared a homotrimer, but the attached model has a
+   single chain. Interface analysis needs a multi-chain model, so predict or attach the
+   assembly."*
+4. Attach a **dimer** model instead.
+   *Expect:* *"…the largest attached model has only 2 chains. That is a partial assembly…"*
+5. Attach a **trimer** model.
+   *Expect:* *"Declared homotrimer; an attached model has 3 chains, so the interface analysis
+   can be run on it."*
+6. Answer **Monomer** with a multimer attached.
+   *Expect:* an info line asking whether that assembly is biological or a crystallographic
+   artefact.
+7. Set Integrate → goal = *Binding interface*.
+   *Expect:* the hint names the declared state, and the interface panel shows
+   "Declared: Homotrimer".
+
+**Edge cases (symptom → likely cause).**
+- **No answer → no comment anywhere.** The parameter is optional; only a declared state is
+  compared against the coordinates.
+- **"Unknown" is recorded but never compared.** It implies no chain count, so there is nothing
+  to check — that is deliberate.
+- **The claim and the model differ by count.** You get the *partial assembly* warning, not the
+  hard one; only fewer than two chains blocks interface analysis entirely.
+- **A model whose chains cannot be read.** No comparison happens (the file is skipped), so no
+  warning either way.
+- **The methods report says "Unknown".** Expected: it records whatever was answered.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -650,6 +692,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 206 | Import Foldseek hits | They do **not** join the conservation tallies (by design: the option says HHR) |
 | 207 | Reset Data | The option returns to on |
 
+## 0.41.0 - declared oligomeric state (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 208 | Guide → Protein Background | A sixth question, "What is its oligomeric state?", with six options |
+| 209 | Declare Homotrimer, attach a single-chain model | Read-out warns that interfaces need a multimer |
+| 210 | Attach a dimer instead | "partial assembly" warning, not the hard one |
+| 211 | Attach a trimer | "can be run on it" |
+| 212 | Declare Monomer with a multimer attached | Info line about biological vs crystallographic |
+| 213 | Set Integrate → Binding interface | Hint names the declared state; panel shows "Declared: Homotrimer" |
+| 214 | Check the methods summary | The declared state is recorded |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -687,4 +741,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6n. 191–196 (Track Control Color column; full card at the top).
 6o. 197–200 (Track Control width + config hints).
 6p. 201–207 (HHR conservation default).
+6q. 208–214 (declared oligomeric state; card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

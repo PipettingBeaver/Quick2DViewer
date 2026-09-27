@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-09-25
+
+### Added
+
+- **A declared oligomeric state** — the sixth intake question ("What is its oligomeric state?":
+  Monomer / Homodimer / Homotrimer / Homotetramer or larger / Hetero-oligomer / Unknown). Until
+  now the state could only be *inferred* from an attached structure, so a sequence-only session
+  (FASTA or Quick2D) had no way to say "this is a homotrimer". The declaration is recorded in
+  the methods summary and drives the interface step:
+  - **Claim vs coordinates.** The read-out compares the declaration with the chain count of the
+    attached models: a declared assembly against a single-chain model warns that interface
+    analysis needs a multimer; against a *smaller* assembly it warns about a partial assembly;
+    when the model supports it, it says the analysis can be run; a monomer declaration against a
+    multimer asks whether the assembly is biological or a crystallographic artefact.
+  - The interface action's hint names the declared state, and the interface panel shows
+    "Declared: Homotrimer" beside the analysis.
+
+### Fixed (caught while building it)
+
+- The interface hint was computed once at load (an IIFE in the resolver table) instead of per
+  call, so it would have frozen whatever the profile was at startup.
+- A declared assembly that the model only *partly* matched (declared trimer, dimer model) fell
+  through to the reassuring branch; it now warns about the partial assembly.
+
 ## [0.40.0] - 2026-09-25
 
 ### Changed

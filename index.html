@@ -2293,7 +2293,7 @@
                 </details>
 
                 <details class="workflow-section qa-new" id="interfaceSection" style="margin-top: 10px;"
-                    ontoggle="if (!this.open) clearGuideCoachmark();">
+                    ontoggle="if (this.open) syncInterfaceDeclared(); else clearGuideCoachmark();">
                     <summary>Interfaces (oligomer contacts)</summary>
                     <div id="guideCoachmarkInterfaces" class="guide-coachmark" hidden></div>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
@@ -2304,6 +2304,7 @@
                             <input type="number" id="ifaceCutoff" value="8" min="3" max="20" step="0.5" style="width:52px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">
                         </label>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="runInterfaceAnalysis()" style="font-size:0.72rem; padding:3px 8px;">Compute interfaces</button>
+                    <span id="interfaceDeclared" style="font-size:0.72rem; color:#475569;"></span>
                     </div>
                     <div id="interfaceStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                     <div id="interfaceResults" style="margin-top:8px; overflow-x:auto;"></div>
@@ -5038,6 +5039,15 @@ function runInterfaceAnalysis() {
     showToast(added ? ('Interface: ' + result.pairs.length + ' chain pair(s) in ' + file + '.') : 'No inter-chain contacts found.', added ? 'success' : 'info');
 }
 
+// Mirrors the guide's declared oligomeric state into the interface panel, so
+// the claim and the coordinates are visible side by side.
+function syncInterfaceDeclared() {
+    const el = document.getElementById('interfaceDeclared');
+    if (!el) return;
+    const declared = declaredOligomerState();
+    el.textContent = (declared && declared.chains >= 2) ? ('Declared: ' + declared.label) : '';
+}
+
 function renderInterfaceSummary(result, file, cutoff) {
     const wrap = document.getElementById('interfaceResults');
     if (!wrap) return;
@@ -5448,10 +5458,48 @@ const GUIDE_QUESTIONS = [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] },
     { id: 'variants', label: 'Are you evaluating sequence variants?', options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] },
+    // Declared oligomeric state: a sequence-only session (FASTA or Quick2D) has
+    // no way to say "this is a homotrimer", yet the biology matters for the
+    // interface step and for how the write-up reads.
+    { id: 'chains', label: 'What is its oligomeric state?', options: [
+        { value: 'monomer', label: 'Monomer' },
+        { value: 'homo2', label: 'Homodimer' },
+        { value: 'homo3', label: 'Homotrimer' },
+        { value: 'homo4', label: 'Homotetramer or larger' },
+        { value: 'hetero', label: 'Hetero-oligomer' },
+        { value: 'unknown', label: 'Unknown' }] },
     { id: 'unknownFunction', label: 'Is the function / domain architecture unknown?', options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] }
 ];
 let guideProfile = {};
+// Declared oligomeric states, with the chain count each implies (used to compare
+// the claim against what the attached coordinates actually show).
+const OLIGOMER_STATES = {
+    monomer: { label: 'Monomer', chains: 1 },
+    homo2: { label: 'Homodimer', chains: 2 },
+    homo3: { label: 'Homotrimer', chains: 3 },
+    homo4: { label: 'Homotetramer or larger', chains: 4 },
+    hetero: { label: 'Hetero-oligomer', chains: 2 },
+    unknown: { label: 'Unknown', chains: 0 }
+};
+function declaredOligomerState() {
+    const v = guideProfile.chains;
+    if (!v || !OLIGOMER_STATES[v]) return null;
+    return Object.assign({ value: v }, OLIGOMER_STATES[v]);
+}
+// What the attached coordinates actually contain (the declared state is a claim
+// about the biology; this is the model).
+function attachedChainCounts() {
+    const out = [];
+    Object.keys(cachedStructureTexts || {}).forEach(f => {
+        if (!p3dUsableStructure(f)) return;
+        try {
+            const n = Object.keys(parseStructureChains(cachedStructureTexts[f], structExt(f))).length;
+            if (n) out.push({ file: f, chains: n });
+        } catch (e) { /* unreadable file */ }
+    });
+    return out;
+}
 // The intake block auto-collapses once every question is answered (and stays
 // wherever the user last put it for the session).
 let guideIntakeOpen = null;
@@ -5633,7 +5681,12 @@ const STEP_ACTION_RESOLVERS = {
     integration(a) {
         const map = {
             variants: { label: 'Open Analysis Rules…', run: "openGuideCoachmark('rules')", hint: 'Co-localize variants with conservation, domains and structure.' },
-            interface: { label: 'Run interface analysis…', run: "openGuideCoachmark('interfaces')", hint: 'Needs a multi-chain model; residues under the cut-off become IF_ tracks.' },
+            interface: {
+                label: 'Run interface analysis…', run: "openGuideCoachmark('interfaces')",
+                hint: 'Needs a multi-chain model; residues under the cut-off become IF_ tracks.' +
+                    (declaredOligomerState() && declaredOligomerState().chains >= 2
+                        ? ' You declared a ' + declaredOligomerState().label.toLowerCase() + '.' : '')
+            },
             construct: { label: 'Open command generator →', run: "switchSidebarTab('workflow')", hint: 'Build ChimeraX/PyMOL/VMD selections for the construct.' },
             report: { label: 'Export figure & table…', run: "menuBarAction('png')", hint: 'PNG/SVG of the viewport plus TSV/CSV of the metrics.' }
         };
@@ -6008,6 +6061,26 @@ function computeGuideInsights() {
             out.push({ level: 'info', text: models.length + ' models are attached but not compared yet. Compute the ensemble variance to see where they agree.' });
         }
     } catch (e) { /* ensemble read-out is advisory */ }
+    try {
+        const declared = declaredOligomerState();
+        const counts = attachedChainCounts();
+        if (declared && counts.length) {
+            const maxChains = Math.max.apply(null, counts.map(c => c.chains));
+            if (declared.chains >= 2 && maxChains < 2) {
+                out.push({ level: 'warn', text: 'You declared a ' + declared.label.toLowerCase() + ', but the attached model' +
+                    (counts.length > 1 ? 's have' : ' has') + ' a single chain. Interface analysis needs a multi-chain model, so predict or attach the assembly.' });
+            } else if (declared.value === 'monomer' && maxChains >= 2) {
+                out.push({ level: 'info', text: 'You declared a monomer, but an attached model has ' + maxChains +
+                    ' chains. If that assembly is biological, update the oligomeric state; if it is a crystallographic artefact, the interface analysis will still report it.' });
+            } else if (declared.chains >= 2 && maxChains < declared.chains) {
+                out.push({ level: 'warn', text: 'You declared a ' + declared.label.toLowerCase() + ', but the largest attached model has only ' +
+                    maxChains + ' chains. That is a partial assembly, so interface analysis will report only the contacts the model contains.' });
+            } else if (declared.chains >= 2) {
+                out.push({ level: 'info', text: 'Declared ' + declared.label.toLowerCase() + '; an attached model has ' + maxChains +
+                    ' chains, so the interface analysis can be run on it.' });
+            }
+        }
+    } catch (e) { /* the oligomer read-out is advisory */ }
     if (guideProfile.structure === 'predicted') {
         out.push({ level: 'info', text: 'Structure evidence is predicted only. Corroborate fold-level claims with Foldseek, or with an experimental model where one exists.' });
     }
@@ -7231,7 +7304,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.40.0';
+const APP_VERSION = '0.41.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
