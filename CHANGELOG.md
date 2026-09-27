@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-09-25
+
+### Added
+
+- **The declared oligomeric state now travels with the workflows.** Review found that it was
+  advisory only: exports and structure generation still produced a single chain regardless.
+  - **Exported FASTA** (the HHpred clipboard hand-off and *Download FASTA*) carries the state in
+    the header, e.g. `>sp|P42212|GFP_AEVI_homotrimer`, so whatever consumes it is not left
+    assuming one chain.
+  - **ESMFold and the AlphaFold DB fetch state what they produce.** Both return a single chain —
+    the AlphaFold DB's per-accession model is the monomer (verified: its API exposes no assembly
+    fields for a known trimer, only `AF-<acc>-F1-model_v6.pdb`) — so with a declared oligomer
+    they warn at the point of generation, and the pre-action hint says it *before* the click.
+  - **The state is read from the input when it is there.** A FASTA header carrying a stoichiometry
+    token (`A:A:A`, `chainA:chainA:chainA`) or repeating the same record N times fills the intake
+    question automatically — never overwriting an explicit answer — while the viewer still shows
+    **one** chain (a homotrimer is one sequence). `parsePlainFasta` now reports every record so
+    this is possible; differing records are deliberately *not* inferred.
+
+### Notes
+
+- The detection is narrow on purpose (identical short token, colons without spaces), so prose
+  labels are not mistaken for stoichiometry; the answer stays editable either way.
+
 ## [0.41.0] - 2026-09-25
 
 ### Added

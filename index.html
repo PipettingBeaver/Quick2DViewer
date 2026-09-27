@@ -3394,8 +3394,10 @@ async function predictStructureESMFold() {
         refreshInputDataModalIfVisible();
         refreshTrackManagerIfVisible();
         schedulePersist();
-        setStatus('ESMFold model attached.');
-        endGuideTask('structure', 'ESMFold model attached', 'success');
+        const chainNote = singleChainGeneratorNote();
+        setStatus('ESMFold model attached.' + (chainNote ? ' ' + chainNote : ''));
+        endGuideTask('structure', 'ESMFold model attached' + (chainNote ? ' (single chain)' : ''), 'success');
+        if (chainNote) showToast('ESMFold model attached. ' + chainNote, 'info');
     } catch (err) {
         const m = err && err.message ? err.message : String(err);
         const blocked = /networkerror|failed to fetch|load failed|network request failed/i.test(m);
@@ -3442,8 +3444,10 @@ async function fetchAlphaFoldModel() {
         refreshInputDataModalIfVisible();
         refreshTrackManagerIfVisible();
         schedulePersist();
-        setStatus('AlphaFold model attached (' + acc + ').');
-        endGuideTask('structure', 'Attached the AlphaFold model for ' + acc, 'success');
+        const afChainNote = singleChainGeneratorNote();
+        setStatus('AlphaFold model attached (' + acc + ').' + (afChainNote ? ' ' + afChainNote : ''));
+        endGuideTask('structure', 'Attached the AlphaFold model for ' + acc + (afChainNote ? ' (single chain)' : ''), 'success');
+        if (afChainNote) showToast('AlphaFold model attached. ' + afChainNote, 'info');
     } catch (err) {
         const m = err && err.message ? err.message : String(err);
         setStatus('AlphaFold fetch failed: ' + m);
@@ -5635,9 +5639,9 @@ const STEP_ACTION_RESOLVERS = {
         const model = a.model || (guideProfile.structure === 'experimental' ? 'pdb'
             : (guideProfile.structure === 'predicted' ? 'afdb'
             : (guideProfile.structure === 'none' ? 'esmfold' : '')));
-        if (model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (max 400 aa) and attaches the model.' };
+        if (model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (max 400 aa) and attaches the model.' + (singleChainGeneratorNote() ? ' ' + singleChainGeneratorNote() : '') };
         if (model === 'afdb') {
-            if (acc) return { label: 'Fetch AlphaFold model (' + acc + ')', run: 'fetchAlphaFoldModel()', hint: 'Downloads the AlphaFold DB model for ' + acc + ' and attaches it.' };
+            if (acc) return { label: 'Fetch AlphaFold model (' + acc + ')', run: 'fetchAlphaFoldModel()', hint: 'Downloads the AlphaFold DB model for ' + acc + ' and attaches it.' + (singleChainGeneratorNote() ? ' ' + singleChainGeneratorNote() : '') };
             return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'No UniProt accession is loaded, so AlphaFold DB cannot be queried. ESMFold folds the sequence directly instead.' };
         }
         if (model === 'pdb') return { label: 'Attach PDB / CIF…', run: 'openInputDataModal()', hint: 'Attach the experimental model; pLDDT/RSA follow from it.' };
@@ -5750,6 +5754,17 @@ async function undoGuideStep(stepId) {
     if (!ok) return;
     const n = removeTracks(keys);
     showToast('Removed ' + n + ' track(s). The step no longer counts as covered.', 'success');
+}
+
+// ESMFold and the AlphaFold DB both return ONE chain (the DB's per-accession
+// model is the monomer - the API exposes no assembly), so when the researcher has
+// declared an oligomer the model will not contain it. Say that at the point of
+// generation rather than letting the read-out be the only warning.
+function singleChainGeneratorNote() {
+    const declared = declaredOligomerState();
+    if (!declared || declared.chains < 2) return '';
+    return 'This returns a single chain, so the declared ' + declared.label.toLowerCase() +
+        ' is not modelled. Attach an assembly model for the interface step.';
 }
 
 // --- Construct designer (truncated FASTA) ----------------------------------
@@ -5892,7 +5907,12 @@ function sequenceFastaText() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     if (!seq) return '';
     const raw = (currentProteinLabel || '').trim();
-    const header = raw ? raw.replace(/\s+/g, ' ').slice(0, 120) : 'Q2DV_sequence';
+    // The header carries the declared oligomeric state, because whatever consumes
+    // this FASTA (HHpred, a predictor, a colleague) would otherwise assume a
+    // single chain from a single sequence.
+    const declared = declaredOligomerState();
+    const stateTag = (declared && declared.chains >= 2) ? '_' + declared.label.toLowerCase().replace(/[^a-z0-9]+/g, '') : '';
+    const header = (raw ? raw.replace(/\s+/g, ' ').slice(0, 120) : 'Q2DV_sequence') + stateTag;
     const lines = [];
     for (let i = 0; i < seq.length; i += 60) lines.push(seq.slice(i, i + 60));
     return '>' + header + '\n' + lines.join('\n') + '\n';
@@ -7304,7 +7324,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.41.0';
+const APP_VERSION = '0.42.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9616,20 +9636,67 @@ function recomputeConservationScores() {
 // sequence, and predictions/annotations can be layered on afterwards.
 function parsePlainFasta(text) {
     const lines = String(text == null ? '' : text).replace(/\r/g, '').split('\n');
+    const records = [];
     let label = null, seq = '';
     for (let i = 0; i < lines.length; i++) {
         const t = lines[i].trim();
         if (!t) continue;
         if (t.charAt(0) === '>') {
-            if (label === null) { label = t.slice(1).trim(); continue; }
-            break; // a second record: keep the first
+            if (label !== null) { records.push({ label, sequence: seq.toUpperCase() }); }
+            label = t.slice(1).trim();
+            seq = '';
+            continue;
         }
         if (label === null) return null;      // sequence before any header
         if (!/^[A-Za-z*.\-]+$/.test(t)) break; // not sequence -> stop cleanly
         seq += t.replace(/[^A-Za-z]/g, '');
     }
-    seq = seq.toUpperCase();
-    return seq ? { label, sequence: seq } : null;
+    if (label !== null) records.push({ label, sequence: seq.toUpperCase() });
+    const first = records[0];
+    if (!first || !first.sequence) return null;
+    // `records` lets the caller read stoichiometry (identical repeats) while the
+    // viewer still shows one chain.
+    return { label: first.label, sequence: first.sequence, records };
+}
+
+// --- Oligomeric state read from the input -----------------------------------
+// A FASTA (or a Quick2D identifier line) can carry chain stoichiometry, either as
+// a repeated-record FASTA (the same chain three times) or as a token like
+// A:A:A. The viewer keeps ONE chain - a homotrimer is the same sequence - but the
+// declared state travels with the session so the automated workflows know.
+function oligomerFromLabelToken(label) {
+    // A short alphanumeric token repeated with colons: A:A:A, chainA:chainA,
+    // chainA:chainA:chainA:chainA. Deliberately narrow (identical token, no
+    // spaces around the colons) so prose labels are not mistaken for this.
+    const m = String(label || '').match(/(?:^|[^A-Za-z0-9])([A-Za-z][A-Za-z0-9]{0,7})(?::\1){1,}(?![A-Za-z0-9])/);
+    if (!m) return null;
+    const count = m[0].split(':').filter(Boolean).length;
+    if (count < 2) return null;
+    return { value: count === 2 ? 'homo2' : (count === 3 ? 'homo3' : 'homo4'), count, source: 'the identifier token ' + m[0].trim() };
+}
+function detectOligomerFromInput(text) {
+    const raw = String(text == null ? '' : text);
+    const token = oligomerFromLabelToken(raw);
+    if (token) return token;
+    if (!isPlainFastaInput(raw)) return null;
+    const parsed = parsePlainFasta(raw);
+    if (!parsed || !parsed.records || parsed.records.length < 2) return null;
+    const seqs = parsed.records.map(r => r.sequence);
+    const same = seqs.every(q => q === seqs[0]);
+    if (!same) return null; // different chains: not something we can infer safely
+    const n = seqs.length;
+    return { value: n === 2 ? 'homo2' : (n === 3 ? 'homo3' : 'homo4'), count: n, source: n + ' identical FASTA records' };
+}
+// Records a detected state only when the researcher has not answered the question
+// themselves, and says so either way.
+function applyDetectedOligomer(detected) {
+    if (!detected) return false;
+    if (guideProfile.chains && guideProfile.chains !== 'unknown') return false;
+    guideProfile.chains = detected.value;
+    logAction('guide', 'oligomeric state from input', detected.source);
+    showToast('Read a ' + (OLIGOMER_STATES[detected.value] || {}).label + ' from ' + detected.source +
+        '. The viewer still shows one chain; the state is recorded for the workflows.', 'info');
+    return true;
 }
 function isPlainFastaInput(text) {
     const t = String(text == null ? '' : text).trim();
@@ -10114,6 +10181,7 @@ function parseAndBuildViewer() {
     populateCrossRefDropdown();
     applyLookupDefaults(false);
     logAction('import', 'Quick2D parse', fullAA.length + ' aa');
+    applyDetectedOligomer(oligomerFromLabelToken(currentProteinLabel));
 
     renderViewer(parsedTracks);
 }
@@ -10125,6 +10193,7 @@ function buildFromPlainFasta(rawText) {
     const parsed = parsePlainFasta(rawText);
     if (!parsed || !parsed.sequence) return false;
     currentProteinLabel = parsed.label || null;
+    applyDetectedOligomer(detectOligomerFromInput(rawText));
     parsedTracks = { AA: parsed.sequence };
     selectStart = null; selectEnd = null; selectionMode = 'point';
     activeRowKey = null; rowRanges = [];

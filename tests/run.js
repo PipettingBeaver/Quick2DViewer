@@ -870,6 +870,55 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('oligomeric state travels with the input and the exports');
+// --- read from the identifier token ---
+let tok = ctxRun(`oligomerFromLabelToken('A:A:A')`);
+assert(tok && tok.value === 'homo3' && tok.count === 3, 'an A:A:A token reads as a homotrimer');
+tok = ctxRun(`oligomerFromLabelToken('sp|P42212|GFP_AEVI A:A:A')`);
+assert(tok && tok.value === 'homo3', 'the token is found after a UniProt-style identifier');
+assert(ctxRun(`oligomerFromLabelToken('sp|P42212|GFP_AEVI')`) === null, 'a plain identifier is not mistaken for stoichiometry');
+assert(ctxRun(`oligomerFromLabelToken('A:B')`) === null, 'different letters cannot be inferred as a homo-oligomer');
+assert(ctxRun(`oligomerFromLabelToken('A')`) === null, 'a single letter is not a stoichiometry');
+tok = ctxRun(`oligomerFromLabelToken('chainA:chainA:chainA:chainA')`);
+assert(tok && tok.value === 'homo4' && tok.count === 4, 'four repeats read as a tetramer or larger');
+// --- read from repeated identical records ---
+const threeRecs = '>chainA\nMKV\n>chainA\nMKV\n>chainA\nMKV\n';
+let det = ctxRun(`detectOligomerFromInput(${JSON.stringify(threeRecs)})`);
+assert(det && det.value === 'homo3' && /3 identical FASTA records/.test(det.source), 'three identical records read as a homotrimer');
+const twoDiff = '>a\nMKV\n>b\nAAA\n';
+assert(ctxRun(`detectOligomerFromInput(${JSON.stringify(twoDiff)})`) === null, 'differing records are not inferred (too easy to get wrong)');
+assert(ctxRun(`detectOligomerFromInput('MKV')`) === null, 'a bare sequence has no stoichiometry');
+// the parser still returns the first chain, plus every record
+const pf2 = ctxRun(`parsePlainFasta(${JSON.stringify(threeRecs)})`);
+assert(pf2.label === 'chainA' && pf2.sequence === 'MKV' && pf2.records.length === 3, 'the viewer keeps one chain while the records are reported');
+// --- recorded, but never over an explicit answer ---
+ctxRun(`guideProfile = {};`);
+assert(ctxRun(`applyDetectedOligomer({ value: 'homo3', source: 'test' })`) === true && ctxRun(`guideProfile.chains`) === 'homo3', 'a detected state fills an unanswered question');
+ctxRun(`guideProfile = { chains: 'monomer' };`);
+assert(ctxRun(`applyDetectedOligomer({ value: 'homo3', source: 'test' })`) === false && ctxRun(`guideProfile.chains`) === 'monomer', 'an explicit answer is never overwritten');
+ctxRun(`guideProfile = { chains: 'unknown' };`);
+assert(ctxRun(`applyDetectedOligomer({ value: 'homo3', source: 'test' })`) === true, '"unknown" counts as unanswered');
+// --- it travels with the sequence FASTA ---
+ctxRun(`parsedTracks = { AA: 'MKV' }; currentProteinLabel = 'sp|P42212|GFP_AEVI'; guideProfile = { chains: 'homo3' };`);
+const seqFasta = ctxRun(`sequenceFastaText()`);
+assert(seqFasta.split('\n')[0] === '>sp|P42212|GFP_AEVI_homotrimer', 'the exported FASTA header records the declared state (' + seqFasta.split('\n')[0] + ')');
+ctxRun(`guideProfile = { chains: 'monomer' };`);
+assert(ctxRun(`sequenceFastaText()`).indexOf('_monomer') === -1, 'a monomer needs no tag');
+ctxRun(`guideProfile = {};`);
+assert(ctxRun(`sequenceFastaText()`).indexOf('_') === ctxRun(`sequenceFastaText()`).lastIndexOf('_'), 'no state tag when nothing is declared');
+// --- the single-chain generators say so ---
+ctxRun(`guideProfile = { chains: 'homo3' };`);
+assert(/single chain/.test(ctxRun(`singleChainGeneratorNote()`)) && /assembly model/.test(ctxRun(`singleChainGeneratorNote()`)), 'the generators warn that a multimer is not modelled');
+ctxRun(`guideProfile = { chains: 'monomer' };`);
+assert(ctxRun(`singleChainGeneratorNote()`) === '', 'no note for a monomer');
+ctxRun(`guideProfile = { chains: 'homo3' }; guideAnswers = {};`);
+ctxRun(`setStepAnswer('structure', 'model', 'esmfold');`);
+assert(/single chain/.test(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]).hint`)), 'the ESMFold hint warns before the click');
+ctxRun(`setStepAnswer('structure', 'model', 'afdb'); uniprotAccession = 'P42212';`);
+assert(/single chain/.test(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]).hint`)), 'so does the AlphaFold hint');
+assert(HTML.indexOf('singleChainGeneratorNote()') !== -1, 'both generators consult it');
+ctxRun(`guideProfile = {}; guideAnswers = {}; uniprotAccession = null; parsedTracks = {}; currentProteinLabel = null;`);
+
 section('declared oligomeric state (chains)');
 // the state model
 ctxRun(`guideProfile = {};`);

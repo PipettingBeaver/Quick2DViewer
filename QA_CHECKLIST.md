@@ -295,11 +295,12 @@ View as and Config. Homologs: **Match quality** (default) / **Conservation** / *
 
 ---
 
-### Declared oligomeric state — 0.41.0
+### Declared oligomeric state — 0.41.0 / 0.42.0
 
 **Should do.** Let a sequence-only session (FASTA or Quick2D) declare its oligomeric state, so
-the biology is recorded and the interface step knows what to expect — previously the state
-could only be *inferred* from attached structures.
+the biology is recorded, the interface step knows what to expect, **and the exports and
+structure generators carry it** — previously the state could only be *inferred* from attached
+structures, and every export was silently a single chain.
 
 **Try (normal use).**
 1. Guide → **Protein Background**.
@@ -324,7 +325,24 @@ could only be *inferred* from attached structures.
    *Expect:* the hint names the declared state, and the interface panel shows
    "Declared: Homotrimer".
 
+8. Export the sequence (**Copy sequence (FASTA)** / **Download FASTA**) with a multimer declared.
+   *Expect:* the header ends with the state, e.g. `>sp|P42212|GFP_AEVI_homotrimer` — so HHpred or
+   a colleague does not read it as one chain.
+9. Press **Predict with ESMFold** (or **Fetch AlphaFold model**) with a multimer declared.
+   *Expect:* the hint warns *before* the click, and the status/toast afterwards says the model is
+   a single chain and that an assembly is needed for the interface step.
+10. Paste a FASTA whose header says `A:A:A`, or one that repeats the same record three times.
+   *Expect:* the intake question fills itself in as Homotrimer (a toast says what was read), the
+   viewer still shows **one** chain, and the export header then carries `_homotrimer`.
+
 **Edge cases (symptom → likely cause).**
+- **A detected state overwrote your answer.** It should not: detection only fills an *unanswered*
+  question (and "Unknown" counts as unanswered). If it ever overwrites an explicit answer, that
+  is the bug.
+- **A FASTA with different records sets nothing.** Only identical repeats are inferred; differing
+  chains are too easy to get wrong, so the question stays open.
+- **A prose label was read as stoichiometry.** The token pattern needs an identical short token
+  joined by colons with no spaces (`A:A:A`); report the label if it tripped.
 - **No answer → no comment anywhere.** The parameter is optional; only a declared state is
   compared against the coordinates.
 - **"Unknown" is recorded but never compared.** It implies no chain count, so there is nothing
@@ -704,6 +722,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 213 | Set Integrate → Binding interface | Hint names the declared state; panel shows "Declared: Homotrimer" |
 | 214 | Check the methods summary | The declared state is recorded |
 
+## 0.42.0 - chain count travels with the exports (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 215 | Declare a homotrimer, then Copy sequence (FASTA) | The header ends `_homotrimer` |
+| 216 | Predict with ESMFold while a multimer is declared | The hint warns before the click; the toast afterwards says the model is a single chain |
+| 217 | Fetch an AlphaFold model while a multimer is declared | Same warning (the DB model is the monomer) |
+| 218 | Paste a FASTA whose header says `A:A:A` | The intake fills in as Homotrimer, one chain shown in the viewer, export header tagged |
+| 219 | Paste the same record three times | Detected as a homotrimer |
+| 220 | Paste two *different* records | Nothing is inferred; the question stays open |
+| 221 | Answer Monomer yourself, then paste an `A:A:A` FASTA | Your answer is kept |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -741,5 +771,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6n. 191–196 (Track Control Color column; full card at the top).
 6o. 197–200 (Track Control width + config hints).
 6p. 201–207 (HHR conservation default).
-6q. 208–214 (declared oligomeric state; card at the top).
+6q. 208–214 + 215–221 (declared oligomeric state and its export/generator wiring; card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
