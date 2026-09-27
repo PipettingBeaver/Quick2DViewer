@@ -868,6 +868,58 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('construct designer (truncated FASTA)');
+['constructSection','constructMode','constructMinRun','constructStripN','constructStripC','constructStatus','constructPreview'].forEach(id => {
+  assert(HTML.indexOf('id="' + id + '"') !== -1, 'the ' + id + ' control exists');
+});
+// 30 aa: 6 disordered N-terminal, 20 ordered core, 4 disordered C-terminal
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(30), 'DO_IUPred': 'D'.repeat(6) + ' '.repeat(20) + 'D'.repeat(4) };
+    lastRanges = null; rowRanges = []; currentProteinLabel = 'GFP';
+`);
+let con = ctxRun(`computeConstruct({ mode: 'disorder', minRun: 5, stripN: true, stripC: true })`);
+assert(con.ok === true, 'the construct computes');
+assert(con.start === 7 && con.end === 30 && con.length === 24, 'a 6-residue N-terminal stretch is trimmed at minRun 5');
+assert(con.trimmedN === 6 && con.trimmedC === 0, 'the 4-residue C-terminal stretch is left alone (below minRun)');
+assert(con.sequence === 'M'.repeat(24), 'the construct sequence is the kept range');
+// lowering the threshold trims both ends
+con = ctxRun(`computeConstruct({ mode: 'disorder', minRun: 4, stripN: true, stripC: true })`);
+assert(con.start === 7 && con.end === 26 && con.length === 20 && con.trimmedN === 6 && con.trimmedC === 4, 'both termini trim once the threshold allows it');
+// one end only
+con = ctxRun(`computeConstruct({ mode: 'disorder', minRun: 4, stripN: false, stripC: true })`);
+assert(con.start === 1 && con.trimmedN === 0, 'the N-terminal checkbox is honoured');
+// a single stray residue never triggers a trim
+ctxRun(`parsedTracks = { AA: 'M'.repeat(20), 'DO_IUPred': 'D' + ' '.repeat(19) };`);
+con = ctxRun(`computeConstruct({ mode: 'disorder', minRun: 5, stripN: true, stripC: true })`);
+assert(con.start === 1 && con.trimmedN === 0, 'a 1-residue terminal stretch is not trimmed at minRun 5');
+// selection mode
+ctxRun(`parsedTracks = { AA: 'M'.repeat(30) }; lastRanges = [[10, 25]];`);
+con = ctxRun(`computeConstruct({ mode: 'selection' })`);
+assert(con.ok && con.start === 10 && con.end === 25 && con.length === 16 && con.trimmedN === 9 && con.trimmedC === 5, 'selection mode keeps exactly the selection');
+// guards
+ctxRun(`lastRanges = null; rowRanges = [];`);
+assert(ctxRun(`computeConstruct({ mode: 'selection' }).ok`) === false, 'selection mode with nothing selected is refused');
+ctxRun(`parsedTracks = { AA: 'M'.repeat(30) };`);
+assert(ctxRun(`computeConstruct({ mode: 'disorder' }).ok`) === false, 'no disorder track is refused with an explanation');
+assert(ctxRun(`computeConstruct({ mode: 'disorder' }).message`).indexOf('disorder track') !== -1, 'the refusal names the missing input');
+ctxRun(`parsedTracks = { AA: 'M'.repeat(30), 'DO_IUPred': 'D'.repeat(30) };`);
+assert(ctxRun(`computeConstruct({ mode: 'disorder', minRun: 5 }).ok`) === false, 'an all-disordered sequence is refused');
+ctxRun(`parsedTracks = {};`);
+assert(ctxRun(`computeConstruct({ mode: 'disorder' }).ok`) === false, 'no sequence is refused');
+// FASTA output
+ctxRun(`parsedTracks = { AA: 'M'.repeat(130), 'DO_IUPred': ' '.repeat(130) }; currentProteinLabel = 'sp|P42212|GFP_AEQVI GFP';`);
+con = ctxRun(`computeConstruct({ mode: 'disorder', minRun: 5 })`);
+const conFasta = ctxRun(`constructFastaText(${JSON.stringify({ start: 1, end: 130, length: 130, mode: 'disorder', sequence: 'M'.repeat(130) })}, 'GFP')`);
+assert(conFasta.indexOf('>GFP_1-130_disorder-trimmed') === 0, 'the header names the label, range and mode');
+assert(conFasta.trim().split('\n').length === 4 && conFasta.trim().split('\n')[1].length === 60, 'the construct sequence wraps at 60');
+assert(ctxRun(`constructHeaderLine({ start: 7, end: 30, mode: 'selection' })`).indexOf('_selection') !== -1, 'selection mode is marked in the header');
+let conThrew = null;
+try { ctxRun(`renderConstructPreview(); downloadConstructFasta(); copyConstructFasta();`); } catch (e) { conThrew = e.message; }
+assert(conThrew === null, 'preview, download and copy do not throw');
+// the guide offers it as a deliverable
+assert(ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'integration')[0].extraActions.some(a => a.run === 'showConstructPanel()')`), 'the Integrate step offers the construct designer');
+ctxRun(`parsedTracks = {}; currentProteinLabel = null;`);
+
 section('feature -> guide taxonomy (retroactive pass)');
 const structStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]`);
 assert(structStep.extraActions.some(a => a.run === 'showEnsemblePanel()'), 'the structure step offers the ensemble variance');

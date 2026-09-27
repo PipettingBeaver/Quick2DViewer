@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-09-25
+
+### Added
+
+- **Construct designer (truncated FASTA)** — Workflow tab, or *Construct FASTA…* on the
+  Integrate step. Turns the annotations into a wet-lab construct: trim the disordered
+  termini (only a terminal disordered stretch of at least N residues, so a short tail or
+  a single stray residue is left alone) or keep the current selection, then preview,
+  download or copy the construct as FASTA. Refuses when there is no disorder track, no
+  ordered core, nothing selected, or when trimming would leave fewer than N residues.
+  Primer design stays out of scope.
+- **Feature → guide taxonomy** (`DESIGN.md` §16): every feature is classified
+  (Background / Evidence source / Step extension / Interpretation / Analysis input /
+  Deliverable / Step candidate), and the class decides whether and where it appears in
+  the Evaluation Guide — plus a checklist for placing a new feature. This came out of
+  review: the guide should explain *how a feature is used in a workflow* (e.g. what RMSF
+  means for a fold claim), not just that the feature exists.
+
+### Changed (retroactive taxonomy pass)
+
+- **Ensemble variance** is now surfaced as a *step extension*: the Structure step carries
+  an *Ensemble variance…* action and a how-to-read line about model agreement, the
+  resolver offers *Compute ensemble variance* when more than one model is attached and
+  none has been compared, and the read-out reports the ensemble spread (or suggests
+  computing it).
+- The **Integrate** step now carries the deliverables as actions: *Co-localization
+  table…*, *Methods summary (.md)* and *Construct FASTA…*.
+- `QA_CHECKLIST.md` gained the construct designer's feature card.
+
 ## [0.35.0] - 2026-09-25
 
 ### Added

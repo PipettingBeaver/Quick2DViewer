@@ -117,6 +117,45 @@ annotation types present, and which cofactors that residue sits near.
 
 ---
 
+### Construct designer (truncated FASTA) — 0.36.0
+
+**Should do.** Turn the annotations into a wet-lab construct: trim the disordered termini
+(only terminal stretches of at least N residues) or keep the current selection, then
+export or copy the construct as FASTA.
+
+**Try (normal use).**
+1. Load a sequence with Quick2D disorder output, then **Workflow → Construct designer**.
+   *Expect:* a status line "Construct: residues X-Y (N aa). Trimmed A N-terminal and B
+   C-terminal residue(s) (runs of at least 5 disordered residues)." and the FASTA in a box.
+2. Lower **Min disordered run** to 2 and press **Preview**.
+   *Expect:* more is trimmed (both termini, if both are disordered).
+3. Untick **N-term**.
+   *Expect:* the start returns to residue 1.
+4. Switch **Mode** to *Keep the current selection*, with a range selected in the viewer.
+   *Expect:* the construct is exactly that range; the status reports the trimmed counts.
+5. **Download FASTA** then **Copy FASTA**.
+   *Expect:* the file is named `<label>_<start>-<end>_disorder-trimmed.fasta` and the
+   clipboard holds the same text.
+
+**Edge cases (symptom → likely cause).**
+- **"No disorder track is loaded…"** — no `DO_` row is present. Load Quick2D disorder
+  output, or use selection mode.
+- **"Every residue is predicted disordered…"** — there is no ordered core to keep; the
+  design refuses rather than emitting a whole-sequence "construct".
+- **A short disordered tail is not trimmed.** Expected: the threshold is the point — a
+  4-residue tail at minRun 5 is deliberately left alone.
+- **Selection mode with nothing selected is refused.** Make a selection first (or switch
+  back to disorder mode).
+- **"Trimming would leave fewer than N residues."** Raise the threshold or untick an end.
+- **The preview looks stale after loading new data.** It refreshes when the section is
+  opened or **Preview** is pressed; nothing is recomputed in the background.
+- **The header looks mangled for a `sp|...|...` label.** Expected: the header is
+  sanitised to `[A-Za-z0-9._-]` so it stays a valid single-line FASTA header.
+- **Trimmed residues are reported as counts, not sequences.** The full sequence is still
+  in the viewer and the FASTA Segment panel if you need to inspect what was removed.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -407,6 +446,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 171 | Open with nothing selected | "Nothing to tabulate yet…" hint, no empty table |
 | 172 | Select more than 300 residues | Capped at 300 with a note |
 
+## 0.36.0 - construct designer + guide taxonomy (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 173 | Workflow → Construct designer with disorder data | Status line names the kept range, the trimmed counts and the threshold; FASTA preview appears |
+| 174 | Change Min disordered run / untick an end | The preview updates to match |
+| 175 | Selection mode with a viewer selection | The construct is exactly the selection |
+| 176 | Download / Copy FASTA | `label_start-end_disorder-trimmed.fasta`; clipboard holds the same text |
+| 177 | Integrate step in the Guide | Offers Co-localization table, Methods summary and Construct FASTA actions |
+| 178 | Structure step with two models attached | Offers Compute ensemble variance; the read-out reports the spread once computed |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -438,4 +488,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6h. 149–155 (Phase 1 loose ends).
 6i. 166/156–165 (ensemble variance; 157/158 are the superposition checks).
 6j. 167–172 (co-localization table; its full card is at the top).
+6k. 173–178 (construct designer + taxonomy pass; full card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

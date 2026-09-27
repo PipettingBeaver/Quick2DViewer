@@ -104,6 +104,11 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
 4. **Downstream Script Compiler** — ChimeraX/PyMOL/VMD (done) + wet-lab
    **truncated FASTA constructs** (strip disordered termini). Primer design
    scoped out for now.
+   **Done (0.36.0)** — Construct designer in the Workflow tab (`computeConstruct` /
+   `constructFastaText` / `renderConstructPreview` / `downloadConstructFasta` /
+   `copyConstructFasta`): disorder-trimmed or selection-based, threshold on the
+   *terminal disordered stretch* length, with guards for no disorder data, no ordered
+   core, nothing selected, and too-short results. Exposed on the Integrate step.
 
 ## 8. Interfaces (client-side)
 
@@ -124,8 +129,8 @@ deposited entries).
 4. Contradiction engine (Rules panel)
 5. Client-side interface analysis — **done (0.15.0)**: `IF_<chain>` tracks + chain-pair table
 6. HMMER hmmscan
-7. Ensemble variance — **computation + row done (0.34.0)**, line plot remaining;
-   co-localization table; wet-lab constructs
+7. ~~Ensemble variance~~ — **computation + row done (0.34.0)**, line plot remaining;
+   ~~co-localization table~~ — **done (0.35.0)**; ~~wet-lab constructs~~ — **done (0.36.0)**
 
 ## 10. Open items / to discuss
 - **Tracks vs Track Control redundancy (noted).** The right sidebar's *Tracks* tab and the

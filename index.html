@@ -2388,6 +2388,37 @@
                 Change engine (ChimeraX / PyMOL / VMD) in <a href="#" onclick="openOptionsModal(); return false;" style="color: #2563eb;">Options</a>.
             </div>
             </details>
+
+            <details class="workflow-section qa-new" id="constructSection" style="margin-top: 10px;"
+                ontoggle="if (this.open) renderConstructPreview();">
+                <summary>Construct designer (truncated FASTA)</summary>
+                <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                    Turns the annotations into a wet-lab construct: strip the disordered termini, or keep the
+                    current selection, then export the construct as FASTA. Only a terminal disordered stretch of
+                    at least N residues is trimmed, so a short tail or a single stray residue is left alone.
+                    Primer design is out of scope.
+                </p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:0.75rem; color:#475569; margin-bottom:8px;">
+                    <label>Mode
+                        <select id="constructMode" class="q2dv-select" onchange="renderConstructPreview()" style="font-size:0.72rem; padding:2px 4px;">
+                            <option value="disorder">Trim disordered termini</option>
+                            <option value="selection">Keep the current selection</option>
+                        </select>
+                    </label>
+                    <label>Min disordered run
+                        <input type="number" id="constructMinRun" value="5" min="1" max="50" onchange="renderConstructPreview()" style="width:52px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">
+                    </label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="constructStripN" checked onchange="renderConstructPreview()"> N-term</label>
+                    <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="constructStripC" checked onchange="renderConstructPreview()"> C-term</label>
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="renderConstructPreview()" style="font-size:0.72rem; padding:3px 8px;">Preview</button>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="downloadConstructFasta()" style="font-size:0.72rem; padding:3px 8px;">Download FASTA</button>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="copyConstructFasta()" style="font-size:0.72rem; padding:3px 8px;">Copy FASTA</button>
+                </div>
+                <div id="constructStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                <div id="constructPreview" style="margin-top:6px;"></div>
+            </details>
             </div>
         </div>
     </div>
@@ -5280,7 +5311,8 @@ const WORKFLOW_STEPS = [
         extraActions: [
             { label: 'Interfaces…', run: "openGuideCoachmark('interfaces')" },
             { label: 'Co-localization table…', run: 'openDataModal()' },
-            { label: 'Methods summary (.md)', run: 'exportMethodsReport()' }
+            { label: 'Methods summary (.md)', run: 'exportMethodsReport()' },
+            { label: 'Construct FASTA…', run: 'showConstructPanel()' }
         ],
         how: ['A rule hit is a hypothesis to inspect, not a conclusion. Click through its matches.',
               'Export the figure plus table so the track state behind the claim is archived.'],
@@ -5555,6 +5587,136 @@ async function undoGuideStep(stepId) {
     if (!ok) return;
     const n = removeTracks(keys);
     showToast('Removed ' + n + ' track(s). The step no longer counts as covered.', 'success');
+}
+
+// --- Construct designer (truncated FASTA) ----------------------------------
+// Wet-lab constructs start from the same evidence the viewer shows: strip the
+// disordered termini (run-aware, so a single stray residue does not trigger it)
+// or keep the current selection, then export as FASTA. Primer design is out of
+// scope by design.
+function disorderMaskForConstruct() {
+    const total = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!total) return null;
+    const keys = Object.keys(parsedTracks).filter(k => k.startsWith('DO_') && typeof parsedTracks[k] === 'string');
+    if (!keys.length) return null;
+    const mask = new Array(total).fill(false);
+    for (let i = 0; i < total; i++) {
+        mask[i] = keys.some(k => {
+            const ch = parsedTracks[k][i];
+            return !!(ch && ch !== ' ' && ch !== '-' && ch !== '\t');
+        });
+    }
+    return mask;
+}
+// Finds the first ordered run of at least `minRun` residues (for the N-terminal
+// trim) and the last one (for the C-terminal trim).
+function computeConstruct(opts) {
+    const o = opts || {};
+    const seq = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const total = seq.length;
+    if (!total) return { ok: false, message: 'Load a sequence first.' };
+    const minRun = Math.max(1, parseInt(o.minRun, 10) || 5);
+    if (o.mode === 'selection') {
+        const ranges = (lastRanges && lastRanges.length)
+            ? lastRanges
+            : ((Array.isArray(rowRanges) && rowRanges.length) ? rowRanges.map(r => [r[0] + 1, r[1] + 1]) : []);
+        if (!ranges.length) return { ok: false, message: 'Make a selection first, or switch to trimming the disordered termini.' };
+        const start = Math.min.apply(null, ranges.map(r => r[0]));
+        const end = Math.max.apply(null, ranges.map(r => r[1]));
+        return {
+            ok: true, mode: 'selection', start, end, length: end - start + 1,
+            trimmedN: start - 1, trimmedC: total - end, sequence: seq.slice(start - 1, end)
+        };
+    }
+    const mask = disorderMaskForConstruct();
+    if (!mask) return { ok: false, message: 'No disorder track is loaded, so there is nothing to trim by. Load Quick2D disorder output, or use selection mode.' };
+    if (!mask.some(m => !m)) return { ok: false, message: 'Every residue is predicted disordered, so there is no ordered core to build a construct from.' };
+    // Only a *terminal disordered stretch of at least minRun residues* is
+    // trimmed, which is what the option label says: a short disordered tail (or
+    // one stray residue) is left alone.
+    let start = 0, end = total - 1;
+    if (o.stripN !== false) {
+        let k = 0;
+        while (k < total && mask[k]) k++;
+        if (k >= minRun && k < total) start = k;
+    }
+    if (o.stripC !== false) {
+        let k = 0;
+        while (k < total && mask[total - 1 - k]) k++;
+        if (k >= minRun && k < total) end = total - 1 - k;
+    }
+    if (end - start + 1 < minRun) return { ok: false, message: 'Trimming would leave fewer than ' + minRun + ' residues.' };
+    return {
+        ok: true, mode: 'disorder', start: start + 1, end: end + 1, length: end - start + 1,
+        trimmedN: start, trimmedC: total - 1 - end, minRun, sequence: seq.slice(start, end + 1)
+    };
+}
+function constructHeaderLine(res, label) {
+    const base = (label || currentProteinLabel || 'construct').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'construct';
+    return base + '_' + res.start + '-' + res.end + (res.mode === 'disorder' ? '_disorder-trimmed' : '_selection');
+}
+function constructFastaText(res, label) {
+    const lines = [];
+    for (let i = 0; i < res.sequence.length; i += 60) lines.push(res.sequence.slice(i, i + 60));
+    return '>' + constructHeaderLine(res, label) + '\n' + lines.join('\n') + '\n';
+}
+function readConstructOptions() {
+    const modeEl = document.getElementById('constructMode');
+    const minEl = document.getElementById('constructMinRun');
+    const nEl = document.getElementById('constructStripN');
+    const cEl = document.getElementById('constructStripC');
+    return {
+        mode: (modeEl && modeEl.value) || 'disorder',
+        minRun: (minEl && parseInt(minEl.value, 10)) || 5,
+        stripN: !nEl || nEl.checked !== false,
+        stripC: !cEl || cEl.checked !== false
+    };
+}
+function renderConstructPreview() {
+    const statusEl = document.getElementById('constructStatus');
+    const wrap = document.getElementById('constructPreview');
+    const res = computeConstruct(readConstructOptions());
+    if (!res.ok) {
+        if (statusEl) statusEl.textContent = res.message;
+        if (wrap) wrap.innerHTML = '';
+        return null;
+    }
+    if (statusEl) {
+        statusEl.textContent = 'Construct: residues ' + res.start + '-' + res.end + ' (' + res.length + ' aa). Trimmed ' +
+            res.trimmedN + ' N-terminal and ' + res.trimmedC + ' C-terminal residue(s)' +
+            (res.mode === 'disorder' ? ' (runs of at least ' + res.minRun + ' disordered residues)' : '') + '.';
+    }
+    if (wrap) {
+        wrap.innerHTML = '<div class="data-box" style="max-height:90px; overflow-y:auto; font-family:monospace; font-size:0.72rem; white-space:pre-wrap;">' +
+            structureEscapeHtml(constructFastaText(res)) + '</div>';
+    }
+    return res;
+}
+function downloadConstructFasta() {
+    const res = computeConstruct(readConstructOptions());
+    if (!res.ok) { showToast('Construct: ' + res.message, 'error'); return; }
+    downloadTextFile(constructHeaderLine(res) + '.fasta', constructFastaText(res), 'text/plain');
+    showToast('Construct FASTA downloaded (' + res.length + ' aa).', 'success');
+}
+async function copyConstructFasta() {
+    const res = computeConstruct(readConstructOptions());
+    if (!res.ok) { showToast('Construct: ' + res.message, 'error'); return; }
+    const text = constructFastaText(res);
+    let ok = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { /* fall through */ }
+    }
+    if (!ok) ok = legacyCopyText(text);
+    showToast(ok ? ('Construct sequence copied (' + res.length + ' aa).') : 'Could not write to the clipboard.', ok ? 'success' : 'error');
+}
+function showConstructPanel() {
+    switchSidebarTab('workflow');
+    const sec = document.getElementById('constructSection');
+    if (sec) {
+        sec.open = true;
+        if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' });
+    }
+    renderConstructPreview();
 }
 
 // --- Clipboard hand-off to external tools ----------------------------------
@@ -6949,7 +7111,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.35.0';
+const APP_VERSION = '0.36.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
