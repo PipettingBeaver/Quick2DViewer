@@ -868,6 +868,79 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('Track Control: the Color column (homolog colouring)');
+ctxRun(`trackControlState = getDefaultTrackControlState();`);
+assert(ctxRun(`getGroupColorMode('HL')`) === 'quality', 'homologs default to match-quality colouring');
+assert(ctxRun(`groupColorModes('HL').length`) === 3, 'homologs offer three colour modes');
+assert(ctxRun(`groupColorModes('SS').length`) === 0, 'a type without a choice reports none');
+// selecting a mode keeps the legacy flag in step
+ctxRun(`setGroupColorMode('HL', 'conservation');`);
+assert(ctxRun(`getGroupColorMode('HL')`) === 'conservation' && ctxRun(`isTrackGroupConsColored('HL')`) === true, 'conservation mode drives the legacy predicate');
+assert(ctxRun(`trackControlState.consColor.HL`) === true, 'the legacy flag stays in sync for old code and saves');
+ctxRun(`setGroupColorMode('HL', 'residue');`);
+assert(ctxRun(`getGroupColorMode('HL')`) === 'residue' && ctxRun(`isTrackGroupConsColored('HL')`) === false, 'residue mode is not conservation');
+// a legacy session (flag only, no mode) still reads as conservation
+ctxRun(`trackControlState = getDefaultTrackControlState(); trackControlState.consColor.HL = true;`);
+assert(ctxRun(`getGroupColorMode('HL')`) === 'conservation', 'a pre-mode session is interpreted as conservation');
+// the palette is stable per letter and distinct across chemistry
+assert(ctxRun(`residueColorFor('I')`) === ctxRun(`residueColorFor('i')`) && ctxRun(`residueColorFor('I')`) === '#8cc4f5', 'the residue palette is case-insensitive and stable');
+assert(ctxRun(`residueColorFor('K')`) !== ctxRun(`residueColorFor('I')`), 'different chemistry, different colour');
+assert(ctxRun(`residueColorFor('X')`) === '', 'an unknown letter has no colour (falls back)');
+// the master list: header + a selector where there is a choice, a dash where not
+assert(HTML.indexOf("mkEl('div', 'tctl-color-cell', 'Color')") !== -1, 'the header has a Color column');
+const hlCell = ctxRun(`
+    (function () {
+        var cell = buildGroupColorCell('HL');
+        var opts = [];
+        (cell.children || []).forEach(function (c) { if (c.children) c.children.forEach(function (o) { opts.push(o.value); }); });
+        return opts.join(',');
+    })()
+`);
+assert(hlCell === 'quality,conservation,residue', 'the homolog cell offers all three modes');
+const ssCell = ctxRun(`
+    (function () {
+        var cell = buildGroupColorCell('SS');
+        var texts = [];
+        (cell.children || []).forEach(function (c) { texts.push(c._text); });
+        return texts.join(',');
+    })()
+`);
+assert(ssCell === '-', 'a single-mode type shows a dash rather than a fake choice');
+// rendering honours the mode: residue mode colours by the letter, not by match quality
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'HL_01_hit': '||.' };
+    homologHitsInfo = { 'HL_01_hit': { aaTrack: 'MKI', source: 'HHpred' } };
+    trackControlState = getDefaultTrackControlState();
+    setGroupColorMode('HL', 'residue');
+`);
+const residueBgs = ctxRun(`
+    (function () {
+        var row = buildTrackRow('HL_01_hit', parsedTracks, 3, true);
+        var cells = row.children[1];
+        return (cells.children || []).map(function (c) { return c.style.backgroundColor; }).join('|');
+    })()
+`);
+assert(residueBgs.split('|')[0] === ctxRun(`residueColorFor('M')`), 'residue mode colours by the template letter');
+assert(residueBgs.split('|')[2] === ctxRun(`residueColorFor('I')`), 'and the same letter is the same colour in any row');
+ctxRun(`setGroupColorMode('HL', 'quality');`);
+const qualityBgs = ctxRun(`
+    (function () {
+        var row = buildTrackRow('HL_01_hit', parsedTracks, 3, true);
+        var cells = row.children[1];
+        return (cells.children || []).map(function (c) { return c.style.backgroundColor; }).join('|');
+    })()
+`);
+assert(qualityBgs.split('|')[0] !== residueBgs.split('|')[0], 'switching to match quality changes the colouring');
+assert(qualityBgs.indexOf('#8cc4f5') === -1, 'and does not use the residue palette');
+// the moved controls are gone from their old homes
+assert(HTML.indexOf('Cons. colors on') === -1 && HTML.indexOf('Cons. colors off') === -1, 'the group popup no longer carries the colour toggle');
+assert(HTML.indexOf('consColor.HH') === -1, 'the stale HH-keyed checkbox is gone');
+assert(HTML.indexOf("Track Control's Color column") !== -1, 'the config frame points at the new column');
+// the mode persists with the session
+ctxRun(`setGroupColorMode('HL', 'residue');`);
+assert(ctxRun(`gatherPersistableState().preferences.trackControl.colorMode.HL`) === 'residue', 'the colour mode is persisted');
+ctxRun(`trackControlState = getDefaultTrackControlState(); parsedTracks = {}; homologHitsInfo = {};`);
+
 section('empty tracks + no duplicate action + action log');
 // --- the tailored-label duplicate button is gone ---
 ctxRun(`

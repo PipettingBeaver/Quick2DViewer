@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-09-25
+
+### Added
+
+- **Track Control gained a Color column**, between *View as* and *Config*, for a type's
+  per-residue **colour meaning** — a separate choice from how the row is drawn. Homologs offer
+  three modes:
+  - **Match quality** (default): the existing per-homolog HHpred match-quality colour. Worth
+    stating plainly: this encodes *that homolog at that column*, so the same residue letter in
+    one column is legitimately a different colour in every row.
+  - **Conservation**: the per-column conservation band, so a column is one colour across rows.
+  - **Residue type**: a chemistry palette (`RESIDUE_COLORS`), so the same letter is the same
+    colour in every row and column; it also forces the letters, like the conservation mode.
+  Types with a single mode show a muted dash rather than a fake choice; adding a mode for
+  another type is a `GROUP_COLOR_MODES` entry plus a rendering branch.
+
+### Fixed
+
+- **The homolog "Cons. colors" controls never worked.** The per-type Config frame's checkbox
+  wrote `consColor.HH` / `hideSymbols.HH` / `fullBar.HH` / `aaSeq.HH` — all stale keys from the
+  `HH_` → `HL_` rename — so it appeared to do nothing. Both it and the chevron popup's toggle
+  are **removed**, replaced by the Color column (the config frame now points at it).
+- Choosing **Bar** no longer silently discards the colour choice: the mode is independent of the
+  view, so returning to Glyphs keeps it.
+- `isTrackGroupConsColored()` is now a thin wrapper over the colour mode, so existing call sites
+  and pre-0.39.0 saved sessions (which only had the boolean) keep working.
+
+### Notes
+
+- `DESIGN.md` §17 records where homolog colouring lives and why the default looks the way it
+  does; the feature card is in `QA_CHECKLIST.md`.
+
 ## [0.38.0] - 2026-09-25
 
 ### Added

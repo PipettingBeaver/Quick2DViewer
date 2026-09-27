@@ -1643,11 +1643,14 @@
         .tctl-head-btn.tctl-on { background: #2563eb; color: #fff; border-color: #2563eb; }
         .tctl-grid {
             display: grid;
-            grid-template-columns: 1fr 100px 62px;
+            grid-template-columns: 1fr 88px 104px 56px;
             gap: 6px;
             align-items: center;
             padding: 2px 4px;
         }
+        .tctl-color-cell { display: flex; align-items: center; min-width: 0; }
+        .tctl-color-none { color: #cbd5e1; font-size: 0.75rem; }
+        .tctl-color-select { font-size: 0.68rem; padding: 1px 2px; max-width: 100px; }
         .tctl-footer {
             display: flex;
             justify-content: flex-end;
@@ -7230,7 +7233,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.38.0';
+const APP_VERSION = '0.39.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -7772,8 +7775,39 @@ function buildTctlMasterGroupRow(g, expanded) {
     vcell.appendChild(buildGroupViewSelect(g));
     row.appendChild(vcell);
 
+    row.appendChild(buildGroupColorCell(g));
     row.appendChild(buildConfigGear(g));
     return row;
+}
+
+// The Color column: a selector where a type actually has a choice, and a muted
+// dash where it does not (so the column reads consistently without pretending
+// to offer options that do not exist).
+function buildGroupColorCell(g) {
+    const cell = mkEl('div', 'tctl-color-cell');
+    const modes = groupColorModes(g);
+    if (!modes.length) {
+        cell.appendChild(mkEl('span', 'tctl-color-none', '-'));
+        return cell;
+    }
+    const sel = mkEl('select', 'tctl-view-select tctl-color-select');
+    const cur = getGroupColorMode(g);
+    modes.forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = t;
+        sel.appendChild(o);
+    });
+    sel.value = modes.some(([v]) => v === cur) ? cur : modes[0][0];
+    sel.title = g === 'HL'
+        ? 'What each homolog column colour means: the match quality of that homolog (default), the per-column conservation, or the residue type'
+        : 'What the row colours mean';
+    sel.addEventListener('change', () => {
+        setGroupColorMode(g, sel.value);
+        tctlAfterChange();
+    });
+    cell.appendChild(sel);
+    return cell;
 }
 
 // One expanded per-track row: indented tree connector + name, its own "View
@@ -7790,6 +7824,12 @@ function buildTctlMasterTrackRow(g, key, isLast) {
     const vcell = mkEl('div', 'tctl-view-cell');
     vcell.appendChild(buildTrackViewSelect(key, g));
     row.appendChild(vcell);
+
+    // Colour is a type-level choice (the column above); the per-track rows keep
+    // the grid aligned with a muted dash.
+    const colorCell = mkEl('div', 'tctl-color-cell');
+    colorCell.appendChild(mkEl('span', 'tctl-color-none', '-'));
+    row.appendChild(colorCell);
 
     const ccell = mkEl('div', 'tctl-config-cell');
     const hidden = isTrackFiltered(key);
@@ -7840,6 +7880,7 @@ function buildTctlMasterList(pop) {
     const colh = mkEl('div', 'tctl-grid tctl-colheader');
     colh.appendChild(mkEl('div', 'tctl-cat-cell', 'Category'));
     colh.appendChild(mkEl('div', 'tctl-view-cell', 'View as'));
+    colh.appendChild(mkEl('div', 'tctl-color-cell', 'Color'));
     colh.appendChild(mkEl('div', 'tctl-config-cell', 'Config'));
     pop.appendChild(colh);
 
@@ -7918,25 +7959,11 @@ function buildConservationConfigFrame(withColors, title) {
     });
     wrap.appendChild(hhrLabel);
 
+    // The colour choice itself lives in Track Control's Color column now (the
+    // checkbox that used to sit here wrote stale HH keys, so it never applied).
+    // Point at the column rather than duplicating the control.
     if (withColors) {
-        wrap.appendChild(mkEl('div', 'tctl-config-divider'));
-        const colorLabel = mkEl('label', 'tctl-config-label tctl-config-row');
-        const colorChk = document.createElement('input');
-        colorChk.type = 'checkbox';
-        colorChk.checked = !!isTrackGroupConsColored('HL');
-        colorLabel.appendChild(colorChk);
-        colorLabel.appendChild(document.createTextNode('Recolor homolog AA letters by conservation score (Cons. colors)'));
-        colorChk.addEventListener('change', () => {
-            trackControlState.consColor.HH = !!colorChk.checked;
-            if (trackControlState.consColor.HH) {
-                trackControlState.hideSymbols.HH = false;
-                trackControlState.fullBar.HH = false;
-                trackControlState.aaSeq.HH = false;
-            }
-            tctlAfterChange();
-        });
-        wrap.appendChild(colorLabel);
-        wrap.appendChild(mkEl('div', 'tctl-config-note', 'When on, homolog rows show their amino-acid letters colored by the per-column conservation band above instead of the HHpred match-quality colors.'));
+        wrap.appendChild(mkEl('div', 'tctl-config-note', 'Homolog colouring (match quality / conservation / residue type) is chosen in Track Control\'s Color column.'));
     }
     return wrap;
 }
@@ -8066,20 +8093,6 @@ function buildTctlContent() {
         });
         pop.appendChild(barBtn);
 
-        if (g === 'HL') {
-            const consBtn = mkEl('button', 'tctl-btn' + (isTrackGroupConsColored('HL') ? ' tctl-on' : ''), isTrackGroupConsColored('HL') ? 'Cons. colors on' : 'Cons. colors off');
-            consBtn.title = "Recolor each homolog's amino-acid letters by the per-column conservation score (metric set under Options > Conservation Scoring) instead of the HHpred match-quality colors";
-            consBtn.addEventListener('click', () => {
-                trackControlState.consColor[g] = !trackControlState.consColor[g];
-                if (trackControlState.consColor[g]) {
-                    trackControlState.hideSymbols[g] = false;
-                    trackControlState.fullBar[g] = false;
-                    trackControlState.aaSeq[g] = false;
-                }
-                tctlAfterChange();
-            });
-            pop.appendChild(consBtn);
-        }
 
         const remBtn = mkEl('button', 'tctl-btn tctl-danger', 'Remove type…');
         remBtn.title = 'Delete every ' + trackGroupLabel(g) + ' track and the data behind it (not undoable)';
@@ -10091,7 +10104,7 @@ const TRACK_GROUP_LABELS = {
     Cofactors: 'Cofactors',
     other: 'Other'
 };
-let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {}, consColor: {}, viewOverride: {} };
+let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {}, consColor: {}, colorMode: {}, viewOverride: {} };
 
 // Fresh-install / cleared-cache default: Transmembrane rows start in "Bar"
 // (fullBar) mode so new users see labeled bars instead of letters, and Homolog
@@ -10099,7 +10112,7 @@ let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}
 // glance. Persisted preferences override this when loading a previous session.
 // (The old `fullBar.HH` key predated the HH_ -> HL_ rename, so it never applied.)
 function getDefaultTrackControlState() {
-    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true }, filtered: {}, aaSeq: { HL: true }, consColor: {}, viewOverride: {} };
+    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true }, filtered: {}, aaSeq: { HL: true }, consColor: {}, colorMode: {}, viewOverride: {} };
 }
 
 function getTrackGroup(key) {
@@ -10162,7 +10175,45 @@ function isTrackGroupAASeq(g) { return !!trackControlState.aaSeq[g]; }
 // Homolog "conservation colors" mode: like AA mode (letters shown) but the
 // letters are colored by the per-column conservation score instead of the
 // HHpred match-quality colors. Independent of the glyph cycle.
-function isTrackGroupConsColored(g) { return !!trackControlState.consColor[g]; }
+// --- Per-type colouring -----------------------------------------------------
+// What a row's per-residue colour *means* is a separate choice from how it is
+// drawn (View as) and from the type's configuration, so it gets its own column in
+// Track Control. Homologs are the case that needs it: the default colours encode
+// each homolog's match quality at that column, so the same residue letter in one
+// column can legitimately differ between rows - which reads as noise unless you
+// know that. "Conservation" makes a column uniform by evidence, "Residue type"
+// makes it uniform by residue identity.
+const GROUP_COLOR_MODES = {
+    HL: [['quality', 'Match quality'], ['conservation', 'Conservation'], ['residue', 'Residue type']]
+};
+function groupColorModes(g) { return GROUP_COLOR_MODES[g] || []; }
+function getGroupColorMode(g) {
+    const m = trackControlState.colorMode && trackControlState.colorMode[g];
+    if (m) return m;
+    // Legacy sessions only had a boolean "cons colours" flag.
+    return (trackControlState.consColor && trackControlState.consColor[g]) ? 'conservation' : 'quality';
+}
+function setGroupColorMode(g, mode) {
+    if (!trackControlState.colorMode) trackControlState.colorMode = {};
+    trackControlState.colorMode[g] = mode;
+    // Keep the legacy flag in step so older code paths and saves agree.
+    if (!trackControlState.consColor) trackControlState.consColor = {};
+    trackControlState.consColor[g] = (mode === 'conservation');
+}
+function isTrackGroupConsColored(g) { return getGroupColorMode(g) === 'conservation'; }
+// Residue-identity palette (Clustal-X-like chemistry groups), light enough for
+// black letters: the same letter is the same colour in every row and column.
+const RESIDUE_COLORS = {
+    A: '#8cc4f5', V: '#8cc4f5', I: '#8cc4f5', L: '#8cc4f5', M: '#8cc4f5', F: '#8cc4f5', W: '#8cc4f5', C: '#f5a3c7',
+    K: '#f5a3a3', R: '#f5a3a3',
+    D: '#f5a3e0', E: '#f5a3e0',
+    S: '#a8e6a3', T: '#a8e6a3', N: '#a8e6a3', Q: '#a8e6a3',
+    G: '#f5c98c', P: '#f5e08c', H: '#8ce0e6', Y: '#8ce0e6'
+};
+function residueColorFor(letter) {
+    const l = String(letter == null ? '' : letter).toUpperCase();
+    return RESIDUE_COLORS[l] || '';
+}
 // Per-track "View as" override: when present it pins one track to a view mode
 // regardless of its type group; absent means "follow the group".
 function getTrackViewOverride(key) {
@@ -10190,7 +10241,8 @@ function setGroupView(g, v) {
     trackControlState.fullBar[g] = (v === 'bar');
     trackControlState.aaSeq[g] = (v === 'aa');
     trackControlState.hideSymbols[g] = (v === 'noletters');
-    if (v === 'bar') trackControlState.consColor[g] = false;
+    // The colour mode is an independent choice now, so switching the view must
+    // not silently discard it (Bar simply paints over it).
 }
 // Group view is non-default when the type isn't in plain glyph mode, or any
 // of its tracks carry a per-track override / hidden filter.
@@ -10329,7 +10381,7 @@ function removeTracks(keys, opts) {
     try { syncP3DConservationMode(); } catch (e) { /* 3D state is optional */ }
 
     // 4) control state must not outlive the tracks it referred to
-    ['hidden', 'hideSymbols', 'fullBar', 'filtered', 'aaSeq', 'consColor', 'viewOverride'].forEach(bag => {
+    ['hidden', 'hideSymbols', 'fullBar', 'filtered', 'aaSeq', 'consColor', 'colorMode', 'viewOverride'].forEach(bag => {
         if (!trackControlState[bag]) return;
         list.forEach(k => { delete trackControlState[bag][k]; });
     });
@@ -10684,7 +10736,8 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     // Conservation-colors mode forces the AA letters too, but colored by the
     // per-column conservation band instead of HHpred match-quality.
     const consColorMode = group === 'HL' && !fullBar && isTrackGroupConsColored('HL');
-    const showHHAA = aaMode || consColorMode;
+    const residueColorMode = group === 'HL' && !fullBar && getGroupColorMode('HL') === 'residue';
+    const showHHAA = aaMode || consColorMode || residueColorMode;
     const aaTrackForRow = showHHAA ? (homologHitsInfo[key] && homologHitsInfo[key].aaTrack) || null : null;
     const queryAAFallback = showHHAA && !aaTrackForRow && typeof tracks.AA === 'string' ? tracks.AA : null;
     // Conservation scores used by the CONSERVATION row: prefer the cached
@@ -10896,9 +10949,16 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 // colors for the conservation band colors (heatmap letters).
                 const consForCell = consColorMode ? ((conservationScoresForHH && conservationScoresForHH.length > i) ? conservationScoresForHH[i] : null) : null;
                 const band = (consColorMode && consForCell != null && typeof getConservationBandForScore === 'function') ? getConservationBandForScore(consForCell) : null;
+                // Residue mode: colour by the residue letter itself (the
+                // template's when it has one, else the reference), so a column
+                // of the same residue is one colour across every row.
+                const letterForCell = residueColorMode
+                    ? ((aaTrackForRow && aaTrackForRow[i]) || (queryAAFallback && queryAAFallback[i]) || '')
+                    : '';
+                const residueBg = residueColorMode ? residueColorFor(letterForCell) : '';
                 // Full-bar paints every covered column the strongest-match teal,
                 // making the whole homolog row one solid hit bar.
-                cellEl.style.backgroundColor = fullBar ? '#0891b2' : (band ? band.bg : bg);
+                cellEl.style.backgroundColor = fullBar ? '#0891b2' : (residueBg || (band ? band.bg : bg));
                 if (showHHAA) {
                     // The pre-loop glyph pass laid the per-column match-quality
                     // glyph (e.g. '.') into every string cell, so clear it here:
@@ -10912,7 +10972,9 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                         if (!fullBar) span.style.color = (band && band.fg) ? band.fg : fg;
                         cellEl.title = consColorMode
                             ? `Residue ${i + 1}: homolog AA '${aaChar}' (conservation ${consForCell != null ? consForCell.toFixed(3) : 'n/a'}, ${conservationMetric})`
-                            : `Residue ${i + 1}: homolog AA '${aaChar}' (HHpred match quality '${char}')`;
+                            : (residueColorMode
+                                ? `Residue ${i + 1}: homolog AA '${aaChar}' (coloured by residue type)`
+                                : `Residue ${i + 1}: homolog AA '${aaChar}' (HHpred match quality '${char}')`);
                     } else {
                         cellEl.title = consColorMode
                             ? `Residue ${i + 1}: conservation ${consForCell != null ? consForCell.toFixed(3) : 'n/a'} (${conservationMetric})`
@@ -14187,6 +14249,7 @@ function gatherPersistableState() {
                 filtered: Object.assign({}, trackControlState.filtered),
                 aaSeq: Object.assign({}, trackControlState.aaSeq),
                 consColor: Object.assign({}, trackControlState.consColor),
+                colorMode: Object.assign({}, trackControlState.colorMode),
                 viewOverride: Object.assign({}, trackControlState.viewOverride)
             },
             savedSelections: savedSelections.map(slot => slot ? { ranges: slot.ranges.map(r => [r[0], r[1]]), row: slot.row || null, label: slot.label || null } : null)

@@ -478,3 +478,29 @@ workflow rather than a feature list.
 6. If **Step candidate**, do not sneak it in: add a `WORKFLOW_STEPS` entry (with why /
    how-to-read / citations) and regenerate `WORKFLOW.md`.
 7. Write the feature test card either way.
+
+## 17. Homolog colouring: where it lives (v0.39.0)
+
+**Before 0.39.0** a homolog row's per-residue colour came from
+`HH_QUALITY_COLORS[char]`, where `char` is the **per-column match-quality symbol** imported
+from the `.hhr` (`|`, `:`, `.`, …). That is a property of *that homolog at that column*, so
+the same residue letter in one column is legitimately a different colour in every row — which
+reads as noise until you know the encoding. The only alternative was a "Cons. colors" toggle
+buried in the per-type chevron popup, plus a checkbox in the type's Config frame that wrote
+**stale `HH` keys** from before the `HH_` → `HL_` rename, so it never applied at all.
+
+**Now** the choice is a first-class **Color** column in Track Control, between *View as* and
+*Config*, driven by `trackControlState.colorMode[group]`:
+
+| Mode | Colour encodes | Uniformity |
+|---|---|---|
+| **Match quality** (default) | that homolog's HHpred match quality at the column | varies per row, by design |
+| **Conservation** | the per-column conservation band (Options metric) | one colour per column across rows |
+| **Residue type** | the residue letter (template's, else the reference) via `RESIDUE_COLORS` | the same letter is one colour everywhere |
+
+Only homologs have more than one mode today (`GROUP_COLOR_MODES`); other types show a muted
+dash rather than a fake choice, and adding a mode for another type is a table entry plus a
+rendering branch. `isTrackGroupConsColored()` is now a thin wrapper over the mode, so older
+call sites and saved sessions keep working, and the old toggle/checkbox were **removed** rather
+than duplicated. The colour mode is also independent of the view: choosing Bar no longer
+discards it (Bar simply paints over the colours).

@@ -258,6 +258,43 @@ with the log copyable as text or JSON.
 
 ---
 
+### Track Control: the Color column — 0.39.0
+
+**Should do.** Let a type's per-residue *colour meaning* be chosen in Track Control, between
+View as and Config. Homologs: **Match quality** (default) / **Conservation** / **Residue type**.
+
+**Try (normal use).**
+1. Load an `.hhr` with several homologs, then open Track Control.
+   *Expect:* a **Color** column header between *View as* and *Config*; the Homologs row has a
+   selector reading "Match quality"; other types show a dash.
+2. Look at one column down the homolog rows.
+   *Expect (Match quality):* the colours differ per row — that is the per-homolog match-quality
+   encoding, not noise.
+3. Switch the Homologs Color to **Conservation**.
+   *Expect:* the column becomes one colour across every row (the conservation band), and the
+   rows show letters.
+4. Switch to **Residue type**.
+   *Expect:* each letter takes a chemistry colour, identical for the same residue in any row or
+   column; rows show letters.
+5. Reload.
+   *Expect:* the mode persists.
+6. Open the type's **Config** frame.
+   *Expect:* no colour checkbox; a note pointing at the Color column.
+
+**Edge cases (symptom → likely cause).**
+- **A dash in the Color column.** That type has a single colour mode, so there is nothing to
+  choose (by design, rather than offering a fake option).
+- **Choosing Bar then returning to Glyphs.** The colour choice survives — the mode is
+  independent of the view.
+- **Conservation mode looks like match quality.** With no conservation data the band is null,
+  so the row falls back to the match-quality colour. Check the Conservation row exists.
+- **Residue mode shows no letters.** It should force letters; if not, the template sequence may
+  be missing (older saves) — it then colours by the reference AA.
+- **A pre-0.39.0 session with "Cons. colors" on.** It reads as Conservation mode.
+- **An unknown letter (X, gaps).** No residue colour, so the match-quality colour shows through.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -581,6 +618,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 189 | Run `q2dvActions()` in the browser console | The same log as JSON |
 | 190 | Reload and reopen the console | Empty (session-only by design) |
 
+## 0.39.0 - Track Control Color column (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 191 | Open Track Control with homologs loaded | A **Color** column sits between View as and Config; Homologs offers three modes, other types show a dash |
+| 192 | Switch Homologs to Conservation | A column becomes one colour across rows; rows show letters |
+| 193 | Switch to Residue type | Same letter = same colour in every row/column |
+| 194 | Reload after choosing a mode | The mode persists |
+| 195 | Choose Bar, then Glyphs | The colour mode survives |
+| 196 | Open the homolog Config frame | No colour checkbox; a note points at the Color column |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -615,4 +663,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6k. 173–178 (construct designer + taxonomy pass; full card at the top).
 6l. 179–184 (RMSF line plot; full card at the top).
 6m. 185–190 (empty tracks / duplicate button / debugging console; cards at the top).
+6n. 191–196 (Track Control Color column; full card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
