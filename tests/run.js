@@ -950,6 +950,30 @@ assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
 
+section('guide coachmark: collapse is a one-shot transition, user choices survive');
+ctxRun(`
+    guideCoachmark = null; appliedCoachmarkKind = undefined;
+    document.getElementById('trackManagerSection').open = true;
+    document.getElementById('rulesSection').open = true;
+`);
+ctxRun(`openGuideCoachmark('rules');`);
+assert(ctxRun(`document.getElementById('rulesSection').open`) === true, 'the coachmark opens the section it points at');
+assert(ctxRun(`document.getElementById('trackManagerSection').open`) === false, 'and collapses the siblings while guiding');
+ctxRun(`document.getElementById('trackManagerSection').open = true;`);
+ctxRun(`applyGuideCoachmark();`);
+assert(ctxRun(`document.getElementById('trackManagerSection').open`) === true, 'a later refresh does not slam shut a section the user reopened (was: forced shut on every apply)');
+ctxRun(`clearGuideCoachmark();`);
+assert(ctxRun(`document.getElementById('trackManagerSection').open`) === true, 'ending guidance keeps the user\'s choice');
+assert(ctxRun(`document.getElementById('rulesSection').open`) === true, 'and restores what the coachmark itself changed');
+ctxRun(`
+    document.getElementById('crossCheckSection').open = false;
+    openGuideCoachmark('rules');
+`);
+assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'an untouched sibling stays collapsed while guiding');
+ctxRun(`clearGuideCoachmark();`);
+assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'and is restored to its pre-guidance state');
+ctxRun(`guideCoachmark = null; appliedCoachmarkKind = undefined;`);
+
 section('rule sources: "any model" RSA presets actually match');
 ctxRun(`
     parsedTracks = { AA: 'MMMM',

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.3] - 2026-09-25
+
+### Fixed
+
+- **Preset cards vanished while the guide's rules coachmark was active.** The coachmark's
+  "collapse the sibling sections while guidance is active" ran on *every* `applyGuideCoachmark()`
+  call, not just when the coachmark changed. So any guide refresh re-slammed the sections shut and
+  forced the active one open, and when guidance ended the saved states were restored over whatever
+  the user had done in the meantime - including collapsing the Rules section (with its Presets
+  accordion and all eight cards) right while they were adding or removing a preset from it.
+  - The collapse/restore is now a **one-shot transition**: it runs only when the coachmark kind
+    actually changes, and it only undoes what it set itself - if the user opened or closed a
+    section since, their choice wins.
+  - `renderRulesList()` now snapshots the sidebar scroll position and the Presets accordion state
+    around its rewrite (which destroys the clicked button and can shift the view), and puts them
+    back afterwards.
+  - Tests: the coachmark opens its section and collapses siblings; a later refresh does not slam
+    shut a section the user reopened; ending guidance keeps the user's choice and restores what the
+    coachmark changed; an untouched sibling is restored to its pre-guidance state.
+
 ## [0.50.2] - 2026-09-25
 
 ### Fixed

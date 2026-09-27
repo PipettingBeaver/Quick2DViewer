@@ -948,6 +948,16 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 276 | Check the row count against the Tracks tab | They agree (a duplicate would double the rows on screen) |
 | 277 | Export the viewport as SVG with rules present | One set of rows in the file |
 
+## 0.50.3 - preset cards vanish while guiding + dead RSA presets (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 278 | Guide → rules step → **Open Analysis Rules...**, then in the Tracks tab reopen **Track Visibility** while the coachmark is up, then add/remove a preset | Track Visibility stays open (it used to be slammed shut on any guide refresh) |
+| 279 | Same coachmark, open **Interfaces** while guiding, then end guidance (close the section, switch tab, or Return to Guide) | Interfaces stays open - your choice is kept, not overwritten by the restore |
+| 280 | Same coachmark, expand **Presets (curated rules)** and add/remove rules repeatedly | The accordion stays open and the cards stay where you left them; the sidebar does not jump |
+| 281 | Add **Conserved buried residue** or **Rigid, well-folded core** with an RSA track loaded (structure attached) | A rule row now appears where those presets used to add a rule that marked nothing |
+| 282 | Add either RSA preset with no structure/RSA track loaded | The card says "needs RSA (any model)" and no row is added (no error) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -999,4 +1009,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6x. 262–267 (graph axis title clearance + header chevron).
 6y. 268–272 (uniform hover framework; card at the top).
 6z. 273–277 (duplicate viewport with rules - fixed 0.50.1; check 273 first).
+6aa. 278–282 (preset cards vanish while guiding + dead RSA presets - fixed 0.50.2/0.50.3; check 278 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

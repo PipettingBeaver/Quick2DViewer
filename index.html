@@ -4947,6 +4947,19 @@ function renderRulePresets() {
 let ruleEditing = null; // working copy while the editor modal is open
 
 function renderRulesList() {
+    // Re-rendering rewrites #rulesList and the preset cards. That destroys the
+    // button the user just clicked and can shift the sidebar's scroll, which
+    // made the preset cards look like they vanished after Add or Remove. Take a
+    // snapshot of the view and put it back when the rewrite is done.
+    const scroller = document.querySelector('.sidebar');
+    const scrollTop = (scroller && typeof scroller.scrollTop === 'number') ? scroller.scrollTop : null;
+    const presets = document.getElementById('rulePresetsSection');
+    const presetsOpen = presets ? presets.open : null;
+    renderRulesListInner();
+    if (scroller && scrollTop !== null) scroller.scrollTop = scrollTop;
+    if (presets && presetsOpen !== null && presets.open !== presetsOpen) presets.open = presetsOpen;
+}
+function renderRulesListInner() {
     renderRulePresets();
     const wrap = document.getElementById('rulesList');
     if (!wrap) return;
@@ -6816,6 +6829,7 @@ const GUIDE_COACHMARKS = {
 };
 const COACHMARK_SIBLINGS = ['trackManagerSection', 'rulesSection', 'interfaceSection', 'crossCheckSection'];
 let guideCoachmark = null;
+let appliedCoachmarkKind; // undefined = the collapse/restore has not run yet
 function openGuideCoachmark(kind) {
     const cm = GUIDE_COACHMARKS[kind];
     if (!cm) return;
@@ -6855,18 +6869,28 @@ function applyGuideCoachmark() {
         }
     });
     // Collapse the sibling sections while guidance is active, restoring whatever
-    // the user had open once it ends.
-    COACHMARK_SIBLINGS.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (active) {
-            if (el._coachPrevOpen === undefined) el._coachPrevOpen = el.open;
-            el.open = (id === active.section);
-        } else if (el._coachPrevOpen !== undefined) {
-            el.open = el._coachPrevOpen;
-            el._coachPrevOpen = undefined;
-        }
-    });
+    // the user had open once it ends. This is a transition, applied only when the
+    // coachmark actually changes: re-applying it on every refresh slammed the
+    // sections shut (and forced the active one open) whenever the guide
+    // re-rendered while the user was working in the Tracks tab.
+    if (appliedCoachmarkKind !== guideCoachmark) {
+        appliedCoachmarkKind = guideCoachmark;
+        COACHMARK_SIBLINGS.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (active) {
+                if (el._coachPrevOpen === undefined) el._coachPrevOpen = el.open;
+                el._coachSetOpen = (id === active.section);
+                el.open = el._coachSetOpen;
+            } else if (el._coachPrevOpen !== undefined) {
+                // Only undo what the coachmark itself set: if the user has
+                // opened or closed the section since, keep their choice.
+                if (el.open === el._coachSetOpen) el.open = el._coachPrevOpen;
+                el._coachPrevOpen = undefined;
+                el._coachSetOpen = undefined;
+            }
+        });
+    }
     // Surface the suggested presets the guidance is pointing at.
     const presets = document.getElementById('rulePresetsSection');
     if (presets && active && active.target === 'rulePresetsSection') presets.open = true;
@@ -7644,7 +7668,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.50.2';
+const APP_VERSION = '0.50.3';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
