@@ -870,6 +870,38 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('rules panel polish + modern citations');
+// the Tracks tab's own submenu is no longer called "Tracks"
+assert(HTML.indexOf('<summary>Track Visibility</summary>') !== -1, 'the Tracks tab submenu is called Track Visibility');
+assert(HTML.indexOf('<summary>Tracks</summary>') === -1, 'the confusing "Tracks > Tracks" pairing is gone');
+// the coachmark names what fits this protein
+ctxRun(`guideProfile = { membrane: 'yes' }; guideAnswers = {}; parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE' };`);
+const cmText = ctxRun(`coachmarkText('rules')`);
+assert(/Based on your answers, these fit:/.test(cmText), 'the rules banner names the fitting presets');
+assert(/highlighted below/.test(cmText), 'and points at the highlight');
+assert(/Topology contradiction \(QC\)/.test(cmText), 'a membrane answer names the QC preset');
+ctxRun(`guideProfile = {}; parsedTracks = {};`);
+assert(/No preset matches your answers yet/.test(ctxRun(`coachmarkText('rules')`)), 'with no answers it says the list is unfiltered');
+assert(ctxRun(`coachmarkText('interfaces')`).indexOf('Based on your answers') === -1, 'other coachmarks keep their plain text');
+// modern, DOI-verified follow-ups replace the two classic refs
+const allRefs = ctxRun(`(function(){ var out = []; RULE_PRESETS.forEach(p => p.refs.forEach(r => out.push(r.cite + ' | ' + r.doi))); return out.join('\\n'); })()`);
+assert(allRefs.indexOf('Lichtarge') === -1 && allRefs.indexOf('Valdar') === -1, 'the 1996/2001 pair is no longer cited');
+assert(allRefs.indexOf('10.1073/pnas.1111471108') !== -1, 'co-evolution (DCA) is cited for coupled positions');
+assert(allRefs.indexOf('10.1073/pnas.0505425102') !== -1 && allRefs.indexOf('10.1110/ps.03323604') !== -1, 'interface-conservation follow-ups are cited');
+assert(allRefs.indexOf('10.1126/science.adg7492') !== -1, 'a current variant-effect model is cited for triage');
+const integRefs = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'integration')[0].refs.map(r => r.doi).join(',')`);
+assert(integRefs.indexOf('10.1073/pnas.1111471108') !== -1 && integRefs.indexOf('10.1126/science.adg7492') !== -1, 'the Integrate step carries them too');
+// the presets render reports itself (so a disappearing list is diagnosable)
+ctxRun(`actionLog = []; renderRulePresets();`);
+// (indexOf rather than a regex: backslashes inside ctxRun template literals are eaten)
+assert(ctxRun(`actionLog.some(e => e.kind === 'render' && String(e.detail).indexOf('card(s)') !== -1)`), 'the preset render logs how many cards it wrote');
+assert(ctxRun(`String(actionLog.filter(e => e.kind === 'render').pop().detail)`) === '8 card(s)', 'and the count is the real one');
+// robustness wiring
+assert(HTML.indexOf("section.appendChild(wrap)") !== -1, 'a missing preset container is recreated rather than silently skipped');
+assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 'opening the presets section refreshes them');
+assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
+ctxRun(`actionLog = [];`);
+
 section('experimental biological assemblies (RCSB)');
 assert(ctxRun(`isValidPdbId('1TNF')`) === true, 'a 4-character id starting with a digit is accepted');
 assert(ctxRun(`isValidPdbId('tnf')`) === false && ctxRun(`isValidPdbId('1TN')`) === false && ctxRun(`isValidPdbId('')`) === false, 'malformed ids are rejected');

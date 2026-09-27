@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-09-25
+
+### Changed
+
+- **The Tracks tab's own submenu is now "Track Visibility"** — "Tracks > Tracks" was confusing.
+- **The Rules coachmark now says which rules fit.** The Guide's hand-off to the Rules panel was
+  just "pick every rule that applies"; it now names the presets its intake answers and loaded data
+  suggest ("Based on your answers, these fit: … (highlighted below)"), or says plainly that nothing
+  matches yet and the list is unfiltered.
+- **Modern, DOI-verified follow-ups replace the classic rule citations.** Lichtarge et al. 1996
+  (evolutionary trace) and Valdar & Thornton 2001 (interface conservation) were the oldest
+  references in the rule library. They are replaced by, each resolved against Crossref:
+  - **Morcos et al., PNAS 2011** (direct-coupling analysis — co-evolution marks coupled positions)
+  - **Guharoy & Chakrabarti, PNAS 2005** (residue importance across protein–protein interfaces)
+  - **Caffrey et al., Protein Sci 2004** (interfaces are more conserved than the rest of the surface)
+  - **Cheng et al., Science 2023** (AlphaMissense — a current missense variant-effect model, for the
+    variant-triage rationale)
+  They now back the *Conserved buried residue*, *Conserved exposed patch* and *Integrate* step
+  references, so the scenarios are cited from the current literature rather than the origins.
+
+### Fixed (robustness)
+
+- **The Rules panel now diagnoses itself.** A report that adding a preset makes the preset cards
+  disappear could not be reproduced: the render logic keeps all eight cards through every path
+  (plain add, two adds, the coachmark route), the generated markup parses into the right tree, and
+  the deployed build is byte-identical to this one. So instead of guessing: `renderRulePresets()`
+  now **logs how many cards it wrote** (visible in Help → Debugging console), **recreates its
+  container** if it ever goes missing, and **refreshes when the section is opened**; and
+  **uncaught errors / rejected promises are recorded in the action log** so a failure that only
+  happens in a real browser shows up in the console rather than vanishing.
+
 ## [0.43.0] - 2026-09-25
 
 ### Added

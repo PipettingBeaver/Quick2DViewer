@@ -209,8 +209,10 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 **Promoted when.** Always. It is where the collected evidence is combined.
 
 **Citations.**
-- Lichtarge, Bourne & Cohen, J Mol Biol 1996 (evolutionary trace). <https://doi.org/10.1006/jmbi.1996.0167>
-- Valdar & Thornton, Proteins 2001 (interface conservation). <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
+- Morcos et al., Proc Natl Acad Sci USA 2011 (direct-coupling analysis). <https://doi.org/10.1073/pnas.1111471108>
+- Guharoy & Chakrabarti, Proc Natl Acad Sci USA 2005 (residue importance across interfaces). <https://doi.org/10.1073/pnas.0505425102>
+- Caffrey et al., Protein Sci 2004 (interfaces are more conserved than the surface). <https://doi.org/10.1110/ps.03323604>
+- Cheng et al., Science 2023 (AlphaMissense: missense variant effect). <https://doi.org/10.1126/science.adg7492>
 
 ## Rule presets
 
@@ -239,7 +241,8 @@ is loaded.
 
 **Citations.**
 - Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016). <https://doi.org/10.1093/nar/gkw408>
-- Capra & Singh, Bioinformatics 2007. <https://doi.org/10.1093/bioinformatics/btm270>
+- Capra & Singh, Bioinformatics 2007 (functionally important residues). <https://doi.org/10.1093/bioinformatics/btm270>
+- Cheng et al., Science 2023 (AlphaMissense: missense variant effect). <https://doi.org/10.1126/science.adg7492>
 
 ### 3. Conserved exposed patch
 
@@ -248,8 +251,10 @@ is loaded.
 **Rationale.** Conserved surface residues often mark protein–protein interfaces and functional surfaces rather than a hydrophobic core.
 
 **Citations.**
-- Capra & Singh, Bioinformatics 2007. <https://doi.org/10.1093/bioinformatics/btm270>
-- Valdar & Thornton, Proteins 2001 (interface conservation). <https://doi.org/10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o>
+- Capra & Singh, Bioinformatics 2007 (functionally important residues). <https://doi.org/10.1093/bioinformatics/btm270>
+- Guharoy & Chakrabarti, Proc Natl Acad Sci USA 2005 (residue importance across interfaces). <https://doi.org/10.1073/pnas.0505425102>
+- Caffrey et al., Protein Sci 2004 (interfaces are more conserved than the surface). <https://doi.org/10.1110/ps.03323604>
+- Morcos et al., Proc Natl Acad Sci USA 2011 (direct-coupling analysis). <https://doi.org/10.1073/pnas.1111471108>
 
 ### 4. Rigid, well-folded core
 

@@ -2263,7 +2263,7 @@
 
             <div class="sidebar-panel" id="side-panel-tracks" hidden>
                 <details class="workflow-section qa-new" id="trackManagerSection" open>
-                    <summary>Tracks</summary>
+                    <summary>Track Visibility</summary>
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:6px;">
                         <button type="button" class="tctl-link" onclick="openTrackControlsFromSidebar()" title="Open the compact Track Controls popover (View as + per-track filter)">Track Controls ↗</button>
                         <span style="display:flex; gap:4px;">
@@ -2283,7 +2283,8 @@
                     </p>
                     <button type="button" class="tb-btn tb-btn-secondary" onclick="openRuleEditor()" style="font-size:0.72rem; padding:3px 8px;">+ New rule</button>
                     <div id="rulesList" style="margin-top:8px;"></div>
-                    <details id="rulePresetsSection" style="margin-top:10px;">
+                    <details id="rulePresetsSection" style="margin-top:10px;"
+                        ontoggle="if (this.open) renderRulePresets();">
                         <summary style="font-size:0.75rem; font-weight:600; color:#334155; cursor:pointer;">Presets (curated rules)</summary>
                         <p style="font-size:0.72rem; color:#64748b; margin:6px 0 8px; line-height:1.4;">
                             Literature-backed rules, suggested from your guide answers and loaded data. Add one and tweak it in the editor.
@@ -4635,7 +4636,8 @@ const RULE_PRESETS = [
         ],
         refs: [
             { cite: 'Ashkenazy et al., Nucleic Acids Res 2016 (ConSurf 2016)', doi: '10.1093/nar/gkw408' },
-            { cite: 'Capra & Singh, Bioinformatics 2007', doi: '10.1093/bioinformatics/btm270' }
+            { cite: 'Capra & Singh, Bioinformatics 2007 (functionally important residues)', doi: '10.1093/bioinformatics/btm270' },
+            { cite: 'Cheng et al., Science 2023 (AlphaMissense: missense variant effect)', doi: '10.1126/science.adg7492' }
         ]
     },
     {
@@ -4646,8 +4648,10 @@ const RULE_PRESETS = [
             { kind: 'numeric', source: 'RSA:', op: '>=', value: '0.5', anyKey: true }
         ],
         refs: [
-            { cite: 'Capra & Singh, Bioinformatics 2007', doi: '10.1093/bioinformatics/btm270' },
-            { cite: 'Valdar & Thornton, Proteins 2001 (interface conservation)', doi: '10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o' }
+            { cite: 'Capra & Singh, Bioinformatics 2007 (functionally important residues)', doi: '10.1093/bioinformatics/btm270' },
+            { cite: 'Guharoy & Chakrabarti, Proc Natl Acad Sci USA 2005 (residue importance across interfaces)', doi: '10.1073/pnas.0505425102' },
+            { cite: 'Caffrey et al., Protein Sci 2004 (interfaces are more conserved than the surface)', doi: '10.1110/ps.03323604' },
+            { cite: 'Morcos et al., Proc Natl Acad Sci USA 2011 (direct-coupling analysis)', doi: '10.1073/pnas.1111471108' }
         ]
     },
     {
@@ -4788,17 +4792,27 @@ function addRuleFromPreset(presetId) {
     return rule;
 }
 function renderRulePresets() {
-    const wrap = document.getElementById('rulePresetList');
-    if (!wrap) return;
+    let wrap = document.getElementById('rulePresetList');
+    if (!wrap) {
+        // Self-heal: if the container ever goes missing (a mangled DOM, a stale
+        // build), recreate it in its documented home rather than silently
+        // rendering nothing.
+        const section = document.getElementById('rulePresetsSection');
+        if (!section) return;
+        wrap = document.createElement('div');
+        wrap.id = 'rulePresetList';
+        section.appendChild(wrap);
+    }
     const suggested = suggestedRulePresets().map(p => p.id);
     const ordered = RULE_PRESETS.slice().sort((a, b) => {
         const sa = suggested.indexOf(a.id) === -1 ? 1 : 0;
         const sb = suggested.indexOf(b.id) === -1 ? 1 : 0;
         return sa - sb;
     });
-    let html = '';
+    let html = '', cards = 0;
     ordered.forEach(preset => {
         const missing = presetMissingSources(preset);
+        cards++;
         const isSuggested = suggested.indexOf(preset.id) !== -1;
         html += '<div class="rp-card' + (isSuggested ? ' rp-suggested' : '') + '">' +
             '<div class="rp-head"><span class="rp-swatch" style="background:' + structureEscapeHtml(preset.color) + ';"></span>' +
@@ -4814,6 +4828,7 @@ function renderRulePresets() {
             '</div></div>';
     });
     wrap.innerHTML = html;
+    logAction('render', 'rule presets', cards + ' card(s)');
 }
 
 // --- Rule list + editor UI -------------------------------------------------
@@ -5244,6 +5259,17 @@ function openActionLog() { renderActionLog(); openModalAsDialog('actionLogModal'
 function closeActionLog() { closeModalAsDialog('actionLogModal'); }
 // Console access for debugging/macros: q2dvActions() returns the log as JSON.
 window.q2dvActions = () => actionLogText(true);
+// Uncaught errors and rejected promises are the hardest thing to diagnose from a
+// screenshot, so they are recorded in the action log too (visible in Help →
+// Debugging console). Purely additive: nothing is caught or suppressed.
+window.addEventListener('error', (e) => {
+    logAction('error', (e && e.message) ? e.message : 'script error',
+        [e && e.filename ? String(e.filename).split('/').pop() : '', e && e.lineno ? ':' + e.lineno : ''].filter(Boolean).join(''));
+});
+window.addEventListener('unhandledrejection', (e) => {
+    const r = e && e.reason;
+    logAction('error', 'unhandled rejection', (r && r.message) ? r.message : String(r || ''));
+});
 
 function showToast(message, type, options) {
     const container = document.getElementById('toastContainer');
@@ -5452,8 +5478,13 @@ const WORKFLOW_STEPS = [
         how: ['A rule hit is a hypothesis to inspect, not a conclusion. Click through its matches.',
               'Export the figure plus table so the track state behind the claim is archived.'],
         refs: [
-            { cite: 'Lichtarge, Bourne & Cohen, J Mol Biol 1996 (evolutionary trace)', doi: '10.1006/jmbi.1996.0167' },
-            { cite: 'Valdar & Thornton, Proteins 2001 (interface conservation)', doi: '10.1002/1097-0134(20010101)42:1<108::aid-prot110>3.0.co;2-o' }
+            // Modern successors to the classic evolutionary-trace / interface-conservation
+            // pair: co-evolution for coupled positions, interface-specific conservation
+            // for the patch reading, and a current variant-effect model for triage.
+            { cite: 'Morcos et al., Proc Natl Acad Sci USA 2011 (direct-coupling analysis)', doi: '10.1073/pnas.1111471108' },
+            { cite: 'Guharoy & Chakrabarti, Proc Natl Acad Sci USA 2005 (residue importance across interfaces)', doi: '10.1073/pnas.0505425102' },
+            { cite: 'Caffrey et al., Protein Sci 2004 (interfaces are more conserved than the surface)', doi: '10.1110/ps.03323604' },
+            { cite: 'Cheng et al., Science 2023 (AlphaMissense: missense variant effect)', doi: '10.1126/science.adg7492' }
         ],
         check: () => analysisRules.length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('IF_')),
         priority: () => true,
@@ -6639,6 +6670,20 @@ function clearGuideCoachmark() {
     guideCoachmark = null;
     applyGuideCoachmark();
 }
+// The rules hand-off is the one place the Guide knows *which* rules fit (from the
+// intake answers and the loaded data), so the banner names them instead of leaving
+// the researcher to guess among the whole library.
+function coachmarkText(kind) {
+    const base = (GUIDE_COACHMARKS[kind] || {}).text || '';
+    if (kind !== 'rules') return base;
+    let suggested = [];
+    try { suggested = suggestedRulePresets(); } catch (e) { suggested = []; }
+    if (!suggested.length) return base + ' No preset matches your answers yet, so the list is unfiltered.';
+    const shown = suggested.slice(0, 4).map(p => p.name).join(', ');
+    const rest = suggested.length > 4 ? ' and ' + (suggested.length - 4) + ' more' : '';
+    return base + ' Based on your answers, these fit: ' + shown + rest + ' (highlighted below).';
+}
+
 function applyGuideCoachmark() {
     const active = guideCoachmark ? GUIDE_COACHMARKS[guideCoachmark] : null;
     Object.keys(GUIDE_COACHMARKS).forEach(kind => {
@@ -6647,7 +6692,7 @@ function applyGuideCoachmark() {
         const on = kind === guideCoachmark;
         el.hidden = !on;
         if (on) {
-            el.innerHTML = structureEscapeHtml(GUIDE_COACHMARKS[kind].text) +
+            el.innerHTML = structureEscapeHtml(coachmarkText(kind)) +
                 ' <button type="button" onclick="returnToGuide()">Return to Guide</button>';
         }
     });
@@ -7416,7 +7461,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.43.0';
+const APP_VERSION = '0.44.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

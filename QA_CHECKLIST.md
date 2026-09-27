@@ -782,10 +782,25 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 227 | Attach assembly for an entry with no assembly | Clear failure; nothing half-attached |
 | 228 | Check the id box with an .hhr loaded | Pre-filled from the first homolog hit that has a PDB id |
 
+## 0.44.0 - rules panel polish, coachmark guidance, modern citations (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 229 | Open the Tracks tab | The submenu reads **Track Visibility**, not "Tracks" |
+| 230 | Guide → Integrate → Open Analysis Rules | The banner names the fitting presets and says they are highlighted below |
+| 231 | Answer the intake so nothing is suggested | The banner says no preset matches yet and the list is unfiltered |
+| 232 | Read a preset card's citations | DCA / interface-conservation / AlphaMissense instead of the 1996-2001 pair |
+| 233 | Add a preset, then Help → Debugging console | A "render / rule presets / 8 card(s)" line confirms the cards were written |
+| 234 | Reproduce the "cards disappear" report | Check the console for an `error` entry (uncaught errors are now logged) — please share it if it appears |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
   no "hide the rule row but keep the rule" concept.
+- **OPEN: "adding a preset makes the preset cards disappear"** (reported 0.43.0). Not reproducible
+  in the harness or by parsing the generated markup, and the deployed build matches the source. The
+  render is now instrumented (console line + error capture) and self-healing; if it happens again,
+  the Debugging console should say why.
 - **`group:pLDDT` / `group:RSA` are not offered** as categorical sources (those tracks hold
   objects, not chars) — use the numeric `pLDDT:`/`RSA:` sources instead.
 - **Older saves** (pre-0.23.0) have no `topologySources`/`uniprotFeatures`/`domainHitsInfo`,
@@ -821,4 +836,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6p. 201–207 (HHR conservation default).
 6q. 208–214 + 215–221 (declared oligomeric state and its export/generator wiring; card at the top).
 6r. 222–228 (experimental assembly import; card at the top).
+6s. 229–234 (rules panel polish + modern citations).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
