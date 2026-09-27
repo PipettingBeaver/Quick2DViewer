@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.1] - 2026-09-25
+
+### Fixed
+
+- **The viewport duplicated itself vertically once any rule existed** (reported as "A, B, C, A, B, C").
+  A regression from 0.23.0: `renderViewer` re-evaluates the rules mid-render, and that hook called
+  `applyRules()` — which **renders**. So the sequence was: the outer render clears the grid → the
+  hook's nested render clears it again and paints a full set → the outer render then **appends its own
+  copy on top of it**. Every data change (attach, remove, zoom, parse) doubled the viewport, and more
+  nesting meant more copies — which is why it appeared "at some point" and kept getting worse.
+  - `reevaluateRulesIfNeeded()` now calls a new **`rebuildRuleTracks()`** that rebuilds the `RULE_`
+    tracks *without touching the DOM*; `applyRulesInner()` = rebuild + render + refresh + persist, as
+    before. The in-render path can no longer repaint.
+  - Regression test: the harness now keeps the real `renderViewer` (it stubs it for speed) and
+    **counts render invocations** — a data-change render must be exactly 1 with rules present, and the
+    in-render hook exactly 0 while still rebuilding the track. The stub cannot show the duplication
+    itself, because its `innerHTML = ''` does not clear children; counting calls is the reliable check.
+
 ## [0.50.0] - 2026-09-25
 
 ### Changed

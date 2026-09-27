@@ -141,7 +141,7 @@ assert(upB.length === 1 && upB[0].type === 'Transmembrane', 'EBI parser maps TRA
 section('topology parser + consensus');
 const tp = ctxRun(`parseTopologyText('inside 1 11\\nTMhelix 12 30\\noutside 31 40', 40)`);
 assert(tp && tp.state[11] === 'M' && tp.state[30] === 'o', 'TMHMM segments parsed');
-ctxRun(`topologySources = [ { name:'Topology 1', state:'iiiiMMMMoooo' }, { name:'Topology 2', state:'iiiiiMMMooooo' } ]; parsedTracks.AA = 'X'.repeat(13); renderViewer = function(){}; schedulePersist = function(){}; applyTopologySources();`);
+ctxRun(`topologySources = [ { name:'Topology 1', state:'iiiiMMMMoooo' }, { name:'Topology 2', state:'iiiiiMMMooooo' } ]; parsedTracks.AA = 'X'.repeat(13); if (!window.__realRenderViewer) window.__realRenderViewer = renderViewer; renderViewer = function(){}; schedulePersist = function(){}; applyTopologySources();`);
 assert(ctxRun(`typeof parsedTracks['TP_Consensus']`) === 'string', 'topology consensus track built');
 
 section('homolog template metrics');
@@ -949,6 +949,36 @@ assert(HTML.indexOf("section.appendChild(wrap)") !== -1, 'a missing preset conta
 assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 'opening the presets section refreshes them');
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
+
+section('no duplicate render (rules + renderViewer)');
+// The stub cannot show the duplication (its innerHTML='' does not clear children),
+// so count render invocations instead: a nested render inside renderViewer is the
+// bug - it clears the grid, paints a full set, and the outer render then appends
+// a second copy on top of it.
+ctxRun(`
+    if (window.__realRenderViewer) {
+        parsedTracks = { AA: 'MKV', 'SS_PSIPRED': 'HHH' };
+        analysisRules = [{ id: 'rx', name: 'Probe', color: '#f00', mode: 'all', enabled: true,
+            conditions: [{ kind: 'categorical', source: 'group:SS', op: 'annotated', value: '' }] }];
+        window.__renderCalls = 0;
+        window.__countingRender = function (t) { window.__renderCalls++; return window.__realRenderViewer.call(null, t); };
+        renderViewer = window.__countingRender;
+    }
+`);
+const canCount = ctxRun(`typeof window.__realRenderViewer === 'function'`);
+assert(canCount, 'the harness kept the real renderer for this check');
+ctxRun(`window.__renderCalls = 0; renderViewer(parsedTracks);`);
+assert(ctxRun(`window.__renderCalls`) === 1, 'a data-change render renders exactly once with rules present (got ' + ctxRun(`window.__renderCalls`) + ')');
+ctxRun(`window.__renderCalls = 0; applyRules();`);
+assert(ctxRun(`window.__renderCalls`) === 1, 'applying rules renders exactly once (got ' + ctxRun(`window.__renderCalls`) + ')');
+ctxRun(`window.__renderCalls = 0; reevaluateRulesIfNeeded(parsedTracks);`);
+assert(ctxRun(`window.__renderCalls`) === 0, 'the in-render rule re-evaluation does NOT render (it only rebuilds tracks)');
+assert(ctxRun(`typeof parsedTracks['RULE_rx']`) === 'string', 'but it does rebuild the rule track');
+ctxRun(`
+    renderViewer = function(){};
+    analysisRules = []; parsedTracks = {};
+    delete window.__renderCalls; delete window.__countingRender;
+`);
 
 section('uniform hover framework (every track)');
 ctxRun(`

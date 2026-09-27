@@ -4648,7 +4648,12 @@ function evaluateRule(rule) {
 // renderViewer (hence the guard in applyRules against re-entering through it).
 function reevaluateRulesIfNeeded(tracks) {
     try {
-        if (analysisRules.length && tracks && tracks.AA) applyRules();
+        if (!analysisRules.length || !tracks || !tracks.AA) return;
+        // Rebuild the rule tracks ONLY. This runs *inside* renderViewer, so it
+        // must not render: a nested render clears the grid, paints a full set,
+        // and then the outer render appends a second copy of everything on top
+        // of it (the viewport appeared duplicated once any rule existed).
+        rebuildRuleTracks();
     } catch (e) { console.warn('rule re-evaluation failed:', e && e.message); }
 }
 
@@ -4662,6 +4667,14 @@ function applyRules() {
     try { applyRulesInner(); } finally { applyingRules = false; }
 }
 function applyRulesInner() {
+    rebuildRuleTracks();
+    renderViewer(parsedTracks);
+    refreshTrackManagerIfVisible();
+    schedulePersist();
+}
+// Rebuilds the RULE_ tracks from analysisRules without touching the DOM. Kept
+// separate from applyRulesInner() because renderViewer calls it mid-render.
+function rebuildRuleTracks() {
     Object.keys(parsedTracks).forEach(k => { if (k.startsWith('RULE_')) delete parsedTracks[k]; });
     const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     if (totalLength) {
@@ -4678,9 +4691,6 @@ function applyRulesInner() {
             setTrackMeta(key, { source: 'Rule', color: rule.color, ruleName: rule.name });
         });
     }
-    renderViewer(parsedTracks);
-    refreshTrackManagerIfVisible();
-    schedulePersist();
 }
 // Selects a rule's matching residues via the normal selection pipeline.
 function selectRuleMatches(id) {
@@ -7623,7 +7633,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.50.0';
+const APP_VERSION = '0.50.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

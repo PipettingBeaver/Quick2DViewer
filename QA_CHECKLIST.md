@@ -932,6 +932,16 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 271 | Hover a plotted graph point | The same styled tooltip; no duplicate native one |
 | 272 | Check a C/H/P/E/M/D/S residue on a prediction row vs the AA row | Meaning on the prediction row, plain residue on the AA row |
 
+## 0.50.1 - duplicate viewport with rules (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 273 | With a rule added, change the data (attach a structure, remove a track, zoom, re-parse) | The viewport stays a **single** set of rows + graphs (this was the A,B,C,A,B,C report) |
+| 274 | Add a rule, then reload and change data again | Still single |
+| 275 | With rules present, toggle a rule's track (○/●) | One render, one set |
+| 276 | Check the row count against the Tracks tab | They agree (a duplicate would double the rows on screen) |
+| 277 | Export the viewport as SVG with rules present | One set of rows in the file |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -982,4 +992,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6w. 249–253 (pinned graph axis strip) + 254–261 (its regression fix and the graph right-click menu).
 6x. 262–267 (graph axis title clearance + header chevron).
 6y. 268–272 (uniform hover framework; card at the top).
+6z. 273–277 (duplicate viewport with rules - fixed 0.50.1; check 273 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
