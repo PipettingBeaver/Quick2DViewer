@@ -1,11 +1,17 @@
-# Q2DV — QA checklist for the current development session (v0.16.0 → v0.23.0)
+# Q2DV — QA checklist for the current development session (v0.16.0 → v0.50.1)
 
-**Read this first.** Every item below has automated coverage in `npm test` (240 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (753 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
-`renderViewer` with a no-op for speed. So treat **all UI behaviour as unverified**
-until you have driven it by hand. The list is written for trying to break things,
-not for confirming they work — each row says what to do and what would count as a bug.
+`renderViewer` with a no-op for speed (one check restores the real renderer just to
+count render calls, so a nested re-render cannot sneak back in). So treat **all UI
+behaviour as unverified** until you have driven it by hand. The list is written for
+trying to break things, not for confirming they work — each row says what to do and
+what would count as a bug.
+
+**Current pass (0.50.1).** Start with rows 273–277 (the duplicate viewport that was
+reported and fixed) and the two live OPEN items under *Known gaps*; then follow the
+*Suggested order* at the bottom.
 
 ## Feature test cards (newest first)
 
