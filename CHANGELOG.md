@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-09-25
+
+### Changed
+
+- **"Include HHR homolog sequences in the tallies" is now on by default.** The homologs are
+  already loaded and on screen, so excluding them from the conservation row made the row
+  disagree with the viewer (and with what a researcher expects). Consequence worth knowing:
+  a session with an `.hhr` but no variant FASTA now gets a conservation row where previously
+  there was none.
+- **Restoring a session respects a deliberate choice.** The preference is read as
+  `!== false`, so a session that explicitly turned it off keeps it off, while a session saved
+  before the option existed picks up the new default rather than inheriting the old one.
+- **Importing an `.hhr` now recomputes conservation.** It previously only recomputed on
+  variant import, an option change, or a removal — so with the new default the row would have
+  appeared only after some unrelated action.
+- Reset Data returns the option to its new default (on).
+
+### Notes
+
+- Structural homologs (Foldseek) are deliberately **not** included in the tallies: the option
+  says HHR, and mixing structural alignments into a sequence-conservation tally is a judgement
+  call worth keeping explicit.
+
 ## [0.39.1] - 2026-09-25
 
 ### Fixed

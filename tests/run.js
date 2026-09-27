@@ -868,6 +868,30 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('conservation includes HHR homologs by default');
+assert(/id="conservationIncludeHHRCheck"[^>]*checked/.test(HTML), 'the checkbox is checked before any state is restored');
+ctxRun(`applyConservationSettings({});`);
+assert(ctxRun(`conservationIncludeHHR`) === true, 'an absent preference means the new default (on)');
+ctxRun(`applyConservationSettings({ conservationIncludeHHR: false });`);
+assert(ctxRun(`conservationIncludeHHR`) === false, 'a deliberate opt-out is respected');
+ctxRun(`applyConservationSettings({ conservationIncludeHHR: true });`);
+assert(ctxRun(`conservationIncludeHHR`) === true, 'an explicit on stays on');
+// the tallies really take the homolog sequences in
+ctxRun(`keyedVariantsInfo = {}; parsedTracks = { AA: 'MKV', 'HL_01_hit': '||.' };
+    homologHitsInfo = { 'HL_01_hit': { aaTrack: 'MKI', source: 'HHpred' } };`);
+const withHhr = ctxRun(`getConservationAlignedSequences()`);
+assert(withHhr.length === 1 && withHhr[0] === 'MKI', 'HHR homolog sequences join the tallies when on');
+ctxRun(`conservationIncludeHHR = false;`);
+assert(ctxRun(`getConservationAlignedSequences().length`) === 0, 'and are excluded when off');
+ctxRun(`conservationIncludeHHR = true;`);
+// an .hhr import recomputes, so the default takes effect immediately
+const importFn = HTML.slice(HTML.indexOf('function importHHpredFile'), HTML.indexOf('function importHHpredFile') + 3200);
+assert(importFn.indexOf('recomputeConservationScores();') !== -1, 'an .hhr import recomputes conservation rather than waiting for an unrelated change');
+// the methods summary records it
+ctxRun(`parsedTracks.CONSERVATION = { type: 'conservation', metric: 'shannon', values: [1, 1, 1] };`);
+assert(ctxRun(`buildMethodsReport()`).indexOf('(incl. HHR homologs)') !== -1, 'the methods summary says the homologs were included');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {}; keyedVariantsInfo = {};`);
+
 section('Track Control layout: width + no config hints');
 assert(HTML.indexOf('min-width: 380px') !== -1 && HTML.indexOf('max-width: 460px') !== -1, 'the popover is wide enough for four columns (the category was truncating)');
 assert(HTML.indexOf('tctl-config-hint') === -1, 'the redundant hint beside the Config gear is gone (CSS included)');

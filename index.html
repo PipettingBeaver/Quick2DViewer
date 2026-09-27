@@ -2540,7 +2540,7 @@
                 <option value="unaligned">Always realign onto the reference (Needleman-Wunsch / BLOSUM62)</option>
             </select>
             <label for="conservationIncludeHHRCheck" style="display:flex; align-items:center; gap:8px; font-size:0.8rem; font-weight:600; color:#475569; margin-top:12px; cursor:pointer;">
-                <input type="checkbox" id="conservationIncludeHHRCheck" onchange="onConservationIncludeHHRChange()" style="width:auto;">
+                <input type="checkbox" id="conservationIncludeHHRCheck" onchange="onConservationIncludeHHRChange()" style="width:auto;" checked>
                 Include HHR homolog sequences in the tallies
             </label>
         </details>
@@ -3009,7 +3009,10 @@ let keyedVariantsInfo = {}; // { variantKey: { aligned, raw, name } }
 let conservationMetric = 'shannon'; // 'shannon' | 'jsd' | 'wukabat'
 // Include HHR homolog sequences in the per-column conservation tallies when
 // a metric is (re)computed. Default OFF.
-let conservationIncludeHHR = false;
+// HHR homolog sequences count toward the conservation tallies by default: the
+// homologs are already loaded, so leaving them out made the row disagree with
+// what the viewer shows (and with what a researcher expects).
+let conservationIncludeHHR = true;
 // How pasted/imported variant FASTA is aligned onto the AA reference:
 // 'auto' (already reference-length rows are kept verbatim, others are
 // realigned), 'aligned' (all rows verbatim), or 'unaligned' (always realign).
@@ -7228,7 +7231,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.39.1';
+const APP_VERSION = '0.40.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9757,7 +9760,9 @@ function onFastaAlignmentModeChange() {
 // (shared by loadStateFromStorage and importSaveFile).
 function applyConservationSettings(prefs) {
     conservationMetric = CONSERVATION_METRICS.includes(prefs.conservationMetric) ? prefs.conservationMetric : 'shannon';
-    conservationIncludeHHR = !!prefs.conservationIncludeHHR;
+    // `!== false` so a session that deliberately turned it off keeps it off,
+    // while a session saved before this option existed picks up the new default.
+    conservationIncludeHHR = prefs.conservationIncludeHHR !== false;
     fastaAlignmentMode = FASTA_ALIGNMENT_MODES.includes(prefs.fastaAlignmentMode) ? prefs.fastaAlignmentMode : 'auto';
 }
 
@@ -9865,6 +9870,9 @@ function importHHpredFile(text, fileName) {
         homologHitsInfo[trackKey] = { rank, hitId: hit.hitId, hitDesc: hit.hitDesc, stats: hit.stats, aaTrack: built.aaTrack, source: 'HHpred' };
     });
 
+    // The homologs can now feed the conservation row (they are included by
+    // default), so recompute rather than waiting for the next unrelated change.
+    recomputeConservationScores();
     if (parsed.hits.length > HH_HIT_CAP) {
         showToast(`Imported the top ${HH_HIT_CAP} of ${parsed.hits.length} hits from "${fileName}" to keep the view manageable.`, 'success');
     } else {
@@ -15133,7 +15141,7 @@ async function resetAllData() {
     homologHitsInfo = {};
     keyedVariantsInfo = {};
     conservationMetric = 'shannon';
-    conservationIncludeHHR = false;
+    conservationIncludeHHR = true;
     fastaAlignmentMode = 'auto';
     uniprotAnnotationMode = 'accession';
     uniprotAccession = '';

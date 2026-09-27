@@ -638,6 +638,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 199 | Hover a gear | Tooltip reads "Config for <type>" |
 | 200 | Open Track Control near the right edge of a narrow window | The popover clamps to the viewport rather than overflowing |
 
+## 0.40.0 - HHR homologs included in conservation by default (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 201 | Load a Quick2D dataset + an `.hhr`, with **no** variant FASTA | A Conservation row appears (previously none, because the homologs were excluded) |
+| 202 | Open Options → Conservation Scoring | "Include HHR homolog sequences in the tallies" is ticked on a fresh session |
+| 203 | Untick it, then reload | Stays off (a deliberate opt-out is respected) |
+| 204 | Clear `localStorage`, load an `.hhr` | Ticked again (the new default) |
+| 205 | Load variant FASTA + `.hhr` together | The tallies use both; the methods summary says "(incl. HHR homologs)" |
+| 206 | Import Foldseek hits | They do **not** join the conservation tallies (by design: the option says HHR) |
+| 207 | Reset Data | The option returns to on |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -674,4 +686,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6m. 185–190 (empty tracks / duplicate button / debugging console; cards at the top).
 6n. 191–196 (Track Control Color column; full card at the top).
 6o. 197–200 (Track Control width + config hints).
+6p. 201–207 (HHR conservation default).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
