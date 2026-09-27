@@ -870,6 +870,72 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('experimental biological assemblies (RCSB)');
+assert(ctxRun(`isValidPdbId('1TNF')`) === true, 'a 4-character id starting with a digit is accepted');
+assert(ctxRun(`isValidPdbId('tnf')`) === false && ctxRun(`isValidPdbId('1TN')`) === false && ctxRun(`isValidPdbId('')`) === false, 'malformed ids are rejected');
+assert(ctxRun(`SERVICE_URLS.rcsbAssembly`) === 'https://files.rcsb.org/download/', 'the assembly base lives in the central URL table');
+assert(HTML.indexOf('id="assemblyPdbId"') !== -1 && HTML.indexOf('id="assemblyNumber"') !== -1, 'the interface panel has the id and assembly inputs');
+assert(HTML.indexOf('Attach assembly') !== -1, 'and a button to fetch it');
+// the id can be pre-filled from the homolog hits
+ctxRun(`homologHitsInfo = { 'HL_01_1TNF_A': { hitId: '1TNF_A', source: 'HHpred' } };`);
+assert(ctxRun(`firstHomologPdbId()`) === '1TNF', 'the first homolog hit with a PDB id pre-fills the input');
+ctxRun(`homologHitsInfo = { 'HL_01_none': { hitId: 'none', source: 'HHpred' } };`);
+assert(ctxRun(`firstHomologPdbId()`) === '', 'and nothing is pre-filled when no hit has one');
+// guards (the invalid path returns before any network call)
+let asmThrew = null;
+try { ctxRun(`fetchBiologicalAssembly('nope', 1);`); } catch (e) { asmThrew = e.message; }
+assert(asmThrew === null, 'an invalid id is refused without throwing');
+ctxRun(`homologHitsInfo = { 'HL_01_1TNF_A': { hitId: '1TNF_A' } };`);
+let panelThrew = null;
+try { ctxRun(`showAssemblyPanel();`); } catch (e) { panelThrew = e.message; }
+assert(panelThrew === null, 'the assembly panel opens without throwing');
+assert(ctxRun(`document.getElementById('assemblyPdbId').value`) === '1TNF', 'and pre-fills the id');
+// the guide routes a declared multimer with only single-chain models here
+ctxRun(`
+    guideProfile = { chains: 'homo3' }; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' };
+    cachedStructureTexts = { 'one.pdb': 'ATOM' };
+`);
+let stAct3 = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(stAct3.run === 'showAssemblyPanel()' && /experimental assembly/.test(stAct3.label), 'a declared assembly with a single-chain model offers the assembly import');
+assert(/cannot be predicted by the services wired in here/.test(stAct3.hint), 'and says why the import is the route');
+// once a multimer model is attached the offer goes away
+ctxRun(`
+    var L1 = new Array(80).fill(' ');
+    function caLine(serial, chain, resSeq) {
+        var L = new Array(80).fill(' ');
+        var put = function (st, str) { for (var k = 0; k < str.length; k++) L[st + k] = str[k]; };
+        put(0, 'ATOM'); put(6, String(serial).padStart(5)); put(12, 'CA'); put(17, 'ALA');
+        put(21, chain); put(22, String(resSeq).padStart(4));
+        put(30, '0.000'.padStart(8)); put(38, '0.000'.padStart(8)); put(46, String(resSeq).padStart(8));
+        return L.join('');
+    }
+    var multi = '';
+    ['A', 'B', 'C'].forEach(function (c, ci) { for (var i = 1; i <= 3; i++) multi += caLine(ci * 10 + i, c, i) + '\\n'; });
+    cachedStructureTexts = { 'trimer.pdb': multi };
+`);
+stAct3 = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
+assert(stAct3.run !== 'showAssemblyPanel()', 'with a real multimer attached the import is no longer the suggestion');
+// the read-out names the route
+ctxRun(`
+    (function () {
+        function caLine(serial, chain, resSeq) {
+            var L = new Array(80).fill(' ');
+            var put = function (st, str) { for (var k = 0; k < str.length; k++) L[st + k] = str[k]; };
+            put(0, 'ATOM'); put(6, String(serial).padStart(5)); put(12, 'CA'); put(17, 'ALA');
+            put(21, chain); put(22, String(resSeq).padStart(4));
+            put(30, '0.000'.padStart(8)); put(38, '0.000'.padStart(8)); put(46, String(resSeq).padStart(8));
+            return L.join('');
+        }
+        var one = '';
+        for (var i = 1; i <= 3; i++) one += caLine(i, 'A', i) + '\\n';
+        cachedStructureTexts = { 'one.pdb': one };
+    })();
+    guideProfile = { chains: 'homo3' };
+`);
+assert(ctxRun(`attachedChainCounts().length`) === 1 && ctxRun(`attachedChainCounts()[0].chains`) === 1, 'the single-chain model is readable (so the comparison can happen)');
+assert(ctxRun(`computeGuideInsights()`).some(i => /Attach assembly/.test(i.text)), 'the read-out points at the assembly action');
+ctxRun(`cachedStructureTexts = {}; parsedTracks = {}; guideProfile = {}; homologHitsInfo = {};`);
+
 section('oligomeric state travels with the input and the exports');
 // --- read from the identifier token ---
 let tok = ctxRun(`oligomerFromLabelToken('A:A:A')`);

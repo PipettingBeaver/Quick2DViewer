@@ -355,6 +355,42 @@ structures, and every export was silently a single chain.
 
 ---
 
+### Experimental biological assembly import — 0.43.0
+
+**Should do.** Import a real multimer model when one exists experimentally: give a PDB id and
+fetch RCSB's biological assembly file, which contains the assembly's chains — so the interface
+step has something to work on, instead of the declaration only producing a warning.
+
+**Try (normal use).**
+1. Declare a homotrimer with no multimer model attached.
+   *Expect:* the Guide's structure step offers **Attach an experimental assembly…**, the read-out
+   points at the same route, and Analyze → Interfaces shows the id/assembly inputs.
+2. In Analyze → Interfaces, enter a known trimer's id (**1TNF**) and press **Attach assembly**.
+   *Expect:* `1TNF.pdb1` downloads and attaches as `RCSB_1TNF_assembly1.pdb`; the status reads
+   "(3 chains). Compute interfaces on it."
+3. Press **Compute interfaces**.
+   *Expect:* `IF_` tracks per chain, exactly as with any multi-chain model.
+4. Check the Data modal → Structure Files.
+   *Expect:* the assembly is listed, with its oligomeric state inferred from the chain count.
+5. Enter a valid-format id that has no assembly (or a bogus one).
+   *Expect:* a dismissible error saying a multimer would then have to be predicted outside Q2DV.
+
+**Edge cases (symptom → likely cause).**
+- **A malformed id** (`tnf`, `1TN`) is refused *before* any network call.
+- **"Could not fetch assembly …"** — the entry has no biological assembly, or the id is wrong;
+  the message names the external options (AlphaFold-Multimer, ColabFold, AF Server).
+- **A novel sequence with no PDB entry** — there is nothing to import; that is the honest answer,
+  and the reason the declaration produces a caveat rather than a model.
+- **The status says "It has one chain, so it is not a multimer"** — the file fetched fine but is
+  not an assembly (some entries' assembly 1 is the asymmetric unit).
+- **Assembly 2 or 3** — use the number field (`{id}.pdb2`).
+- **The Guide's offer vanishes after attaching a multimer** — by design; it only appears when the
+  declared assembly has no multimer model.
+- **The id box pre-fills with a homolog's PDB id** — taken from the first hit that has one; it is
+  editable.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -734,6 +770,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 220 | Paste two *different* records | Nothing is inferred; the question stays open |
 | 221 | Answer Monomer yourself, then paste an `A:A:A` FASTA | Your answer is kept |
 
+## 0.43.0 - experimental assembly import (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 222 | Declare a homotrimer with a single-chain model attached | The structure step offers "Attach an experimental assembly…"; the read-out names the route |
+| 223 | Analyze → Interfaces → id `1TNF`, assembly 1 → Attach assembly | Downloads `1TNF.pdb1`, attaches it, status says "(3 chains)" |
+| 224 | Compute interfaces on it | IF_ tracks per chain |
+| 225 | Data modal → Structure Files | The assembly is listed with its inferred oligomeric state |
+| 226 | Attach assembly with a bogus id | Dismissible error naming the external options |
+| 227 | Attach assembly for an entry with no assembly | Clear failure; nothing half-attached |
+| 228 | Check the id box with an .hhr loaded | Pre-filled from the first homolog hit that has a PDB id |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -772,4 +820,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6o. 197–200 (Track Control width + config hints).
 6p. 201–207 (HHR conservation default).
 6q. 208–214 + 215–221 (declared oligomeric state and its export/generator wiring; card at the top).
+6r. 222–228 (experimental assembly import; card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

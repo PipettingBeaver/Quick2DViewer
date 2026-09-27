@@ -2306,6 +2306,16 @@
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="runInterfaceAnalysis()" style="font-size:0.72rem; padding:3px 8px;">Compute interfaces</button>
                     <span id="interfaceDeclared" style="font-size:0.72rem; color:#475569;"></span>
                     </div>
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                        <label style="font-size:0.72rem; color:#475569;">Assembly from PDB id
+                            <input type="text" id="assemblyPdbId" placeholder="e.g. 1TNF" maxlength="4"
+                                style="width:64px; font-family:monospace; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">
+                        </label>
+                        <label style="font-size:0.72rem; color:#475569;">assembly
+                            <input type="number" id="assemblyNumber" value="1" min="1" max="9" style="width:44px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">
+                        </label>
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="fetchBiologicalAssembly(document.getElementById('assemblyPdbId').value, document.getElementById('assemblyNumber').value)" style="font-size:0.72rem; padding:3px 8px;">Attach assembly</button>
+                    </div>
                     <div id="interfaceStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                     <div id="interfaceResults" style="margin-top:8px; overflow-x:auto;"></div>
                 </details>
@@ -3147,7 +3157,11 @@ const SERVICE_REGISTRY = {
         },
     },
 };
-const SERVICE_URLS = { rcsbDownload: 'https://files.rcsb.org/download/' };
+const SERVICE_URLS = {
+    rcsbDownload: 'https://files.rcsb.org/download/',
+    // Biological assembly files: {id}.pdb{n} is assembly n (CORS enabled).
+    rcsbAssembly: 'https://files.rcsb.org/download/'
+};
 
 // fetch() with an AbortController timeout (shared by the adapters).
 function fetchWithTimeout(url, opts, ms) {
@@ -5645,6 +5659,14 @@ const STEP_ACTION_RESOLVERS = {
             return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'No UniProt accession is loaded, so AlphaFold DB cannot be queried. ESMFold folds the sequence directly instead.' };
         }
         if (model === 'pdb') return { label: 'Attach PDB / CIF…', run: 'openInputDataModal()', hint: 'Attach the experimental model; pLDDT/RSA follow from it.' };
+        // A declared assembly with only single-chain models has one API-able
+        // route: an experimental biological assembly from RCSB.
+        const decl = declaredOligomerState();
+        const counts = attachedChainCounts();
+        if (decl && decl.chains >= 2 && (!counts.length || Math.max.apply(null, counts.map(c => c.chains)) < 2)) {
+            return { label: 'Attach an experimental assembly…', run: 'showAssemblyPanel()',
+                hint: 'A ' + decl.label.toLowerCase() + ' cannot be predicted by the services wired in here, but an experimental biological assembly can be imported: give a PDB id (from the homolog table or Foldseek) and attach it.' };
+        }
         // An ensemble already attached is worth comparing, so say so rather than
         // leaving the variance tool undiscovered.
         const models = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
@@ -5765,6 +5787,76 @@ function singleChainGeneratorNote() {
     if (!declared || declared.chains < 2) return '';
     return 'This returns a single chain, so the declared ' + declared.label.toLowerCase() +
         ' is not modelled. Attach an assembly model for the interface step.';
+}
+
+// --- Experimental biological assemblies (RCSB) ------------------------------
+// A declared multimer cannot be *predicted* here: ESMFold has no complex mode and
+// the AlphaFold DB path is per-accession monomers. An experimental assembly can
+// still be imported: RCSB serves `{id}.pdb{n}` as the biological assembly (CORS
+// enabled, verified 2026-09; 1TNF.pdb1 comes back as three chains), and the chain
+// parser reads it like any other PDB.
+function isValidPdbId(id) { return /^[0-9][A-Za-z0-9]{3}$/.test(String(id || '').trim()); }
+// The first homolog hit that carries a PDB id, for pre-filling the assembly input.
+function firstHomologPdbId() {
+    const keys = Object.keys(homologHitsInfo || {});
+    for (let i = 0; i < keys.length; i++) {
+        const info = homologHitsInfo[keys[i]];
+        // p3dPdbIdFromHitId returns { pdbId, chain }, not a bare id.
+        const parsed = (info && typeof p3dPdbIdFromHitId === 'function') ? p3dPdbIdFromHitId(info.hitId) : null;
+        if (parsed && parsed.pdbId) return parsed.pdbId;
+    }
+    return '';
+}
+async function fetchBiologicalAssembly(pdbId, assemblyN) {
+    const id = String(pdbId || '').trim().toUpperCase();
+    if (!isValidPdbId(id)) { showToast('Enter a 4-character PDB id (e.g. 1TNF) to fetch its biological assembly.', 'error'); return null; }
+    const n = Math.max(1, parseInt(assemblyN, 10) || 1);
+    if (!beginGuideTask('structure', 'RCSB biological assembly ' + id + ' (assembly ' + n + ')')) return null;
+    const statusEl = document.getElementById('interfaceStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('structure'); return null; }
+        setStatus('Fetching the biological assembly for ' + id + '…');
+        const url = SERVICE_URLS.rcsbAssembly + id + '.pdb' + n;
+        const resp = await fetchWithTimeout(url, {}, 60000);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const text = await resp.text();
+        if (!/^(ATOM|HEADER|MODEL)/m.test(text)) throw new Error('not a coordinate file');
+        let chains = 0;
+        try { chains = Object.keys(parseStructureChains(text, 'pdb')).length; } catch (e) { chains = 0; }
+        await attachStructureText('RCSB_' + id + '_assembly' + n + '.pdb', text, 'pdb', { source: 'RCSB assembly' });
+        renderViewer(parsedTracks);
+        populateCrossRefDropdown();
+        if (p3dViewerOpen) { refreshP3DModelOptions(); updateP3DColoring(); }
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        schedulePersist();
+        setStatus('Attached ' + id + ' assembly ' + n + (chains ? ' (' + chains + ' chains).' : '.') +
+            (chains >= 2 ? ' Compute interfaces on it.' : ' It has one chain, so it is not a multimer.'));
+        endGuideTask('structure', 'Attached ' + id + ' assembly ' + n + (chains >= 2 ? ' (' + chains + ' chains)' : ''), 'success');
+        return chains;
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('Assembly fetch failed: ' + m);
+        endGuideTask('structure', 'Assembly fetch failed: ' + m, 'error');
+        showToast('Could not fetch assembly ' + n + ' for ' + id + ' (' + m + '). If that entry has no biological assembly, or the protein has no PDB entry at all, there is nothing to import: a multimer would have to be predicted outside Q2DV (AlphaFold-Multimer, ColabFold, AF Server) and attached here.', 'error', { dismissible: true });
+        return null;
+    }
+}
+// Opens the interface section with the assembly input ready (used by the Guide).
+function showAssemblyPanel() {
+    switchSidebarTab('tracks');
+    const sec = document.getElementById('interfaceSection');
+    if (sec) {
+        sec.open = true;
+        if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' });
+    }
+    syncInterfaceDeclared();
+    const inp = document.getElementById('assemblyPdbId');
+    if (inp) {
+        if (!inp.value) inp.value = firstHomologPdbId();
+        if (typeof inp.focus === 'function') inp.focus();
+    }
 }
 
 // --- Construct designer (truncated FASTA) ----------------------------------
@@ -6088,7 +6180,7 @@ function computeGuideInsights() {
             const maxChains = Math.max.apply(null, counts.map(c => c.chains));
             if (declared.chains >= 2 && maxChains < 2) {
                 out.push({ level: 'warn', text: 'You declared a ' + declared.label.toLowerCase() + ', but the attached model' +
-                    (counts.length > 1 ? 's have' : ' has') + ' a single chain. Interface analysis needs a multi-chain model, so predict or attach the assembly.' });
+                    (counts.length > 1 ? 's have' : ' has') + ' a single chain. Interface analysis needs a multi-chain model: attach an experimental biological assembly (Analyze → Interfaces → Attach assembly), or predict the complex outside Q2DV.' });
             } else if (declared.value === 'monomer' && maxChains >= 2) {
                 out.push({ level: 'info', text: 'You declared a monomer, but an attached model has ' + maxChains +
                     ' chains. If that assembly is biological, update the oligomeric state; if it is a crystallographic artefact, the interface analysis will still report it.' });
@@ -7324,7 +7416,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.42.0';
+const APP_VERSION = '0.43.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-09-25
+
+### Added
+
+- **Experimental biological assemblies can be imported.** Review asked whether a trimer model can
+  be fetched by API; for experimental assemblies it can. RCSB serves `{id}.pdb{n}` as biological
+  assembly n — CORS-enabled (verified with an Origin header) and readable by the existing chain
+  parser (verified: `1TNF.pdb1` comes back as three chains of 152 CA). Analyze → Interfaces now
+  has an **id + assembly number + Attach assembly** control, and the Guide's structure step offers
+  *Attach an experimental assembly…* when a declared oligomer has no multimer model. The id
+  pre-fills from the first homolog hit that carries one (the Homolog Templates table), and the
+  status reports the chain count that arrived.
+- The read-out **routes** a declared multimer to that action instead of only warning, and the
+  guide hint explains why the import is the route.
+
+### Notes
+
+- A multimer still cannot be **predicted** here: ESMFold has no complex mode and the AlphaFold DB
+  path is per-accession monomers. When there is no experimental assembly (a novel sequence, or an
+  entry without one) the failure message says so and names the external options — AlphaFold-
+  Multimer, ColabFold, AF Server — rather than implying the app can produce one.
+
 ## [0.42.0] - 2026-09-25
 
 ### Added

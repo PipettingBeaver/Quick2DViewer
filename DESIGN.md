@@ -460,6 +460,8 @@ workflow rather than a feature list.
 | Methods summary report | Deliverable | *Added 0.36.0*: Integrate step action |
 | Variant FASTA panel | Background (utility) | none |
 | Empty-track marking | Background (readability) | none (but the read-out flags an empty TM row against a membrane answer) |
+| Declared oligomeric state | Step extension (structure / interfaces) | sixth intake question; read-out claim-vs-coordinates; assembly action |
+| Experimental assembly import | Evidence source | Structure step action (`showAssemblyPanel`) + the Interfaces control |
 | Debugging console (action log) | Background (tooling) | none — a testing/macro aid, not a research feature |
 | Track removal / Undo / overrides | Background | none |
 | Legend + scroll fix, layout, a11y | Background | none |
