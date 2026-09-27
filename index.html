@@ -1015,7 +1015,13 @@
         /* The pinned axis strip: opaque, full graph height, so scrolled plot
            content and the SVG's own axis never show through the label column. */
         .graph-axis-side {
-            position: relative;
+            /* Absolutely positioned: it paints the strip *behind* the pills
+               without occupying flow space (otherwise it pushes them below the
+               graph, out of the range they belong in). The sticky overlay it
+               lives in is the positioned ancestor. */
+            position: absolute;
+            left: 0;
+            top: 0;
             width: 195px;
             box-sizing: border-box;
             background: #fafafa;
@@ -7588,7 +7594,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.47.0';
+const APP_VERSION = '0.48.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11508,6 +11514,24 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, graphGroup
     header.appendChild(titleWrap);
     wrapper.appendChild(header);
 
+    // Right-clicking the graph opens the same per-track menu the rows use
+    // (View as / hide / Config / Track Control / remove). The target decides
+    // which track: a pill names its own, a plotted point carries data-track,
+    // and anything else falls back to the section's first track.
+    const graphKeyFromEvent = (target) => {
+        if (!target || !target.closest) return null;
+        const pill = target.closest('.graph-pill');
+        if (pill && pill.dataset && pill.dataset.key) return pill.dataset.key;
+        const marked = target.closest('[data-track]');
+        return (marked && marked.dataset && marked.dataset.track) ? marked.dataset.track : null;
+    };
+    wrapper.addEventListener('contextmenu', (e) => {
+        const key = graphKeyFromEvent(e.target) || trackKeys[0];
+        if (!key) return;
+        e.preventDefault();
+        openTrackCtxMenu(key, e.clientX, e.clientY);
+    });
+
     const inner = document.createElement('div');
     inner.className = 'graph-container-inner';
 
@@ -11529,6 +11553,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, graphGroup
 
         const pill = document.createElement('span');
         pill.className = `graph-pill graph-pill-stacked ${graphHighlights[key] ? 'active' : ''}`;
+        pill.dataset.key = key;
         pill.style.backgroundColor = graphHighlights[key] ? color : '#f1f5f9';
         pill.style.color = graphHighlights[key] ? '#fff' : '#475569';
         pill.style.borderColor = color;

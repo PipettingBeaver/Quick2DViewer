@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-09-25
+
+### Fixed
+
+- **The pinned axis strip pushed the model pills out of the range.** It was a flow block, so it
+  occupied the graph's full height and the pills were laid out *below* it instead of nestled inside
+  the strip. It is now absolutely positioned (the sticky overlay is its containing block), so it
+  paints the strip behind the pills without taking any layout space.
+
+### Added
+
+- **Right-click on a graph opens the same per-track menu the rows use** — View as, hide/show, Config,
+  Track Control, and Remove. The target decides which track: a **model pill** names its own key, a
+  **plotted point** carries `data-track`, and anything else (the strip, the plot background) falls
+  back to the section's first track. Hiding a track this way removes it from the graph, since the
+  graph's keys are filtered the same way the rows are.
+
 ## [0.47.0] - 2026-09-25
 
 ### Fixed

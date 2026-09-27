@@ -865,6 +865,19 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 252 | Export the viewport as SVG | The exported file still carries its own axis (the strip is on-screen only) |
 | 253 | Hover the strip's tick labels | They are decorative text (the interactive axis is the SVG's, for selection) |
 
+## 0.48.0 - graph pills in range + right-click menu (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 254 | Show a type as a graph with 2+ models | The model pills sit **inside** the left strip (not below the graph) |
+| 255 | Click a pill | Toggles that model's line, as before |
+| 256 | Right-click a **pill** | The per-track menu opens for that model's track |
+| 257 | Right-click a **plotted point** | The menu opens for that point's track |
+| 258 | Right-click the plot background or the strip | The menu opens for the section's first track |
+| 259 | Use **Hide this track** from that menu | The line disappears from the graph (and the row is hidden too) |
+| 260 | Use **View as → Glyphs** from that menu | The graph collapses back to heatmap rows |
+| 261 | Scroll right with the graph shown | The axis strip stays pinned; pills stay clickable; no plot in the label column |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -912,5 +925,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6t. 235–240 (characterizing an unresolved fold; card at the top).
 6u. 241–243 (rule toggle naming).
 6v. 244–248 (model numbering vs the reference).
-6w. 249–253 (pinned graph axis strip).
+6w. 249–253 (pinned graph axis strip) + 254–261 (its regression fix and the graph right-click menu).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

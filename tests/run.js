@@ -1001,10 +1001,33 @@ const stripOrder = ctxRun(`
 `);
 assert(stripOrder.indexOf('graph-axis-side') !== -1 && stripOrder.indexOf('graph-axis-side') < stripOrder.indexOf('graph-pills-inner'), 'the strip paints behind the pills (' + stripOrder + ')');
 // the strip is opaque, which is what stops the plot showing through
-const stripCss = HTML.slice(HTML.indexOf('.graph-axis-side {'), HTML.indexOf('.graph-axis-side {') + 260);
+const stripStart = HTML.indexOf('.graph-axis-side {');
+const stripCss = HTML.slice(stripStart, HTML.indexOf('}', stripStart) + 1);
 assert(stripCss.indexOf('background: #fafafa') !== -1, 'the strip has an opaque background');
 assert(stripCss.indexOf('border-right') !== -1, 'and the axis line as its right border');
 assert(HTML.indexOf('.graph-axis-title') !== -1 && HTML.indexOf('writing-mode: vertical-rl') !== -1, 'the title is vertical, like the SVG axis');
+// the strip must not occupy flow space, or it pushes the pills out of the range
+assert(stripCss.indexOf('position: absolute') !== -1, 'the strip is out of flow so the pills stay nestled in the range');
+assert(stripCss.indexOf('position: relative') === -1, 'and is not a flow block (that was the regression)');
+// the graph carries the per-track right-click menu, with keys to resolve
+assert(HTML.indexOf("addEventListener('contextmenu'") !== -1 && HTML.indexOf('openTrackCtxMenu(key, e.clientX, e.clientY)') !== -1, 'right-clicking the graph opens the per-track menu');
+const pillKeys = ctxRun(`
+    (function () {
+        var section = createOverlayGraphSection('T', ['m_pLDDT'], 40, 'pLDDT');
+        var keys = [], tracks = [];
+        function walk(el, depth) {
+            if (!el || depth > 10) return;
+            var cls = String(el.className || (el.attrs && el.attrs.class) || '');
+            if (cls.indexOf('graph-pill') !== -1 && el.dataset && el.dataset.key) keys.push(el.dataset.key);
+            if (el.dataset && el.dataset.track) tracks.push(el.dataset.track);
+            (el.children || []).forEach(function (c) { walk(c, depth + 1); });
+        }
+        walk(section, 0);
+        return { keys: keys.join(','), tracks: tracks.join(',') };
+    })()
+`);
+assert(pillKeys.keys === 'm_pLDDT', 'pills carry the track key the menu resolves (' + pillKeys.keys + ')');
+assert(pillKeys.tracks.indexOf('m_pLDDT') !== -1, 'plotted points carry data-track too (' + pillKeys.tracks + ')');
 ctxRun(`parsedTracks = {};`);
 
 section('model numbering vs reference (the RMSF offset bug)');
