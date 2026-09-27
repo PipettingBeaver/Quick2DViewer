@@ -950,6 +950,49 @@ assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
 
+section('rule sources: "any model" RSA presets actually match');
+ctxRun(`
+    parsedTracks = { AA: 'MMMM',
+        'm_RSA': [{ val: 0.1, type: 'rsa' }, { val: 0.6, type: 'rsa' }, { val: 0.1, type: 'rsa' }, { val: 0.05, type: 'rsa' }],
+        CONSERVATION: { type: 'conservation', metric: 'shannon', values: [0.9, 0.9, 0.5, 0.9] } };
+    analysisRules = [];
+`);
+assert(ctxRun(`ruleNumericValue('RSA:', 0)`) === 0.1, 'bare RSA: resolves to the loaded RSA track (was parsedTracks[""] = null)');
+const buried = ctxRun(`
+    (function () {
+        const preset = RULE_PRESETS.find(p => p.id === 'conserved_buried');
+        const rule = { id: 'b', name: preset.name, mode: preset.mode, conditions: preset.conditions.map(c => Object.assign({}, c)) };
+        return evaluateRule(rule).map(Boolean);
+    })()
+`);
+assert(JSON.stringify(buried) === JSON.stringify([true, false, false, true]), 'conserved_buried matches conserved AND buried residues (got ' + JSON.stringify(buried) + ')');
+const rigid = ctxRun(`
+    (function () {
+        parsedTracks['m_pLDDT'] = [{ val: 95, type: 'plddt' }, { val: 95, type: 'plddt' }, { val: 95, type: 'plddt' }, { val: 95, type: 'plddt' }];
+        const preset = RULE_PRESETS.find(p => p.id === 'rigid_core');
+        const rule = { id: 'r', name: preset.name, mode: preset.mode, conditions: preset.conditions.map(c => Object.assign({}, c)) };
+        return evaluateRule(rule).map(Boolean);
+    })()
+`);
+assert(JSON.stringify(rigid) === JSON.stringify([true, false, true, true]), 'rigid_core matches confident AND buried residues (got ' + JSON.stringify(rigid) + ')');
+const noRsa = ctxRun(`
+    (function () {
+        delete parsedTracks['m_RSA'];
+        const preset = RULE_PRESETS.find(p => p.id === 'conserved_buried');
+        const rule = { id: 'b2', name: preset.name, mode: preset.mode, conditions: preset.conditions.map(c => Object.assign({}, c)) };
+        return { matches: evaluateRule(rule).filter(Boolean).length, missing: presetMissingSources(preset) };
+    })()
+`);
+assert(noRsa.matches === 0, 'without an RSA track the rule matches nothing (no throw)');
+assert(noRsa.missing.indexOf('RSA:') !== -1, 'and the card reports "needs RSA"');
+assert(ctxRun(`
+    (function () {
+        parsedTracks['m_RSA'] = [{ val: 0.1, type: 'rsa' }];
+        return presetMissingSources(RULE_PRESETS.find(p => p.id === 'conserved_buried')).length === 0;
+    })()
+`), 'and stops needing it once one is loaded');
+ctxRun(`parsedTracks = {}; analysisRules = [];`);
+
 section('no duplicate render (rules + renderViewer)');
 // The stub cannot show the duplication (its innerHTML='' does not clear children),
 // so count render invocations instead: a nested render inside renderViewer is the

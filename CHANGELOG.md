@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.2] - 2026-09-25
+
+### Fixed
+
+- **Two curated presets could never match anything.** "Conserved buried residue" and "Rigid,
+  well-folded core" use the bare `RSA:` source ("any model"), but the `anyKey` flag was never
+  resolved: evaluation read `parsedTracks['']`, got `null`, and every residue failed the
+  comparison. The rules were added, listed and evaluated, but produced no track, forever.
+  - `ruleNumericValue()` now resolves a bare keyed source (`RSA:`, and for consistency `pLDDT:`
+    and `RMSF:`) to the first loaded track of that kind, so the presets start matching as soon
+    as an RSA track exists - and any saved rule that used the bare form keeps working.
+  - `presetMissingSources()` simplified to match (the unused rename map is gone); the card's
+    "needs RSA" label was already correct.
+  - Tests: bare `RSA:` resolves to the loaded track; `conserved_buried` matches exactly the
+    conserved+buried residues; `rigid_core` matches exactly the confident+buried residues;
+    without an RSA track the rule matches nothing and the card reports "needs RSA", which
+    clears once a track is loaded.
+
 ## [0.50.1] - 2026-09-25
 
 ### Fixed

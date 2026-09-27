@@ -4577,10 +4577,22 @@ function ruleNumericValue(sourceId, i) {
         if (!vals.length) return null;
         return sourceId === 'pLDDT_mean' ? vals.reduce((a, b) => a + b, 0) / vals.length : Math.min.apply(null, vals);
     }
-    if (sourceId.startsWith('pLDDT:')) { const t = parsedTracks[sourceId.slice(6)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
-    if (sourceId.startsWith('RSA:')) { const t = parsedTracks[sourceId.slice(4)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
-    if (sourceId.startsWith('RMSF:')) { const t = parsedTracks[sourceId.slice(5)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
+    if (sourceId.startsWith('pLDDT:')) return keyedNumericValue(sourceId, 6, '_pLDDT', i);
+    if (sourceId.startsWith('RSA:')) return keyedNumericValue(sourceId, 4, '_RSA', i);
+    if (sourceId.startsWith('RMSF:')) return keyedNumericValue(sourceId, 5, '_RMSF', i);
     return null;
+}
+// A keyed numeric source ("RSA:<trackKey>"). The bare form ("RSA:", as the
+// curated presets write it) means "any model": resolve it to the first loaded
+// track of that kind, so a preset written before a structure was attached
+// starts matching as soon as one arrives - and so saved rules that used the
+// bare form keep working. Without this the bare source read parsedTracks['']
+// and the rule silently matched nothing, forever.
+function keyedNumericValue(sourceId, prefixLen, suffix, i) {
+    let key = sourceId.slice(prefixLen);
+    if (!key) key = Object.keys(parsedTracks).find(k => k.endsWith(suffix) && Array.isArray(parsedTracks[k])) || '';
+    const t = key ? parsedTracks[key] : null;
+    return (t && t[i] && t[i].val != null) ? t[i].val : null;
 }
 function getRuleCategoricalSources() {
     const out = Object.keys(parsedTracks)
@@ -4848,11 +4860,10 @@ function presetMissingSources(preset) {
     getRuleNumericSources().forEach(x => { avail[x.id] = true; });
     getRuleCategoricalSources().forEach(x => { avail[x.id] = true; });
     // "any model" sources pass if at least one concrete track exists.
-    const anyRsa = Object.keys(parsedTracks).some(k => k.endsWith('_RSA'));
-    const rename = { 'RSA:': anyRsa };
+    const anyRsa = Object.keys(parsedTracks).some(k => k.endsWith('_RSA') && Array.isArray(parsedTracks[k]));
     const missing = [];
     preset.conditions.forEach(c => {
-        if (rename[c.source] !== undefined) { if (!rename[c.source]) missing.push(c.source); return; }
+        if (c.source === 'RSA:') { if (!anyRsa) missing.push(c.source); return; }
         if (!avail[c.source]) missing.push(c.source);
     });
     return missing.filter((v, i) => missing.indexOf(v) === i);
@@ -7633,7 +7644,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.50.1';
+const APP_VERSION = '0.50.2';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
