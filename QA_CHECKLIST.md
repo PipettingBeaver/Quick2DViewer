@@ -7,6 +7,76 @@ pixel, never lays anything out, never fires a real browser event, and it *replac
 until you have driven it by hand. The list is written for trying to break things,
 not for confirming they work — each row says what to do and what would count as a bug.
 
+## Feature test cards (newest first)
+
+**Convention, going forward: every new feature ships with a card here.** The per-version
+tables further down are quick "try this, watch for that" rows; a card is the fuller form
+for a feature that is *entirely* unverified, and it has three parts:
+
+- **Should do** — one sentence: the behaviour in normal use.
+- **Try** — the normal-use walkthrough, each step with the result you expect. If a step
+  doesn't produce the expected result, that's the bug report.
+- **Edge cases** — the specific ways it is likely to break, each with the symptom and the
+  most likely cause, so a failure points at a diagnosis rather than a mystery.
+
+Cards stay until the feature has been driven by hand at least once.
+
+---
+
+### Ensemble variance (RMSF) — 0.34.0
+
+**Should do.** Given two or more attached models of the same construct, measure how much
+each residue moves across them (in angstroms) after removing the rigid-body difference,
+and add an *Ensemble variance* row plus a summary of which models were compared and which
+residues are most mobile.
+
+**Try (normal use).**
+1. Attach two models of the same protein (e.g. an AlphaFold model and an ESMFold
+   prediction), then **Tracks → Ensemble variance (RMSF)**.
+   *Expect:* one checkbox per attached model, all ticked.
+2. Press **Compute variance**.
+   *Expect:* a status line "Ensemble variance over 2 models: mean RMSF x.xx A, max y.yy A
+   (N residues covered)"; a new **Ensemble variance** row appears near the bottom of the
+   viewer (below Cross-checks), mostly blue with warmer colours at loops and termini; a
+   table listing each model's chain, residue count and RMSD to the first.
+3. Hover a warm residue.
+   *Expect:* "Residue 148 RMSF: 3.21 A across the ensemble".
+4. Press **Select mobile (RMSF ≥ 3 A)**.
+   *Expect:* the selection jumps to those ranges, with a toast naming the count.
+5. Build a rule with the RMSF source (Analyze → Analysis Rules → new, source
+   "RMSF (A)") combined with, say, *Disorder annotated*.
+   *Expect:* matches only where both hold; the rule row appears as usual.
+
+**Edge cases (symptom → likely cause).**
+- **Two copies of the same model give non-zero RMSF.** The superposition is broken — this
+  is the sharpest diagnostic, because a rigid body must fit exactly.
+- **A model moved or rotated (same shape, different frame) gives non-zero RMSF.** Same
+  cause, one step stronger: this is the case the Kabsch step exists to handle.
+- **Only one model attached.** *Expect* a refusal ("Select at least two models…"), not a
+  crash or an empty row.
+- **The row is mostly neutral grey.** Those residues were covered by fewer than two models
+  (their tooltip says "not covered by enough models"). Models are matched by their own
+  residue numbering, so a crystal structure numbered differently from your sequence will
+  cover the wrong range or none.
+- **A partial model (domain-only) leaves most of the row blank.** Expected: only the
+  modelled range can carry values.
+- **A multi-chain model only reports one chain.** Expected: the largest chain is used, and
+  the summary table names it.
+- **The top-8 "most mobile" list is all termini.** Check whether those termini are modelled
+  at all; a partly-modelled terminus is a modelling artefact, not flexibility.
+- **Numbers look smaller than the visible displacement.** RMSF is measured about the
+  ensemble *mean*, and the optimal fit redistributes a single displacement across the whole
+  set — a 2 Å move by one residue in a small toy reads ≈0.45 Å, less in a real protein.
+  Compare residues *within* the row (and the top-8 list) rather than expecting half the
+  displacement.
+- **The row is missing after Compute.** It may be hidden: check the Tracks tab / Track
+  Control for the **Ensemble variance** group (a saved hide state persists).
+- **The row survives a reload but the numbers are stale after adding a model.** Expected:
+  the row is a snapshot; press Compute again. The model *list* refreshes when the section
+  is opened.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |

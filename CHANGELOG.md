@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Feature test cards** in `QA_CHECKLIST.md`: a documented convention that every new
+  feature ships with a card giving *what it should do*, a normal-use walkthrough with
+  the expected result at each step, and the likely edge cases with their symptom and
+  cause. The first card covers Ensemble variance (RMSF).
+
 ## [0.34.0] - 2026-09-25
 
 ### Added
