@@ -1028,6 +1028,35 @@ const pillKeys = ctxRun(`
 `);
 assert(pillKeys.keys === 'm_pLDDT', 'pills carry the track key the menu resolves (' + pillKeys.keys + ')');
 assert(pillKeys.tracks.indexOf('m_pLDDT') !== -1, 'plotted points carry data-track too (' + pillKeys.tracks + ')');
+// the pills clear the rotated axis title rather than covering it
+const pillsCss = HTML.slice(HTML.indexOf('.graph-pills-inner {'), HTML.indexOf('}', HTML.indexOf('.graph-pills-inner {')));
+assert(pillsCss.indexOf('margin-left: 18px') !== -1, 'the pills are indented past the vertical axis title');
+assert(pillsCss.indexOf('max-width: 110px') !== -1, 'and stay clear of the right-aligned tick labels');
+// the graph header carries the same Track Control chevron the rows have
+const headerBits = ctxRun(`
+    (function () {
+        var section = createOverlayGraphSection('pLDDT Confidence', ['m_pLDDT'], 40, 'pLDDT');
+        var header = null, chev = null;
+        function walk(el, depth) {
+            if (!el || depth > 10) return;
+            var cls = String(el.className || (el.attrs && el.attrs.class) || '');
+            if (cls.indexOf('graph-header') !== -1) { header = el; }
+            if (cls.indexOf('tctl-chevron') !== -1) { chev = el; }
+            (el.children || []).forEach(function (c) { walk(c, depth + 1); });
+        }
+        walk(section, 0);
+        return {
+            headerClass: header ? String(header.className || (header.attrs && header.attrs.class) || '') : '',
+            chevronText: chev ? chev._text : '',
+            chevronTitle: chev ? String(chev.title || '') : ''
+        };
+    })()
+`);
+assert(headerBits.headerClass.indexOf('has-chevron') !== -1, 'the header makes room for the chevron');
+assert(headerBits.chevronText === '\u25b6', 'the header has the Track Control chevron');
+assert(/Track Control: pLDDT/.test(headerBits.chevronTitle), 'labelled with the type, like the rows (' + headerBits.chevronTitle + ')');
+assert(HTML.indexOf('openTrackGroupPopup(graphGroup, headerChevron)') !== -1, 'and it opens that type\'s popup');
+assert(HTML.indexOf('.graph-header.has-chevron { padding-left: 24px; }') !== -1, 'the header indents for it');
 ctxRun(`parsedTracks = {};`);
 
 section('model numbering vs reference (the RMSF offset bug)');

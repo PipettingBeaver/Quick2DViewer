@@ -958,6 +958,8 @@
            scroll the same way the Q2D annotation row labels do, instead of
            scrolling away with the rest of the graph content. Wraps instead
            of truncating since these titles are longer than a row label. */
+        .graph-header.has-chevron { padding-left: 24px; } /* clears the chevron */
+        .graph-header:hover .tctl-chevron { color: #475569; }
         .graph-header {
             display: flex;
             align-items: center;
@@ -1054,10 +1056,12 @@
         .graph-pills-inner {
             position: relative;
             z-index: 1; /* above the opaque axis strip it sits on */
-            /* Narrower than the strip so the right-aligned tick labels stay
+            /* Indented past the rotated axis title at the strip's left edge, and
+               narrower than the strip so the right-aligned tick labels stay
                readable; the model names ellipsize as before. */
             width: auto;
-            max-width: 128px;
+            margin-left: 18px;
+            max-width: 110px;
             box-sizing: border-box;
             padding: 6px 8px 4px;
             display: flex;
@@ -7594,7 +7598,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.48.0';
+const APP_VERSION = '0.49.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11499,8 +11503,23 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, graphGroup
     wrapper.className = 'graph-section-wrapper';
 
     const header = document.createElement('div');
-    header.className = 'graph-header';
-    
+    header.className = 'graph-header has-chevron';
+
+    // Same affordance as the first row of a type: the chevron opens that type's
+    // Track Control popup (View as / Color / Config / hide), so a graph is not a
+    // dead end for the controls the rows offer.
+    const headerChevron = document.createElement('span');
+    headerChevron.className = 'tctl-chevron' + (isGroupViewNonDefault(graphGroup) ? ' state-on' : '');
+    headerChevron.textContent = '▶';
+    headerChevron.title = 'Track Control: ' + trackGroupLabel(graphGroup);
+    headerChevron.setAttribute('role', 'button');
+    headerChevron.tabIndex = 0;
+    headerChevron.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openTrackGroupPopup(graphGroup, headerChevron);
+    });
+    header.appendChild(headerChevron);
+
     const titleWrap = document.createElement('span');
     titleWrap.style.display = 'inline-flex';
     titleWrap.style.alignItems = 'center';

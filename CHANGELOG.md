@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-09-25
+
+### Fixed
+
+- **The model pills covered the rotated axis title.** They are indented 18 px now (clearing the
+  vertical "pLDDT (0-100)" / "RSA (0-1)" / "RMSF (A)" title at the strip's left edge) and their
+  width cap dropped to 110 px so the right-aligned tick labels stay readable too.
+
+### Added
+
+- **The graph header carries the same Track Control chevron the rows have**, so a graph is no longer
+  a dead end for the controls the rows offer: clicking it opens that type's popup (View as / Color /
+  Config / hide) for the type the graph is showing. The header indents to make room, the chevron
+  shows the `state-on` colour when that type's view is non-default, and it is focusable like the
+  row chevrons.
+
 ## [0.48.0] - 2026-09-25
 
 ### Fixed

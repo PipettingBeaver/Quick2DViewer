@@ -878,6 +878,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 260 | Use **View as → Glyphs** from that menu | The graph collapses back to heatmap rows |
 | 261 | Scroll right with the graph shown | The axis strip stays pinned; pills stay clickable; no plot in the label column |
 
+## 0.49.0 - graph axis title + header chevron (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 262 | Show a type as a graph with model pills | The pills start right of the vertical axis title (title fully readable) |
+| 263 | Check the tick labels on the right of the strip | Still readable beside the pills |
+| 264 | Look at the graph header ("pLDDT Confidence", …) | A chevron sits before the title, like the rows |
+| 265 | Click that chevron | Opens the type's Track Control popup (View as / Color / Config / hide) |
+| 266 | Change the type's view (e.g. to Glyphs) | The chevron shows its active colour; the graph collapses |
+| 267 | Tab to the chevron | It takes focus (keyboard reachable) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -926,4 +937,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6u. 241–243 (rule toggle naming).
 6v. 244–248 (model numbering vs the reference).
 6w. 249–253 (pinned graph axis strip) + 254–261 (its regression fix and the graph right-click menu).
+6x. 262–267 (graph axis title clearance + header chevron).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
