@@ -870,6 +870,29 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('rule toggle naming');
+// the source escapes the apostrophe (it lives in a JS string); the rendered HTML is clean
+assert(HTML.indexOf("rule\\'s track") !== -1, 'the source carries the escaped wording');
+ctxRun(`analysisRules = [{ id: 'rt', name: 'T', color: '#f00', mode: 'all', enabled: true, conditions: [] }]; renderRulesList();`);
+assert(ctxRun(`document.getElementById('rulesList').innerHTML`).indexOf("title=\"Enable / disable this rule's track\"") !== -1, 'the rendered toggle names what it actually does (the rule\'s track)');
+assert(HTML.indexOf('title="Enable / disable this rule"') === -1, 'the over-promising title is gone');
+ctxRun(`analysisRules = [];`);
+assert(HTML.indexOf('it does not disable the rule itself') !== -1, 'the code documents the track-level meaning');
+// behaviour is unchanged: it still only controls the drawn row
+ctxRun(`analysisRules = [{ id: 'rn', name: 'Probe', color: '#f00', mode: 'all', enabled: true,
+    conditions: [{ kind: 'categorical', source: 'group:TM', op: 'annotated', value: '' }] }];
+    parsedTracks = { AA: 'MKV', 'TM_Quick2D': ' E ' };`);
+ctxRun(`applyRules();`);
+assert(ctxRun(`typeof parsedTracks['RULE_rn']`) === 'string', 'an enabled rule draws its track');
+ctxRun(`toggleRuleEnabled('rn');`);
+assert(ctxRun(`parsedTracks['RULE_rn']`) === undefined, 'disabling removes the track');
+assert(ctxRun(`analysisRules[0].enabled`) === false, 'and records the flag');
+ctxRun(`selectRuleMatches('rn');`);
+assert(ctxRun(`analysisRules[0].enabled`) === false, 'select still works while disabled (the rule is not off, only its track)');
+ctxRun(`toggleRuleEnabled('rn');`);
+assert(ctxRun(`typeof parsedTracks['RULE_rn']`) === 'string', 're-enabling draws it again');
+ctxRun(`analysisRules = []; parsedTracks = {};`);
+
 section('characterizing an unresolved fold');
 const goalQ = ctxRun(`STEP_QUESTIONS.integration.filter(q => q.id === 'goal')[0]`);
 assert(goalQ.options.map(o => o.value).join(',') === 'characterize,variants,interface,construct,report', 'the closing-goal question leads with characterizing an unresolved fold');

@@ -837,6 +837,14 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 239 | Import an HHpred .hhr only | The line does **not** clear (sequence homology ≠ fold assignment) |
 | 240 | Import Foldseek hits | The line clears |
 
+## 0.45.1 - rule toggle naming (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 241 | Hover the ○/● toggle on a rule | Tooltip reads "Enable / disable this rule's track" |
+| 242 | Disable a rule, then press its **select** | Still selects the matches (the rule is not off, only its track) |
+| 243 | Disable a rule, then open the co-localization table's source picker | The rule is still listed and tabulates |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -882,4 +890,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6r. 222–228 (experimental assembly import; card at the top).
 6s. 229–234 (rules panel polish + modern citations).
 6t. 235–240 (characterizing an unresolved fold; card at the top).
+6u. 241–243 (rule toggle naming).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

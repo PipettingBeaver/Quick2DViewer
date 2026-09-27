@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.1] - 2026-09-25
+
+### Changed
+
+- **The rule toggle is now labelled "Enable / disable this rule's track"** (it was "Enable /
+  disable this rule"). The control only governs whether the rule draws a `RULE_` row: a disabled
+  rule is still evaluated by **select** and by the **co-localization** source picker. The label now
+  matches that, and the code comment records the distinction so it is not re-widened by accident.
+
 ## [0.45.0] - 2026-09-25
 
 ### Added

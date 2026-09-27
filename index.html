@@ -4451,10 +4451,12 @@ function selectTmCrossCheckSegments(cls) {
 // --- Analysis rules (contradiction / co-localization engine) --------------
 // A rule is a boolean query across per-residue tracks. Each enabled rule becomes
 // a RULE_ track (matching residues flagged in the rule's colour) and can be
-// turned into a selection. The condition model is open: numeric sources
+// turned into a selection. `enabled: false` means "do not draw this rule's track";
+// it does not disable the rule itself - "select" and the co-localization table
+// still evaluate it. The condition model is open: numeric sources
 // (conservation, pLDDT, RSA, …) and categorical sources (any string track) can be
 // combined with all/any. Literature-backed presets can be layered on later.
-let analysisRules = []; // [{ id, name, color, mode:'all'|'any', enabled, conditions:[{kind,source,op,value}] }]
+let analysisRules = []; // [{ id, name, color, mode:'all'|'any', enabled (track drawn?), conditions:[{kind,source,op,value}] }]
 const RULE_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
 const RULE_MARKER = '■';
 
@@ -4846,7 +4848,7 @@ function renderRulesList() {
     analysisRules.forEach(r => {
         html += '<div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; margin-bottom:4px;">' +
             '<span style="width:10px; height:10px; border-radius:2px; background:' + structureEscapeHtml(r.color) + '; flex-shrink:0;"></span>' +
-            '<button type="button" class="tm-eye" onclick="toggleRuleEnabled(\'' + structureEscapeHtml(r.id) + '\')" title="Enable / disable this rule">' + (r.enabled === false ? '○' : '●') + '</button>' +
+            '<button type="button" class="tm-eye" onclick="toggleRuleEnabled(\'' + structureEscapeHtml(r.id) + '\')" title="Enable / disable this rule\'s track">' + (r.enabled === false ? '○' : '●') + '</button>' +
             '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + structureEscapeHtml(r.name) +
             ' <span style="color:#94a3b8;">(' + r.conditions.length + ' cond, ' + (r.mode === 'any' ? 'any' : 'all') + ')</span></span>' +
             '<button type="button" class="copy-btn" onclick="selectRuleMatches(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;" title="Select matching residues">select</button>' +
@@ -7484,7 +7486,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.45.0';
+const APP_VERSION = '0.45.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
