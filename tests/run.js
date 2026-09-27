@@ -868,6 +868,50 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('co-localization table');
+assert(HTML.indexOf('id="colocSourceSelect"') !== -1 && HTML.indexOf('id="dataColocWrap"') !== -1, 'the Data modal has the section and its container');
+ctxRun(`
+    parsedTracks = {
+        AA: 'MKV',
+        CONSERVATION: { type: 'conservation', metric: 'shannon', values: [0.9, 0.5, 0.1] },
+        'm_pLDDT': [{ val: 90 }, { val: 80 }, { val: 70 }],
+        'm_RSA': [{ val: 0.1 }, { val: 0.5 }, { val: 0.9 }],
+        'EV_RMSF': [{ val: 0.5, type: 'rmsf' }, { val: 2.5, type: 'rmsf' }, { val: null, type: 'rmsf' }],
+        'DO_IUPred': '  D',
+        'TM_Quick2D': 'E  '
+    };
+    uploadedStructureFiles = [{ name: 'm.pdb', cofactors: [{ resName: 'HEM', chain: 'A', resSeq: 100, category: 'Heme', neighbors: [1, 2, -1, -1] }] }];
+    lastRanges = [[1, 3]]; rowRanges = []; analysisRules = [];
+`);
+const coloc = ctxRun(`buildColocalizationRows([1, 2, 3])`);
+assert(coloc.length === 3, 'one row per residue');
+assert(coloc[0].aa === 'M' && coloc[0].conservation === 0.9 && coloc[0].plddt === 90 && coloc[0].rsa === 0.1 && coloc[0].rmsf === 0.5, 'the metrics land in the right columns');
+assert(coloc[2].rmsf === null, 'an uncovered metric is null (rendered as -)');
+assert(coloc[0].cofactors.length === 1 && coloc[0].cofactors[0].indexOf('HEM') === 0, 'cofactor proximity comes from the neighbour list');
+assert(coloc[2].cofactors.length === 0, 'a residue outside the neighbour list reports none');
+assert(coloc[0].types.join(', ').indexOf('Transmembrane') !== -1, 'annotation types present are listed');
+assert(coloc[2].types.join(', ').indexOf('Disorder') !== -1, 'and they differ per residue');
+ctxRun(`renderColocalizationTable();`);
+let colocHtml = ctxRun(`document.getElementById('dataColocWrap').innerHTML`);
+assert(colocHtml.indexOf('<th>Residue</th>') !== -1 && colocHtml.indexOf('<th>Cofactor proximity</th>') !== -1, 'the table has the expected columns');
+assert(colocHtml.indexOf('<td>1</td>') !== -1 && colocHtml.indexOf('HEM') !== -1, 'rows and cofactor proximity render');
+assert(colocHtml.indexOf('3 residue(s) from the current selection') !== -1, 'the footer names the source and count');
+// empty selection explains itself instead of rendering an empty table
+ctxRun(`lastRanges = null; rowRanges = []; renderColocalizationTable();`);
+assert(ctxRun(`document.getElementById('dataColocWrap').innerHTML`).indexOf('Nothing to tabulate') !== -1, 'an empty source explains itself');
+// a rule can drive the table
+ctxRun(`analysisRules = [{ id: 'r1', name: 'TM probe', color: '#f00', mode: 'all', enabled: true,
+    conditions: [{ kind: 'categorical', source: 'group:TM', op: 'annotated', value: '' }] }];`);
+ctxRun(`document.getElementById('colocSourceSelect').value = 'r1';`);
+const ruleSrc = ctxRun(`colocalizationRowSource()`);
+assert(ruleSrc.residues.join(',') === '1' && ruleSrc.label.indexOf('TM probe') !== -1, 'a rule source tabulates exactly its matches');
+ctxRun(`syncColocSourceOptions();`);
+assert(ctxRun(`document.getElementById('colocSourceSelect').innerHTML`).indexOf('TM probe') !== -1, 'the rule appears in the source picker');
+ctxRun(`renderColocalizationTable();`);
+const ruleFooter = ctxRun(`document.getElementById('dataColocWrap').innerHTML`);
+assert(ruleFooter.indexOf('from the rule') !== -1 && ruleFooter.indexOf('TM probe') !== -1, 'the footer names the rule (quotes may be escaped)');
+ctxRun(`parsedTracks = {}; uploadedStructureFiles = []; analysisRules = [];`);
+
 section('ensemble variance (RMSF)');
 // synthetic PDBs written into the exact columns the parser reads
 ctxRun(`

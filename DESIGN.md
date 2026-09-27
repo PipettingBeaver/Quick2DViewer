@@ -84,6 +84,13 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
    (conservation ∧ distance-to-ligand ∧ variant score). Output: a **track** of
    passing residues **plus** a separate Data **table**. Needs spatial distance
    (cofactor machinery exists).
+   **Done (0.35.0)** — the track half is the Rules engine (any numeric/categorical
+   source, `RULE_` tracks, select-matches); the table half is the Data modal's
+   *Co-localization* section (`buildColocalizationRows` / `renderColocalizationTable`),
+   sourced from the current selection or a rule, with cofactor proximity taken from the
+   neighbour lists recorded at attach time. A dedicated `distance-to-cofactor` numeric
+   rule source is *not* built: proximity is exposed in the table rather than as a
+   condition, since the neighbour shell is already a yes/no at attach time.
 3. **Ensemble Structural Variance Analyzer** — column-wise coordinate variance
    across models. Output: a **graph** (RMSF-style line plot). Scope: **all
    loaded models or a user-picked subset**.

@@ -77,6 +77,46 @@ residues are most mobile.
 
 ---
 
+### Co-localization table — 0.35.0
+
+**Should do.** Tabulate, for the current selection or for a rule's matches, every metric
+that applies to each residue side by side: conservation, pLDDT, RSA, ensemble RMSF, the
+annotation types present, and which cofactors that residue sits near.
+
+**Try (normal use).**
+1. Select a residue range, then **Analyze → Data & Structures**, and look at the
+   **Co-localization** section.
+   *Expect:* one row per residue, metrics in columns, footer "N residue(s) from the
+   current selection".
+2. Change the source picker to a rule (if any exist).
+   *Expect:* the table re-renders with exactly that rule's matches, and the footer names
+   the rule.
+3. With two models and an ensemble RMSF row present.
+   *Expect:* the RMSF column is filled; without that row it reads "-".
+4. With a ligand-bearing structure attached (e.g. a heme protein).
+   *Expect:* residues in that cofactor's neighbour shell name it in the last column.
+5. Open the modal with nothing selected.
+   *Expect:* "Nothing to tabulate yet: make a selection (or pick a rule that matches)
+   first."
+
+**Edge cases (symptom → likely cause).**
+- **A whole metric column is "-".** That metric has no data: no CONSERVATION row, no
+  attached model (pLDDT/RSA), or the variance has not been computed (RMSF).
+- **The cofactor column is empty for a structure that clearly has a ligand.** The
+  neighbour shell is computed once, at attach time, with a distance cutoff — check the
+  **Structure Files** table lists the cofactor for that file. Re-attaching the file
+  recomputes it.
+- **More than 300 residues selected.** By design the table shows the first 300 with a
+  note; narrow the selection or use a rule to get a smaller set.
+- **The rule is missing from the source picker.** There are no rules yet, or the modal
+  was opened before the rule was created — reopen the modal (the picker syncs on open).
+- **"Homologs" or "Variants" appear in the Types column.** Expected: any track annotated
+  at that residue contributes its type, including imported ones.
+- **The table looks stale after loading new data.** It rebuilds when the modal opens or
+  the source changes; press **Build table** to force it.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -356,6 +396,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 165 | Show the legend and scroll the grid sideways at the bottom | The legend no longer overlaps the horizontal scrollbar (raised 20 px) |
 | 166 | Open the Ensemble section | The model list is populated with one checkbox per attached model, all ticked |
 
+## 0.35.0 - co-localization table (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 167 | Select a range, open Analyze → Data & Structures | The Co-localization table lists one row per residue with metrics and the selection footer |
+| 168 | Switch the source to a rule | Re-renders with that rule's matches; footer names the rule |
+| 169 | Check the RMSF column with/without a computed variance | Filled when `EV_RMSF` exists, "-" otherwise |
+| 170 | Attach a ligand-bearing structure and look at the last column | Residues in the cofactor's neighbour shell name it |
+| 171 | Open with nothing selected | "Nothing to tabulate yet…" hint, no empty table |
+| 172 | Select more than 300 residues | Capped at 300 with a note |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -386,4 +437,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6g. 141–148 (copy split from open; 142 is the fixed copy).
 6h. 149–155 (Phase 1 loose ends).
 6i. 166/156–165 (ensemble variance; 157/158 are the superposition checks).
+6j. 167–172 (co-localization table; its full card is at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-09-25
+
+### Added
+
+- **Co-localization table** (DESIGN §7.2). The Data modal now tabulates, for the current
+  selection or for a rule's matches, every metric that applies to each residue side by
+  side: conservation, pLDDT, RSA, ensemble RMSF, the annotation types present, and which
+  cofactors that residue sits near. Cofactor proximity reuses the neighbour lists
+  recorded when each structure was attached, so no extra geometry work happens. The
+  source picker lists the current selection plus every rule, and the table caps at 300
+  rows with a note.
+
+### Notes
+
+- This completes the *table* half of §7.2; the boolean-query half was already the Rules
+  engine. `QA_CHECKLIST.md` gained the feature card for it (should-do / try / edge cases).
+
 ### Added
 
 - **Feature test cards** in `QA_CHECKLIST.md`: a documented convention that every new

@@ -2627,6 +2627,24 @@
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Co-localization</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 8px; line-height: 1.4;">
+                One row per residue with the metrics that apply to it side by side: conservation, pLDDT, RSA,
+                ensemble RMSF, the annotation types present, and how close it sits to each cofactor. Rows come
+                from the current selection or from a rule's matches, so a boolean query can be read against the
+                numbers behind it.
+            </p>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+                <label for="colocSourceSelect" style="position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;">Row source</label>
+                <select id="colocSourceSelect" class="q2dv-select" onchange="renderColocalizationTable()" style="font-size:0.72rem; padding:2px 4px; max-width:260px;">
+                    <option value="selection">Current selection</option>
+                </select>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="renderColocalizationTable()" style="font-size:0.72rem; padding:3px 8px;">Build table</button>
+            </div>
+            <div id="dataColocWrap" style="overflow-x:auto;"></div>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <h4 style="margin: 0; color: #0f172a; font-size: 0.95rem;">Raw JSON</h4>
                 <button class="copy-btn" onclick="copyDataJSON()">Copy JSON</button>
@@ -6903,7 +6921,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.34.0';
+const APP_VERSION = '0.35.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -14477,6 +14495,104 @@ async function loadHomologIn3D(key) {
     }
 }
 
+// --- Co-localization table (DESIGN 7.2) -----------------------------------
+// One row per residue with every metric that applies to it side by side, so the
+// boolean queries the Rules engine runs can be read against the numbers behind
+// them. Cofactor proximity reuses the neighbour lists recorded when each
+// structure was attached, so no extra geometry work happens here.
+function colocalizationCofactors(resSeq) {
+    const out = [];
+    (uploadedStructureFiles || []).forEach(f => {
+        (f.cofactors || []).forEach(c => {
+            if (Array.isArray(c.neighbors) && c.neighbors.indexOf(resSeq) !== -1) {
+                out.push(c.resName + ' ' + (c.chain || '') + c.resSeq + ' (' + (c.category || 'cofactor') + ')');
+            }
+        });
+    });
+    return out;
+}
+function colocalizationRowSource() {
+    const sel = document.getElementById('colocSourceSelect');
+    const value = (sel && sel.value) || 'selection';
+    if (value === 'selection') {
+        const ranges = (lastRanges && lastRanges.length)
+            ? lastRanges
+            : ((Array.isArray(rowRanges) && rowRanges.length) ? rowRanges.map(r => [r[0] + 1, r[1] + 1]) : []);
+        const set = new Set();
+        ranges.forEach(r => { for (let i = r[0]; i <= r[1]; i++) set.add(i); });
+        return { label: 'current selection', residues: Array.from(set).sort((a, b) => a - b) };
+    }
+    const rule = (analysisRules || []).find(r => r.id === value);
+    if (!rule) return { label: '', residues: [] };
+    const residues = [];
+    evaluateRule(rule).forEach((m, i) => { if (m) residues.push(i + 1); });
+    return { label: 'rule "' + rule.name + '"', residues };
+}
+function buildColocalizationRows(residues) {
+    const aa = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const plddtKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_pLDDT'));
+    const rsaKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_RSA'));
+    const rmsfKeys = Object.keys(parsedTracks).filter(k => k.endsWith('_RMSF'));
+    const cons = (parsedTracks.CONSERVATION && Array.isArray(parsedTracks.CONSERVATION.values)) ? parsedTracks.CONSERVATION.values : null;
+    const meanOf = (keys, i) => {
+        const vals = keys.map(k => parsedTracks[k][i]).filter(x => x && x.val != null).map(x => x.val);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    };
+    return residues.map(res => {
+        const i = res - 1;
+        const types = [];
+        Object.keys(parsedTracks).forEach(k => {
+            if (k === 'AA' || typeof parsedTracks[k] !== 'string') return;
+            const ch = parsedTracks[k][i];
+            if (ch && ch !== ' ' && ch !== '-' && ch !== '\t') {
+                const label = trackGroupLabel(getTrackGroup(k));
+                if (types.indexOf(label) === -1) types.push(label);
+            }
+        });
+        return {
+            res, aa: aa[i] || '',
+            conservation: cons ? cons[i] : null,
+            plddt: meanOf(plddtKeys, i), rsa: meanOf(rsaKeys, i), rmsf: meanOf(rmsfKeys, i),
+            types, cofactors: colocalizationCofactors(res)
+        };
+    });
+}
+function fmtColocMetric(v, digits) { return v == null ? '-' : v.toFixed(digits); }
+function renderColocalizationTable() {
+    const wrap = document.getElementById('dataColocWrap');
+    if (!wrap) return;
+    const src = colocalizationRowSource();
+    if (!src.residues.length) {
+        wrap.innerHTML = '<p style="color:#94a3b8; font-size:0.8rem;">Nothing to tabulate yet: make a selection (or pick a rule that matches) first.</p>';
+        return;
+    }
+    const CAP = 300;
+    const rows = buildColocalizationRows(src.residues.slice(0, CAP));
+    let html = '<table class="metrics-table" style="font-size:0.7rem;"><thead><tr>' +
+        ['Residue', 'AA', 'Cons.', 'pLDDT', 'RSA', 'RMSF (A)', 'Types', 'Cofactor proximity']
+            .map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>';
+    rows.forEach(r => {
+        html += '<tr><td>' + r.res + '</td><td>' + structureEscapeHtml(r.aa) + '</td><td>' + fmtColocMetric(r.conservation, 2) +
+            '</td><td>' + fmtColocMetric(r.plddt, 1) + '</td><td>' + fmtColocMetric(r.rsa, 2) + '</td><td>' + fmtColocMetric(r.rmsf, 2) +
+            '</td><td>' + structureEscapeHtml(r.types.join(', ')) + '</td><td>' + structureEscapeHtml(r.cofactors.join('; ')) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    if (src.residues.length > CAP) html += '<p style="font-size:0.7rem; color:#64748b;">Showing the first ' + CAP + ' of ' + src.residues.length + ' residues.</p>';
+    html += '<p style="font-size:0.7rem; color:#64748b; margin-top:4px;">' + rows.length + ' residue(s) from the ' + structureEscapeHtml(src.label) + '.</p>';
+    wrap.innerHTML = html;
+}
+function syncColocSourceOptions() {
+    const sel = document.getElementById('colocSourceSelect');
+    if (!sel) return;
+    const prev = sel.value;
+    let html = '<option value="selection">Current selection</option>';
+    (analysisRules || []).forEach(r => {
+        html += '<option value="' + structureEscapeHtml(r.id) + '">Rule: ' + structureEscapeHtml(r.name) + '</option>';
+    });
+    sel.innerHTML = html;
+    sel.value = prev;
+}
+
 function renderDataModal() {
     const data = buildStructureDataJSON();
 
@@ -14553,6 +14669,8 @@ function renderDataModal() {
     document.getElementById('dataJSONView').textContent = JSON.stringify(data, null, 2);
 
     renderHomologTable();
+    syncColocSourceOptions();
+    renderColocalizationTable();
 }
 
 function openDataModal() {
