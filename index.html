@@ -4086,6 +4086,37 @@ function renderTopologySourceList() {
     wrap.innerHTML = html;
 }
 
+// Maps a model chain's residues onto reference-sequence indices (0-based).
+// Residue *numbering* is not trustworthy: a model numbered from its own mature
+// chain, an experimental assembly with different author numbering, or a subrange
+// model all land shifted by their start. So the chain's own sequence is aligned
+// onto the reference with the same aligner the variant FASTA path uses, and each
+// model residue takes the reference index it aligns to. Falls back to the raw
+// numbering when the model carries no usable residue letters.
+function mapChainToReference(chain, referenceAA) {
+    const ref = String(referenceAA || '');
+    const out = new Map();
+    if (!chain || !chain.length || !ref) return out;
+    const letters = chain.map(r => RESIDUE_3TO1[r.aa] || 'X').join('');
+    if (letters.replace(/X/g, '').length < Math.min(3, chain.length)) {
+        chain.forEach((r, i) => out.set(i, r.resSeq - 1));
+        return out;
+    }
+    let aligned = null;
+    try { aligned = alignVariantToReference(letters); } catch (e) { aligned = null; }
+    if (!aligned || aligned.length !== ref.length) {
+        chain.forEach((r, i) => out.set(i, r.resSeq - 1));
+        return out;
+    }
+    let k = 0;
+    for (let j = 0; j < aligned.length && k < chain.length; j++) {
+        if (aligned[j] === '-') continue; // reference residue the model does not cover
+        out.set(k, j);
+        k++;
+    }
+    return out;
+}
+
 // --- Ensemble variance (per-residue RMSF across models) -------------------
 // Comparing coordinates between models only means something after removing the
 // rigid-body difference, so each model is superposed onto the first over their
@@ -4195,12 +4226,18 @@ function computeEnsembleVariance(fileNames) {
         const ids = Object.keys(chains).sort((a, b) => chains[b].length - chains[a].length);
         if (!ids.length) return;
         const id = ids[0];
+        const mapping = mapChainToReference(chains[id], parsedTracks.AA);
         const byIdx = new Map();
-        chains[id].forEach(r => {
-            const idx = r.resSeq - 1;
+        chains[id].forEach((r, i) => {
+            const idx = mapping.has(i) ? mapping.get(i) : (r.resSeq - 1);
             if (idx >= 0 && idx < total && !byIdx.has(idx)) byIdx.set(idx, { x: r.x, y: r.y, z: r.z });
         });
-        if (byIdx.size) models.push({ file: f, chain: id, byIdx, n: byIdx.size });
+        // How far the model's own numbering sits from the reference (0 = matches),
+        // so a shifted model is visible rather than silently misplaced.
+        const firstEntry = chains[id][0];
+        const firstMapped = mapping.has(0) ? mapping.get(0) : (firstEntry.resSeq - 1);
+        const numberingOffset = firstMapped - (firstEntry.resSeq - 1);
+        if (byIdx.size) models.push({ file: f, chain: id, byIdx, n: byIdx.size, offset: numberingOffset });
     });
     if (models.length < 2) return { ok: false, message: 'Need at least two models with readable CA coordinates.' };
     const common = [];
@@ -4248,7 +4285,7 @@ function computeEnsembleVariance(fileNames) {
     const max = present.length ? Math.max.apply(null, present) : 0;
     return {
         ok: true, total, values, mean, max,
-        models: aligned.map(a => ({ file: a.model.file, chain: a.model.chain, residues: a.model.n, rmsd: a.rmsd })),
+        models: aligned.map(a => ({ file: a.model.file, chain: a.model.chain, residues: a.model.n, rmsd: a.rmsd, offset: a.model.offset })),
         common: common.length,
         covered: present.length
     };
@@ -4301,6 +4338,11 @@ function renderEnsembleSummary(res) {
             (m.rmsd == null ? '-' : m.rmsd.toFixed(2) + ' A') + '</td></tr>';
     });
     html += '</tbody></table>';
+    const shifted = res.models.filter(m => m.offset);
+    if (shifted.length) {
+        html += '<div style="font-size:0.68rem; color:#b45309; margin-top:4px;">Aligned by sequence (their numbering differs from the reference): ' +
+            shifted.map(m => structureEscapeHtml(m.file) + ' (' + (m.offset > 0 ? '+' : '') + m.offset + ')').join(', ') + '</div>';
+    }
     html += '<div style="font-size:0.7rem; color:#475569; margin-top:6px;">Most mobile residues (RMSF, A): ' +
         top.map(t => '<strong>' + t.res + '</strong> ' + t.val.toFixed(2)).join(', ') + '</div>';
     wrap.innerHTML = html;
@@ -4961,22 +5003,31 @@ function saveRuleEditor() {
 const INTERFACE_CHAIN_COLORS = ['#0ea5e9', '#f97316', '#22c55e', '#a855f7', '#eab308', '#ec4899', '#14b8a6', '#ef4444'];
 const INTERFACE_MARKER = '◆';
 
+// Three-letter residue names to one letter, for mapping a model onto the
+// reference sequence (see mapChainToReference). Selenomethionine and the
+// ambiguous codes are included so modified structures still align.
+const RESIDUE_3TO1 = {
+    ALA: 'A', ARG: 'R', ASN: 'N', ASP: 'D', CYS: 'C', GLN: 'Q', GLU: 'E', GLY: 'G', HIS: 'H',
+    ILE: 'I', LEU: 'L', LYS: 'K', MET: 'M', PHE: 'F', PRO: 'P', SER: 'S', THR: 'T', TRP: 'W',
+    TYR: 'Y', VAL: 'V', MSE: 'M', SEC: 'U', PYL: 'O', ASX: 'B', GLX: 'Z', UNK: 'X'
+};
 function parseStructureChains(text, ext) {
     const chains = {};
-    const add = (chain, resSeq, x, y, z) => {
+    const add = (chain, resSeq, x, y, z, resName) => {
         const id = chain || '_';
         if (!isFinite(resSeq) || !isFinite(x) || !isFinite(y) || !isFinite(z)) return;
-        (chains[id] = chains[id] || []).push({ resSeq, x, y, z });
+        (chains[id] = chains[id] || []).push({ resSeq, x, y, z, aa: String(resName || '').toUpperCase() });
     };
     if (ext === 'pdb' || (ext !== 'cif' && /^(ATOM|HEADER|MODEL)/m.test(text))) {
         for (const line of text.split('\n')) {
             if (!line.startsWith('ATOM') || line.substring(12, 16).trim() !== 'CA') continue;
             add((line.substring(21, 22) || '').trim(), parseInt(line.substring(22, 26).trim(), 10),
-                parseFloat(line.substring(30, 38).trim()), parseFloat(line.substring(38, 46).trim()), parseFloat(line.substring(46, 54).trim()));
+                parseFloat(line.substring(30, 38).trim()), parseFloat(line.substring(38, 46).trim()), parseFloat(line.substring(46, 54).trim()),
+                line.substring(17, 20).trim());
         }
     } else {
         let inAtomSite = false, colIndex = 0;
-        let seqIdIdx = -1, atomIdIdx = -1, xIdx = -1, yIdx = -1, zIdx = -1, asymIdx = -1, authAsymIdx = -1;
+        let seqIdIdx = -1, atomIdIdx = -1, xIdx = -1, yIdx = -1, zIdx = -1, asymIdx = -1, authAsymIdx = -1, compIdIdx = -1;
         for (const line of text.split('\n')) {
             if (line.startsWith('_atom_site.')) {
                 inAtomSite = true;
@@ -4987,12 +5038,15 @@ function parseStructureChains(text, ext) {
                 if (line.includes('Cartn_z')) zIdx = colIndex;
                 if (line.includes('label_asym_id')) asymIdx = colIndex;
                 else if (line.includes('auth_asym_id')) authAsymIdx = colIndex;
+                if (line.includes('label_comp_id')) compIdIdx = colIndex;
+                else if (line.includes('auth_comp_id')) compIdIdx = colIndex;
                 colIndex++;
             } else if (inAtomSite && line.startsWith('ATOM')) {
                 const cols = line.trim().split(/\s+/);
                 if (cols[atomIdIdx] === 'CA') {
                     add(asymIdx >= 0 ? cols[asymIdx] : (authAsymIdx >= 0 ? cols[authAsymIdx] : '_'),
-                        parseInt(cols[seqIdIdx], 10), parseFloat(cols[xIdx]), parseFloat(cols[yIdx]), parseFloat(cols[zIdx]));
+                        parseInt(cols[seqIdIdx], 10), parseFloat(cols[xIdx]), parseFloat(cols[yIdx]), parseFloat(cols[zIdx]),
+                        compIdIdx >= 0 ? cols[compIdIdx] : '');
                 }
             } else if (inAtomSite && line.startsWith('#')) inAtomSite = false;
         }
@@ -5029,7 +5083,7 @@ function computeInterfaces(chains, cutoff) {
     return { ids, residuesByChain, pairs };
 }
 
-function applyInterfaceTracks(result) {
+function applyInterfaceTracks(result, chains) {
     const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     Object.keys(parsedTracks).forEach(k => { if (k.startsWith('IF_')) delete parsedTracks[k]; });
     if (!totalLength || !result) return 0;
@@ -5037,8 +5091,19 @@ function applyInterfaceTracks(result) {
     result.ids.forEach((id, idx) => {
         const set = result.residuesByChain[id];
         if (!set || !set.size) return;
+        // Same reasoning as the ensemble variance: the model's numbering may not
+        // match the reference, so map through the sequence alignment when we can.
+        const resSeqToRef = new Map();
+        const chain = chains && chains[id];
+        if (chain && chain.length) {
+            const mapping = mapChainToReference(chain, parsedTracks.AA);
+            chain.forEach((r, i) => { if (mapping.has(i) && !resSeqToRef.has(r.resSeq)) resSeqToRef.set(r.resSeq, mapping.get(i)); });
+        }
         const track = new Array(totalLength).fill(' ');
-        set.forEach(resSeq => { const i = resSeq - 1; if (i >= 0 && i < totalLength) track[i] = INTERFACE_MARKER; });
+        set.forEach(resSeq => {
+            const i = resSeqToRef.has(resSeq) ? resSeqToRef.get(resSeq) : (resSeq - 1);
+            if (i >= 0 && i < totalLength) track[i] = INTERFACE_MARKER;
+        });
         const key = 'IF_' + id;
         parsedTracks[key] = track.join('');
         setTrackMeta(key, { source: 'Interface', chain: id, color: INTERFACE_CHAIN_COLORS[idx % INTERFACE_CHAIN_COLORS.length] });
@@ -5065,7 +5130,7 @@ function runInterfaceAnalysis() {
         return;
     }
     const result = computeInterfaces(chains, cutoff);
-    const added = applyInterfaceTracks(result);
+    const added = applyInterfaceTracks(result, chains);
     renderViewer(parsedTracks);
     renderInterfaceSummary(result, file, cutoff);
     refreshTrackManagerIfVisible();
@@ -7486,7 +7551,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.45.1';
+const APP_VERSION = '0.46.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

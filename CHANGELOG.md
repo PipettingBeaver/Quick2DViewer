@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-09-25
+
+### Fixed
+
+- **Models were mapped onto the reference by residue numbering alone**, so a model
+  whose numbering differs from the sequence (an assembly numbered from its own mature
+  chain, an experimental entry with different author numbering, or a domain-only model
+  numbered from 1) was placed **shifted by its start** — reported as "the RMSF graph is
+  offset by ~17 residues". The ensemble variance and the interface tracks now map
+  residues by **aligning each chain's own sequence onto the reference** (the same
+  aligner the variant FASTA path uses), so a shifted model lands where it belongs.
+  - `parseStructureChains` now records the residue letter (PDB `resName` / mmCIF
+    `label_comp_id`, with `RESIDUE_3TO1` covering MSE and the ambiguous codes), which
+    is what makes the alignment possible.
+  - `mapChainToReference()` is the shared mapping, falling back to the raw numbering
+    when a model carries no usable letters (or when the alignment cannot be built).
+  - The ensemble summary **names any model whose numbering differs** ("Aligned by
+    sequence (their numbering differs from the reference): m.pdb (-17)"), so a
+    renumbering is visible rather than silent.
+- The interface tracks had the same assumption and are fixed with it.
+
+### Notes
+
+- Horizontal scrolling was a red herring: the graph geometry is identical across
+  graph types (verified by comparing the generated SVG), so the apparent misalignment
+  was the mapping, visible only once you scrolled to compare features.
+
 ## [0.45.1] - 2026-09-25
 
 ### Changed

@@ -949,6 +949,67 @@ assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
 
+section('model numbering vs reference (the RMSF offset bug)');
+// A model's residue numbering is not trustworthy: an assembly numbered from its
+// own mature chain, or a domain-only model numbered from 1, lands shifted. The
+// mapping now aligns the chain's own sequence onto the reference.
+const oneTo3 = { A:'ALA', R:'ARG', N:'ASN', D:'ASP', C:'CYS', Q:'GLN', E:'GLU', G:'GLY', H:'HIS', I:'ILE', L:'LEU', K:'LYS', M:'MET', F:'PHE', P:'PRO', S:'SER', T:'THR', W:'TRP', Y:'TYR', V:'VAL' };
+const mkPdb = (seq, startResSeq) => {
+  let out = '';
+  for (let i = 0; i < seq.length; i++) {
+    const L = new Array(80).fill(' ');
+    const put = (st, str) => { for (let k = 0; k < str.length; k++) L[st + k] = str[k]; };
+    put(0, 'ATOM'); put(6, String(i + 1).padStart(5)); put(12, 'CA');
+    put(17, oneTo3[seq[i]] || 'UNK');
+    put(21, 'A'); put(22, String(startResSeq + i).padStart(4));
+    put(30, '0.000'.padStart(8)); put(38, String(i).padStart(8)); put(46, String(i % 3).padStart(8));
+    out += L.join('') + '\n';
+  }
+  return out;
+};
+const refSeq = 'MKTAYIAKQRQISFVKSHFSRQLEERLGLI';
+ctxRun(`parsedTracks = { AA: ${JSON.stringify(refSeq)} };
+    cachedStructureTexts = {
+        'a.pdb': ${JSON.stringify(mkPdb(refSeq, 1))},
+        'b.pdb': ${JSON.stringify(mkPdb(refSeq, 18))},
+        'c.pdb': ${JSON.stringify(mkPdb(refSeq.slice(17), 1))}
+    };`);
+// the parser carries the residue letters
+assert(ctxRun(`parseStructureChains(cachedStructureTexts['a.pdb'], 'pdb').A[0].aa`) === 'MET', 'the chain parser records the residue name');
+assert(ctxRun(`RESIDUE_3TO1.MSE`) === 'M' && ctxRun(`RESIDUE_3TO1.UNK`) === 'X', 'modified/unknown residues map too');
+// numbering that matches the reference: unchanged behaviour
+let evN = ctxRun(`computeEnsembleVariance(['a.pdb', 'b.pdb'])`);
+assert(evN.ok === true, 'a renumbered model still computes');
+assert(evN.models[1].offset === -17, 'the offset is reported (numbered 17 ahead of the reference)');
+assert(evN.values[0].val != null && evN.values[29].val != null, 'its residues land at the reference start and end, not shifted');
+// a domain-only model numbered from 1: the numbering would put it at 0.., the
+// alignment puts it at 17..
+const evD = ctxRun(`computeEnsembleVariance(['a.pdb', 'c.pdb'])`);
+assert(evD.ok === true, 'a subrange model computes');
+assert(evD.models[1].offset === 17, 'the subrange model is reported as numbered 17 behind');
+assert(evD.values[0].val == null, 'its residues do NOT land at the reference start (the bug)');
+assert(evD.values[17].val != null && evD.values[29].val != null, 'they land at the aligned range');
+assert(evD.covered === 13, 'and only the shared range is measured');
+// the mapping helper degrades safely without letters
+ctxRun(`var noLetters = [{ resSeq: 5, x: 0, y: 0, z: 0, aa: '' }, { resSeq: 6, x: 1, y: 0, z: 0, aa: '' }, { resSeq: 7, x: 2, y: 0, z: 0, aa: '' }];`);
+assert(ctxRun(`mapChainToReference(noLetters, 'MKTAYIAK').get(0)`) === 4, 'without residue letters it falls back to the numbering');
+// interface tracks share the mapping (a shifted model must not shift them either)
+ctxRun(`
+    parsedTracks = { AA: 'MKTAYIAKQRQISFVKSHFSRQLEERLGLI' };
+    var chainA = [
+        { resSeq: 18, x: 0, y: 0, z: 0, aa: 'MET' },
+        { resSeq: 19, x: 1, y: 0, z: 0, aa: 'LYS' },
+        { resSeq: 20, x: 2, y: 0, z: 0, aa: 'THR' }
+    ];
+    var ifaceChains = { A: chainA };
+    var ifaceResult = { ids: ['A'], residuesByChain: { A: new Set([18, 19, 20]) }, pairs: [] };
+    applyInterfaceTracks(ifaceResult, ifaceChains);
+`);
+assert(ctxRun(`parsedTracks.IF_A.slice(0, 3)`) === '\u25c6\u25c6\u25c6', 'interface residues land at the aligned reference indices');
+assert(ctxRun(`parsedTracks.IF_A.slice(17, 20)`) === '   ', 'not at the raw numbering (the same bug class)');
+ctxRun(`parsedTracks = {};`);
+ctxRun(`parsedTracks = {}; cachedStructureTexts = {};`);
+
 section('experimental biological assemblies (RCSB)');
 assert(ctxRun(`isValidPdbId('1TNF')`) === true, 'a 4-character id starting with a digit is accepted');
 assert(ctxRun(`isValidPdbId('tnf')`) === false && ctxRun(`isValidPdbId('1TN')`) === false && ctxRun(`isValidPdbId('')`) === false, 'malformed ids are rejected');
@@ -1940,3 +2001,76 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
 })();
+
+// ---------- async tests ----------
+(async () => {
+    let err = null;
+    try { await ctxRun(`runCapability('fold', { sequence: 'X'.repeat(500) })`); }
+    catch (e) { err = e; }
+    assert(err && /too long/.test(err.message), 'fold rejects >400 aa before any network call');
+
+    err = null;
+    try { await ctxRun(`runCapability('no_such_capability', {})`); }
+    catch (e) { err = e; }
+    assert(err && /Unknown capability/.test(err.message), 'unknown capability rejects');
+
+    // Provider fallback: a capability whose first provider throws, second succeeds.
+    ctxRun(`
+        SERVICE_ADAPTERS.__ok = async () => 'second-provider-result';
+        SERVICE_REGISTRY.capabilities.__test = { label: 'Test', providers: [
+            { id: 'a', label: 'A', adapter: 'nope' },
+            { id: 'b', label: 'B', adapter: '__ok' }
+        ] };
+    `);
+    const result = await ctxRun(`runCapability('__test', {})`);
+    assert(result === 'second-provider-result', 'runCapability falls through a failing provider to the next');
+
+    console.log(`\n${passed} passed, ${failed} failed`);
+    process.exit(failed ? 1 : 0);
+})();
+
+// ---------- TEMP geometry diagnostic ----------
+section('TEMP graph geometry');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(60),
+        'm_pLDDT': Array.from({length: 60}, (_, i) => ({ val: 90, type: 'plddt' })),
+        'EV_RMSF': Array.from({length: 60}, (_, i) => ({ val: 1.5, type: 'rmsf' })) };
+    graphHighlights = {}; gridCellW = 11.5;
+`);
+const geom = ctxRun(`
+    (function () {
+        function collect(section) {
+            var out = { svg: null, circles: [] };
+            function walk(el, depth) {
+                if (!el || depth > 10) return;
+                if (el.attrs && el.attrs.width && el.attrs.height && el.attrs.class === 'graph-svg') { out.svg = el; }
+                if (el.attrs && el.attrs.class && String(el.attrs.class).indexOf('col-') === 0) out.circles.push(el.attrs.cx);
+                (el.children || []).forEach(function (c) { walk(c, depth + 1); });
+            }
+            walk(section, 0);
+            return { width: out.svg ? out.svg.attrs.width : null, first: out.circles[0], last: out.circles[out.circles.length - 1], n: out.circles.length };
+        }
+        return {
+            plddt: collect(createOverlayGraphSection('pLDDT', ['m_pLDDT'], 60, 'pLDDT')),
+            ev: collect(createOverlayGraphSection('RMSF', ['EV_RMSF'], 60, 'EV'))
+        };
+    })()
+`);
+console.log('  [geom] pLDDT:', JSON.stringify(geom.plddt));
+console.log('  [geom] EV   :', JSON.stringify(geom.ev));
+const sig = ctxRun(`
+    (function () {
+        function describe(el, depth) {
+            if (!el || depth > 4) return '';
+            var cls = (el.attrs && el.attrs.class) ? el.attrs.class : (el.className || '');
+            var id = el.id ? '#' + el.id : '';
+            var kids = (el.children || []).map(function (c) { return describe(c, depth + 1); }).filter(Boolean);
+            return el.tagName ? (el.tagName + id + (cls ? '.' + String(cls).split(' ').join('.') : '') + (kids.length ? '(' + kids.join(',') + ')' : '')) : '';
+        }
+        function sigOf(section) { return describe(section, 0); }
+        return { plddt: sigOf(createOverlayGraphSection('pLDDT', ['m_pLDDT'], 60, 'pLDDT')), ev: sigOf(createOverlayGraphSection('RMSF', ['EV_RMSF'], 60, 'EV')) };
+    })()
+`);
+console.log('  [sig] pLDDT:', sig.plddt.slice(0, 300));
+console.log('  [sig] EV   :', sig.ev.slice(0, 300));
+console.log('  [sig] same shape:', sig.plddt.replace(/pLDDT|m_pLDDT/g, 'X') === sig.ev.replace(/RMSF|EV_RMSF|Ensemble variance/g, 'X'));

@@ -845,6 +845,16 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 242 | Disable a rule, then press its **select** | Still selects the matches (the rule is not off, only its track) |
 | 243 | Disable a rule, then open the co-localization table's source picker | The rule is still listed and tabulates |
 
+## 0.46.0 - model numbering vs the reference (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 244 | Attach two models numbered differently from your sequence (e.g. an assembly whose chain starts at its own residue 1) | The RMSF features sit where the *sequence* says, not shifted; the summary lists "Aligned by sequence (their numbering differs …) (offset)" |
+| 245 | Attach a domain-only model numbered from 1 | Its values land at the aligned reference range, not at the start |
+| 246 | Attach two models numbered like the sequence | Unchanged behaviour; no offset note |
+| 247 | Run the interface analysis on a renumbered model | IF_ tracks land at the aligned reference indices |
+| 248 | Scroll horizontally across the RMSF graph and the grids | The columns line up (this was the "offset" report; the geometry was already correct) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -891,4 +901,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6s. 229–234 (rules panel polish + modern citations).
 6t. 235–240 (characterizing an unresolved fold; card at the top).
 6u. 241–243 (rule toggle naming).
+6v. 244–248 (model numbering vs the reference).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
