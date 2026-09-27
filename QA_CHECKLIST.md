@@ -270,6 +270,22 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 154 | Remove a pLDDT/RSA row with the 3D viewer open | The model stays attached and still renders (removing the row does not detach the model) |
 | 155 | Remove a graph-mode row, then re-open the graph | No stale highlight state for the removed key |
 
+## 0.34.0 - ensemble variance (RMSF)
+
+| # | Try | Watch for |
+|---|---|---|
+| 156 | Attach two models of the same protein, then Tracks -> Ensemble variance -> Compute | An **Ensemble variance** row appears; the status reports the model count, mean and max RMSF in A |
+| 157 | Attach two *identical* files (or the same model twice) | Every residue reports ~0.00 A (a rigid-body difference must be removed before measuring) |
+| 158 | Attach a model and a copy moved/rotated (e.g. re-exported from another tool) | Still ~0.00 A: the superposition cancels the rigid-body difference. Non-zero here means the Kabsch step regressed |
+| 159 | Attach a genuinely different model (a homolog, or a partially disordered prediction) | The mobile regions light up (orange/red); the rigid core stays blue |
+| 160 | Check the summary table | Per-model chain, residue count and RMSD-to-first; the eight most mobile residues listed |
+| 161 | Press **Select mobile (RMSF >= 3 A)** | Selects exactly the residues at or above 3 A |
+| 162 | Try it with one model / no models / models that share almost nothing | Clear refusal message, nothing written |
+| 163 | Build a rule with the RMSF source (e.g. RMSF >= 3 AND Disorder annotated) | Works like any numeric source |
+| 164 | Remove the Ensemble variance row | Goes like any other row (recomputable via Compute) |
+| 165 | Show the legend and scroll the grid sideways at the bottom | The legend no longer overlaps the horizontal scrollbar (raised 20 px) |
+| 166 | Open the Ensemble section | The model list is populated with one checkbox per attached model, all ticked |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -299,4 +315,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6f. 132–140 (clipboard hand-off; 132/133 are the HHpred flow).
 6g. 141–148 (copy split from open; 142 is the fixed copy).
 6h. 149–155 (Phase 1 loose ends).
+6i. 166/156–165 (ensemble variance; 157/158 are the superposition checks).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

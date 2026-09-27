@@ -868,6 +868,90 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('ensemble variance (RMSF)');
+// synthetic PDBs written into the exact columns the parser reads
+ctxRun(`
+    window.__mkPdb = function (coords, chain) {
+        var out = '';
+        coords.forEach(function (c, i) {
+            var L = new Array(80).fill(' ');
+            var put = function (start, str) { for (var k = 0; k < str.length; k++) L[start + k] = str[k]; };
+            put(0, 'ATOM'); put(6, String(i + 1).padStart(5)); put(12, 'CA'); put(17, 'ALA');
+            put(21, chain || 'A'); put(22, String(i + 1).padStart(4));
+            put(30, c[0].toFixed(3).padStart(8)); put(38, c[1].toFixed(3).padStart(8)); put(46, c[2].toFixed(3).padStart(8));
+            out += L.join('') + '\\n';
+        });
+        return out;
+    };
+    window.__base = [[0,0,0],[3,0,0],[3,3,0],[0,3,0],[0,0,3]];
+    window.__translate = function (coords, d) { return coords.map(function (c) { return [c[0]+d[0], c[1]+d[1], c[2]+d[2]]; }); };
+    window.__rotZ = function (coords) { return coords.map(function (c) { return [-c[1], c[0], c[2]]; }); };
+`);
+const mkEnsemble = (a, b) => ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(5) };
+    cachedStructureTexts = { 'a.pdb': window.__mkPdb(${a}), 'b.pdb': window.__mkPdb(${b}) };
+`);
+
+// identical models -> no fluctuation
+mkEnsemble('window.__base', 'window.__base');
+let ev = ctxRun(`computeEnsembleVariance(['a.pdb', 'b.pdb'])`);
+assert(ev.ok === true, 'two models compute');
+assert(ev.values.every(v => v.val != null && v.val < 1e-6), 'identical models give zero RMSF');
+assert(ev.mean < 1e-6 && ev.models.length === 2, 'mean is zero and both models are reported');
+
+// a rigid-body translation must vanish after superposition (this is the whole point)
+mkEnsemble('window.__base', 'window.__translate(window.__base, [12, -7, 4.5])');
+ev = ctxRun(`computeEnsembleVariance(['a.pdb', 'b.pdb'])`);
+assert(ev.ok && ev.values.every(v => v.val != null && v.val < 1e-6), 'a pure translation is removed by the superposition');
+assert(ev.models[1].rmsd < 1e-6, 'the reported RMSD to the first model is zero too');
+
+// and so must a rigid-body rotation
+mkEnsemble('window.__base', 'window.__rotZ(window.__base)');
+ev = ctxRun(`computeEnsembleVariance(['a.pdb', 'b.pdb'])`);
+assert(ev.ok && ev.values.every(v => v.val != null && v.val < 1e-6), 'a pure rotation is removed by the superposition');
+
+// a real difference shows up, localised to the moved residue
+mkEnsemble('window.__base', "window.__base.map(function (c, i) { return i === 2 ? [c[0], c[1], c[2] + 2] : c; })");
+ev = ctxRun(`computeEnsembleVariance(['a.pdb', 'b.pdb'])`);
+assert(ev.ok, 'a differing model still computes');
+// The optimal fit spreads a single displacement over the whole set, so the
+// meaningful property is that the moved residue stands out from the baseline,
+// not that it reaches half the displacement.
+assert(ev.values[2].val > 0.3 && ev.values[2].val > 3 * ev.values[0].val,
+    'the moved residue reports a real fluctuation (' + ev.values[2].val.toFixed(2) + ' A vs ' + ev.values[0].val.toFixed(2) + ' A baseline)');
+assert(ev.values[0].val < 0.3, 'an unmoved residue stays low (' + ev.values[0].val.toFixed(2) + ' A)');
+assert(ev.values[2].val > ev.values[3].val && ev.values[2].val > ev.values[4].val, 'the moved residue is the largest signal in the row');
+assert(ev.max > ev.mean, 'max exceeds the mean');
+
+// guards
+ctxRun(`cachedStructureTexts = { 'a.pdb': window.__mkPdb(window.__base) };`);
+assert(ctxRun(`computeEnsembleVariance(['a.pdb'])`).ok === false, 'one model is refused (needs an ensemble)');
+assert(ctxRun(`computeEnsembleVariance(['a.pdb']).message`).indexOf('at least two') !== -1, 'the refusal explains why');
+ctxRun(`parsedTracks = {};`);
+assert(ctxRun(`computeEnsembleVariance(['a.pdb'])`).ok === false, 'no sequence is refused');
+
+// the run writes the track, and it is wired into the app
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(5) };
+    cachedStructureTexts = { 'a.pdb': window.__mkPdb(window.__base), 'b.pdb': window.__mkPdb(window.__translate(window.__base, [1, 2, 3])) };
+`);
+assert(ctxRun(`runEnsembleVariance() !== null`), 'running the analysis succeeds');
+assert(Array.isArray(ctxRun(`parsedTracks.EV_RMSF`)) && ctxRun(`parsedTracks.EV_RMSF.length`) === 5, 'it writes the EV_RMSF row over the sequence length');
+assert(ctxRun(`parsedTracks.EV_RMSF[0].type`) === 'rmsf', 'the row is typed as RMSF');
+assert(ctxRun(`getTrackGroup('EV_RMSF')`) === 'EV' && ctxRun(`trackGroupLabel('EV')`) === 'Ensemble variance', 'EV_ rows form the Ensemble variance group');
+assert(ctxRun(`getTrackSource('EV_RMSF')`) === 'Ensemble', 'the row reports its provenance');
+assert(ctxRun(`getPredictorInfo('EV_RMSF').category`) === 'Structure ensemble', 'it has a real tooltip, not the blank fallback');
+assert(ctxRun(`rmsfColor(0.5)`) === '#3b82f6' && ctxRun(`rmsfColor(2.5)`) === '#facc15' && ctxRun(`rmsfColor(9)`) === '#ef4444', 'the colour scale bands are right');
+assert(ctxRun(`rmsfColor(null)`) === '#f1f5f9', 'uncovered residues get the neutral colour');
+// usable as a rule condition
+const rmsfSrcs = ctxRun(`getRuleNumericSources().map(s => s.id)`);
+assert(rmsfSrcs.indexOf('RMSF:EV_RMSF') !== -1, 'RMSF is available as a rule numeric source');
+assert(ctxRun(`ruleNumericValue('RMSF:EV_RMSF', 0)`) === ctxRun(`parsedTracks.EV_RMSF[0].val`), 'the rule source reads the same value');
+let ensThrew = null;
+try { ctxRun(`selectEnsembleMobile();`); } catch (e) { ensThrew = e.message; }
+assert(ensThrew === null, 'selecting mobile residues does not throw');
+ctxRun(`cachedStructureTexts = {}; parsedTracks = {}; trackMeta = {};`);
+
 section('3D scheme + removal consistency');
 ctxRun(`
     parsedTracks = { AA: 'MKV' }; graphHighlights = {}; analysisRules = []; guideProfile = {}; guideOverrides = {};

@@ -390,7 +390,9 @@
             gap: 8px 15px;
             position: fixed;
             left: 20px;
-            bottom: 20px;
+            /* Clears the alignment grid's horizontal scrollbar, which the
+               legend used to overlap at the window's bottom-left corner. */
+            bottom: 40px;
             z-index: 850;
             max-width: 640px;
             padding: 10px 12px;
@@ -1948,6 +1950,7 @@
                     <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
                     <button type="button" onclick="menuBarAction('domains')">Scan Domains (HMMER)…</button>
                     <button type="button" onclick="menuBarAction('crosschecks')">Cross-checks…</button>
+                    <button type="button" onclick="menuBarAction('ensemble')">Ensemble variance…</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -2291,6 +2294,24 @@
                     </div>
                     <div id="interfaceStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                     <div id="interfaceResults" style="margin-top:8px; overflow-x:auto;"></div>
+                </details>
+
+                <details class="workflow-section qa-new" id="ensembleSection" style="margin-top: 10px;"
+                    ontoggle="if (this.open) renderEnsembleModelList();">
+                    <summary>Ensemble variance (RMSF)</summary>
+                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                        Per-residue fluctuation across the attached models, in angstroms, after superposing each
+                        model onto the first over the residues they share. Needs at least two models of the same
+                        construct; residues are matched by their own numbering. The result is an
+                        <strong>Ensemble variance</strong> row (blue = rigid, red = mobile).
+                    </p>
+                    <div id="ensembleModelList" style="display:flex; flex-direction:column; gap:3px; margin-bottom:8px;"></div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="runEnsembleVariance()" style="font-size:0.72rem; padding:3px 8px;">Compute variance</button>
+                        <button type="button" class="tb-btn tb-btn-secondary" onclick="selectEnsembleMobile()" style="font-size:0.72rem; padding:3px 8px;">Select mobile (RMSF &ge; 3 A)</button>
+                    </div>
+                    <div id="ensembleStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                    <div id="ensembleResults" style="margin-top:8px; overflow-x:auto;"></div>
                 </details>
 
                 <details class="workflow-section qa-new" id="crossCheckSection" style="margin-top: 10px;">
@@ -3955,6 +3976,266 @@ function renderTopologySourceList() {
     wrap.innerHTML = html;
 }
 
+// --- Ensemble variance (per-residue RMSF across models) -------------------
+// Comparing coordinates between models only means something after removing the
+// rigid-body difference, so each model is superposed onto the first over their
+// shared residues (Kabsch, solved through the quaternion eigenvector so no
+// matrix library is needed), and only then is the per-residue spread measured.
+function centroidOf(points) {
+    const c = { x: 0, y: 0, z: 0 };
+    points.forEach(p => { c.x += p.x; c.y += p.y; c.z += p.z; });
+    const n = points.length || 1;
+    return { x: c.x / n, y: c.y / n, z: c.z / n };
+}
+// Jacobi eigen-decomposition of a small symmetric matrix, returning the
+// eigenvector for the largest eigenvalue. Iterative and dependency-free.
+function largestEigenvector4(m) {
+    const a = m.map(row => row.slice());
+    let v = [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]];
+    for (let sweep = 0; sweep < 64; sweep++) {
+        let off = 0;
+        for (let p = 0; p < 3; p++) for (let q = p + 1; q < 4; q++) off += a[p][q] * a[p][q];
+        if (off < 1e-14) break;
+        for (let p = 0; p < 3; p++) {
+            for (let q = p + 1; q < 4; q++) {
+                if (Math.abs(a[p][q]) < 1e-18) continue;
+                const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+                const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+                const c = 1 / Math.sqrt(t * t + 1), sn = t * c;
+                for (let k = 0; k < 4; k++) {
+                    const akp = a[k][p], akq = a[k][q];
+                    a[k][p] = c * akp - sn * akq;
+                    a[k][q] = sn * akp + c * akq;
+                }
+                for (let k = 0; k < 4; k++) {
+                    const apk = a[p][k], aqk = a[q][k];
+                    a[p][k] = c * apk - sn * aqk;
+                    a[q][k] = sn * apk + c * aqk;
+                }
+                for (let k = 0; k < 4; k++) {
+                    const vkp = v[k][p], vkq = v[k][q];
+                    v[k][p] = c * vkp - sn * vkq;
+                    v[k][q] = sn * vkp + c * vkq;
+                }
+            }
+        }
+    }
+    let best = 0;
+    for (let i = 1; i < 4; i++) if (a[i][i] > a[best][best]) best = i;
+    return { value: a[best][best], vector: [v[0][best], v[1][best], v[2][best], v[3][best]] };
+}
+// Superposes `mobile` onto `reference` (equal-length arrays of {x,y,z}) and
+// returns the transform plus the RMSD over those points.
+function kabschSuperpose(mobile, reference) {
+    const n = Math.min(mobile.length, reference.length);
+    if (n < 3) return null;
+    const cm = centroidOf(mobile.slice(0, n)), cr = centroidOf(reference.slice(0, n));
+    const P = mobile.slice(0, n).map(p => ({ x: p.x - cm.x, y: p.y - cm.y, z: p.z - cm.z }));
+    const Q = reference.slice(0, n).map(p => ({ x: p.x - cr.x, y: p.y - cr.y, z: p.z - cr.z }));
+    let hxx = 0, hxy = 0, hxz = 0, hyx = 0, hyy = 0, hyz = 0, hzx = 0, hzy = 0, hzz = 0;
+    for (let i = 0; i < n; i++) {
+        hxx += P[i].x * Q[i].x; hxy += P[i].x * Q[i].y; hxz += P[i].x * Q[i].z;
+        hyx += P[i].y * Q[i].x; hyy += P[i].y * Q[i].y; hyz += P[i].y * Q[i].z;
+        hzx += P[i].z * Q[i].x; hzy += P[i].z * Q[i].y; hzz += P[i].z * Q[i].z;
+    }
+    const K = [
+        [hxx + hyy + hzz, hyz - hzy, hzx - hxz, hxy - hyx],
+        [hyz - hzy, hxx - hyy - hzz, hxy + hyx, hzx + hxz],
+        [hzx - hxz, hxy + hyx, -hxx + hyy - hzz, hyz + hzy],
+        [hxy - hyx, hzx + hxz, hyz + hzy, -hxx - hyy + hzz]
+    ];
+    const eig = largestEigenvector4(K);
+    const [qw, qx, qy, qz] = eig.vector;
+    const norm = Math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz) || 1;
+    const w = qw / norm, x = qx / norm, y = qy / norm, z = qz / norm;
+    const R = [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]
+    ];
+    let sumSq = 0;
+    for (let i = 0; i < n; i++) {
+        const sq = P[i].x * P[i].x + P[i].y * P[i].y + P[i].z * P[i].z;
+        sumSq += sq;
+    }
+    const rmsd = Math.sqrt(Math.max(0, (sumSq - 2 * eig.value) / n));
+    const apply = (p) => {
+        const dx = p.x - cm.x, dy = p.y - cm.y, dz = p.z - cm.z;
+        return {
+            x: R[0][0] * dx + R[0][1] * dy + R[0][2] * dz + cr.x,
+            y: R[1][0] * dx + R[1][1] * dy + R[1][2] * dz + cr.y,
+            z: R[2][0] * dx + R[2][1] * dy + R[2][2] * dz + cr.z
+        };
+    };
+    return { rmsd, apply };
+}
+// Per-residue fluctuation across the selected models, indexed by the reference
+// sequence (model residues are matched by their own residue numbering, which is
+// how AlphaFold/ESMFold number a sequence-matched model).
+function computeEnsembleVariance(fileNames) {
+    const total = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!total) return { ok: false, message: 'Load a sequence first.' };
+    const files = (Array.isArray(fileNames) ? fileNames : Object.keys(cachedStructureTexts))
+        .filter(f => p3dUsableStructure(f));
+    if (files.length < 2) return { ok: false, message: 'Select at least two models. Ensemble variance needs an ensemble.' };
+    const models = [];
+    files.forEach(f => {
+        let chains = {};
+        try { chains = parseStructureChains(cachedStructureTexts[f], structExt(f)); } catch (e) { chains = {}; }
+        const ids = Object.keys(chains).sort((a, b) => chains[b].length - chains[a].length);
+        if (!ids.length) return;
+        const id = ids[0];
+        const byIdx = new Map();
+        chains[id].forEach(r => {
+            const idx = r.resSeq - 1;
+            if (idx >= 0 && idx < total && !byIdx.has(idx)) byIdx.set(idx, { x: r.x, y: r.y, z: r.z });
+        });
+        if (byIdx.size) models.push({ file: f, chain: id, byIdx, n: byIdx.size });
+    });
+    if (models.length < 2) return { ok: false, message: 'Need at least two models with readable CA coordinates.' };
+    const common = [];
+    models[0].byIdx.forEach((_, idx) => { if (models.every(m => m.byIdx.has(idx))) common.push(idx); });
+    common.sort((a, b) => a - b);
+    if (common.length < 3) return { ok: false, message: 'The models share fewer than three residues, so they cannot be superposed.' };
+    const reference = common.map(i => models[0].byIdx.get(i));
+    const aligned = models.map((m, i) => {
+        if (i === 0) return { model: m, points: new Map(m.byIdx) };
+        const fit = kabschSuperpose(common.map(idx => m.byIdx.get(idx)), reference);
+        if (!fit) return null;
+        const moved = new Map();
+        m.byIdx.forEach((p, idx) => moved.set(idx, fit.apply(p)));
+        return { model: m, points: moved, rmsd: fit.rmsd };
+    }).filter(Boolean);
+    // Fluctuation about the ensemble mean position for every residue covered by
+    // at least two superposed models.
+    const rmsf = [];
+    const counts = new Map();
+    const sums = new Map();
+    aligned.forEach(a => a.points.forEach((p, idx) => {
+        const s = sums.get(idx) || { x: 0, y: 0, z: 0 };
+        s.x += p.x; s.y += p.y; s.z += p.z;
+        sums.set(idx, s);
+        counts.set(idx, (counts.get(idx) || 0) + 1);
+    }));
+    const means = new Map();
+    sums.forEach((s, idx) => { const c = counts.get(idx); means.set(idx, { x: s.x / c, y: s.y / c, z: s.z / c }); });
+    aligned.forEach(a => a.points.forEach((p, idx) => {
+        const c = counts.get(idx);
+        if (c < 2) return;
+        const mean = means.get(idx);
+        const d2 = (p.x - mean.x) ** 2 + (p.y - mean.y) ** 2 + (p.z - mean.z) ** 2;
+        const acc = rmsf[idx] || { sum: 0, n: 0 };
+        acc.sum += d2; acc.n += 1;
+        rmsf[idx] = acc;
+    }));
+    const values = [];
+    for (let i = 0; i < total; i++) {
+        const acc = rmsf[i];
+        values.push(acc && acc.n ? { val: Math.sqrt(acc.sum / acc.n), type: 'rmsf' } : { val: null, type: 'rmsf' });
+    }
+    const present = values.filter(v => v.val != null).map(v => v.val);
+    const mean = present.length ? present.reduce((a, b) => a + b, 0) / present.length : 0;
+    const max = present.length ? Math.max.apply(null, present) : 0;
+    return {
+        ok: true, total, values, mean, max,
+        models: aligned.map(a => ({ file: a.model.file, chain: a.model.chain, residues: a.model.n, rmsd: a.rmsd })),
+        common: common.length,
+        covered: present.length
+    };
+}
+// Colour scale for RMSF (Å): tight blue through to very mobile red.
+function rmsfColor(v) {
+    if (v == null) return '#f1f5f9';
+    if (v < 1) return '#3b82f6';
+    if (v < 2) return '#22d3ee';
+    if (v < 3) return '#facc15';
+    if (v < 5) return '#fb923c';
+    return '#ef4444';
+}
+// Runs the analysis for the chosen models, writes the EV_RMSF row and reports.
+function runEnsembleVariance() {
+    const picked = [];
+    const wrap = document.getElementById('ensembleModelList');
+    if (wrap && wrap.querySelectorAll) {
+        Array.prototype.slice.call(wrap.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
+            if (cb.checked) picked.push(cb.getAttribute('data-file'));
+        });
+    }
+    const statusEl = document.getElementById('ensembleStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    const res = computeEnsembleVariance(picked.length ? picked : undefined);
+    if (!res.ok) { setStatus(res.message); showToast('Ensemble variance: ' + res.message, 'error'); return null; }
+    parsedTracks.EV_RMSF = res.values;
+    setTrackMeta('EV_RMSF', { source: 'Ensemble', color: '#f97316' });
+    renderViewer(parsedTracks);
+    refreshTrackManagerIfVisible();
+    renderEnsembleSummary(res);
+    schedulePersist();
+    setStatus('Ensemble variance over ' + res.models.length + ' models: mean RMSF ' + res.mean.toFixed(2) +
+        ' A, max ' + res.max.toFixed(2) + ' A (' + res.covered + ' residues covered).');
+    showToast('Ensemble variance computed over ' + res.models.length + ' models.', 'success');
+    return res;
+}
+function renderEnsembleSummary(res) {
+    const wrap = document.getElementById('ensembleResults');
+    if (!wrap) return;
+    if (!res || !res.ok) { wrap.innerHTML = ''; return; }
+    const top = res.values
+        .map((v, i) => ({ res: i + 1, val: v.val }))
+        .filter(x => x.val != null)
+        .sort((a, b) => b.val - a.val)
+        .slice(0, 8);
+    let html = '<table class="metrics-table" style="font-size:0.7rem;"><thead><tr><th>Model</th><th>Chain</th><th>Residues</th><th>RMSD to first</th></tr></thead><tbody>';
+    res.models.forEach(m => {
+        html += '<tr><td>' + structureEscapeHtml(m.file) + '</td><td>' + structureEscapeHtml(m.chain) + '</td><td>' + m.residues + '</td><td>' +
+            (m.rmsd == null ? '-' : m.rmsd.toFixed(2) + ' A') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="font-size:0.7rem; color:#475569; margin-top:6px;">Most mobile residues (RMSF, A): ' +
+        top.map(t => '<strong>' + t.res + '</strong> ' + t.val.toFixed(2)).join(', ') + '</div>';
+    wrap.innerHTML = html;
+}
+function selectEnsembleMobile() {
+    const res = { values: parsedTracks.EV_RMSF };
+    if (!Array.isArray(res.values)) { showToast('Compute the ensemble variance first.', 'info'); return; }
+    const ranges = [];
+    let start = -1;
+    res.values.forEach((v, i) => {
+        const mobile = v && v.val != null && v.val >= 3;
+        if (mobile && start === -1) start = i;
+        else if (!mobile && start !== -1) { ranges.push([start, i - 1]); start = -1; }
+    });
+    if (start !== -1) ranges.push([start, res.values.length - 1]);
+    if (!ranges.length) { showToast('No residues above 3 A RMSF.', 'info'); return; }
+    selectSeqSearchRanges(ranges, 'all');
+    showToast('Selected residues with RMSF >= 3 A.', 'success');
+}
+// Model picker for the ensemble section (one checkbox per attached model).
+function renderEnsembleModelList() {
+    const wrap = document.getElementById('ensembleModelList');
+    if (!wrap) return;
+    const files = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
+    if (!files.length) {
+        wrap.innerHTML = '<span style="color:#94a3b8; font-size:0.75rem;">No structures attached yet.</span>';
+        return;
+    }
+    let html = '';
+    files.forEach((f, i) => {
+        html += '<label style="display:flex; align-items:center; gap:6px; font-size:0.74rem; color:#334155;">' +
+            '<input type="checkbox" data-file="' + structureEscapeHtml(f) + '" checked>' + structureEscapeHtml(f) + '</label>';
+    });
+    wrap.innerHTML = html;
+}
+function showEnsemblePanel() {
+    switchSidebarTab('tracks');
+    const sec = document.getElementById('ensembleSection');
+    if (sec) {
+        sec.open = true;
+        if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' });
+    }
+    renderEnsembleModelList();
+}
+
 // --- TM cross-check (topology consensus vs Quick2D TM) --------------------
 // Two independent reads on the same question: the pasted topology consensus
 // (TMHMM/Phobius/DeepTMHMM) and the Quick2D transmembrane prediction. Where they
@@ -4081,6 +4362,7 @@ function getRuleNumericSources() {
     }
     plddt.forEach(k => out.push({ id: 'pLDDT:' + k, label: formatTrackLabel(k) + ' pLDDT' }));
     rsa.forEach(k => out.push({ id: 'RSA:' + k, label: formatTrackLabel(k) + ' RSA' }));
+    Object.keys(parsedTracks).filter(k => k.endsWith('_RMSF')).forEach(k => out.push({ id: 'RMSF:' + k, label: formatTrackLabel(k) + ' RMSF (A)' }));
     return out;
 }
 function ruleNumericValue(sourceId, i) {
@@ -4096,6 +4378,7 @@ function ruleNumericValue(sourceId, i) {
     }
     if (sourceId.startsWith('pLDDT:')) { const t = parsedTracks[sourceId.slice(6)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
     if (sourceId.startsWith('RSA:')) { const t = parsedTracks[sourceId.slice(4)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
+    if (sourceId.startsWith('RMSF:')) { const t = parsedTracks[sourceId.slice(5)]; return (t && t[i] && t[i].val != null) ? t[i].val : null; }
     return null;
 }
 function getRuleCategoricalSources() {
@@ -6020,6 +6303,7 @@ function menuBarAction(action) {
         case 'interfaces': showInterfacesPanel(); break;
         case 'domains': runDomainScan(); break;
         case 'crosschecks': showCrossCheckPanel(); break;
+        case 'ensemble': showEnsemblePanel(); break;
         case 'json': exportFullSave(); break;
         case 'methods': exportMethodsReport(); break;
         case 'tsv': exportMetricsTableTSV(); break;
@@ -6369,6 +6653,13 @@ function getPredictorInfo(trackKey) {
     if (trackKey.endsWith('_Cofactors')) return PREDICTOR_INFO.COFACTOR;
     if (trackKey.startsWith('HL_')) return buildHomologPredictorInfo(trackKey);
     if (trackKey.startsWith('DM_')) return buildDomainPredictorInfo(trackKey);
+    if (trackKey.endsWith('_RMSF')) return {
+        name: 'Ensemble variance (RMSF)',
+        category: 'Structure ensemble',
+        description: 'Per-residue fluctuation across the selected models, in angstroms, measured after superposing each model onto the first over the residues they share.',
+        useCase: 'High values mark regions the models disagree about: flexible loops, termini, or regions only ordered in a complex. Low values mark the rigid core every model agrees on.',
+        citation: 'Computed in-app (Kabsch superposition); see DESIGN.md section 7.3.'
+    };
     // Variant and conservation rows are not structure predictors: suppress the
     // synthesized fallback so their "Structural Prediction" ℹ tooltip is never
     // shown - those rows build their own tooltips (FASTA header/conservation).
@@ -6612,7 +6903,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.33.0';
+const APP_VERSION = '0.34.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -7996,12 +8287,13 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('RULE_')) return 10;
     if (key.startsWith('IF_')) return 11;
     if (key.startsWith('XC_')) return 12;
+    if (key.endsWith('_RMSF')) return 13;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
     // above the pLDDT/RSA graph sections.
-    if (key.endsWith('_Cofactors')) return 13;
-    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 14;
-    return 15;
+    if (key.endsWith('_Cofactors')) return 14;
+    if (key.endsWith('_pLDDT') || key.endsWith('_RSA')) return 15;
+    return 16;
 }
 
 // pLDDT/RSA graph-vs-heatmap is a type-level view choice (Track Control's
@@ -9432,6 +9724,7 @@ const TRACK_GROUP_LABELS = {
     IF: 'Interfaces',
     DM: 'Domains',
     XC: 'Cross-checks',
+    EV: 'Ensemble variance',
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
@@ -9463,6 +9756,7 @@ function getTrackGroup(key) {
     if (key.startsWith('IF_')) return 'IF';
     if (key.startsWith('DM_')) return 'DM';
     if (key.startsWith('XC_')) return 'XC';
+    if (key.endsWith('_RMSF')) return 'EV';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';
     if (key.endsWith('_RSA')) return 'RSA';
@@ -9494,6 +9788,7 @@ function getTrackSource(key) {
     if (key.startsWith('IF_')) return 'Interface';
     if (key.startsWith('DM_')) { const d = domainHitsInfo[key]; return 'HMMER (' + ((d && d.database) || 'Pfam') + ')'; }
     if (key.startsWith('XC_')) return 'Cross-check';
+    if (key.endsWith('_RMSF')) return 'Ensemble';
     if (key.endsWith('_pLDDT') || key.endsWith('_RSA') || key.endsWith('_Cofactors')) return 'Structure';
     return 'Other';
 }
@@ -9595,7 +9890,7 @@ function tctlFilterLabel(key) {
 // Groups that have at least one track in the loaded data, in the same order
 // they appear in the viewer, with AA (the pinned reference sequence) excluded.
 function getTctlGroupsInOrder() {
-    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, DM: 11, RULE: 12, IF: 13, XC: 14, pLDDT: 15, RSA: 16, Cofactors: 17, other: 99 };
+    const order = { SS: 1, TM: 2, TP: 3, DO: 4, CC: 5, SP: 6, HL: 7, VAR: 8, CONSERVATION: 9, UP: 10, DM: 11, RULE: 12, IF: 13, XC: 14, EV: 15, pLDDT: 16, RSA: 17, Cofactors: 18, other: 99 };
     const groups = [];
     Object.keys(parsedTracks)
         .map(getTrackGroup)
@@ -10050,7 +10345,20 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
             // continuous heatmap band instead of an empty strip.
             const glyphOpacity = showGlyphs ? glyphOpacityFor(gridCellW) : 0;
             const needsHeatmapBg = showGlyphs && glyphOpacity < 1;
-            if (dataVal.type === 'plddt') {
+            if (dataVal.type === 'rmsf') {
+                const v = dataVal.val;
+                if (v == null) {
+                    cellEl.title = `Residue ${i + 1}: not covered by enough models`;
+                } else {
+                    const color = rmsfColor(v);
+                    if (hideSym || fullBar || needsHeatmapBg) cellEl.style.backgroundColor = color;
+                    if (showGlyphs) {
+                        const span = setGlyph(cellEl, '\u2588', gridCellW);
+                        span.style.color = color;
+                    }
+                    cellEl.title = `Residue ${i + 1} RMSF: ${v.toFixed(2)} A across the ensemble`;
+                }
+            } else if (dataVal.type === 'plddt') {
                 const v = dataVal.val;
                 const color = v > 90 ? '#0053d6' : (v > 70 ? '#00c1df' : (v > 50 ? '#ffd700' : '#ff7d45'));
                 if (hideSym || fullBar || needsHeatmapBg) cellEl.style.backgroundColor = color;

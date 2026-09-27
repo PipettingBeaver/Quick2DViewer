@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-09-25
+
+### Added
+
+- **Ensemble variance (RMSF).** Tracks tab -> *Ensemble variance (RMSF)* (or Analyze ->
+  *Ensemble variance…*): pick which attached models to compare (all by default) and
+  compute the per-residue fluctuation across them. Comparing coordinates between
+  models is only meaningful once the rigid-body difference is removed, so each model
+  is superposed onto the first over their shared residues (**Kabsch**, solved through
+  the quaternion eigenvector with a Jacobi eigensolver, so no matrix library is
+  needed), and the spread about the ensemble mean is measured afterwards.
+  - Writes one **Ensemble variance** (`EV_RMSF`) row: blue (rigid) through cyan,
+    yellow and orange to red (very mobile), with a per-residue RMSF tooltip and a
+    neutral colour where too few models cover a residue.
+  - Reports each model's chain, residue count and **RMSD to the first**, plus the
+    eight most mobile residues, and offers *Select mobile (RMSF >= 3 A)*.
+  - Available as a rule condition (`RMSF:EV_RMSF`), so "mobile in the ensemble AND
+    disordered" is a one-line rule.
+  - Refuses clearly with fewer than two models, no sequence, or models sharing fewer
+    than three residues.
+
+### Fixed
+
+- The floating legend overlapped the alignment grid's horizontal scrollbar; it now
+  sits 20 px higher (`bottom: 40px`).
+
+### Notes
+
+- The RMSF is drawn as a heatmap row plus the summary table; the RMSF **line plot**
+  (the shape DESIGN §7.3 describes) is the next increment — the graph machinery is
+  currently pLDDT/RSA-specific.
+
 ## [0.33.0] - 2026-09-25
 
 ### Fixed

@@ -87,6 +87,13 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
 3. **Ensemble Structural Variance Analyzer** — column-wise coordinate variance
    across models. Output: a **graph** (RMSF-style line plot). Scope: **all
    loaded models or a user-picked subset**.
+   **Computation done (0.34.0)** — `computeEnsembleVariance()` + Kabsch
+   superposition (`kabschSuperpose` / `largestEigenvector4`, Jacobi eigensolver,
+   no dependencies); writes the `EV_RMSF` row (heatmap colours + tooltip), reports
+   per-model RMSD and the most mobile residues, and exposes `RMSF:` as a rule
+   numeric source. **Remaining:** the line plot itself — `createOverlayGraphSection`
+   is still pLDDT/RSA-specific (scale + bands), so a third graph type needs the
+   graph-mode plumbing (graphMode keys, Track Control View-as, legend rows, export).
 4. **Downstream Script Compiler** — ChimeraX/PyMOL/VMD (done) + wet-lab
    **truncated FASTA constructs** (strip disordered termini). Primer design
    scoped out for now.
@@ -110,7 +117,8 @@ deposited entries).
 4. Contradiction engine (Rules panel)
 5. Client-side interface analysis — **done (0.15.0)**: `IF_<chain>` tracks + chain-pair table
 6. HMMER hmmscan
-7. Ensemble variance graph; co-localization table; wet-lab constructs
+7. Ensemble variance — **computation + row done (0.34.0)**, line plot remaining;
+   co-localization table; wet-lab constructs
 
 ## 10. Open items / to discuss
 - **Tracks vs Track Control redundancy (noted).** The right sidebar's *Tracks* tab and the
