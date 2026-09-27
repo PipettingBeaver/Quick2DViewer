@@ -1031,7 +1031,7 @@ assert(pillKeys.tracks.indexOf('m_pLDDT') !== -1, 'plotted points carry data-tra
 // the pills clear the rotated axis title rather than covering it
 const pillsCss = HTML.slice(HTML.indexOf('.graph-pills-inner {'), HTML.indexOf('}', HTML.indexOf('.graph-pills-inner {')));
 assert(pillsCss.indexOf('margin-left: 18px') !== -1, 'the pills are indented past the vertical axis title');
-assert(pillsCss.indexOf('max-width: 110px') !== -1, 'and stay clear of the right-aligned tick labels');
+assert(pillsCss.indexOf('max-width: 150px') !== -1, 'and stay clear of the right-aligned tick labels (150px cap, as reviewed)');
 // the graph header carries the same Track Control chevron the rows have
 const headerBits = ctxRun(`
     (function () {

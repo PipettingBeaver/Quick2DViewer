@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.49.1] - 2026-09-25
+
+### Changed
+
+- The graph model pills are wider again (max-width 150 px, up from 110 px) so model names truncate
+  less, while still clearing the right-aligned tick labels in the pinned axis strip.
+
 ## [0.49.0] - 2026-09-25
 
 ### Fixed
