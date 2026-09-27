@@ -868,6 +868,95 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('empty tracks + no duplicate action + action log');
+// --- the tailored-label duplicate button is gone ---
+ctxRun(`
+    parsedTracks = { AA: 'MKV' }; guideProfile = {}; guideAnswers = {}; guideOverrides = {};
+    cachedStructureTexts = { 'm.pdb': 'ATOM' };
+    setStepAnswer('foldseek', 'db', 'pdb100');
+`);
+let fsAct2 = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'foldseek')[0])`);
+assert(fsAct2.run === 'runFoldseekSearch()' && fsAct2.custom === false, 'a tailored label for the same handler is not a second action (no duplicate button)');
+assert(fsAct2.label.indexOf('pdb100') !== -1, 'but the tailored label is still used');
+ctxRun(`setStepAnswer('structure', 'model', 'afdb'); uniprotAccession = 'P42212';`);
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0]).custom`) === true, 'a genuinely different action still gets the secondary button');
+ctxRun(`uniprotAccession = null; guideAnswers = {}; cachedStructureTexts = {};`);
+
+// --- (Empty) tracks ---
+ctxRun(`parsedTracks = { AA: 'MKV', 'TM_Quick2D': '   ', 'SS_PSIPRED': 'HH ', 'm_pLDDT': [{ val: null }, { val: null }], 'm_RSA': [{ val: 0.2 }] };`);
+assert(ctxRun(`isTrackEmpty('TM_Quick2D')`) === true, 'an all-blank string track is empty');
+assert(ctxRun(`isTrackEmpty('SS_PSIPRED')`) === false, 'an annotated string track is not');
+assert(ctxRun(`isTrackEmpty('AA')`) === false, 'the sequence row is never empty');
+assert(ctxRun(`isTrackEmpty('m_pLDDT')`) === true, 'an object track with no values is empty');
+assert(ctxRun(`isTrackEmpty('m_RSA')`) === false, 'an object track with a value is not');
+assert(ctxRun(`isTrackEmpty('nope')`) === false, 'a missing key is not reported as empty');
+// the row gets the greyed class and the tag
+const emptyRowTag = ctxRun(`
+    (function () {
+        var row = buildTrackRow('TM_Quick2D', parsedTracks, 3, true);
+        function find(el, needle, depth) {
+            if (!el || depth > 8) return '';
+            if (el._text === needle) return needle;
+            var kids = el.children || [];
+            for (var i = 0; i < kids.length; i++) { var r = find(kids[i], needle, depth + 1); if (r) return r; }
+            return '';
+        }
+        return find(row, '(Empty)', 0);
+    })()
+`);
+assert(emptyRowTag === '(Empty)', 'an empty track row carries the (Empty) tag');
+const filledRowTag = ctxRun(`
+    (function () {
+        var row = buildTrackRow('SS_PSIPRED', parsedTracks, 3, true);
+        function find(el, needle, depth) {
+            if (!el || depth > 8) return '';
+            if (el._text === needle) return needle;
+            var kids = el.children || [];
+            for (var i = 0; i < kids.length; i++) { var r = find(kids[i], needle, depth + 1); if (r) return r; }
+            return '';
+        }
+        return find(row, '(Empty)', 0);
+    })()
+`);
+assert(filledRowTag === '', 'a populated track row does not');
+assert(HTML.indexOf('.track-row.track-empty') !== -1, 'the greying rule exists');
+assert(HTML.indexOf('(Empty)</em>') !== -1, 'the Tracks tab shows the tag too');
+// the read-out flags an empty TM row against a membrane answer
+ctxRun(`guideProfile = { membrane: 'yes' };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /every transmembrane prediction came back empty/.test(i.text)), 'an empty TM row contradicts a membrane answer');
+ctxRun(`guideProfile = { membrane: 'no' };`);
+assert(!ctxRun(`computeGuideInsights()`).some(i => /came back empty/.test(i.text)), 'and is not flagged when the answer says soluble');
+ctxRun(`parsedTracks = {}; guideProfile = {};`);
+
+// --- action log ---
+ctxRun(`actionLog = [];`);
+assert(Array.isArray(ctxRun(`actionLog`)) && ctxRun(`actionLog.length`) === 0, 'the log starts empty after clearing');
+ctxRun(`logAction('menu', 'legend'); logAction('export', 'x.tsv', '12 chars');`);
+assert(ctxRun(`actionLog.length`) === 2, 'entries are appended');
+assert(ctxRun(`actionLog[0].kind`) === 'menu' && ctxRun(`actionLog[1].label`) === 'x.tsv', 'entries keep their kind and label');
+assert(ctxRun(`actionLog[0].t`).indexOf(':') !== -1, 'entries carry a timestamp');
+const logJson = ctxRun(`JSON.parse(actionLogText(true))`);
+assert(Array.isArray(logJson) && logJson.length === 2 && logJson[0].kind === 'menu', 'the log copies as parseable JSON (macro foundation)');
+assert(ctxRun(`actionLogText(false)`).split('\n').length === 2, 'the plain form is one line per action');
+// the cap holds
+ctxRun(`actionLog = []; for (var i = 0; i < 260; i++) logAction('click', 'b' + i);`);
+assert(ctxRun(`actionLog.length`) === 200, 'the log keeps the last 200 actions');
+assert(ctxRun(`actionLog[0].label`) === 'b60' && ctxRun(`actionLog[199].label`) === 'b259', 'the oldest entries are the ones dropped');
+// rendering + clearing + the export hook
+ctxRun(`renderActionLog();`);
+assert(ctxRun(`document.getElementById('actionLogBody').textContent`).indexOf('b259') !== -1, 'the console renders the newest first');
+assert(ctxRun(`document.getElementById('actionLogBody').textContent`).split('\n')[0].indexOf('b259') !== -1, 'newest is at the top');
+ctxRun(`clearActionLog();`);
+assert(ctxRun(`actionLog.length`) === 0 && ctxRun(`document.getElementById('actionLogBody').textContent`).indexOf('no actions recorded') !== -1, 'clearing empties the log and the console says so');
+ctxRun(`downloadTextFile('probe.tsv', 'abc', 'text/plain');`);
+assert(ctxRun(`actionLog.some(e => e.kind === 'export' && e.label === 'probe.tsv')`), 'an export is logged automatically');
+ctxRun(`menuBarAction('legend');`);
+assert(ctxRun(`actionLog.some(e => e.kind === 'menu' && e.label === 'legend')`), 'a menu choice is logged');
+assert(typeof ctxRun(`window.q2dvActions`) === 'function' && ctxRun(`JSON.parse(window.q2dvActions()).length`) > 0, 'the console accessor returns the log as JSON');
+assert(HTML.indexOf('id="actionLogModal"') !== -1 && HTML.indexOf('openActionLog()') !== -1, 'the debugging console has a modal and a way in');
+assert(HTML.indexOf('ACTION_LOG_MAX = 200') !== -1, 'the 200-entry cap is explicit');
+ctxRun(`actionLog = [];`);
+
 section('RMSF line plot (third graph type)');
 ctxRun(`
     parsedTracks = { AA: 'M'.repeat(5), EV_RMSF: [{ val: 0.4, type: 'rmsf' }, { val: 1.2, type: 'rmsf' }, { val: 2.4, type: 'rmsf' }, { val: null, type: 'rmsf' }, { val: 0.9, type: 'rmsf' }] };

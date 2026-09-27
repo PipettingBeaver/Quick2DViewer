@@ -199,6 +199,65 @@ hover, the legend, export and persistence all behave identically to the existing
 
 ---
 
+### Empty-track marking — 0.38.0
+
+**Should do.** A track that imported successfully but found nothing (a TM row for a soluble
+protein, say) stays visible, greyed slightly, with an **(Empty)** tag, so it reads as "ran,
+found nothing" rather than looking like data or a broken import.
+
+**Try (normal use).**
+1. Load the Quick2D output for a soluble protein (GFP) that includes a TM track.
+   *Expect:* the TM row is drawn at ~55% opacity with "(Empty)" after its name; its tooltip
+   explains that nothing was annotated.
+2. Open the Tracks tab.
+   *Expect:* the same track shows "(Empty)" in the manager list.
+3. Answer **Yes** to the membrane question with that dataset.
+   *Expect:* the read-out warns that every transmembrane prediction came back empty.
+
+**Edge cases (symptom → likely cause).**
+- **A populated track is greyed.** `isTrackEmpty` treats any non-blank character as data; a
+  track holding only spaces/tabs/dashes is the empty case. Report it if a real track trips this.
+- **The AA row never gets the tag.** By design — it is the reference sequence, not a prediction.
+- **A pLDDT/RSA/RMSF row is marked empty when the model covers nothing.** Correct: those rows
+  are object arrays and count as empty only when every entry has a null value.
+- **No warning for the empty TM row.** It only fires when the membrane answer is *Yes*; with
+  *No* (or unanswered) an empty TM row is expected and stays quiet.
+- **The greying is too subtle / too strong.** It is one CSS rule (`.track-row.track-empty`).
+
+---
+
+### Debugging console (action log) — 0.38.0
+
+**Should do.** Record the last 200 actions of the session (clicks, menu choices, task
+starts/finishes, imports, attaches, removals, exports) so a workflow can be reconstructed,
+with the log copyable as text or JSON.
+
+**Try (normal use).**
+1. Do a few things — open a menu, run a task, export something — then **Help → Debugging
+   console**.
+   *Expect:* the newest action at the top with a timestamp and kind; buttons to Copy log,
+   Copy as JSON and Clear.
+2. Press **Copy as JSON** and paste into an editor.
+   *Expect:* an array of `{t, kind, label, detail}` objects.
+3. In the browser console, run `q2dvActions()`.
+   *Expect:* the same JSON.
+4. Reload the page and reopen the console.
+   *Expect:* empty (the log is deliberately session-only, not saved).
+
+**Edge cases (symptom → likely cause).**
+- **A click is missing from the log.** Only clicks landing on a `button`, `a`,
+  `[role="button"]` or `[onclick]` element are captured; a click on a bare cell or a label is
+  not an action.
+- **The log stops growing past 200 entries.** By design; the oldest are dropped first.
+- **The browser console only shows some entries.** Meaningful events (menu, task, export,
+  import, remove, attach) are mirrored to the console; raw clicks are not, so a user clicking
+  around does not flood the console.
+- **The log looks empty after reload.** Expected: session-only, never persisted and never sent.
+- **Entries look truncated.** Labels cap at 120 characters and details at 200, so one action
+  cannot blow up the log.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -511,6 +570,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 183 | Export SVG/PNG then TSV/CSV | The plot serializes; the metrics row reads "RMSF (A)" with the mean and % mobile |
 | 184 | Switch back to Glyphs | The heatmap row returns |
 
+## 0.38.0 - empty tracks, duplicate button, debugging console (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 185 | Load GFP Quick2D output with a TM track | The TM row is greyed with "(Empty)"; the Tracks tab shows it too |
+| 186 | Answer Yes to membrane with that dataset | The read-out warns that every TM prediction was empty |
+| 187 | Foldseek step: choose pdb100 | Exactly one action button, labelled "Run Foldseek (pdb100)" (no duplicate) |
+| 188 | Do a few actions, then Help → Debugging console | Newest first, with kinds and timestamps; Copy log / Copy as JSON / Clear work |
+| 189 | Run `q2dvActions()` in the browser console | The same log as JSON |
+| 190 | Reload and reopen the console | Empty (session-only by design) |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -544,4 +614,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6j. 167–172 (co-localization table; its full card is at the top).
 6k. 173–178 (construct designer + taxonomy pass; full card at the top).
 6l. 179–184 (RMSF line plot; full card at the top).
+6m. 185–190 (empty tracks / duplicate button / debugging console; cards at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

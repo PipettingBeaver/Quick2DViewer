@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-09-25
+
+### Added
+
+- **Empty tracks are marked, not hidden.** A track that imported but found nothing (a TM row
+  for a soluble protein, say) now carries an **(Empty)** tag and is greyed slightly in the
+  viewer and the Tracks tab, so it reads as "ran, found nothing" instead of looking like data
+  or a failed import. The read-out also warns when the membrane answer is *Yes* but every
+  transmembrane prediction came back empty.
+- **Debugging console (action log).** Help → *Debugging console* shows the last **200** actions
+  of the session — clicks, menu choices, task starts/finishes, imports, structure attaches,
+  removals and exports — newest first, with Copy log / Copy as JSON / Clear. `q2dvActions()`
+  in the browser console returns the same log as JSON. Structured entries are a deliberate
+  starting point for macros. Session-only: never persisted, never sent anywhere.
+
+### Fixed
+
+- **A duplicated action button in the guided questionnaire.** After choosing a Foldseek
+  database the card showed *Run Foldseek (pdb100)* **and** *Run Foldseek* — the tailored label
+  was being treated as a second action. The secondary button now appears only when the
+  *handler* differs, not the label (so it still appears for genuinely different actions, e.g.
+  fetching an AlphaFold model vs attaching a file).
+- The action log mirrors only meaningful events to the browser console (not raw clicks), so a
+  user clicking around does not flood the console they are debugging with.
+
+### Notes
+
+- Both features have feature cards in `QA_CHECKLIST.md`, per the convention.
+
 ## [0.37.0] - 2026-09-25
 
 ### Added

@@ -1265,6 +1265,8 @@
         }
         .guide-coachmark button:hover { background:#6d28d9; }
         .coachmark-on .rp-suggested { box-shadow:0 0 0 2px #ddd6fe; }
+        .track-row.track-empty { opacity:0.55; }
+        .track-empty-tag { margin-left: 6px; font-size: 0.68rem; color: #94a3b8; font-style: italic; }
         .task-running { opacity:0.85; cursor:progress; }
         .task-running::after {
             content:''; display:inline-block; width:9px; height:9px; margin-left:6px;
@@ -2719,12 +2721,34 @@
             <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; display:flex; gap:8px; flex-wrap:wrap;">
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openWorkflowDoc();" style="font-size:0.78rem; padding:4px 10px;">Workflow reference</button>
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openChangelogModal();" style="font-size:0.78rem; padding:4px 10px;">Changelog</button>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openActionLog();" style="font-size:0.78rem; padding:4px 10px;">Debugging console</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Changelog Modal -->
+<div class="modal-overlay" id="actionLogModal" role="dialog" aria-modal="true" aria-labelledby="actionLogTitle">
+    <div class="modal-content" style="width: 720px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="actionLogTitle" style="margin: 0; color: #0f172a;">Debugging console</h3>
+            <button onclick="closeActionLog()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <p style="font-size:0.78rem; color:#64748b; margin: 12px 0 8px; line-height:1.4;">
+            The last 200 actions this session, newest first: clicks, menu choices, task starts/finishes,
+            imports, structure attaches, removals and exports. Session-only, nothing is sent anywhere.
+            Useful for reconstructing a workflow; <code>q2dvActions()</code> in the console returns the same
+            log as JSON (a starting point for macros).
+        </p>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+            <button type="button" class="copy-btn" onclick="copyActionLog(false)">Copy log</button>
+            <button type="button" class="copy-btn" onclick="copyActionLog(true)">Copy as JSON</button>
+            <button type="button" class="copy-btn" onclick="clearActionLog()">Clear</button>
+        </div>
+        <pre id="actionLogBody" class="data-box" style="font-size:0.7rem; max-height:50vh; overflow:auto; white-space:pre-wrap; margin:0; color:#334155;">(no actions recorded yet this session)</pre>
+    </div>
+</div>
+
 <div class="modal-overlay" id="workflowDocModal" role="dialog" aria-modal="true" aria-labelledby="workflowDocTitle">
     <div class="modal-content" style="width: 680px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
@@ -5090,6 +5114,7 @@ function beginGuideTask(stepId, label) {
         return false;
     }
     guideTask = { stepId, label, startedAt: Date.now() };
+    logAction('task', 'start: ' + label, stepId);
     showTimerToast('guide-task', label);
     refreshGuideIfVisible();
     syncTaskButtons();
@@ -5097,6 +5122,7 @@ function beginGuideTask(stepId, label) {
 }
 function endGuideTask(stepId, message, type) {
     if (!guideTask || (stepId && guideTask.stepId !== stepId)) return;
+    logAction('task', 'end: ' + (message || stepId), type || 'success');
     guideTask = null;
     endTimerToast('guide-task', message || '', type || 'success');
     refreshGuideIfVisible();
@@ -5125,6 +5151,70 @@ const STEP_TASK_RUNS = {
     foldseek: 'runFoldseekSearch()',
     structure: 'predictStructureESMFold()'
 };
+
+// --- Action log (session-only) ---------------------------------------------
+// The last 200 user actions, so a workflow can be reconstructed after the fact
+// (what was pressed, in what order) without instrumenting every handler. Also a
+// foundation for macros: the entries are structured, not just strings, and can be
+// copied as JSON. Deliberately session-only - it is a debugging aid, not part of
+// the saved session, and nothing is ever sent anywhere.
+const ACTION_LOG_MAX = 200;
+let actionLog = [];
+function logAction(kind, label, detail) {
+    actionLog.push({
+        t: new Date().toISOString().slice(11, 19),
+        kind: String(kind || 'action').slice(0, 12),
+        label: String(label == null ? '' : label).slice(0, 120),
+        detail: detail == null ? '' : String(detail).slice(0, 200)
+    });
+    if (actionLog.length > ACTION_LOG_MAX) actionLog.splice(0, actionLog.length - ACTION_LOG_MAX);
+    // Mirror the meaningful events to the console, but not raw clicks: a user
+    // clicking around would otherwise flood the console they are debugging with.
+    if (kind !== 'click') {
+        try { console.log('[Q2DV ' + kind + '] ' + label + (detail ? ' - ' + detail : '')); } catch (e) { /* console may be absent */ }
+    }
+}
+// Delegated capture: any click on something actionable is recorded with enough
+// context to identify it (its text, id and inline handler), which covers the
+// whole UI without touching each handler.
+document.addEventListener('click', (e) => {
+    const el = e.target && e.target.closest ? e.target.closest('button, a, [role="button"], [onclick]') : null;
+    if (!el) return;
+    const text = String(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+    const id = el.id || '';
+    const onclick = el.getAttribute ? (el.getAttribute('onclick') || '') : '';
+    logAction('click', text || id || '(unlabelled)', [id ? '#' + id : '', onclick].filter(Boolean).join(' '));
+});
+function actionLogText(asJson) {
+    if (asJson) return JSON.stringify(actionLog, null, 2);
+    return actionLog.map(e => e.t + '\t' + e.kind + '\t' + e.label + (e.detail ? '\t' + e.detail : '')).join('\n');
+}
+function renderActionLog() {
+    const body = document.getElementById('actionLogBody');
+    if (!body) return;
+    if (!actionLog.length) { body.textContent = '(no actions recorded yet this session)'; return; }
+    body.textContent = actionLog.slice().reverse()
+        .map(e => e.t + '  ' + (e.kind + '        ').slice(0, 8) + e.label + (e.detail ? '   [' + e.detail + ']' : ''))
+        .join('\n');
+}
+function copyActionLog(asJson) {
+    const text = actionLogText(asJson) || '(empty log)';
+    const done = () => showToast('Action log copied' + (asJson ? ' as JSON' : '') + '.', 'success');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => {
+            showToast(legacyCopyText(text) ? 'Action log copied.' : 'Could not copy the log.', legacyCopyText(text) ? 'success' : 'error');
+        });
+    } else if (legacyCopyText(text)) {
+        done();
+    } else {
+        showToast('Clipboard unavailable. The log is also mirrored to the browser console.', 'info');
+    }
+}
+function clearActionLog() { actionLog = []; renderActionLog(); showToast('Action log cleared.', 'success'); }
+function openActionLog() { renderActionLog(); openModalAsDialog('actionLogModal'); }
+function closeActionLog() { closeModalAsDialog('actionLogModal'); }
+// Console access for debugging/macros: q2dvActions() returns the log as JSON.
+window.q2dvActions = () => actionLogText(true);
 
 function showToast(message, type, options) {
     const container = document.getElementById('toastContainer');
@@ -5563,7 +5653,10 @@ function resolveStepAction(step) {
         label: resolved.label, run: resolved.run, hint: resolved.hint || '',
         done: !!resolved.done,
         accessory: resolved.accessory || null,
-        custom: resolved.run !== step.action.run || resolved.label !== step.action.label
+        // Only a *different action* earns the secondary button. A tailored label
+        // for the same handler (e.g. "Run Foldseek (pdb100)" vs "Run Foldseek")
+        // must not show twice.
+        custom: resolved.run !== step.action.run
     };
 }
 // Undoing a step from the guide. Unlike hiding, this removes the data the step
@@ -5928,6 +6021,12 @@ function computeGuideInsights() {
         out.push(best && best >= 30
             ? { level: 'info', text: 'Best homolog identity is ' + best.toFixed(0) + '%. Annotation transfer from templates is reasonable.' }
             : { level: 'warn', text: 'No homolog above ~30% identity, so homology-based annotation transfer is weak. Lean on structural and curated evidence.' });
+    }
+    if (guideProfile.membrane === 'yes') {
+        const tmKeys = keys.filter(k => k.startsWith('TM_'));
+        if (tmKeys.length && tmKeys.every(k => isTrackEmpty(k))) {
+            out.push({ level: 'warn', text: 'You flagged this as membrane-associated, but every transmembrane prediction came back empty. Check the Quick2D run, or reconsider the membrane answer.' });
+        }
     }
     if (guideProfile.membrane === 'yes' && !keys.some(k => k.startsWith('TM_') || k.startsWith('SP_'))) {
         out.push({ level: 'warn', text: 'You flagged a membrane/secreted protein, but no TM or signal-peptide track is loaded.' });
@@ -6457,7 +6556,9 @@ function renderTrackManager() {
                 const vis = !isTrackFiltered(k);
                 html += '<div class="tm-track">' +
                     '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
-                    '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) + ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
+                    '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) +
+                    (isTrackEmpty(k) ? ' <em style="color:#94a3b8;" title="Nothing annotated: the import found nothing for this protein">(Empty)</em>' : '') +
+                    ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
                     '<button type="button" class="tm-remove" data-k="' + structureEscapeHtml(k) + '" onclick="confirmRemoveTrack(this.dataset.k)" title="Remove this track and its data">×</button>' +
                     '</div>';
             });
@@ -6510,6 +6611,7 @@ function toggleMenuBarMenu(name) {
     menu.hidden = !willOpen;
 }
 function menuBarAction(action) {
+    logAction('menu', action);
     closeMenuBarMenus();
     switch (action) {
         case 'input': openInputDataModal(); break;
@@ -7128,7 +7230,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.37.0';
+const APP_VERSION = '0.38.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -8588,6 +8690,7 @@ function syncGraphModeControls() {
 // "predict structure" action.
 async function attachStructureText(fileName, text, ext, opts) {
     opts = opts || {};
+    logAction('attach', fileName, ext + (opts.source ? ' (' + opts.source + ')' : ''));
     const baseName = fileName.replace(/\.[^/.]+$/, '');
     let cachePromise = null;
     if (ext === 'pdb' || ext === 'cif') {
@@ -9930,6 +10033,7 @@ function parseAndBuildViewer() {
     lastRanges = null; refreshChimeraxDisplay();
     populateCrossRefDropdown();
     applyLookupDefaults(false);
+    logAction('import', 'Quick2D parse', fullAA.length + ' aa');
 
     renderViewer(parsedTracks);
 }
@@ -9951,6 +10055,7 @@ function buildFromPlainFasta(rawText) {
     lastRanges = null; refreshChimeraxDisplay();
     populateCrossRefDropdown();
     applyLookupDefaults(false);
+    logAction('import', 'FASTA parse', parsed.sequence.length + ' aa');
     renderViewer(parsedTracks);
     schedulePersist();
     showToast('Loaded a ' + parsed.sequence.length + ' aa FASTA sequence' +
@@ -10233,6 +10338,7 @@ function removeTracks(keys, opts) {
     });
 
     // 5) repaint everything that mirrors the track list
+    logAction('remove', list.length + ' track(s)', list.slice(0, 6).join(', '));
     if (!opts.silent) {
         renderViewer(parsedTracks);
         populateCrossRefDropdown();
@@ -10435,9 +10541,21 @@ function buildPositionMarkerRow(totalLength) {
 // Builds one heatmap row (label + badges + per-residue cells) for a single
 // track. Shared by Grid mode (every track) and Graph mode (annotation tracks
 // only, rendered above the overlaid graphs for visual cross-reference).
+// A track with nothing annotated is still a track: the import simply found
+// nothing for this protein (a TM row for a soluble protein, say). Rather than
+// hiding it, mark it "(Empty)" and grey it slightly, so it reads as "ran, found
+// nothing" instead of looking like data or a broken import.
+function isTrackEmpty(key) {
+    if (!key || key === 'AA') return false;
+    const t = parsedTracks ? parsedTracks[key] : null;
+    if (Array.isArray(t)) return !t.some(x => x && x.val != null);
+    if (typeof t === 'string') return !/[^ \t-]/.test(t);
+    return false;
+}
 function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     const rowEl = document.createElement('div');
     rowEl.className = 'track-row' + (isGroupFirst ? ' track-group-first' : '');
+    if (isTrackEmpty(key)) rowEl.classList.add('track-empty');
 
     const labelEl = document.createElement('div');
     labelEl.className = 'track-label';
@@ -10476,6 +10594,13 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     const varDesc = key.startsWith('VAR_') ? getVariantDescription(key) : '';
     labelText.title = key + (varDesc ? '\n' + varDesc : '');
     labelEl.appendChild(labelText);
+    if (isTrackEmpty(key)) {
+        const emptyTag = document.createElement('span');
+        emptyTag.className = 'track-empty-tag';
+        emptyTag.textContent = '(Empty)';
+        emptyTag.title = 'No residue in this track is annotated: the prediction or import found nothing for this protein.';
+        labelEl.appendChild(emptyTag);
+    }
 
     const predictorInfo = getPredictorInfo(key);
     if (key.startsWith('VAR_')) {
@@ -12822,6 +12947,7 @@ function buildMetricsDelimited(sep) {
 
 // Generic text download helper shared by the TSV/CSV/SVG exporters.
 function downloadTextFile(filename, text, mime) {
+    logAction('export', filename, (text ? text.length : 0) + ' chars');
     let blob, url;
     try { blob = new Blob([text], { type: mime }); url = URL.createObjectURL(blob); }
     catch (err) { console.error('Export failed:', err); showToast('Failed to build the file.', 'error'); return false; }
@@ -14380,6 +14506,7 @@ function loadStateFromStorage() {
 // attached .json export) below, so a page-load restore and a manual
 // save-file import behave identically.
 function applyPersistedState(state) {
+    logAction('session', 'restored from storage');
     document.getElementById('rawInput').value = state.rawInput || '';
     parsedTracks = state.parsedTracks;
     currentProteinLabel = state.currentProteinLabel || null;

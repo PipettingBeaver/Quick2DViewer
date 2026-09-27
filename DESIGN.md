@@ -459,6 +459,8 @@ workflow rather than a feature list.
 | **Co-localization table** | Deliverable | *Added 0.36.0*: Integrate step action |
 | Methods summary report | Deliverable | *Added 0.36.0*: Integrate step action |
 | Variant FASTA panel | Background (utility) | none |
+| Empty-track marking | Background (readability) | none (but the read-out flags an empty TM row against a membrane answer) |
+| Debugging console (action log) | Background (tooling) | none — a testing/macro aid, not a research feature |
 | Track removal / Undo / overrides | Background | none |
 | Legend + scroll fix, layout, a11y | Background | none |
 | Feature test cards | Process | n/a |
