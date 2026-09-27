@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-09-25
+
+### Added
+
+- **"Characterizing an unresolved fold"** as a closing goal (Guide → Integrate → *What are you
+  closing on?*). Review noticed the question had no route for an undetermined or partially
+  determined model. The tools existed (Foldseek for fold assignment, HMMER/Pfam for domain
+  architecture) but nothing pointed at them from that question.
+  - The route is **adaptive**: with no structure attached it offers **Scan HMMER/Pfam** ("the
+    domain architecture is the first evidence, then predict or attach a model so Foldseek can
+    search it"); with a model attached it goes straight to **Run Foldseek (fold assignment)**.
+  - The read-out now names the state: while there is **no Pfam family and no structural
+    relative**, it says the fold is unplaced and names the two routes that place it. A *sequence*
+    homolog (HHpred) does not clear it — that is not a fold assignment.
+  - Honest scope: the app cannot determine a fold *de novo*. It places one by homology — curated
+    family, profile search, or structural relative — and an unresolved fold with no relatives
+    anywhere stays unresolved.
+
 ## [0.44.0] - 2026-09-25
 
 ### Changed

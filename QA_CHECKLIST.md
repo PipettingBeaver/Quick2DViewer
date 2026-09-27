@@ -391,6 +391,39 @@ step has something to work on, instead of the declaration only producing a warni
 
 ---
 
+### Characterizing an unresolved fold — 0.45.0
+
+**Should do.** Give the closing-goal question a characterization route, so a protein whose
+fold/family is unresolved has an obvious first move — and name that state in the read-out while
+nothing has placed the sequence.
+
+**Try (normal use).**
+1. Guide → Integrate → answer **Characterizing an unresolved fold**.
+   *Expect:* with **no** structure attached the action is **Scan HMMER/Pfam** ("the domain
+   architecture is the first evidence, then predict or attach a model so Foldseek can search it");
+   with a model attached it is **Run Foldseek (fold assignment)**.
+2. Run it, then read the read-out.
+   *Expect:* the "fold is unplaced" line disappears once a **Pfam family** or a **Foldseek** hit
+   exists. A sequence homolog (HHpred) alone does *not* clear it.
+3. With nothing loaded.
+   *Expect:* "No Pfam family and no structural relative are assigned yet, so the fold is unplaced.
+   The Pfam scan … and a Foldseek search are the two routes that place it."
+
+**Edge cases (symptom → likely cause).**
+- **The line stays after a Pfam scan.** Correct: that scan found no family, so nothing placed the
+  fold. The scan's own status says whether it found significant domains.
+- **An HHpred hit does not clear it.** By design — sequence homology is not a fold assignment;
+  only a Pfam family or a structural relative counts.
+- **The Foldseek action refuses.** It needs an attached model (that is why the route changes when
+  one is present) and a structure database selected in the foldseek step.
+- **A partially determined model.** The read-out already covers model confidence (pLDDT) and
+  ensemble disagreement (RMSF); this route adds the family/relative question on top.
+- **What this is not:** the app cannot determine a fold *de novo* — it places one by homology
+  (curated family, profile search, or structural relative). An unresolved fold with no relatives
+  anywhere stays unresolved, and the methods summary will say so.
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -793,6 +826,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 233 | Add a preset, then Help → Debugging console | A "render / rule presets / 8 card(s)" line confirms the cards were written |
 | 234 | Reproduce the "cards disappear" report | Check the console for an `error` entry (uncaught errors are now logged) — please share it if it appears |
 
+## 0.45.0 - characterizing an unresolved fold (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 235 | Guide → Integrate → "Characterizing an unresolved fold" with no model | Action is Scan HMMER/Pfam, with the follow-on explained |
+| 236 | Same with a model attached | Action is Run Foldseek (fold assignment) |
+| 237 | Load data with no Pfam family and no Foldseek hit | The read-out says the fold is unplaced and names both routes |
+| 238 | Run the Pfam scan and find a family | The line clears |
+| 239 | Import an HHpred .hhr only | The line does **not** clear (sequence homology ≠ fold assignment) |
+| 240 | Import Foldseek hits | The line clears |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -837,4 +881,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6q. 208–214 + 215–221 (declared oligomeric state and its export/generator wiring; card at the top).
 6r. 222–228 (experimental assembly import; card at the top).
 6s. 229–234 (rules panel polish + modern citations).
+6t. 235–240 (characterizing an unresolved fold; card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

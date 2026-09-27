@@ -5601,6 +5601,7 @@ const STEP_QUESTIONS = {
     ],
     integration: [
         { id: 'goal', label: 'What are you closing on?', options: [
+            { value: 'characterize', label: 'Characterizing an unresolved fold' },
             { value: 'variants', label: 'Variant triage' },
             { value: 'interface', label: 'Binding interface' },
             { value: 'construct', label: 'Construct design' },
@@ -5736,6 +5737,19 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     integration(a) {
+        // "Unresolved fold" is the one goal whose first move depends on what is
+        // loaded: structural homology needs a model, domain architecture does not.
+        if (a.goal === 'characterize') {
+            const hasModel = Object.keys(cachedStructureTexts || {}).some(f => p3dUsableStructure(f));
+            if (hasModel) return {
+                label: 'Run Foldseek (fold assignment)', run: 'runFoldseekSearch()',
+                hint: 'Structural homology is the fastest route to a fold assignment when the family is unresolved. The Pfam scan (annotation step) adds the domain architecture, and the read-out flags which regions the models disagree on.'
+            };
+            return {
+                label: 'Scan HMMER/Pfam', run: 'runDomainScan()',
+                hint: 'With no structure attached the domain architecture is the first evidence: scan Pfam, then predict or attach a model so Foldseek can search it structurally.'
+            };
+        }
         const map = {
             variants: { label: 'Open Analysis Rules…', run: "openGuideCoachmark('rules')", hint: 'Co-localize variants with conservation, domains and structure.' },
             interface: {
@@ -6266,6 +6280,15 @@ function computeGuideInsights() {
             }
         }
     } catch (e) { /* cross-check is advisory */ }
+    try {
+        // An unresolved fold is a state worth naming: no domain family and no
+        // structural relative means nothing has placed this sequence yet.
+        const hasDomainFamily = Object.keys(domainHitsInfo || {}).length > 0;
+        const hasFoldseekHit = Object.keys(homologHitsInfo || {}).some(k => /Foldseek/i.test((homologHitsInfo[k] || {}).source || ''));
+        if (!hasDomainFamily && !hasFoldseekHit) {
+            out.push({ level: 'info', text: 'No Pfam family and no structural relative are assigned yet, so the fold is unplaced. The Pfam scan (Analyze → Scan Domains) and a Foldseek search are the two routes that place it.' });
+        }
+    } catch (e) { /* fold-placement read-out is advisory */ }
     try {
         const sug = suggestedRulePresets();
         if (sug.length && !analysisRules.length) {
@@ -7461,7 +7484,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.44.0';
+const APP_VERSION = '0.45.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

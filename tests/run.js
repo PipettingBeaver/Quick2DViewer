@@ -870,6 +870,30 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('characterizing an unresolved fold');
+const goalQ = ctxRun(`STEP_QUESTIONS.integration.filter(q => q.id === 'goal')[0]`);
+assert(goalQ.options.map(o => o.value).join(',') === 'characterize,variants,interface,construct,report', 'the closing-goal question leads with characterizing an unresolved fold');
+// the route adapts to what is loaded
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; cachedStructureTexts = {};`);
+ctxRun(`setStepAnswer('integration', 'goal', 'characterize');`);
+let chAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0])`);
+assert(chAct.run === 'runDomainScan()' && /Scan HMMER\/Pfam/.test(chAct.label), 'with no model it starts with the domain architecture');
+assert(/then predict or attach a model so Foldseek/.test(chAct.hint), 'and says what comes next');
+ctxRun(`cachedStructureTexts = { 'm.pdb': 'ATOM' };`);
+chAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'integration')[0])`);
+assert(chAct.run === 'runFoldseekSearch()' && /fold assignment/.test(chAct.label), 'with a model it goes straight to structural homology');
+assert(/fastest route to a fold assignment/.test(chAct.hint), 'and explains why');
+// the read-out names an unplaced fold
+ctxRun(`domainHitsInfo = {}; homologHitsInfo = {}; cachedStructureTexts = {};`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /fold is unplaced/.test(i.text)), 'an unplaced fold is reported');
+ctxRun(`domainHitsInfo = { DM_GFP: { model: 'GFP', domains: [] } };`);
+assert(!ctxRun(`computeGuideInsights()`).some(i => /fold is unplaced/.test(i.text)), 'a Pfam family places it');
+ctxRun(`domainHitsInfo = {}; homologHitsInfo = { 'HL_01_x': { source: 'Foldseek' } };`);
+assert(!ctxRun(`computeGuideInsights()`).some(i => /fold is unplaced/.test(i.text)), 'a structural relative places it');
+ctxRun(`homologHitsInfo = { 'HL_01_x': { source: 'HHpred' } };`);
+assert(ctxRun(`computeGuideInsights()`).some(i => /fold is unplaced/.test(i.text)), 'a sequence homolog alone does not (it is not a fold assignment)');
+ctxRun(`guideAnswers = {}; parsedTracks = {}; cachedStructureTexts = {}; domainHitsInfo = {}; homologHitsInfo = {};`);
+
 section('rules panel polish + modern citations');
 // the Tracks tab's own submenu is no longer called "Tracks"
 assert(HTML.indexOf('<summary>Track Visibility</summary>') !== -1, 'the Tracks tab submenu is called Track Visibility');
