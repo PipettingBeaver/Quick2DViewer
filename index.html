@@ -7555,14 +7555,30 @@ document.addEventListener('click', (e) => {
 // unstyled. On hover we show that text in the shared #globalTooltip (with the
 // track name + the cell's own color swatch) and suppress the native title for
 // the duration so only one tooltip appears. The tooltip is click-through.
+// True for a plotted graph point (an SVG circle), which carries its text in a
+// <title> child and its colour in `fill` rather than an attribute/background.
+function isSvgGraphPoint(el) {
+    return !!(el && (el.ownerSVGElement || el.tagName === 'circle'));
+}
 function showCellTooltip(cell, clientX, clientY) {
     const tooltipEl = document.getElementById('globalTooltip');
     if (!tooltipEl || pinnedIcon) return;
-    let title = cell.getAttribute('title');
-    if (title == null && cell.dataset.origTitle) title = cell.dataset.origTitle;
-    if (!title) return;
-    if (!cell.dataset.origTitle) { cell.dataset.origTitle = title; cell.removeAttribute('title'); }
-    const bg = getComputedStyle(cell).backgroundColor;
+    const svgPoint = isSvgGraphPoint(cell);
+    let title = '';
+    if (svgPoint) {
+        const nativeTitle = cell.querySelector ? cell.querySelector('title') : null;
+        title = nativeTitle ? nativeTitle.textContent : '';
+        if (!title) return;
+        // Suppress the native tooltip while the styled one is up (restored on leave).
+        if (!cell.dataset.origTitle) { cell.dataset.origTitle = title; nativeTitle.remove(); }
+    } else {
+        title = cell.getAttribute('title');
+        if (title == null && cell.dataset.origTitle) title = cell.dataset.origTitle;
+        if (!title) return;
+        if (!cell.dataset.origTitle) { cell.dataset.origTitle = title; cell.removeAttribute('title'); }
+    }
+    const computed = getComputedStyle(cell);
+    const bg = svgPoint ? computed.fill : computed.backgroundColor;
     const swatch = (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
         ? '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + bg + ';border:1px solid rgba(0,0,0,0.25);margin-right:6px;vertical-align:middle;"></span>'
         : '';
@@ -7580,15 +7596,24 @@ function showCellTooltip(cell, clientX, clientY) {
     tooltipEl.style.top = Math.max(10, top) + 'px';
 }
 function restoreCellTitle(cell) {
-    if (cell && cell.dataset.origTitle) { cell.setAttribute('title', cell.dataset.origTitle); delete cell.dataset.origTitle; }
+    if (!cell || !cell.dataset || !cell.dataset.origTitle) return;
+    const text = cell.dataset.origTitle;
+    delete cell.dataset.origTitle;
+    if (isSvgGraphPoint(cell)) {
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = text;
+        cell.appendChild(t);
+    } else {
+        cell.setAttribute('title', text);
+    }
 }
 document.addEventListener('mouseover', (e) => {
     if (pinnedIcon) return;
-    const cell = e.target.closest ? e.target.closest('.cell, .position-cell') : null;
+    const cell = e.target.closest ? e.target.closest('.cell, .position-cell, .graph-svg circle') : null;
     if (cell) showCellTooltip(cell, e.clientX, e.clientY);
 });
 document.addEventListener('mouseout', (e) => {
-    const cell = e.target.closest ? e.target.closest('.cell, .position-cell') : null;
+    const cell = e.target.closest ? e.target.closest('.cell, .position-cell, .graph-svg circle') : null;
     if (!cell) return;
     if (e.relatedTarget && cell.contains(e.relatedTarget)) return;
     restoreCellTitle(cell);
@@ -7598,7 +7623,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.49.1';
+const APP_VERSION = '0.50.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9661,6 +9686,12 @@ function parseHHpredFile(text) {
 // being swallowed into "blank" alongside genuine gaps. Only ' ' (no
 // alignment coverage at all) is left as the real blank for these tracks.
 const HH_QUALITY_REMAP = { '-': ':' };
+// Plain meanings for the single-character prediction rows, used by the uniform
+// cell tooltip when a row has no richer title of its own.
+const CELL_CHAR_MEANINGS = {
+    H: 'helix', P: 'pi-helix', E: 'strand', C: 'coil',
+    M: 'transmembrane', D: 'disordered', S: 'signal peptide'
+};
 const HH_QUALITY_COLORS = {
     '.': ['#ecfeff', '#0e7490'],
     ':': ['#cffafe', '#155e75'],
@@ -10986,9 +11017,9 @@ function buildPositionMarkerRow(totalLength) {
     for (let i = 0; i < totalLength; i++) {
         const cellEl = document.createElement('div');
         cellEl.className = 'position-cell';
+        cellEl.title = `Residue ${i + 1}`;
         if (i === 0 || (i + 1) % 10 === 0) {
             cellEl.textContent = String(i + 1);
-            cellEl.title = `Residue ${i + 1}`;
             // Residue counter follows the same semantic-zoom fade as the
             // sequence letters so it never crowds the columns at low zoom.
             cellEl.style.opacity = String(op);
@@ -11228,6 +11259,9 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
             if (showGlyphs) setGlyph(cellEl, char, gridCellW);
             if (key === 'AA') {
                 cellEl.classList.add('cell-AA');
+                // The reference row's characters are residues, not structure
+                // codes, so it names the letter rather than a meaning.
+                cellEl.title = `Residue ${i + 1}: ${char.trim() ? char : '(gap)'}`;
                 // Fall back to a continuous neutral band once the letters
                 // fade below the 12px threshold so the reference row never
                 // disappears into the empty background.
@@ -11400,6 +11434,20 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     if (gSpan) gSpan.textContent = '-';
                 }
             }
+        }
+
+        // Uniform hover framework: any cell without a richer title of its own
+        // still explains itself, so every track behaves the same on hover.
+        if (!cellEl.title) {
+            // `char` only exists for string tracks; an object track with an
+            // unrecognised type reaches here too.
+            const cellChar = (typeof dataVal === 'string') ? (dataVal || ' ') : '';
+            // Only prediction rows get a meaning: on a sequence row these same
+            // letters are residues (C is cysteine, not "coil").
+            const meaning = key === 'AA' ? undefined : CELL_CHAR_MEANINGS[cellChar];
+            cellEl.title = !cellChar || cellChar === ' ' || cellChar === '-' || cellChar === '\t'
+                ? `Residue ${i + 1}: not annotated in ${formatTrackLabel(key)}`
+                : `Residue ${i + 1}: ${meaning ? cellChar + ' (' + meaning + ')' : cellChar}`;
         }
 
         cellEl.addEventListener('mousedown', (e) => handleMouseDown(i, key, e));

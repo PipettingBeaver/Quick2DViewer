@@ -56,6 +56,7 @@ const sandbox = {
   },
   location: { href: '', host: '', protocol: 'file:', pathname: '', search: '', hash: '', reload() {}, assign() {}, replace() {} },
   navigator: { userAgent: 'node', platform: 'linux', language: 'en', clipboard: { writeText() { return Promise.resolve(); } } },
+  getComputedStyle: () => ({ backgroundColor: '', fill: '#facc15' }),
   localStorage: { _s: {}, getItem(k) { return this._s[k] === undefined ? null : this._s[k]; }, setItem(k, v) { this._s[k] = String(v); }, removeItem(k) { delete this._s[k]; }, clear() { this._s = {}; } },
   history: { pushState() {}, replaceState() {}, back() {}, state: {} },
   fetch() { return Promise.resolve({ ok: false, json() { return Promise.resolve({}); }, text() { return Promise.resolve(''); } }); },
@@ -948,6 +949,70 @@ assert(HTML.indexOf("section.appendChild(wrap)") !== -1, 'a missing preset conta
 assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 'opening the presets section refreshes them');
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
+
+section('uniform hover framework (every track)');
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'SS_PSIPRED': 'H  ', 'TM_TMHMM': '  M', 'DO_IUPred': ' D ',
+        'UP_Sites': '\u25a0  ', 'EV_RMSF': [{ val: 1, type: 'rmsf' }, { val: null, type: 'rmsf' }, { val: 2, type: 'rmsf' }],
+        'm_pLDDT': [{ val: 90 }, { val: 80 }, { val: 70 }] };
+    analysisRules = [{ id: 'r1', name: 'Probe', color: '#f00', mode: 'all', enabled: true,
+        conditions: [{ kind: 'categorical', source: 'group:SS', op: 'annotated', value: '' }] }];
+    applyRules(); gridCellW = 12;
+`);
+// every cell of every row type carries a title (so every track hovers)
+const titleReport = ctxRun(`
+    (function () {
+        var keys = ['AA', 'SS_PSIPRED', 'TM_TMHMM', 'DO_IUPred', 'UP_Sites', 'EV_RMSF', 'm_pLDDT', 'RULE_r1'];
+        var missing = [], samples = {};
+        keys.forEach(function (k) {
+            if (!parsedTracks[k]) return;
+            var row = buildTrackRow(k, parsedTracks, 3, true);
+            var cells = row.children[1];
+            var titles = (cells.children || []).map(function (c) { return c.title || ''; });
+            if (titles.length !== 3 || titles.some(function (t) { return !t; })) missing.push(k);
+            samples[k] = titles.join(' | ');
+        });
+        return { missing: missing.join(','), samples: samples };
+    })()
+`);
+assert(titleReport.missing === '', 'every cell of every track type has a title (' + (titleReport.missing || 'none missing') + ')');
+assert(/Residue 1: H \(helix\)/.test(titleReport.samples.SS_PSIPRED), 'a helix cell explains itself (' + titleReport.samples.SS_PSIPRED + ')');
+assert(/Residue 3: M \(transmembrane\)/.test(titleReport.samples.TM_TMHMM), 'a TM cell explains itself');
+assert(/Residue 2: D \(disordered\)/.test(titleReport.samples.DO_IUPred), 'a disorder cell explains itself');
+assert(/Residue 1: M$/.test(titleReport.samples.AA.split(' | ')[0]), 'the reference row names the residue, not a structure meaning (' + titleReport.samples.AA.split(' | ')[0] + ')');
+assert(titleReport.samples.AA.indexOf('(coil)') === -1 && titleReport.samples.AA.indexOf('(helix)') === -1, 'and never borrows a prediction meaning');
+assert(/not annotated/.test(titleReport.samples.SS_PSIPRED.split(' | ')[1]), 'a blank prediction cell says so');
+// graph points join the same tooltip
+assert(ctxRun(`isSvgGraphPoint({ tagName: 'circle', ownerSVGElement: {} })`) === true, 'an SVG circle is recognised as a graph point');
+assert(ctxRun(`isSvgGraphPoint({ tagName: 'DIV' })`) === false, 'a heatmap cell is not');
+assert(HTML.indexOf("closest('.cell, .position-cell, .graph-svg circle')") !== -1, 'the delegated hover covers graph points too');
+assert(HTML.indexOf('nativeTitle.remove()') !== -1, 'the native SVG tooltip is suppressed while the styled one shows');
+assert(HTML.indexOf("createElementNS('http://www.w3.org/2000/svg', 'title')") !== -1, 'and restored on leave');
+// the tooltip itself runs for a graph point. The stub's querySelector does not
+// search children, so drive the real function with an SVG-shaped object (which
+// is what an SVG circle actually exposes to this code).
+let tooltipErr = null;
+try {
+  ctxRun(`
+    var titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    titleEl.textContent = 'Residue 4 (K): 91.20';
+    var fakeCircle = {
+        tagName: 'circle', ownerSVGElement: {}, dataset: { track: 'm_pLDDT' },
+        querySelector: function (sel) { return sel === 'title' ? titleEl : null; },
+        appendChild: function () {}, removeAttribute: function () {},
+        getAttribute: function () { return null; }
+    };
+    showCellTooltip(fakeCircle, 10, 10);
+  `);
+} catch (e) { tooltipErr = e.message; }
+assert(tooltipErr === null, 'the styled tooltip runs for a graph point (' + (tooltipErr || 'ok') + ')');
+const tipHtml = ctxRun(`String(document.getElementById('globalTooltip').innerHTML)`);
+assert(/pLDDT/.test(tipHtml), 'and includes the track header like the rows (' + tipHtml.slice(0, 90) + ')');
+assert(/\[Structure\]/.test(tipHtml), 'with its provenance, as the rows do');
+assert(/Residue 4 \(K\): 91.20/.test(tipHtml), 'and the point text');
+assert(/background:#facc15/.test(tipHtml), 'and a swatch from the point fill');
+assert(ctxRun(`fakeCircle.dataset.origTitle`) === 'Residue 4 (K): 91.20', 'the native SVG title is stashed for restore');
+ctxRun(`restoreCellTitle(document.querySelector('.graph-svg circle') || { dataset: {}, appendChild: function () {} }); parsedTracks = {}; analysisRules = [];`);
 
 section('pinned graph axis strip (scrolling)');
 ctxRun(`parsedTracks = { AA: 'M'.repeat(40), 'm_pLDDT': Array.from({length: 40}, (_, i) => ({ val: 90, type: 'plddt' })), 'EV_RMSF': Array.from({length: 40}, (_, i) => ({ val: 1.5, type: 'rmsf' })) }; gridCellW = 11.5;`);

@@ -424,6 +424,39 @@ nothing has placed the sequence.
 
 ---
 
+### Uniform hover framework (every track) — 0.50.0
+
+**Should do.** Every track — predictions, annotations, the reference row, the residue-position
+markers, and graph points — explains itself on hover with the *same* styled tooltip: a colour
+swatch, the track name and its provenance, and the residue detail.
+
+**Try (normal use).**
+1. Hover a residue in **any** row: SS, TM, disorder, coiled-coil, signal, homolog, variant,
+   UniProt, topology, rule, interface, domain, pLDDT/RSA/RMSF.
+   *Expect:* the styled tooltip with the swatch, "Track [Source]" and the residue text — for
+   **every** row, not just the ones that already had rich titles.
+2. Hover a **blank** prediction cell.
+   *Expect:* "Residue N: not annotated in &lt;track&gt;".
+3. Hover the **reference (AA)** row, and the residue numbers above it.
+   *Expect:* "Residue N: &lt;letter&gt;" and "Residue N" — every marker hovers now, not just the
+   labelled ones.
+4. Show a type as a **graph** and hover a plotted point.
+   *Expect:* the same styled tooltip (swatch from the point's colour, track header, point value);
+   the browser's own tooltip is suppressed while it shows.
+
+**Edge cases (symptom → likely cause).**
+- **A letter that is both a residue and a structure code** (C, H, P, E, M, D, S). On a
+  *prediction* row it reads as the meaning ("C (coil)"); on the *reference* row those letters are
+  residues and get no meaning — that asymmetry is deliberate.
+- **A graph point with no tooltip.** Points hidden by the model pills have no circles at all
+  (expected); a visible point with no text means its `<title>` was not written.
+- **A native SVG tooltip appearing *as well*.** The styled tooltip removes the `<title>` child while
+  it shows and restores it on leave; seeing both means the restore path fired early.
+- **A cell with no tooltip at all.** Every cell now carries a title — a gap means a new row type was
+  added without one (or without falling through to the generic title).
+
+---
+
 ## Setup / reset between attempts
 
 | Purpose | How |
@@ -889,6 +922,16 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 266 | Change the type's view (e.g. to Glyphs) | The chevron shows its active colour; the graph collapses |
 | 267 | Tab to the chevron | It takes focus (keyboard reachable) |
 
+## 0.50.0 - uniform hover framework (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 268 | Hover residues in SS / TM / disorder / coiled-coil / signal rows | A tooltip with the swatch, track name and provenance (these had none before) |
+| 269 | Hover a blank prediction cell | "not annotated in &lt;track&gt;" |
+| 270 | Hover the AA row and the residue numbers | "Residue N: M" / "Residue N" |
+| 271 | Hover a plotted graph point | The same styled tooltip; no duplicate native one |
+| 272 | Check a C/H/P/E/M/D/S residue on a prediction row vs the AA row | Meaning on the prediction row, plain residue on the AA row |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -938,4 +981,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6v. 244–248 (model numbering vs the reference).
 6w. 249–253 (pinned graph axis strip) + 254–261 (its regression fix and the graph right-click menu).
 6x. 262–267 (graph axis title clearance + header chevron).
+6y. 268–272 (uniform hover framework; card at the top).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

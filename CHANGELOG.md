@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-09-25
+
+### Changed
+
+- **The reactive hover tooltip is now the default for every track.** The styled tooltip (swatch,
+  track name, provenance, residue detail) already covered the rows that set a title — Conservation,
+  UniProt, Rules, Ensemble, variants, topology, domains — but the SS/TM/disorder/coiled-coil/signal
+  rows only added a colour class, so they had **no tooltip at all**, and the reference row's cells
+  had none either.
+  - Every cell now carries a title: prediction letters get a plain meaning ("H (helix)", "M
+    (transmembrane)", "D (disordered)"), blanks say "not annotated in &lt;track&gt;", and the
+    reference row names the residue ("Residue 12: M") — deliberately **without** a meaning, because
+    on a sequence row those same letters are residues (C is cysteine, not "coil").
+  - Residue-position markers all hover now, not only the labelled ones.
+  - **Graph points join the same tooltip.** An SVG circle keeps its text in a `<title>` child and
+    its colour in `fill`, so both are handled; the native tooltip is suppressed while the styled one
+    shows and restored on leave.
+
+`QA_CHECKLIST.md` gained the feature card for the framework.
+
 ## [0.49.1] - 2026-09-25
 
 ### Changed
