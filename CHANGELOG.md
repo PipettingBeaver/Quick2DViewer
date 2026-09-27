@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.1] - 2026-09-25
+
+### Fixed
+
+- **Track Control was too narrow for its four columns**, so the Category name was truncated.
+  The popover is now 380–460 px wide (it was 265–330), which gives the Category column room
+  alongside View as / Color / Config.
+- **Removed the redundant hint beside each Config gear** (the little "(Conservation)" /
+  "(Entropy/PID)" / "(Cutoffs)" text). The gear keeps a plain "Config for <type>" tooltip, and
+  the helper plus its CSS were deleted rather than left as dead code.
+
 ## [0.39.0] - 2026-09-25
 
 ### Added

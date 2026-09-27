@@ -1504,8 +1504,10 @@
             border-radius: 6px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.25);
             padding: 6px;
-            min-width: 265px;
-            max-width: 330px;
+            /* Four columns now (Category / View as / Color / Config), so the
+               popover has to be wide enough to keep the category readable. */
+            min-width: 380px;
+            max-width: 460px;
             max-height: 70vh;
             overflow-y: auto;
         }
@@ -1742,13 +1744,6 @@
             cursor: pointer;
         }
         .tctl-gear:hover { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
-        .tctl-config-hint {
-            font-size: 0.56rem;
-            color: #94a3b8;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
         .tctl-track-row { border-top: 1px solid #f1f5f9; }
         .tctl-track-row:hover { background: #f8fafc; }
         .tctl-track-cat { font-weight: 500; color: #475569; padding-left: 16px; }
@@ -7233,7 +7228,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.39.0';
+const APP_VERSION = '0.39.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -7677,13 +7672,6 @@ function tctlAfterChange() {
 }
 
 // Short caption shown beside a type's Config gear describing what it controls.
-function groupConfigHint(g) {
-    if (g === 'HL') return 'Conservation';
-    if (g === 'CONSERVATION') return 'Entropy/PID';
-    if (g === 'pLDDT') return 'Cutoffs';
-    return '';
-}
-
 // "View as" selector for a whole type group. Options: Glyphs / No letters /
 // Bar / AA (homologs only) / Hidden. Selecting calls setGroupView(), which
 // collapses the old independent hide-symbols / full-bar / AA / hidden flags
@@ -7741,14 +7729,12 @@ function buildTrackViewSelect(key, g) {
 function buildConfigGear(g) {
     const cell = mkEl('div', 'tctl-config-cell');
     const gear = mkEl('button', 'tctl-gear', '⚙');
-    const hintText = groupConfigHint(g);
-    gear.title = 'Config for ' + trackGroupLabel(g) + (hintText ? ': ' + hintText : '');
+    gear.title = 'Config for ' + trackGroupLabel(g);
     gear.addEventListener('click', () => {
         tctlConfigGroup = g;
         tctlRefreshPopup();
     });
     cell.appendChild(gear);
-    if (hintText) cell.appendChild(mkEl('span', 'tctl-config-hint', '(' + hintText + ')'));
     return cell;
 }
 

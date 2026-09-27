@@ -629,6 +629,15 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 195 | Choose Bar, then Glyphs | The colour mode survives |
 | 196 | Open the homolog Config frame | No colour checkbox; a note points at the Color column |
 
+## 0.39.1 - Track Control width + config hints (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 197 | Open Track Control | Full category names (no truncation); the popover is noticeably wider |
+| 198 | Look at the Config column | Just the gear, no "(Conservation)"-style hint text beside it |
+| 199 | Hover a gear | Tooltip reads "Config for <type>" |
+| 200 | Open Track Control near the right edge of a narrow window | The popover clamps to the viewport rather than overflowing |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -664,4 +673,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6l. 179–184 (RMSF line plot; full card at the top).
 6m. 185–190 (empty tracks / duplicate button / debugging console; cards at the top).
 6n. 191–196 (Track Control Color column; full card at the top).
+6o. 197–200 (Track Control width + config hints).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

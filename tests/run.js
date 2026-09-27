@@ -868,6 +868,16 @@ const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
 
+section('Track Control layout: width + no config hints');
+assert(HTML.indexOf('min-width: 380px') !== -1 && HTML.indexOf('max-width: 460px') !== -1, 'the popover is wide enough for four columns (the category was truncating)');
+assert(HTML.indexOf('tctl-config-hint') === -1, 'the redundant hint beside the Config gear is gone (CSS included)');
+assert(HTML.indexOf('function groupConfigHint') === -1, 'its helper is gone rather than left dead');
+assert(HTML.indexOf("gear.title = 'Config for ' + trackGroupLabel(g)") !== -1, 'the gear still explains itself in its tooltip');
+// the four columns are declared in order
+const gridCols = HTML.slice(HTML.indexOf('.tctl-grid {'), HTML.indexOf('.tctl-grid {') + 200);
+assert(gridCols.indexOf('1fr 88px 104px 56px') !== -1, 'the grid declares Category / View as / Color / Config');
+assert(HTML.indexOf("'Color')") !== -1, 'and the header still labels the Color column');
+
 section('Track Control: the Color column (homolog colouring)');
 ctxRun(`trackControlState = getDefaultTrackControlState();`);
 assert(ctxRun(`getGroupColorMode('HL')`) === 'quality', 'homologs default to match-quality colouring');
