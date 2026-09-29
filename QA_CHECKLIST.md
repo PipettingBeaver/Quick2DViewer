@@ -29,6 +29,32 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Empty rules in the rules list — 0.51.0
+
+**Should do.** A rule that currently marks no residue is greyed and tagged "(Empty)" in the
+Tracks tab's rules list, with a tooltip saying why, so a rule that silently does nothing reads as
+"no matches here" instead of looking broken.
+
+**Try (normal use).**
+1. Load a protein with conservation, then Tracks → Rules → add "Conserved buried residue" with no
+   structure attached.
+   *Expect:* the rule row is greyed, tagged "(Empty)", and its tooltip says "No matches: needs
+   RSA (any model)".
+2. Attach a structure (the RSA track appears) with the Tracks tab open.
+   *Expect:* the marker clears as soon as residues match; a matching rule is never greyed.
+3. Remove a track a rule depends on.
+   *Expect:* the rule greys and tags itself again without switching tabs.
+
+**Edge cases (symptom → likely cause).**
+- A disabled rule that matches residues is not marked empty. By design: the marker is about
+  matches, not visibility - the ○ toggle already shows the track is off.
+- Every numeric rule is greyed after loading a bare FASTA. Expected: no sources are loaded yet;
+  each tooltip names what that rule needs.
+- The marker looks stale after a data change while another tab is open. The list refreshes when
+  you switch back to Tracks; the marker is computed, not stored.
+
+---
+
 ### Ensemble variance (RMSF) — 0.34.0
 
 **Should do.** Given two or more attached models of the same construct, measure how much
@@ -958,6 +984,15 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 281 | Add **Conserved buried residue** or **Rigid, well-folded core** with an RSA track loaded (structure attached) | A rule row now appears where those presets used to add a rule that marked nothing |
 | 282 | Add either RSA preset with no structure/RSA track loaded | The card says "needs RSA (any model)" and no row is added (no error) |
 
+## 0.51.0 - empty rules in the rules list (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 283 | Add a rule whose source is not loaded (e.g. Conserved buried residue with no structure) | Greyed row, "(Empty)" tag, tooltip names the missing source |
+| 284 | Add a rule that matches residues | Normal colour, no tag |
+| 285 | Load the missing source with the Tracks tab open (attach a structure) | The marker clears without switching tabs |
+| 286 | Remove that source again | The marker comes back |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -1010,4 +1045,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6y. 268–272 (uniform hover framework; card at the top).
 6z. 273–277 (duplicate viewport with rules - fixed 0.50.1; check 273 first).
 6aa. 278–282 (preset cards vanish while guiding + dead RSA presets - fixed 0.50.2/0.50.3; check 278 first).
+6ab. 283–286 (empty rules in the rules list - new 0.51.0; card at the top, check 283 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

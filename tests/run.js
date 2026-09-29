@@ -950,6 +950,36 @@ assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
 
+section('rules list: empty rules are marked and greyed');
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'SS_PSIPRED': 'HHH', CONSERVATION: { type: 'conservation', metric: 'shannon', values: [0.5, 0.5, 0.5] } };
+    analysisRules = [
+        { id: 'matches', name: 'Matching rule', color: '#f00', mode: 'all', enabled: true,
+          conditions: [{ kind: 'categorical', source: 'group:SS', op: 'annotated', value: '' }] },
+        { id: 'empty', name: 'Empty rule', color: '#00f', mode: 'all', enabled: true,
+          conditions: [{ kind: 'numeric', source: 'CONSERVATION', op: '>=', value: '0.99' }] },
+        { id: 'needsrsa', name: 'Needs RSA rule', color: '#0f0', mode: 'all', enabled: true,
+          conditions: [{ kind: 'numeric', source: 'RSA:', op: '<', value: '0.2' }] }
+    ];
+    renderRulesList();
+`);
+assert(ctxRun(`ruleMatchCount(analysisRules[0])`) === 3, 'a matching rule counts its residues');
+assert(ctxRun(`ruleIsEmpty(analysisRules[0])`) === false, 'and is not empty');
+assert(ctxRun(`ruleIsEmpty(analysisRules[1])`) === true, 'a rule whose threshold nothing meets is empty');
+assert(ctxRun(`ruleIsEmpty(analysisRules[2])`) === true, 'a rule whose source is not loaded is empty (no throw)');
+const rulesHtml = ctxRun(`document.getElementById('rulesList').innerHTML`);
+assert((rulesHtml.match(/\(Empty\)/g) || []).length === 2, 'exactly the two empty rules carry the (Empty) tag (got ' + (rulesHtml.match(/\(Empty\)/g) || []).length + ')');
+assert(rulesHtml.indexOf('No matches: needs RSA (any model)') !== -1, 'the missing-source rule says what it needs');
+assert((rulesHtml.match(/opacity:0\.55/g) || []).length === 2, 'the empty rows are greyed');
+assert(ctxRun(`
+    (function () {
+        parsedTracks['m_RSA'] = [{ val: 0.1, type: 'rsa' }, { val: 0.6, type: 'rsa' }, { val: 0.1, type: 'rsa' }];
+        renderRulesList();
+        return ruleIsEmpty(analysisRules[2]);
+    })()
+`) === false, 'loading the missing track clears the empty state');
+ctxRun(`parsedTracks = {}; analysisRules = [];`);
+
 section('guide coachmark: collapse is a one-shot transition, user choices survive');
 ctxRun(`
     guideCoachmark = null; appliedCoachmarkKind = undefined;

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-09-25
+
+### Added
+
+- **The rules list marks empty rules the same way tracks are marked.** A rule that currently marks
+  no residue is greyed (opacity 0.55) and tagged "(Empty)", with a tooltip that says why: "No
+  matches: needs RSA (any model)" when one of its sources is not loaded, otherwise "No residue in
+  the loaded data matches this rule" (plus ", and its track is switched off" for a disabled rule).
+  A rule that silently did nothing now reads as "no matches here" instead of looking broken.
+  - Helpers `ruleMatchCount()` / `ruleIsEmpty()`; `refreshTrackManagerIfVisible()` also re-renders
+    the rules list, so the markers update with the data while the Tracks tab is open.
+  - Tests: a matching rule counts its residues; a threshold nothing meets is empty; a rule whose
+    source is not loaded is empty without throwing; exactly the two empty rules carry the tag and
+    the grey; loading the missing track clears the marker.
+
 ## [0.50.3] - 2026-09-25
 
 ### Fixed
