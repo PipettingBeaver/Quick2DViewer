@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     inclusion threshold become rows, like the domain scan's significant domains.
   - `buildHomologPredictorInfo()` is source-aware: phmmer rows report E-value, score, identity and
     aligned columns, and cite HMMER phmmer.
+  - The guide is wired properly: the homologs step carries "Search homologs (phmmer)" as a
+    first-class action button (Next card and step card, in every state), its description and "how to
+    read it" explain the in-app route and how phmmer colouring differs from HHpred, the generated
+    WORKFLOW.md lists it, and the read-out suggests it when no homologs are loaded.
+    `resolveStepAction()` now also lets a resolver add context actions - they were silently dropped
+    before, so a tailored action could never appear in the guide.
   - Tests: a real EBI phmmer output (GFP vs Swiss-Prot, `tests/fixtures/phmmer-gfp.out`) is parsed
     end to end - 21 reported hits, 13 above the inclusion threshold, 237/238 identity for the top
     hit, glyphs restricted to the HHpred scale, multi-domain and gapped hits, rank continuation,
