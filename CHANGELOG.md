@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.1] - 2026-09-25
+
+### Changed
+
+- **The homologs route question is no longer HHpred-centric.** "Is the HHpred .hhr ready?" becomes
+  "For homologs, would you prefer MPI's HHpred, phmmer, or both?", with answers that match the
+  routes (HHpred / phmmer / both). Each answer leads with its own action: phmmer -> the in-app
+  search, HHpred -> attach the .hhr with the HHpred link beside it, both -> the in-app search with
+  the .hhr attach as the secondary button and the HHpred link alongside. Saved answers from older
+  sessions ('ready' / 'no') migrate on restore so the right pill is highlighted.
+  - Step copy uses neutral phrasing: the description offers both routes instead of "No HHpred at
+    hand?", and the HHpred hint says "Alternatively, you can search Swiss-Prot in-app with phmmer"
+    while keeping the accepted formats and modelling-database guidance.
+
+### Fixed
+
+- **Duplicate action buttons in the guide.** The short form rendered the accessory without the
+  dedup the step card had, and a route accessory could repeat the step's own action (rendered as
+  the secondary button). `resolveStepAction()` now guarantees one handler, one button: an accessory
+  that repeats the primary action, an extra, or (when the action changed) the step's own action is
+  dropped. Verified across all three routes: phmmer, HHpred link, Copy sequence (FASTA) and
+  "Load .hhr / variant FASTA…" each appear exactly once in both the short form and the step card.
+
 ## [0.52.0] - 2026-09-25
 
 ### Added

@@ -98,7 +98,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 ### 4. Homologs & conservation
 
-**Purpose.** Run [MPI's HHpred](https://toolkit.tuebingen.mpg.de/tools/hhpred) and attach the .hhr; attach a variant FASTA for per-residue conservation. No HHpred at hand? <strong>Search homologs (phmmer)</strong> runs the same idea in-app against Swiss-Prot.
+**Purpose.** Run [MPI's HHpred](https://toolkit.tuebingen.mpg.de/tools/hhpred) and attach the .hhr, or search Swiss-Prot in-app with <strong>phmmer</strong>; attach a variant FASTA for per-residue conservation.
 
 **Why it matters.** Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.
 
@@ -111,7 +111,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Is the HHpred .hhr ready?: Yes, ready to attach / Not yet
+- For homologs, would you prefer MPI's HHpred, phmmer, or both?: MPI's HHpred (have it, or will run it) / phmmer (search Swiss-Prot in-app) / Both
 
 **Promoted when.** Always. Homology is the main cross-check on the sequence-based layers.
 

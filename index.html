@@ -5784,7 +5784,7 @@ const WORKFLOW_STEPS = [
     },
     {
         id: 'homologs', title: 'Homologs & conservation',
-        desc: 'Run <a href="https://toolkit.tuebingen.mpg.de/tools/hhpred" target="_blank" rel="noopener">MPI\'s HHpred</a> and attach the .hhr; attach a variant FASTA for per-residue conservation. No HHpred at hand? <strong>Search homologs (phmmer)</strong> runs the same idea in-app against Swiss-Prot.',
+        desc: 'Run <a href="https://toolkit.tuebingen.mpg.de/tools/hhpred" target="_blank" rel="noopener">MPI\'s HHpred</a> and attach the .hhr, or search Swiss-Prot in-app with <strong>phmmer</strong>; attach a variant FASTA for per-residue conservation.',
         why: 'Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.',
         action: { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()' },
         extraActions: [
@@ -5969,9 +5969,10 @@ const STEP_QUESTIONS = {
             { value: 'domains', label: 'Only Pfam domains' }] }
     ],
     homologs: [
-        { id: 'hhpred', label: 'Is the HHpred .hhr ready?', options: [
-            { value: 'ready', label: 'Yes, ready to attach' },
-            { value: 'no', label: 'Not yet' }] }
+        { id: 'hhpred', label: 'For homologs, would you prefer MPI\'s HHpred, phmmer, or both?', options: [
+            { value: 'hhpred', label: 'MPI\'s HHpred (have it, or will run it)' },
+            { value: 'phmmer', label: 'phmmer (search Swiss-Prot in-app)' },
+            { value: 'both', label: 'Both' }] }
     ],
     structure: [
         { id: 'model', label: 'Where should the model come from?', options: [
@@ -6063,12 +6064,22 @@ const STEP_ACTION_RESOLVERS = {
         return null;
     },
     homologs(a) {
-        if (a.hhpred === 'no') return {
-            label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')",
-            accessory: { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
-            hint: 'Use Copy sequence (FASTA) first, then paste it into HHpred and run the search. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Attach the resulting .hhr here afterwards. No HHpred at hand? Search homologs (phmmer) runs the same idea in-app against Swiss-Prot and adds the hits as Homologs rows.'
+        // The route choice is agnostic (HHpred / phmmer / both). Saved answers
+        // from older sessions used 'ready'/'no'; map them so a restored session
+        // keeps working instead of silently losing its action.
+        const choice = a.hhpred === 'ready' ? 'hhpred' : (a.hhpred === 'no' ? 'both' : a.hhpred);
+        if (choice === 'phmmer' || choice === 'both') return {
+            label: 'Search homologs (phmmer)',
+            run: 'runHomologSearch()',
+            extraActions: choice === 'both' ? [{ label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')" }] : [],
+            hint: 'phmmer searches Swiss-Prot in-app (HMMER, E <= 1e-3) and adds one Homologs row per significant hit; the rows feed conservation, the match-quality colouring and the predictor tooltips.' +
+                (choice === 'both' ? ' Attach the HHpred .hhr afterwards if you ran one - the two sets coexist and both count towards conservation. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling.' : '')
         };
-        if (a.hhpred === 'ready') return { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()', hint: 'Attach the .hhr (and any variant FASTA) in Input Data. The hits become homolog rows and feed the templates table.' };
+        if (choice === 'hhpred') return {
+            label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()',
+            accessory: { label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')" },
+            hint: 'Run MPI\'s HHpred (Copy sequence (FASTA) is below) and attach the resulting .hhr; its hits become Homologs rows and feed the templates table. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Alternatively, you can search Swiss-Prot in-app with phmmer.'
+        };
         return null;
     },
     structure(a) {
@@ -6167,22 +6178,34 @@ function resolveStepAction(step) {
     } catch (e) { resolved = null; }
     // Fall back to the step's own action, and report whether the answer changed it.
     const stepExtras = step.extraActions || [];
-    const base = { label: step.action.label, run: step.action.run, hint: '', extraActions: stepExtras };
+    const base = { label: step.action.label, run: step.action.run, hint: '', extraActions: stepExtras.filter(a => a.run !== step.action.run) };
     if (!resolved) return Object.assign({ custom: false, done: false, accessory: null }, base);
     // A resolver may add context-specific buttons; keep the step's own ones too
     // and drop duplicates by handler (a resolver extra was silently dropped
     // before, so a tailored action could never appear in the guide).
     const resolvedExtras = resolved.extraActions || [];
-    const extraActions = stepExtras.concat(resolvedExtras.filter(a => !stepExtras.some(b => b.run === a.run)));
+    const extraActions = stepExtras
+        .concat(resolvedExtras.filter(a => !stepExtras.some(b => b.run === a.run)))
+        .filter(a => a.run !== resolved.run);
+    // One handler, one button: an accessory that repeats the primary action, an
+    // extra, or (when the action changed) the step's own action - which is
+    // rendered as the secondary button below - would show the same control twice.
+    // This is how "Copy sequence (FASTA)" and "Load .hhr / variant FASTA…"
+    // each appeared twice next to their routes.
+    const custom = resolved.run !== step.action.run;
+    let accessory = resolved.accessory || null;
+    if (accessory && (accessory.run === resolved.run ||
+        extraActions.some(a => a.run === accessory.run) ||
+        (custom && accessory.run === step.action.run))) accessory = null;
     return {
         label: resolved.label, run: resolved.run, hint: resolved.hint || '',
         done: !!resolved.done,
-        accessory: resolved.accessory || null,
+        accessory,
         extraActions,
         // Only a *different action* earns the secondary button. A tailored label
         // for the same handler (e.g. "Run Foldseek (pdb100)" vs "Run Foldseek")
         // must not show twice.
-        custom: resolved.run !== step.action.run
+        custom
     };
 }
 // Undoing a step from the guide. Unlike hiding, this removes the data the step
@@ -7922,7 +7945,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.52.0';
+const APP_VERSION = '0.52.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -15455,6 +15478,11 @@ function applyPersistedState(state) {
     guideProfile = (prefs.guideProfile && typeof prefs.guideProfile === 'object') ? prefs.guideProfile : {};
     guideOverrides = (prefs.guideOverrides && typeof prefs.guideOverrides === 'object') ? prefs.guideOverrides : {};
     guideAnswers = (prefs.guideAnswers && typeof prefs.guideAnswers === 'object') ? prefs.guideAnswers : {};
+    // The homologs route question used to be HHpred-only ('ready' / 'no').
+    // Migrate restored answers onto the agnostic values so the right pill is
+    // highlighted and the resolver picks the intended action.
+    if (guideAnswers.homologs && guideAnswers.homologs.hhpred === 'ready') guideAnswers.homologs.hhpred = 'hhpred';
+    else if (guideAnswers.homologs && guideAnswers.homologs.hhpred === 'no') guideAnswers.homologs.hhpred = 'both';
     analysisRules.forEach(r => { if (r && r.id) setTrackMeta('RULE_' + r.id, { source: 'Rule', color: r.color, ruleName: r.name }); });
     selectionScope = (prefs.selectionScope === 'row' || prefs.selectionScope === 'full') ? prefs.selectionScope : 'full';
     renderSelectionScopeToggle();

@@ -859,15 +859,19 @@ let noSeqThrew = null;
 try { ctxRun(`copySequenceFasta();`); } catch (e) { noSeqThrew = e.message; }
 assert(noSeqThrew === null, 'copying with no sequence refuses gracefully');
 
-// the guide offers the hand-off and the FASTA helpers
+// the guide offers the route choice and the FASTA helpers
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' };`);
-ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'hhpred');`);
 const hhAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0])`);
-assert(hhAct.run.indexOf('window.open') === 0, 'the not-ready answer opens HHpred');
-assert(hhAct.accessory && hhAct.accessory.label === 'Copy sequence (FASTA)' && hhAct.accessory.run === 'copySequenceFasta()', 'and offers Copy sequence (FASTA) as an accessory beside it, named like the step card button');
-assert(/Use Copy sequence \(FASTA\) first/.test(hhAct.hint), 'the short description tells the user to use the copy button');
-assert(hhAct.run.indexOf('copySequence') === -1 && hhAct.run.indexOf('clipboard') === -1, 'the open button itself does not touch the clipboard');
+assert(hhAct.run === 'openInputDataModal()', 'the HHpred route leads with attaching the .hhr');
+assert(hhAct.accessory && hhAct.accessory.run.indexOf('window.open') === 0 && /HHpred/.test(hhAct.accessory.label), 'and offers the HHpred link beside it');
+assert(/Copy sequence \(FASTA\) is below/.test(hhAct.hint), 'the short description points at the copy button');
+assert(hhAct.run.indexOf('copySequence') === -1 && hhAct.run.indexOf('clipboard') === -1, 'the attach button itself does not touch the clipboard');
 assert(/A3M\/CLUSTAL\/FASTA\/STOCKHOLM/.test(hhAct.hint) && /PDB_mmCIF70/.test(hhAct.hint), 'the hint names the accepted formats and the modelling databases');
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'phmmer');`);
+const phAct2 = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0])`);
+assert(phAct2.run === 'runHomologSearch()' && /Swiss-Prot/.test(phAct2.hint), 'the phmmer route leads with the in-app search');
+assert(phAct2.extraActions.every(a => a.run !== 'runHomologSearch()'), 'and does not repeat it as an extra button');
 const hhStep = ctxRun(`WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0]`);
 assert(hhStep.extraActions.some(a => a.run === 'copySequenceFasta()') && hhStep.extraActions.some(a => a.run === 'downloadSequenceFasta()'), 'the step offers copy/download FASTA');
 ctxRun(`guideAnswers = {}; parsedTracks = {}; currentProteinLabel = null;`);
@@ -1023,6 +1027,41 @@ assert(merged.hasExtra, 'a resolver extra action now flows through resolveStepAc
 assert(merged.hasOwn, 'and the step\'s own extra actions are kept');
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.find(s => s.id === 'homologs')).extraActions.some(a => a.run === 'runHomologSearch()')`), 'the resolved homologs action exposes the phmmer button');
 assert(WORKFLOW_MD.indexOf('Search homologs (phmmer)') !== -1, 'the generated workflow doc lists it too');
+const routeQ = ctxRun(`STEP_QUESTIONS.homologs[0]`);
+assert(/HHpred, phmmer, or both/.test(routeQ.label), 'the homologs question offers the routes agnostically (got "' + routeQ.label + '")');
+assert(routeQ.options.map(o => o.value).join(',') === 'hhpred,phmmer,both', 'with HHpred / phmmer / both as the answers');
+const byRoute = ctxRun(`
+    (function () {
+        const out = {};
+        ['hhpred', 'phmmer', 'both', 'ready', 'no'].forEach(v => {
+            const orig = getStepAnswer;
+            setStepAnswer('homologs', 'hhpred', v);
+            const act = resolveStepAction(WORKFLOW_STEPS.find(s => s.id === 'homologs'));
+            out[v] = { run: act.run, label: act.label, custom: act.custom,
+                       accessory: act.accessory ? act.accessory.run : null,
+                       extras: act.extraActions.map(a => a.run), hint: act.hint };
+        });
+        clearStepAnswers('homologs');
+        return out;
+    })()
+`);
+assert(byRoute.phmmer.run === 'runHomologSearch()', 'choosing phmmer offers the in-app search');
+assert(byRoute.hhpred.run === 'openInputDataModal()' && byRoute.hhpred.accessory === "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')", 'choosing HHpred offers the attach action with the HHpred link as accessory');
+assert(byRoute.both.run === 'runHomologSearch()' && byRoute.both.custom === true, 'choosing both leads with the in-app search, with the .hhr attach as the secondary button');
+assert(byRoute.both.accessory === null, 'and no accessory repeats that secondary button (it used to show twice)');
+assert(byRoute.ready.run === byRoute.hhpred.run, 'legacy "ready" answers map onto the HHpred route');
+assert(byRoute.no.run === byRoute.both.run, 'legacy "not yet" answers map onto both');
+['hhpred', 'phmmer', 'both', 'ready', 'no'].forEach(v => {
+    const a = byRoute[v];
+    const all = [a.run].concat(a.extras, a.accessory ? [a.accessory] : [], a.custom ? ['openInputDataModal()'] : []);
+    const dups = all.filter((r, i) => all.indexOf(r) !== i);
+    assert(dups.length === 0, 'route "' + v + '" shows each handler once (dups: ' + dups.join(',') + ')');
+    assert(all.filter(r => r === 'copySequenceFasta()').length <= 1, 'route "' + v + '" shows at most one Copy sequence (FASTA) button');
+});
+assert(byRoute.hhpred.extras.indexOf('runHomologSearch()') !== -1, 'and the alternative route stays one click away as an extra');
+assert(byRoute.phmmer.extras.indexOf('runHomologSearch()') === -1, 'while a redundant phmmer extra is dropped when phmmer is the primary action');
+assert(!/No HHpred at hand/.test(hstep.desc + byRoute.hhpred.hint), 'the copy no longer says "No HHpred at hand" (neutral phrasing instead)');
+assert(/Alternatively, you can/.test(byRoute.hhpred.hint), 'the HHpred hint offers the alternative neutrally');
 assert(HTML.indexOf('Search homologs (phmmer) in-app, add an HHpred .hhr') !== -1, 'the guide read-out names phmmer when no homologs are loaded');
 
 section('phmmer homolog search: parser + apply (real EBI output fixture)');
@@ -2116,23 +2155,36 @@ let gHtml2 = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 const sliceNext = (h) => h.slice(h.indexOf('guide-next-action'), h.indexOf('guide-steps'));
 let nextBlk = sliceNext(gHtml2);
 assert(ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) === 'homologs', 'with only a sequence loaded the homologs step is next (matches the reported case)');
-assert(nextBlk.indexOf('Is the HHpred .hhr ready?') !== -1, 'the short form asks the current step question');
-assert(nextBlk.indexOf('Yes, ready to attach') !== -1 && nextBlk.indexOf('Not yet') !== -1, 'the options are answerable from the short form');
+assert(nextBlk.indexOf('For homologs, would you prefer') !== -1, 'the short form asks the current step question');
+assert(nextBlk.indexOf('phmmer (search Swiss-Prot in-app)') !== -1 && nextBlk.indexOf('Both') !== -1, 'the route options are answerable from the short form');
 assert(nextBlk.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') === -1, 'the long description is NOT repeated in the short form (was the redundancy)');
 assert(gHtml2.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') !== -1, 'the description still lives in the step card below');
 
-ctxRun(`setStepAnswer('homologs', 'hhpred', 'ready');`);
+ctxRun(`setStepAnswer('homologs', 'hhpred', 'hhpred');`);
 gHtml2 = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 nextBlk = sliceNext(gHtml2);
-assert(nextBlk.indexOf('Is the HHpred .hhr ready?') === -1, 'answering collapses the question away');
-assert(nextBlk.indexOf('Attach the .hhr') !== -1, 'the tailored hint replaces it');
+assert(nextBlk.indexOf('For homologs, would you prefer') === -1, 'answering collapses the question away');
+assert(nextBlk.indexOf('attach the resulting .hhr') !== -1, 'the tailored hint replaces it');
 assert(nextBlk.indexOf('Load .hhr / variant FASTA') !== -1, 'the tailored action is offered');
 assert(gHtml2.indexOf('guide-opt-on') !== -1, 'the step card keeps the question as the editable record of the answer');
+// A session saved before 0.52.0 has 'ready' / 'no': it must migrate on restore,
+// or no pill matches and the question looks unanswered.
+assert(ctxRun(`
+    (function () {
+        guideAnswers = { homologs: { hhpred: 'ready' } };
+        if (guideAnswers.homologs.hhpred === 'ready') guideAnswers.homologs.hhpred = 'hhpred';
+        else if (guideAnswers.homologs.hhpred === 'no') guideAnswers.homologs.hhpred = 'both';
+        return guideAnswers.homologs.hhpred;
+    })()
+`) === 'hhpred', 'legacy "ready" answers migrate to the HHpred route on restore');
+assert(HTML.indexOf("guideAnswers.homologs.hhpred = 'hhpred'") !== -1, 'the migration lives in applyPersistedState');
 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
 nextBlk = sliceNext(ctxRun(`document.getElementById('guidePanel').innerHTML`));
-assert(nextBlk.indexOf('Open HHpred') !== -1 && nextBlk.indexOf('PDB_mmCIF70') !== -1, 'the other answer yields its own action + hint');
-assert(nextBlk.indexOf('Copy sequence (FASTA)') !== -1, 'the short form shows the Copy sequence (FASTA) accessory beside the action');
+assert(nextBlk.indexOf('Search homologs (phmmer)') !== -1, 'the legacy "not yet" answer now leads with the in-app search');
+assert(nextBlk.indexOf('Open HHpred') !== -1 && nextBlk.indexOf('PDB_mmCIF70') !== -1, 'and still offers the HHpred route with its format guidance');
+assert(nextBlk.indexOf('Copy sequence (FASTA)') !== -1, 'the short form shows the Copy sequence (FASTA) helper beside the action');
+assert((nextBlk.match(/Copy sequence \(FASTA\)/g) || []).length === 1, 'exactly once - the accessory no longer duplicates it');
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
 
 section('guide focus, re-scan state + structure evidence');

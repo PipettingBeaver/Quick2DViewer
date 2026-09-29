@@ -1035,8 +1035,21 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 291 | Run it with no sequence loaded | Error toast, no job submitted |
 | 292 | Import an .hhr first, then run phmmer | phmmer rows continue after the .hhr numbers |
 
+## 0.52.1 - homologs route question + duplicate buttons (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 293 | Guide → homologs step, answer **phmmer** | Leads with Search homologs (phmmer); no HHpred link; one Copy sequence (FASTA) |
+| 294 | Answer **MPI's HHpred** | Leads with Load .hhr / variant FASTA…, Open HHpred ↗ beside it, one Copy button |
+| 295 | Answer **Both** | Search homologs (phmmer) leads, .hhr attach is the secondary button, HHpred link alongside - each control exactly once |
+| 296 | Restore an old session whose answer was "Not yet" | The "Both" pill shows as answered (migrated), and the action matches |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
+- **UI copy tone (rework wanted).** Several strings are still tool-centric or imperative where a
+  neutral, helpful phrasing reads better ("No HHpred at hand?", "Is the HHpred .hhr ready?"). The
+  homologs step is the first pass (0.52.1); note other offenders here as they turn up, and prefer
+  "Alternatively, you can ..." over warnings or commands.
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
   no "hide the rule row but keep the rule" concept.
 - **FIXED (0.50.3): "adding a preset makes the preset cards disappear"** (reported 0.43.0). The
@@ -1093,4 +1106,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6aa. 278–282 (preset cards vanish while guiding + dead RSA presets - fixed 0.50.2/0.50.3; check 278 first).
 6ab. 283–286 (empty rules in the rules list - new 0.51.0; card at the top, check 283 first).
 6ac. 287–292 (homolog search with phmmer - new 0.52.0; card at the top, check 287 first).
+6ad. 293–296 (homologs route question + duplicate buttons - 0.52.1; check 293 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
