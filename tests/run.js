@@ -1005,6 +1005,26 @@ ctxRun(`clearGuideCoachmark();`);
 assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'and is restored to its pre-guidance state');
 ctxRun(`guideCoachmark = null; appliedCoachmarkKind = undefined;`);
 
+section('guide: phmmer is offered, and resolver extra actions render');
+const hstep = ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'homologs')`);
+assert((hstep.extraActions || []).some(a => a.run === 'runHomologSearch()'), 'the homologs step carries the phmmer action in its own list (so it shows in every state and in WORKFLOW.md)');
+assert(/phmmer/.test(hstep.desc), 'and the step description names the in-app route');
+assert((hstep.how || []).some(h => /posterior/.test(h)), 'and explains how phmmer colouring differs from HHpred');
+const merged = ctxRun(`
+    (function () {
+        const orig = STEP_ACTION_RESOLVERS.features;
+        STEP_ACTION_RESOLVERS.features = () => ({ label: 'Tailored', run: 'openInputDataModal()', extraActions: [{ label: 'Probe extra', run: 'runDomainScan()' }] });
+        const act = resolveStepAction(WORKFLOW_STEPS.find(s => s.id === 'features'));
+        STEP_ACTION_RESOLVERS.features = orig;
+        return { hasExtra: act.extraActions.some(a => a.label === 'Probe extra'), hasOwn: act.extraActions.some(a => a.run === 'runDomainScan()') };
+    })()
+`);
+assert(merged.hasExtra, 'a resolver extra action now flows through resolveStepAction (was silently dropped)');
+assert(merged.hasOwn, 'and the step\'s own extra actions are kept');
+assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.find(s => s.id === 'homologs')).extraActions.some(a => a.run === 'runHomologSearch()')`), 'the resolved homologs action exposes the phmmer button');
+assert(WORKFLOW_MD.indexOf('Search homologs (phmmer)') !== -1, 'the generated workflow doc lists it too');
+assert(HTML.indexOf('Search homologs (phmmer) in-app, add an HHpred .hhr') !== -1, 'the guide read-out names phmmer when no homologs are loaded');
+
 section('phmmer homolog search: parser + apply (real EBI output fixture)');
 sandbox.__phmmerFixture = PHMMER_FIXTURE;
 const phm = ctxRun(`parsePhmmerHits(window.__phmmerFixture)`);

@@ -98,15 +98,16 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 ### 4. Homologs & conservation
 
-**Purpose.** Run [MPI's HHpred](https://toolkit.tuebingen.mpg.de/tools/hhpred) and attach the .hhr; attach a variant FASTA for per-residue conservation.
+**Purpose.** Run [MPI's HHpred](https://toolkit.tuebingen.mpg.de/tools/hhpred) and attach the .hhr; attach a variant FASTA for per-residue conservation. No HHpred at hand? <strong>Search homologs (phmmer)</strong> runs the same idea in-app against Swiss-Prot.
 
 **Why it matters.** Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.
 
 **How to read it.**
 - Probability > 90% with coverage near 100% makes a template a solid model.
 - Conservation is only as good as the alignment depth, so check how many sequences went in.
+- phmmer rows colour by HMMER posterior probability; HHpred rows by match probability. Both feed the same conservation tally.
 
-**In-app action.** `Load .hhr / variant FASTA…` · `Copy sequence (FASTA)` · `Download FASTA`
+**In-app action.** `Load .hhr / variant FASTA…` · `Search homologs (phmmer)` · `Copy sequence (FASTA)` · `Download FASTA`
 
 **Guided questions** (the answers choose the concrete action offered).
 

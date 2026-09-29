@@ -5784,15 +5784,17 @@ const WORKFLOW_STEPS = [
     },
     {
         id: 'homologs', title: 'Homologs & conservation',
-        desc: 'Run <a href="https://toolkit.tuebingen.mpg.de/tools/hhpred" target="_blank" rel="noopener">MPI\'s HHpred</a> and attach the .hhr; attach a variant FASTA for per-residue conservation.',
+        desc: 'Run <a href="https://toolkit.tuebingen.mpg.de/tools/hhpred" target="_blank" rel="noopener">MPI\'s HHpred</a> and attach the .hhr; attach a variant FASTA for per-residue conservation. No HHpred at hand? <strong>Search homologs (phmmer)</strong> runs the same idea in-app against Swiss-Prot.',
         why: 'Homologs supply the evolutionary evidence: match quality, template coverage, and the per-column conservation that separates tolerated from constrained positions.',
         action: { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()' },
         extraActions: [
+            { label: 'Search homologs (phmmer)', run: 'runHomologSearch()' },
             { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
             { label: 'Download FASTA', run: 'downloadSequenceFasta()' }
         ],
         how: ['Probability > 90% with coverage near 100% makes a template a solid model.',
-              'Conservation is only as good as the alignment depth, so check how many sequences went in.'],
+              'Conservation is only as good as the alignment depth, so check how many sequences went in.',
+              'phmmer rows colour by HMMER posterior probability; HHpred rows by match probability. Both feed the same conservation tally.'],
         refs: [
             { cite: 'Söding, Biegert & Lupas, Nucleic Acids Res 2005 (HHpred)', doi: '10.1093/nar/gki408' },
             { cite: 'Remmert et al., Nat Methods 2012 (HHblits)', doi: '10.1038/nmeth.1818' },
@@ -6064,7 +6066,6 @@ const STEP_ACTION_RESOLVERS = {
         if (a.hhpred === 'no') return {
             label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')",
             accessory: { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
-            extraActions: [{ label: 'Search homologs (phmmer)', run: 'runHomologSearch()' }],
             hint: 'Use Copy sequence (FASTA) first, then paste it into HHpred and run the search. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Attach the resulting .hhr here afterwards. No HHpred at hand? Search homologs (phmmer) runs the same idea in-app against Swiss-Prot and adds the hits as Homologs rows.'
         };
         if (a.hhpred === 'ready') return { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()', hint: 'Attach the .hhr (and any variant FASTA) in Input Data. The hits become homolog rows and feed the templates table.' };
@@ -6165,12 +6166,19 @@ function resolveStepAction(step) {
         resolved = STEP_ACTION_RESOLVERS[step.id] ? STEP_ACTION_RESOLVERS[step.id](answers) : null;
     } catch (e) { resolved = null; }
     // Fall back to the step's own action, and report whether the answer changed it.
-    const base = { label: step.action.label, run: step.action.run, hint: '' };
+    const stepExtras = step.extraActions || [];
+    const base = { label: step.action.label, run: step.action.run, hint: '', extraActions: stepExtras };
     if (!resolved) return Object.assign({ custom: false, done: false, accessory: null }, base);
+    // A resolver may add context-specific buttons; keep the step's own ones too
+    // and drop duplicates by handler (a resolver extra was silently dropped
+    // before, so a tailored action could never appear in the guide).
+    const resolvedExtras = resolved.extraActions || [];
+    const extraActions = stepExtras.concat(resolvedExtras.filter(a => !stepExtras.some(b => b.run === a.run)));
     return {
         label: resolved.label, run: resolved.run, hint: resolved.hint || '',
         done: !!resolved.done,
         accessory: resolved.accessory || null,
+        extraActions,
         // Only a *different action* earns the secondary button. A tailored label
         // for the same handler (e.g. "Run Foldseek (pdb100)" vs "Run Foldseek")
         // must not show twice.
@@ -6636,7 +6644,7 @@ function computeGuideInsights() {
     }
     const hlKeys = keys.filter(k => k.startsWith('HL_'));
     if (!hlKeys.length) {
-        out.push({ level: 'warn', text: 'No homologs loaded, so nothing cross-checks the sequence predictions yet. Add an HHpred .hhr (or run Foldseek).' });
+        out.push({ level: 'warn', text: 'No homologs loaded, so nothing cross-checks the sequence predictions yet. Search homologs (phmmer) in-app, add an HHpred .hhr, or run Foldseek.' });
     } else {
         let best = 0;
         try {
@@ -6896,7 +6904,7 @@ function renderWorkflowGuide() {
             '<button type="button" class="guide-run' + (nextAct.done ? ' guide-run-done' : '') + '" onclick="' + nextAct.run + '">' + nextAct.label + '</button>' +
             (nextAct.accessory ? '<button type="button" class="guide-run guide-run-alt guide-accessory" onclick="' + nextAct.accessory.run + '">' + nextAct.accessory.label + '</button>' : '') +
             (nextAct.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + next.step.action.run + '">' + next.step.action.label + '</button>' : '') +
-            (next.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
+            (nextAct.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
             (guideHasStepAnswer(next.step.id) ? '<button type="button" class="guide-mini guide-undo" onclick="clearStepAnswers(\'' + next.step.id + '\')" title="Undo this answer and pick again">\u21ba Undo</button>' : '') +
             '</div>' +
             '<div class="guide-next-meta">' +
@@ -6950,8 +6958,8 @@ function renderWorkflowGuide() {
             '<div class="guide-actions">' +
             '<button type="button" class="guide-run' + (act.done ? ' guide-run-done' : '') + (busy ? ' task-running' : '') + '"' + taskAttrs + ' onclick="' + act.run + '">' + label + '</button>' +
             (act.custom ? '<button type="button" class="guide-run guide-run-alt" onclick="' + r.step.action.run + '">' + r.step.action.label + '</button>' : '') +
-            (r.step.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
-            ((act.accessory && (r.step.extraActions || []).every(a => a.run !== act.accessory.run)) ? '<button type="button" class="guide-run guide-run-alt guide-accessory" onclick="' + act.accessory.run + '">' + act.accessory.label + '</button>' : '') +
+            (act.extraActions || []).map(a => '<button type="button" class="guide-run guide-run-alt" onclick="' + a.run + '">' + a.label + '</button>').join('') +
+            ((act.accessory && (act.extraActions || []).every(a => a.run !== act.accessory.run)) ? '<button type="button" class="guide-run guide-run-alt guide-accessory" onclick="' + act.accessory.run + '">' + act.accessory.label + '</button>' : '') +
             (r.done && STEP_UNDO[r.step.id] ? '<button type="button" class="guide-mini guide-danger" onclick="undoGuideStep(\'' + r.step.id + '\')">' + (STEP_UNDO[r.step.id].label || 'Undo this step') + '</button>' : '') +
             (r.done && !r.manualDone ? '' : '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.manualDone ? 'clear' : 'done') + '\')">' + (r.manualDone ? 'Clear "done"' : 'Mark done') + '</button>') +
             '<button type="button" class="guide-mini" onclick="setGuideOverride(\'' + r.step.id + '\',\'' + (r.skipped ? 'clear' : 'skipped') + '\')">' + (r.skipped ? 'Unskip' : 'Skip') + '</button>' +
