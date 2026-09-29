@@ -997,10 +997,14 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
   no "hide the rule row but keep the rule" concept.
-- **OPEN: "adding a preset makes the preset cards disappear"** (reported 0.43.0). Not reproducible
-  in the harness or by parsing the generated markup, and the deployed build matches the source. The
-  render is now instrumented (console line + error capture) and self-healing; if it happens again,
-  the Debugging console should say why.
+- **FIXED (0.50.3): "adding a preset makes the preset cards disappear"** (reported 0.43.0). The
+  guide coachmark's "collapse the sibling sections while guidance is active" ran on *every* refresh,
+  not just when the coachmark changed, and on clear it restored the saved states over whatever the
+  user had done since - so a guide refresh could collapse the Rules section (with its Presets
+  accordion and all eight cards) while you were working in it. The collapse/restore is now a
+  one-shot transition that never overrides your own open/close choices, and the rules-panel
+  re-render preserves the sidebar scroll. Rows 278-280 are the checks; if it recurs, the Debugging
+  console (console line + error capture) should say why.
 - **`group:pLDDT` / `group:RSA` are not offered** as categorical sources (those tracks hold
   objects, not chars) — use the numeric `pLDDT:`/`RSA:` sources instead.
 - **Older saves** (pre-0.23.0) have no `topologySources`/`uniprotFeatures`/`domainHitsInfo`,
