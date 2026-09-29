@@ -1997,6 +1997,7 @@
                     <button type="button" onclick="menuBarAction('rules')">Analysis Rules…</button>
                     <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
                     <button type="button" onclick="menuBarAction('domains')">Scan Domains (HMMER)…</button>
+                    <button type="button" onclick="menuBarAction('homologs')">Search Homologs (phmmer)…</button>
                     <button type="button" onclick="menuBarAction('crosschecks')">Cross-checks…</button>
                     <button type="button" onclick="menuBarAction('ensemble')">Ensemble variance…</button>
                 </div>
@@ -2068,6 +2069,8 @@
                             style="font-size:0.72rem; padding:3px 8px;" title="Predict a 3D structure for the current sequence with ESMFold (≤400 aa) and attach it">Predict structure (ESMFold)</button>
                         <button type="button" id="btnDomainScan" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="runDomainScan()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Scan the sequence against Pfam with HMMER hmmscan (EBI) and add one track per domain family">Scan domains (HMMER/Pfam)</button>
+                        <button type="button" id="btnHomologSearch" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="runHomologSearch()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Search Swiss-Prot for homologs with HMMER phmmer (EBI) and add one Homologs row per hit">Find homologs (phmmer)</button>
                         <select id="foldseekDb" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Foldseek search database">
                             <option value="afdb50">afdb50 (AlphaFoldDB)</option>
                             <option value="pdb100">pdb100 (PDB)</option>
@@ -2082,6 +2085,7 @@
                 <div id="esmfoldStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                 <div id="foldseekStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="domainScanStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+                <div id="homologSearchStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -3203,6 +3207,20 @@ const SERVICE_REGISTRY = {
                   resultExt: 'out', enabled: true },
             ],
         },
+        homolog_search: {
+            label: 'Homolog search (HMMER phmmer)',
+            providers: [
+                // Verified 2026-09: hmmer3_phmmer is a Job Dispatcher tool with
+                // the same CORS story and text-only result as hmmscan. Databases:
+                // swissprot (default), uniprotkb, uniprotrefprot, pdb, afdb, ...
+                // Its posterior-probability line gives per-column confidence, so
+                // the Homologs match-quality colouring works without HHpred.
+                { id: 'ebi_phmmer', label: 'EBI HMMER phmmer (Swiss-Prot)', adapter: 'ebiJob',
+                  url: 'https://www.ebi.ac.uk/Tools/services/rest/hmmer3_phmmer/',
+                  params: { database: 'swissprot', nhits: '50', E: '1e-3' },
+                  resultExt: 'out', enabled: true },
+            ],
+        },
     },
 };
 const SERVICE_URLS = {
@@ -3663,6 +3681,129 @@ function parseHmmerDomains(text) {
     return out;
 }
 
+// phmmer (EBI HMMER, protein-vs-protein) reports hits in HMMER's text format.
+// The query line is lowercase, the target line uppercase with lowercase
+// insertion residues, '.' is a query gap and '-' a target gap. HMMER pads every
+// alignment line so the sequence columns start at the same offset - the column
+// slices below rely on that. The posterior-probability line (digits 0-9,
+// '*' = 1.0, '.' = <0.05, blank at gaps) becomes the per-column quality glyph on
+// the same scale the HHpred rows already use, so the existing Homologs colouring
+// and tooltips work unchanged.
+const PHMMER_QUALITY_MAP = {
+    '*': '|', '9': '=', '8': '=', '7': '+', '6': '+',
+    '5': ':', '4': ':', '3': ':', '2': '.', '1': '.', '0': '.', '.': '.'
+};
+function parsePhmmerHits(text) {
+    const lines = String(text || '').split(/\r?\n/);
+    let queryName = null, queryLength = null;
+    for (const line of lines) {
+        const m = line.match(/^Query:\s+(\S+)\s+\[L=(\d+)\]/);
+        if (m) { queryName = m[1]; queryLength = parseInt(m[2], 10); break; }
+    }
+    // "Scores for complete sequences" table: full-sequence E-value/score,
+    // best-domain columns, domain count, then the target id and description.
+    // The inclusion threshold marker flips everything below it to non-significant.
+    const table = {};
+    let significant = true;
+    for (const line of lines) {
+        if (/^\s*-+\s*inclusion threshold\s*-+/.test(line)) { significant = false; continue; }
+        const m = line.match(/^\s*([\d.eE+-]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.eE+-]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+(\d+)\s+(\S+)\s*(.*)$/);
+        if (!m) continue;
+        table[m[9]] = {
+            eValue: m[1], score: m[2], bestDomEvalue: m[4], bestDomScore: m[5],
+            nDomains: parseInt(m[8], 10), desc: (m[10] || '').trim(), significant
+        };
+    }
+    const hits = [];
+    let hit = null, seg = null, block = [];
+    const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flushSeg = () => {
+        if (!seg) { block = []; return; }
+        let sub = { qLine: null, tLine: null, ppLine: null };
+        const flushSub = () => {
+            if (sub.qLine) {
+                // Columns: prefix + start coordinate + the single space after it
+                // are the sequence offset; the target, match and posterior lines
+                // are padded to the same offset (verified against real output).
+                const qm = sub.qLine.match(/^(\s*\S+\s+)(\d+)(\s+)(\S+)(\s+)(\d+)\s*$/);
+                if (qm) {
+                    const col = qm[1].length + qm[2].length + qm[3].length;
+                    const len = qm[4].length;
+                    const qSeq = qm[4].replace(/\./g, '-');
+                    const tSeq = sub.tLine ? sub.tLine.slice(col, col + len) : '';
+                    const ppRaw = sub.ppLine ? sub.ppLine.slice(col, col + len) : '';
+                    let qualityChars = '';
+                    for (let k = 0; k < len; k++) qualityChars += PHMMER_QUALITY_MAP[ppRaw[k]] || '.';
+                    if (!seg.parts) seg.parts = [];
+                    seg.parts.push({ qStart: parseInt(qm[2], 10), qSeq, tSeq, qualityChars });
+                }
+            }
+            sub = { qLine: null, tLine: null, ppLine: null };
+        };
+        block.forEach(l => {
+            if (queryName && l.trim().indexOf(queryName) === 0) { flushSub(); sub.qLine = l; return; }
+            if (hit && new RegExp('^\\s*' + esc(hit.hitId) + '\\s').test(l)) { sub.tLine = l; return; }
+            if (/\sPP\s*$/.test(l)) { sub.ppLine = l; return; }
+        });
+        flushSub();
+        if (seg.parts && seg.parts.length) {
+            seg.qStart = seg.parts[0].qStart;
+            seg.qSeq = seg.parts.map(x => x.qSeq).join('');
+            seg.tSeq = seg.parts.map(x => x.tSeq).join('');
+            seg.qualityChars = seg.parts.map(x => x.qualityChars).join('');
+            hit.segments.push(seg);
+        }
+        seg = null; block = [];
+    };
+    lines.forEach(line => {
+        const hm = line.match(/^>>\s+(\S+)\s*(.*)$/);
+        if (hm) {
+            flushSeg();
+            if (hit) hits.push(hit);
+            const t = table[hm[1]];
+            hit = {
+                hitId: hm[1],
+                hitDesc: (hm[2] || '').trim() || (t ? t.desc : ''),
+                stats: t ? { 'E-value': t.eValue, Score: t.score, 'Best-domain E-value': t.bestDomEvalue, Domains: t.nDomains } : {},
+                significant: t ? t.significant : true,
+                segments: []
+            };
+            return;
+        }
+        if (!hit) return;
+        const dm = line.match(/^\s*==\s+domain\s+\d+\s+score:\s*(\S+)\s+bits;\s+conditional E-value:\s*(\S+)/);
+        if (dm) { flushSeg(); seg = { domainScore: parseFloat(dm[1]), domainEvalue: dm[2] }; return; }
+        if (!seg) return;
+        // The alignment wraps every ~100 columns and the wrap blocks are
+        // separated by blank lines: they belong to the SAME domain, so a blank
+        // line must not end it (flushSub starts a new part when the next query
+        // line arrives). Only the trailing statistics sections end a segment.
+        if (/^(Internal pipeline|Pipeline statistics|\/\/|# |\[ok\])/.test(line)) { flushSeg(); return; }
+        if (!line.trim()) return;
+        block.push(line);
+    });
+    flushSeg();
+    if (hit) hits.push(hit);
+    // Identity per hit, computed from the segments (the text output only reports
+    // it per domain, and only for the alignments it shows).
+    hits.forEach(h => {
+        let same = 0, aligned = 0;
+        h.segments.forEach(sg => {
+            for (let k = 0; k < sg.qSeq.length; k++) {
+                const q = sg.qSeq[k], t = (sg.tSeq || '')[k];
+                if (q === '-' || !t || t === '-' || t === '~' || t === ' ') continue;
+                aligned++;
+                if (q.toUpperCase() === t.toUpperCase()) same++;
+            }
+        });
+        if (aligned) {
+            h.stats.Identities = same + '/' + aligned + ' (' + Math.round(same / aligned * 100) + '%)';
+            h.stats['Aligned_cols'] = aligned;
+        }
+    });
+    return { queryName, queryLength, hits };
+}
+
 const DOMAIN_MARKER = '\u2588';
 const DOMAIN_COLORS = ['#bfdbfe', '#fbcfe8', '#bbf7d0', '#fde68a', '#ddd6fe', '#a5f3fc', '#fecdd3', '#e2e8f0'];
 let domainHitsInfo = {};
@@ -3731,6 +3872,83 @@ async function runDomainScan() {
         setStatus('hmmscan failed: ' + m);
         endGuideTask('annotation', 'hmmscan failed: ' + m, 'error');
     }
+}
+
+// phmmer: search the current sequence against a protein database (Swiss-Prot by
+// default) and turn the hits into Homologs rows. They feed conservation, the
+// match-quality colouring and the predictor tooltips exactly like an imported
+// .hhr does; the difference is that phmmer reports per-column posterior
+// probabilities rather than HHpred's match probabilities (parsePhmmerHits maps
+// them onto the same glyph scale).
+async function runHomologSearch() {
+    const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!seq) { showToast('Load a protein sequence first. phmmer searches the sequence against Swiss-Prot.', 'error'); return; }
+    if (!beginGuideTask('annotation', 'phmmer homolog search running')) return;
+    const statusEl = document.getElementById('homologSearchStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('annotation'); return; }
+        setStatus('Submitting phmmer job (Swiss-Prot). Usually under a minute\u2026');
+        const text = await runCapability('homolog_search', { sequence: seq }, (m) => setStatus(m));
+        const parsed = parsePhmmerHits(text);
+        if (!parsed || !parsed.hits.length) {
+            setStatus('phmmer returned no hits.');
+            endGuideTask('annotation', 'phmmer found no homologs', 'info');
+            return;
+        }
+        if (parsed.queryLength && parsed.queryLength !== seq.length) {
+            showToast('phmmer searched a sequence of length ' + parsed.queryLength + ' but the loaded sequence is ' + seq.length + ' - importing anyway, but residue numbering may not line up.', 'error');
+        }
+        const added = applyPhmmerHits(parsed);
+        recomputeConservationScores();
+        renderViewer(parsedTracks);
+        populateCrossRefDropdown();
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        schedulePersist();
+        const nSig = parsed.hits.filter(h => h.significant !== false).length;
+        setStatus(added
+            ? ('phmmer: ' + added + ' homolog track' + (added === 1 ? '' : 's') + ' from ' + nSig + ' significant hit' + (nSig === 1 ? '' : 's') + ' (' + parsed.hits.length + ' reported).')
+            : 'phmmer found no significant hits with aligned residues.');
+        endGuideTask('annotation',
+            added ? ('Added ' + added + ' homolog track(s) from phmmer') : 'phmmer found nothing to add',
+            added ? 'success' : 'info');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('phmmer failed: ' + m);
+        endGuideTask('annotation', 'phmmer failed: ' + m, 'error');
+    }
+}
+// Number imported homologs globally (continues after any HL_ rows already
+// loaded), shared by the .hhr import and the phmmer search.
+function nextHomologRank() {
+    let next = 1;
+    Object.keys(parsedTracks).forEach(k => {
+        const m = k.match(/^HL_(\d+)_/);
+        if (m) next = Math.max(next, parseInt(m[1], 10) + 1);
+    });
+    return next;
+}
+// One Homologs row per phmmer hit (top HH_HIT_CAP), registered in
+// homologHitsInfo so conservation, colouring and tooltips work.
+function applyPhmmerHits(parsed) {
+    const totalLength = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!totalLength || !parsed || !parsed.hits) return 0;
+    let rank = nextHomologRank();
+    let added = 0;
+    parsed.hits.slice(0, HH_HIT_CAP).forEach(hit => {
+        // Same convention as the domain scan: only hits HMMER itself calls
+        // significant (above the inclusion threshold) become rows.
+        if (hit.significant === false) return;
+        const built = buildHomologTrackString(hit, totalLength);
+        if (!/[^ ]/.test(built.track)) return; // nothing aligned - no row worth adding
+        const key = 'HL_' + String(rank).padStart(2, '0') + '_' + hit.hitId.replace(/[^A-Za-z0-9_-]/g, '_');
+        parsedTracks[key] = built.track;
+        graphHighlights[key] = true;
+        homologHitsInfo[key] = { rank, hitId: hit.hitId, hitDesc: hit.hitDesc, stats: hit.stats, aaTrack: built.aaTrack, source: 'phmmer' };
+        rank++; added++;
+    });
+    return added;
 }
 
 // Appends a timestamped entry to the annotation debug log, mirrors it to the
@@ -5846,7 +6064,8 @@ const STEP_ACTION_RESOLVERS = {
         if (a.hhpred === 'no') return {
             label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')",
             accessory: { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
-            hint: 'Use Copy sequence (FASTA) first, then paste it into HHpred and run the search. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Attach the resulting .hhr here afterwards.'
+            extraActions: [{ label: 'Search homologs (phmmer)', run: 'runHomologSearch()' }],
+            hint: 'Use Copy sequence (FASTA) first, then paste it into HHpred and run the search. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Attach the resulting .hhr here afterwards. No HHpred at hand? Search homologs (phmmer) runs the same idea in-app against Swiss-Prot and adds the hits as Homologs rows.'
         };
         if (a.hhpred === 'ready') return { label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()', hint: 'Attach the .hhr (and any variant FASTA) in Input Data. The hits become homolog rows and feed the templates table.' };
         return null;
@@ -7068,6 +7287,7 @@ function menuBarAction(action) {
         case 'rules': showRulesPanel(); break;
         case 'interfaces': showInterfacesPanel(); break;
         case 'domains': runDomainScan(); break;
+        case 'homologs': runHomologSearch(); break;
         case 'crosschecks': showCrossCheckPanel(); break;
         case 'ensemble': showEnsemblePanel(); break;
         case 'json': exportFullSave(); break;
@@ -7694,7 +7914,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.51.0';
+const APP_VERSION = '0.52.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9026,6 +9246,10 @@ function formatTrackLabel(fullKey) {
         return fullKey;
     }
     if (fullKey.startsWith('HL_')) {
+        // Prefer the recorded hit id: the key is sanitized for DOM safety (a
+        // phmmer id like sp|P42212|GFP_AEQVI keeps its pipes only in the info).
+        const info = homologHitsInfo[fullKey];
+        if (info && info.hitId) return `Homolog #${info.rank}: ${info.hitId}`;
         const m = fullKey.match(/^HL_(\d+)_(.+)$/);
         return m ? `Homolog #${parseInt(m[1], 10)}: ${m[2]}` : fullKey;
     }
@@ -9800,17 +10024,24 @@ function buildHomologPredictorInfo(trackKey) {
     if (!hit) return null;
     const s = hit.stats || {};
     const orgMatch = (hit.hitDesc || '').match(/\{[^}]*\}/);
+    const isPhmmer = /phmmer/i.test(hit.source || '');
     return {
         name: `Homolog #${hit.rank}: ${hit.hitId}`,
-        category: 'HHpred Homolog',
+        category: isPhmmer ? 'phmmer homolog' : 'HHpred Homolog',
         description: ((hit.hitDesc || '').split(';')[0] || 'No description in file') + (orgMatch ? ' ' + orgMatch[0] : ''),
-        bands: [
+        bands: isPhmmer ? [
+            { range: '|', desc: 'Posterior probability ~1.0 for this column.' },
+            { range: '= / +', desc: 'High posterior probability.' },
+            { range: ': / .', desc: 'Low posterior probability (weakly supported column).' }
+        ] : [
             { range: '|', desc: 'Strongest column-wise match to this template.' },
             { range: '= / +', desc: 'Moderate-to-good match.' },
             { range: ': / .', desc: 'Weak match.' }
         ],
-        useCase: `Probab=${s.Probab || '?'}%, E-value=${s['E-value'] || '?'}, Identities=${s.Identities || '?'}, Aligned_cols=${s.Aligned_cols || '?'}`,
-        citation: 'HHpred / HHsearch (Söding lab)'
+        useCase: isPhmmer
+            ? `E-value=${s['E-value'] || '?'}, score=${s.Score || '?'}, Identities=${s.Identities || '?'}, Aligned_cols=${s['Aligned_cols'] || '?'}`
+            : `Probab=${s.Probab || '?'}%, E-value=${s['E-value'] || '?'}, Identities=${s.Identities || '?'}, Aligned_cols=${s.Aligned_cols || '?'}`,
+        citation: isPhmmer ? 'HMMER phmmer (Eddy lab)' : 'HHpred / HHsearch (Söding lab)'
     };
 }
 
@@ -10369,12 +10600,8 @@ function importHHpredFile(text, fileName) {
     // file: if Homologs #1-#5 are already loaded, this file's hits continue at
     // #6 (and later files after that) so a second .hhr import never stomps on
     // or reuses numbers already shown in the viewer. The counter is taken from
-    // the highest existing HH_ key prefix, so it also skips any gaps.
-    let startRank = 0;
-    Object.keys(parsedTracks).forEach(k => {
-        const m = k.match(/^HL_(\d+)_/);
-        if (m) startRank = Math.max(startRank, parseInt(m[1], 10));
-    });
+    // the highest existing HL_ key prefix, so it also skips any gaps.
+    const startRank = nextHomologRank() - 1;
 
     const hitsToImport = parsed.hits.slice(0, HH_HIT_CAP);
     hitsToImport.forEach((hit, i) => {

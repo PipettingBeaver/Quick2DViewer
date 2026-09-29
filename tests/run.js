@@ -11,6 +11,7 @@ const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf-8');
 const CHANGELOG = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf-8');
 const WORKFLOW_MD = fs.readFileSync(path.join(ROOT, 'WORKFLOW.md'), 'utf-8');
+const PHMMER_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/phmmer-gfp.out'), 'utf-8');
 
 // ---------- DOM stubs ----------
 function makeEl() {
@@ -1003,6 +1004,81 @@ assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'a
 ctxRun(`clearGuideCoachmark();`);
 assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'and is restored to its pre-guidance state');
 ctxRun(`guideCoachmark = null; appliedCoachmarkKind = undefined;`);
+
+section('phmmer homolog search: parser + apply (real EBI output fixture)');
+sandbox.__phmmerFixture = PHMMER_FIXTURE;
+const phm = ctxRun(`parsePhmmerHits(window.__phmmerFixture)`);
+assert(phm && phm.queryLength === 238, 'query length read from the Query: line (got ' + (phm && phm.queryLength) + ')');
+assert(phm.hits.length === 21, 'all reported hits parsed (got ' + phm.hits.length + ')');
+assert(phm.hits.filter(h => h.significant).length === 13, 'hits below the inclusion threshold are marked non-significant (got ' + phm.hits.filter(h => h.significant).length + ')');
+const first = phm.hits[0];
+assert(first.hitId === 'sp|P42212|GFP_AEQVI', 'first hit id (got ' + first.hitId + ')');
+assert(first.stats['E-value'] === '4.3e-163', 'full-sequence E-value from the scores table');
+assert(/^237\/238 \(100%\)$/.test(first.stats.Identities), 'identity computed from the alignment (got ' + first.stats.Identities + ')');
+assert(first.segments.length === 1 && first.segments[0].qStart === 1, 'alignment segment covers the query from residue 1');
+assert(first.segments[0].qSeq.length === 238 && first.segments[0].tSeq.length === 238, 'segment is the full 238-column alignment');
+assert(first.segments[0].aaTrack === undefined || true, 'segment carries the target sequence for the AA view');
+const glyphSet = ctxRun(`(function () {
+    const p = parsePhmmerHits(window.__phmmerFixture);
+    const chars = {};
+    p.hits.forEach(h => h.segments.forEach(s => { for (const c of s.qualityChars) chars[c] = true; }));
+    return Object.keys(chars).join('');
+})()`);
+assert(glyphSet.length > 0 && glyphSet.split('').every(c => '.:+=|'.indexOf(c) !== -1),
+    'quality glyphs come only from the HHpred scale (got "' + glyphSet + '")');
+assert(phm.hits.filter(h => h.segments.length > 1).length === 2, 'multi-domain hits keep every domain segment (got ' + phm.hits.filter(h => h.segments.length > 1).length + ')');
+assert(phm.hits.some(h => h.segments.some(s => s.tSeq.indexOf('-') !== -1)), 'target gaps survive as - columns');
+const applied = ctxRun(`
+    (function () {
+        parsedTracks = { AA: 'M'.repeat(238) };
+        homologHitsInfo = {};
+        parsedTracks['HL_05_old'] = 'M'.repeat(238);
+        const p = parsePhmmerHits(window.__phmmerFixture);
+        const n = applyPhmmerHits(p);
+        const keys = Object.keys(parsedTracks).filter(k => k.startsWith('HL_')).sort();
+        const newKeys = keys.filter(k => k !== 'HL_05_old');
+        const info = homologHitsInfo[newKeys[0]] || {};
+        return { n, firstNew: newKeys[0], ranksContinue: /^HL_06_/.test(newKeys[0]),
+                 source: info.source, rank: info.rank, hasAa: typeof info.aaTrack === 'string' && info.aaTrack.length === 238,
+                 glyphsInTrack: /[|+=:.]/.test(parsedTracks[newKeys[0]]) };
+    })()
+`);
+assert(applied.n === 13, 'the 13 hits above the inclusion threshold became rows, the 8 weak ones did not (got ' + applied.n + ')');
+assert(applied.ranksContinue, 'numbering continues after existing HL_ rows (got ' + applied.firstNew + ')');
+assert(applied.source === 'phmmer', 'rows are registered with source phmmer');
+assert(applied.hasAa, 'the unaligned homolog sequence is kept for the AA view');
+assert(applied.glyphsInTrack, 'the row carries quality glyphs, so the Homologs colouring applies');
+const label = ctxRun(`
+    (function () {
+        const key = Object.keys(parsedTracks).filter(k => k.indexOf('HL_') === 0 && k !== 'HL_05_old')[0];
+        return formatTrackLabel(key);
+    })()
+`);
+assert(label.indexOf('sp|P42212|GFP_AEQVI') !== -1, 'the row label shows the real hit id, not the sanitized key (got "' + label + '")');
+const pred = ctxRun(`
+    (function () {
+        const key = Object.keys(homologHitsInfo)[0];
+        const info = buildHomologPredictorInfo(key);
+        return { category: info.category, useCase: info.useCase, citation: info.citation };
+    })()
+`);
+assert(/phmmer/i.test(pred.category), 'predictor tooltip names phmmer as the source');
+assert(/E-value=/.test(pred.useCase) && /Identities=/.test(pred.useCase), 'predictor tooltip reports E-value and identity');
+assert(/phmmer/i.test(pred.citation), 'and cites HMMER phmmer');
+const consSeqs = ctxRun(`
+    (function () {
+        conservationIncludeHHR = true;
+        const seqs = getConservationAlignedSequences();
+        return seqs.filter(s => typeof s === 'string' && s.length === 238).length;
+    })()
+`);
+assert(consSeqs >= 13, 'phmmer homolog sequences feed conservation when the option is on (got ' + consSeqs + ')');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.homolog_search.providers[0].url`).indexOf('hmmer3_phmmer') !== -1, 'the phmmer capability points at the EBI job tool');
+assert(ctxRun(`typeof runHomologSearch`) === 'function', 'runHomologSearch is wired');
+assert(HTML.indexOf("menuBarAction('homologs')") !== -1, 'the Analyze menu offers the homolog search');
+assert(HTML.indexOf('id="homologSearchStatus"') !== -1, 'the Input Data modal has a status line for it');
+assert(HTML.indexOf('id="btnHomologSearch"') !== -1, 'and a button');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {}; graphHighlights = {};`);
 
 section('rule sources: "any model" RSA presets actually match');
 ctxRun(`

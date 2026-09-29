@@ -1,0 +1,433 @@
+# phmmer :: search a protein sequence against a protein database
+# HMMER 3.3.2 (Nov 2020); http://hmmer.org/
+# Copyright (C) 2020 Howard Hughes Medical Institute.
+# Freely distributed under the BSD open source license.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# query sequence file:             hmmer3_phmmer-R20260929-224219-0053-11220614-p1m.sequence
+# target sequence database:        /nfs/public/ro/es_codon/newdata/prod/flatfiles/hmmer3/swissprot.fa
+# MSA of hits saved to file:       /nfs/public/rw/es/projects/wp-jdispatcher/sources/prod-hl/jobs/hmmer3_phmmer/rest/20260929/2242/hmmer3_phmmer-R20260929-224219-0053-11220614-p1m.sto
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Query:       EMBOSS_001  [L=238]
+Scores for complete sequences (score includes all domains):
+   --- full sequence ---   --- best 1 domain ---    -#dom-
+    E-value  score  bias    E-value  score  bias    exp  N  Sequence              Description
+    ------- ------ -----    ------- ------ -----   ---- --  --------              -----------
+   4.3e-163  545.4   2.0   4.8e-163  545.3   2.0    1.0  1  sp|P42212|GFP_AEQVI    Green fluorescent protein OS=Aequorea 
+    1.5e-21   82.0   0.6      2e-21   81.6   0.6    1.2  1  sp|Q9U6Y3|GFPL_CLASP   GFP-like fluorescent chromoprotein cFP
+    9.8e-19   72.8   0.8    1.3e-18   72.4   0.8    1.2  1  sp|Q9U6Y6|GFPL_ANEMA   GFP-like fluorescent chromoprotein amF
+    2.2e-17   68.4   0.5    3.1e-17   67.9   0.5    1.2  1  sp|Q9GZ28|NFCP_ANESU   GFP-like non-fluorescent chromoprotein
+    2.5e-17   68.2   0.7      3e-17   68.0   0.7    1.1  1  sp|Q9U6Y8|RFP_DISSP    Red fluorescent protein drFP583 OS=Dis
+    3.2e-17   67.9   0.6    4.1e-17   67.5   0.6    1.1  1  sp|Q95P04|NFCP_GONTE   GFP-like non-fluorescent chromoprotein
+      4e-17   67.6   0.3    4.6e-17   67.3   0.3    1.2  1  sp|Q9U6Y7|GFPL_DISST   GFP-like fluorescent chromoprotein dsF
+    4.8e-17   67.3   0.2    5.9e-17   67.0   0.2    1.1  1  sp|Q8ISF8|RFP_ENTQU    Red fluorescent protein eqFP611 OS=Ent
+    1.1e-16   66.1   0.3    1.4e-16   65.7   0.3    1.0  1  sp|P83690|NFCP_MONEF   GFP-like non-fluorescent chromoprotein
+      8e-16   63.3   0.1    1.1e-15   62.9   0.1    1.1  1  sp|Q95W85|NFCP_HETCR   GFP-like non-fluorescent chromoprotein
+    9.3e-15   59.8   0.0    9.8e-15   59.7   0.0    1.0  1  sp|Q9U6Y5|GFPL1_ZOASP  GFP-like fluorescent chromoprotein FP5
+    9.4e-15   59.8   0.2    1.2e-14   59.5   0.2    1.1  1  sp|Q95W86|NFCP_CONGI   GFP-like non-fluorescent chromoprotein
+    1.3e-13   56.1   0.0    1.6e-13   55.7   0.0    1.1  1  sp|Q9U6Y4|GFPL2_ZOASP  GFP-like fluorescent chromoprotein FP5
+  ------ inclusion threshold ------
+       0.54   14.7   0.0        1.1   13.7   0.0    1.5  1  sp|Q484Q5|SYL_COLP3    Leucine--tRNA ligase OS=Colwellia psyc
+       0.72   14.3   1.0        1.8   13.0   1.0    1.6  1  sp|A7H422|TRMA_CAMJD   tRNA/tmRNA (uracil-C(5))-methyltransfe
+       0.87   14.1   0.9        1.7   13.1   0.9    1.4  1  sp|A8FLP0|TRMA_CAMJ8   tRNA/tmRNA (uracil-C(5))-methyltransfe
+       0.89   14.0   0.9        1.7   13.1   0.9    1.4  1  sp|Q9PP92|TRMA_CAMJE   tRNA/tmRNA (uracil-C(5))-methyltransfe
+          1   13.8   1.7        1.6   13.2   0.9    1.7  2  sp|Q5HUW5|TRMA_CAMJR   tRNA/tmRNA (uracil-C(5))-methyltransfe
+          2   12.9   0.0        2.3   12.7   0.0    1.2  1  sp|Q7SY07|EIF1A_DANRE  Probable RNA-binding protein EIF1AD OS
+          3   12.3   0.0        4.4   11.8   0.0    1.2  1  sp|Q54YN2|MAAI_DICDI   Maleylacetoacetate isomerase OS=Dictyo
+        8.7   10.8   4.5        1.8   13.0   1.0    1.6  2  sp|A1VZH5|TRMA_CAMJJ   tRNA/tmRNA (uracil-C(5))-methyltransfe
+
+
+
+
+Domain annotation for each sequence (and alignments):
+>> sp|P42212|GFP_AEQVI  Green fluorescent protein OS=Aequorea victoria OX=6100 GN=GFP PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !  545.3   2.0  1.8e-167  4.8e-163       1     238 []       1     238 []       1     238 [] 1.00
+
+  Alignments for each domain:
+  == domain 1  score: 545.3 bits;  conditional E-value: 1.8e-167
+           EMBOSS_001   1 mskgeelftgvvpilveldgdvnghkfsvsgegegdatygkltlkficttgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampe 90 
+                          mskgeelftgvvpilveldgdvnghkfsvsgegegdatygkltlkficttgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampe
+  sp|P42212|GFP_AEQVI   1 MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPE 90 
+                          89**************************************************************************************** PP
+
+           EMBOSS_001  91 gyvqertiffkddgnyktraevkfegdtlvnrielkgidfkedgnilghkleynynshnvyimadkqkngikvnfkirhniedgsvqlad 180
+                          gyvqertiffkddgnyktraevkfegdtlvnrielkgidfkedgnilghkleynynshnvyimadkqkngikvnfkirhniedgsvqlad
+  sp|P42212|GFP_AEQVI  91 GYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLAD 180
+                          ****************************************************************************************** PP
+
+           EMBOSS_001 181 hyqqntpigdgpvllpdnhylstqsalskdpnekrdhmvllefvtaagitlgmdelyk 238
+                          hyqqntpigdgpvllpdnhylstqsalskdpnekrdhmvllefvtaagit gmdelyk
+  sp|P42212|GFP_AEQVI 181 HYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK 238
+                          *********************************************************8 PP
+
+>> sp|Q9U6Y3|GFPL_CLASP  GFP-like fluorescent chromoprotein cFP484 OS=Clavularia sp. OX=86521 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   81.6   0.6   7.5e-26     2e-21      14     152 ..      52     190 ..      43     255 .. 0.83
+
+  Alignments for each domain:
+  == domain 1  score: 81.6 bits;  conditional E-value: 7.5e-26
+            EMBOSS_001  14 ilveldgdvnghkfsvsgegegdatygkltlkficttg.klpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffk 101
+                           i ++++g+vngh f + gegeg    g  tl +    g  lp  +  l   f yg +++++ypd +   d+fk ++pegy  ert+ f+
+  sp|Q9U6Y3|GFPL_CLASP  52 IKLKMEGNVNGHAFVIEGEGEGKPYDGTHTLNLEVKEGaPLPFSYDILSNAFQYGNRALTKYPDDIA--DYFKQSFPEGYSWERTMTFE 138
+                           67899**************************998877736999999******************985..9******************* PP
+
+            EMBOSS_001 102 ddgnyktraevkfegdtlvnrielkgidfkedgnilghk.leynynshnvyi 152
+                           d g  k ++++ +e d+++ +i + g++f  +g ++  k l++  +++ +y+
+  sp|Q9U6Y3|GFPL_CLASP 139 DKGIVKVKSDISMEEDSFIYEIRFDGMNFPPNGPVMQKKtLKWEPSTEIMYV 190
+                           **********************************998773566666555555 PP
+
+>> sp|Q9U6Y6|GFPL_ANEMA  GFP-like fluorescent chromoprotein amFP486 OS=Anemonia manjano OX=105399 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   72.4   0.8   4.8e-23   1.3e-18      15     201 ..      15     197 ..       4     225 .. 0.76
+
+  Alignments for each domain:
+  == domain 1  score: 72.4 bits;  conditional E-value: 4.8e-23
+            EMBOSS_001  15 lveldgdvnghkfsvsgegegdatygkltlkfict...tgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiff 100
+                              +dg vngh f+v geg g    g  t  f  t    g l   +  l t f yg +cf+ yp  m   d+fk a+p+g   ert+ +
+  sp|Q9U6Y6|GFPL_ANEMA  15 TYHMDGCVNGHYFTVKGEGNGKPYEGTQTSTFKVTmanGGPLAFSFDILSTVFKYGNRCFTAYPTSM--PDYFKQAFPDGMSYERTFTY 101
+                           5689*******************99999888865522257899999******************988..59***************999 PP
+
+            EMBOSS_001 101 kddgnyktraevkfegdtlvnrielkgidfkedgnilghkleynynshnvyimadkqkngikvnfkirhniedgsvqladhyqqntpig 189
+                           +d g      e+ ++g+ + ++  + g++f  dg +++ k      s     + d    g    f + +    g+ +   h    t   
+  sp|Q9U6Y6|GFPL_ANEMA 102 EDGGVATASWEISLKGNCFEHKSTFHGVNFPADGPVMAKKTTGWDPSFEKMTVCDGILKGDVTAFLMLQGG--GNYRCQFHTSYKT--- 185
+                           9999888899***************************9997654455555555565555555555554432..3333333333333... PP
+
+            EMBOSS_001 190 dgpvllpdnhyl 201
+                             pv +p nh +
+  sp|Q9U6Y6|GFPL_ANEMA 186 KKPVTMPPNHVV 197
+                           245566666655 PP
+
+>> sp|Q9GZ28|NFCP_ANESU  GFP-like non-fluorescent chromoprotein FP595 OS=Anemonia sulcata OX=6108 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   67.9   0.5   1.1e-21   3.1e-17      11     140 ..       8     136 ..       3     155 .. 0.92
+
+  Alignments for each domain:
+  == domain 1  score: 67.9 bits;  conditional E-value: 1.1e-21
+            EMBOSS_001  11 vvpilveldgdvnghkfsvsgegegdatygkltlkf.icttgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqerti 98 
+                            +p+   ++g vngh f  +g+geg+   g   +k+ +   g lp  +  l t+  yg + f +y   +   d+fk ++peg+  ert 
+  sp|Q9GZ28|NFCP_ANESU   8 TMPFKTTIEGTVNGHYFKCTGKGEGNPFEGTQEMKIeVIEGGPLPFAFHILSTSCMYGSKTFIKYVSGI--PDYFKQSFPEGFTWERTT 94 
+                           5788899*************************99984567789**********************9987..59**************** PP
+
+            EMBOSS_001  99 ffkddgnyktraevkfegdtlvnrielkgidfkedgnilghk 140
+                            ++d g    + +  ++gd lv ++++ g +f  dg ++ +k
+  sp|Q9GZ28|NFCP_ANESU  95 TYEDGGFLTAHQDTSLDGDCLVYKVKILGNNFPADGPVMQNK 136
+                           **9999999999*************************99887 PP
+
+>> sp|Q9U6Y8|RFP_DISSP  Red fluorescent protein drFP583 OS=Discosoma sp. OX=86600 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   68.0   0.7   1.1e-21     3e-17      14     205 ..      14     199 ..       2     219 .. 0.82
+
+  Alignments for each domain:
+  == domain 1  score: 68.0 bits;  conditional E-value: 1.1e-21
+           EMBOSS_001  14 ilveldgdvnghkfsvsgegegdatygkltlkfictt.gklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffkd 102
+                          + v ++g vngh+f + gegeg    g  t+k+  t  g lp  w  l   f yg + + ++p  +   d+ k ++peg+  er + f+d
+  sp|Q9U6Y8|RFP_DISSP  14 FKVRMEGTVNGHEFEIEGEGEGRPYEGHNTVKLKVTKgGPLPFAWDILSPQFQYGSKVYVKHPADI--PDYKKLSFPEGFKWERVMNFED 101
+                          56899***************************98776268***********************987..5899****************** PP
+
+           EMBOSS_001 103 dgnyktraevkfegdtlvnrielkgidfkedgnilghk.leynynshnvyimadkqkngikvnfkirhniedgsvqladhyqqntpigdg 191
+                           g      +  ++   ++ ++++ g++f  dg ++  k + +  +++ +y      k  i   +k    ++dg   l +   ++  ++  
+  sp|Q9U6Y8|RFP_DISSP 102 GGVVTVTQDSSLQDGCFIYKVKFIGVNFPSDGPVMQKKtMGWEASTERLYPRDGVLKGEIHKALK----LKDGGHYLVEF--KSIYMAKK 185
+                          9999999999***99*******************9887356777778888765555555554444....56777777764..34567778 PP
+
+           EMBOSS_001 192 pvllpdnhylstqs 205
+                          pv lp  +y+ ++ 
+  sp|Q9U6Y8|RFP_DISSP 186 PVQLPGYYYVDSKL 199
+                          88888888877654 PP
+
+>> sp|Q95P04|NFCP_GONTE  GFP-like non-fluorescent chromoprotein OS=Goniopora tenuidens OX=75301 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   67.5   0.6   1.5e-21   4.1e-17      16     203 ..      12     193 ..       4     205 .. 0.83
+
+  Alignments for each domain:
+  == domain 1  score: 67.5 bits;  conditional E-value: 1.5e-21
+            EMBOSS_001  16 veldgdvnghkfsvsgegegdatygkltlkfictt.gklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffkdd 103
+                           v + g vngh f v g+g+g    g+ t+k+  t  g lp  w  l     yg   f++yp+ +   d+ k ++pegy  er + f+d 
+  sp|Q95P04|NFCP_GONTE  12 VYMSGTVNGHYFEVQGDGKGKPYEGEQTVKLTVTKgGPLPFAWDILSPQSQYGSIPFTKYPEDIP--DYVKQSFPEGYTWERIMNFEDG 98 
+                           6789**************************98886268************************985..99*****************998 PP
+
+            EMBOSS_001 104 gnyktraevkfegdtlvnrielkgidfkedgnilghkle.ynynshnvyimadkqkngikvnfkirhniedgsvqladhyqqntpigdg 191
+                           +      +  ++g+ ++ ++++ g++f  +g ++  k + +  n++ ++   d     i  nf     +e g   l +   ++t  +  
+  sp|Q95P04|NFCP_GONTE  99 AVCTVSNDSSIQGNCFIYNVKFSGLNFPPNGPVMQKKTQgWEPNTERLFA-RDG--MLIGNNFM-ALKLEGGGHYLCEF--KSTYKAKK 181
+                           888889999*************************9887624445554443.222..23444554.56788888888875..46777888 PP
+
+            EMBOSS_001 192 pvllpdnhylst 203
+                           pv +p  hy+  
+  sp|Q95P04|NFCP_GONTE 182 PVKMPGYHYVDR 193
+                           999999999865 PP
+
+>> sp|Q9U6Y7|GFPL_DISST  GFP-like fluorescent chromoprotein dsFP483 OS=Discosoma striata OX=105400 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   67.3   0.3   1.7e-21   4.6e-17      14     140 ..      14     139 ..       2     214 .. 0.89
+
+  Alignments for each domain:
+  == domain 1  score: 67.3 bits;  conditional E-value: 1.7e-21
+            EMBOSS_001  14 ilveldgdvnghkfsvsgegegdatygkltlkfictt.gklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffk 101
+                           i + l+g  ngh f + g+g+g    g  t+ +  t  g lp  w  l   f yg ++f ++pd++  hd++k ++pegy  er++ f+
+  sp|Q9U6Y7|GFPL_DISST  14 IDLHLEGTFNGHYFEIKGKGKGQPNEGTNTVTLEVTKgGPLPFGWHILCPQFQYGNKAFVHHPDNI--HDYLKLSFPEGYTWERSMHFE 100
+                           446799*********************9999886665278************************97..********************* PP
+
+            EMBOSS_001 102 ddgnyktraevkfegdtlvnrielkgidfkedgnilghk 140
+                           d g      ++ + g+ +   i++ g++f  +g ++  k
+  sp|Q9U6Y7|GFPL_DISST 101 DGGLCCITNDISLTGNCFYYDIKFTGLNFPPNGPVVQKK 139
+                           *********************************998766 PP
+
+>> sp|Q8ISF8|RFP_ENTQU  Red fluorescent protein eqFP611 OS=Entacmaea quadricolor OX=6118 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   67.0   0.2   2.2e-21   5.9e-17      14     148 ..      11     145 ..       3     184 .. 0.86
+
+  Alignments for each domain:
+  == domain 1  score: 67.0 bits;  conditional E-value: 2.2e-21
+           EMBOSS_001  14 ilveldgdvnghkfsvsgegegdatygkltlkf.icttgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffkd 102
+                          ++v ++g vng++f  +geg+g+   g  t+++ +   g lp  +  l t+f yg + f ++   +   dffk ++peg+  er   ++d
+  sp|Q8ISF8|RFP_ENTQU  11 MMVVMEGSVNGYQFKCTGEGDGNPYMGTQTMRIkVVEGGPLPFAFDILATSFMYGSKTFIKHTKGI--PDFFKQSFPEGFTWERVTRYED 98 
+                          68899*************************9983566789*******************9987665..69******************** PP
+
+           EMBOSS_001 103 dgnyktraevkfegdtlvnrielkgidfkedgnilghkle.ynynsh 148
+                           g +    +  +e   lv + ++ g++f  +g ++  k + +  n++
+  sp|Q8ISF8|RFP_ENTQU  99 GGVFTVMQDTSLEDGCLVYHAKVTGVNFPSNGAVMQKKTKgWEPNTE 145
+                          **********************************9888652344444 PP
+
+>> sp|P83690|NFCP_MONEF  GFP-like non-fluorescent chromoprotein OS=Montipora efflorescens OX=105610 PE=1 SV=2
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   65.7   0.3   5.3e-21   1.4e-16      16     204 ..      12     194 ..       4     210 .. 0.85
+
+  Alignments for each domain:
+  == domain 1  score: 65.7 bits;  conditional E-value: 5.3e-21
+            EMBOSS_001  16 veldgdvnghkfsvsgegegdatygkltlkfictt.gklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffkdd 103
+                           v + g vngh f v g+g+g    g+ t+k+  t  g lp  w  l     yg   f++yp+ +   d+ k ++peg+  er + f+d 
+  sp|P83690|NFCP_MONEF  12 VYMSGTVNGHYFEVEGDGKGRPYEGEQTVKLTVTKgGPLPFAWDILSPQCQYGSIPFTKYPEDIP--DYVKQSFPEGFTWERIMNFEDG 98 
+                           6789**************************98886268************************985..99*****************998 PP
+
+            EMBOSS_001 104 gnyktraevkfegdtlvnrielkgidfkedgnilghkleynynshnvyimadkqkngikv..nfkirhniedgsvqladhyqqntpigd 190
+                           +      +  ++g+ +  ++++ g++f  +g ++  k    +  h+  ++a     g+ +  nf +   +e g   l +   + t  + 
+  sp|P83690|NFCP_MONEF  99 AVCTVSNDSSIQGNCFTYHVKFSGLNFPPNGPVMQKKT-QGWEPHSERLFAR---GGMLIgnNF-MALKLEGGGHYLCEF--KTTYKAK 180
+                           888889999************************98776.5899999988873...444432155.456799999888875..4677788 PP
+
+            EMBOSS_001 191 gpvllpdnhylstq 204
+                            pv +p  hy+  +
+  sp|P83690|NFCP_MONEF 181 KPVKMPGYHYVDRK 194
+                           99999999998765 PP
+
+>> sp|Q95W85|NFCP_HETCR  GFP-like non-fluorescent chromoprotein OS=Heteractis crispa OX=3122430 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   62.9   0.1     4e-20   1.1e-15      14     140 ..      11     136 ..       4     148 .. 0.92
+
+  Alignments for each domain:
+  == domain 1  score: 62.9 bits;  conditional E-value: 4e-20
+            EMBOSS_001  14 ilveldgdvnghkfsvsgegegdatygkltlkficttg.klpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffk 101
+                           i + ++g vngh f   geg+g+   g  ++++  t g  lp  +  l     yg + f ++  ++   dffk ++peg+  ert  ++
+  sp|Q95W85|NFCP_HETCR  11 IKMYMEGTVNGHYFKCEGEGDGNPFTGTQSMRIHVTEGaPLPFAFDILAPCCEYGSRTFVHHTAEI--PDFFKQSFPEGFTWERTTTYE 97 
+                           566799**************************999988358888999************9987655..7******************** PP
+
+            EMBOSS_001 102 ddgnyktraevkfegdtlvnrielkgidfkedgnilghk 140
+                           d g    + +  +eg+ l+ ++++ g +f  dg ++ +k
+  sp|Q95W85|NFCP_HETCR  98 DGGILTAHQDTSLEGNCLIYKVKVLGTNFPADGPVMKNK 136
+                           *********************************999876 PP
+
+>> sp|Q9U6Y5|GFPL1_ZOASP  GFP-like fluorescent chromoprotein FP506 OS=Zoanthus sp. OX=105402 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   59.7   0.0   3.6e-19   9.8e-15      13     228 ..      13     227 ..       1     231 [] 0.78
+
+  Alignments for each domain:
+  == domain 1  score: 59.7 bits;  conditional E-value: 3.6e-19
+             EMBOSS_001  13 pilveldgdvnghkfsvsgegegdatygkltlkfic.ttgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertif 99 
+                             +   ++g v+ghkf ++geg g    gk  + +     g lp     l   f+yg + f++yp  +   d+fk++ p gy  +r+++
+  sp|Q9U6Y5|GFPL1_ZOASP  13 TMKYRMEGCVDGHKFVITGEGIGYPFKGKQAINLCVvEGGPLPFAEDILSAAFNYGNRVFTEYPQDI--VDYFKNSCPAGYTWDRSFL 98 
+                            5567899***********************998644145678888889999*************987..59***************** PP
+
+             EMBOSS_001 100 fkddgnyktrae..vkfegdtlvnrielkgidfkedgnilghkleynynshnvyimadkqkngikvnfkirhniedgsvqladhyqqn 185
+                            f+d +    +a+  v  e + + ++ ++ g++f  dg ++  k+  n+      i+   ++  +k +  +   ++dg  +l  ++   
+  sp|Q9U6Y5|GFPL1_ZOASP  99 FEDGAVCICNADitVSVEENCMYHESKFYGVNFPADGPVMK-KMTDNWEPSCEKIIPVPKQGILKGDVSMYLLLKDGG-RLRCQFDTV 184
+                            *999988888872256799999****************985.778888877666665555556788888888889987.677777777 PP
+
+             EMBOSS_001 186 tpigdgpvllpdnhylstqsalskdpnekrdhmvllefvtaag 228
+                                  p  +pd h++  +       + k+    l e   a+g
+  sp|Q9U6Y5|GFPL1_ZOASP 185 YKAKSVPRKMPDWHFIQHKLTREDRSDAKNQKWHLTEHAIASG 227
+                            7788889999999998766554444444555556666666666 PP
+
+>> sp|Q95W86|NFCP_CONGI  GFP-like non-fluorescent chromoprotein OS=Condylactis gigantea OX=47073 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   59.5   0.2   4.4e-19   1.2e-14      14     137 ..      11     133 ..       3     156 .. 0.91
+
+  Alignments for each domain:
+  == domain 1  score: 59.5 bits;  conditional E-value: 4.4e-19
+            EMBOSS_001  14 ilveldgdvnghkfsvsgegegdatygkltlkficttg.klpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffk 101
+                           i + ++g vng+ f   geg+g+   g   +++  t g  lp  +  l    +yg + f ++   +   d+fk ++peg+  ert +++
+  sp|Q95W86|NFCP_CONGI  11 IKIYMEGTVNGYHFKCEGEGDGNPFEGTQNMRIRVTEGaPLPFAFDILSPCCAYGSKTFIKHTSGI--PDYFKQSFPEGFTWERTTIYE 97 
+                           67889***************************9999883588888999999**********99877..59******************* PP
+
+            EMBOSS_001 102 ddgnyktraevkfegdtlvnrielkgidfkedgnil 137
+                           d g    + +  +eg+ l+ ++++ g +f  dg ++
+  sp|Q95W86|NFCP_CONGI  98 DGGVLTAHQDTSLEGNCLIYKVKVLGTNFPADGPVM 133
+                           *********************************987 PP
+
+>> sp|Q9U6Y4|GFPL2_ZOASP  GFP-like fluorescent chromoprotein FP538 OS=Zoanthus sp. OX=105402 PE=1 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 !   55.7   0.0     6e-18   1.6e-13      17     201 ..      17     200 ..       9     226 .. 0.77
+
+  Alignments for each domain:
+  == domain 1  score: 55.7 bits;  conditional E-value: 6e-18
+             EMBOSS_001  17 eldgdvnghkfsvsgegegdatygkltlkf.icttgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffkdd 103
+                             ++g vnghkf ++geg g    gk t+ + +   g lp     l   f yg + f++yp  +   d+fk++ p gy   r+++f+d 
+  sp|Q9U6Y4|GFPL2_ZOASP  17 HMEGCVNGHKFVITGEGIGYPFKGKQTINLcVIEGGPLPFSEDILSAGFKYGDRIFTEYPQDI--VDYFKNSCPAGYTWGRSFLFEDG 102
+                            689*************************96234557788888899999************987..59******************998 PP
+
+             EMBOSS_001 104 gnyktrae..vkfegdtlvnrielkgidfkedgnilghkleynynshnvyimadkqkngikvnfkirhniedgsvqladhyqqntpig 189
+                            +    + +  v  + + + ++  + g++f  dg ++  k+  n+ +    im   ++  +k +  +   ++dg      ++       
+  sp|Q9U6Y4|GFPL2_ZOASP 103 AVCICNVDitVSVKENCIYHKSIFNGMNFPADGPVM-KKMTTNWEASCEKIMPVPKQGILKGDVSMYLLLKDGGRYRC-QFDTVYKAK 188
+                            87666555115677889999999**********998.58999999998888877666666777777777777764332.333334444 PP
+
+             EMBOSS_001 190 dgpvllpdnhyl 201
+                              p  +p+ h++
+  sp|Q9U6Y4|GFPL2_ZOASP 189 SVPSKMPEWHFI 200
+                            555666666665 PP
+
+>> sp|Q484Q5|SYL_COLP3  Leucine--tRNA ligase OS=Colwellia psychrerythraea (strain 34H / ATCC BAA-681) OX=167879 GN=leuS 
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   13.7   0.0   4.2e-05       1.1      49     143 ..     313     403 ..     299     474 .. 0.68
+
+  Alignments for each domain:
+  == domain 1  score: 13.7 bits;  conditional E-value: 4.2e-05
+           EMBOSS_001  49 ttgklpvpwptlvttfsygvqcfsrypdhmkqhdffksampegyvqertiffkddgnyktraevkfegdtlvnrielkgidfkedgnilg 138
+                           tgkl   w      + yg  +    p h  q+d ++ a+  g   e+ i  ++  +   +a +  e  tl+n  e+ g+df+e    ++
+  sp|Q484Q5|SYL_COLP3 313 LTGKLVPVWAANFVLMDYGSGAVMSVPGHD-QRD-YEFALKYGLAIEQVIAGQEADDI-NKAAI-TEKSTLINSGEFDGLDFEEAFKAIS 398
+                          69**9999*********************6.566.47799*******99988766555.45555.5889***************999999 PP
+
+           EMBOSS_001 139 hkley 143
+                           kl  
+  sp|Q484Q5|SYL_COLP3 399 DKLIS 403
+                          99843 PP
+
+>> sp|A7H422|TRMA_CAMJD  tRNA/tmRNA (uracil-C(5))-methyltransferase OS=Campylobacter jejuni subsp. doylei (strain ATCC B
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   13.0   1.0   6.6e-05       1.8      76     119 ..      11      56 ..       2      64 .. 0.85
+
+  Alignments for each domain:
+  == domain 1  score: 13.0 bits;  conditional E-value: 6.6e-05
+            EMBOSS_001  76 dhmkqhdffksampegyvqertiffkddgnyktraevkf..egdtl 119
+                              ++h f+k  + e y ++  +f   d +y+trae+ f  e+dtl
+  sp|A7H422|TRMA_CAMJD  11 TLDEKHSFIKKYFKEFYTKDFKLFTSKDKHYRTRAELSFyhENDTL 56 
+                           55679********************************985567777 PP
+
+>> sp|A8FLP0|TRMA_CAMJ8  tRNA/tmRNA (uracil-C(5))-methyltransferase OS=Campylobacter jejuni subsp. jejuni serotype O:6 (
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   13.1   0.9   6.3e-05       1.7      76     119 ..      11      56 ..       2      64 .. 0.85
+
+  Alignments for each domain:
+  == domain 1  score: 13.1 bits;  conditional E-value: 6.3e-05
+            EMBOSS_001  76 dhmkqhdffksampegyvqertiffkddgnyktraevkf..egdtl 119
+                              ++h f+k  + e y ++  +f   d +y+trae+ f  e+dtl
+  sp|A8FLP0|TRMA_CAMJ8  11 TLDEKHSFIKKYFKEFYTKDFKLFASKDKHYRTRAELSFyhENDTL 56 
+                           55679********************************985567777 PP
+
+>> sp|Q9PP92|TRMA_CAMJE  tRNA/tmRNA (uracil-C(5))-methyltransferase OS=Campylobacter jejuni subsp. jejuni serotype O:2 (
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   13.1   0.9   6.3e-05       1.7      76     119 ..      11      56 ..       2      64 .. 0.85
+
+  Alignments for each domain:
+  == domain 1  score: 13.1 bits;  conditional E-value: 6.3e-05
+            EMBOSS_001  76 dhmkqhdffksampegyvqertiffkddgnyktraevkf..egdtl 119
+                              ++h f+k  + e y ++  +f   d +y+trae+ f  e+dtl
+  sp|Q9PP92|TRMA_CAMJE  11 TLDEKHSFIKKYFKEFYTKDFKLFASKDKHYRTRAELSFyhENDTL 56 
+                           55679********************************985567777 PP
+
+>> sp|Q5HUW5|TRMA_CAMJR  tRNA/tmRNA (uracil-C(5))-methyltransferase OS=Campylobacter jejuni (strain RM1221) OX=195099 GN
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   13.2   0.9     6e-05       1.6      76     119 ..      11      56 ..       2      65 .. 0.85
+   2 ?   -2.5   0.0       3.5   9.7e+04     127     147 ..     155     175 ..     144     186 .. 0.76
+
+  Alignments for each domain:
+  == domain 1  score: 13.2 bits;  conditional E-value: 6e-05
+            EMBOSS_001  76 dhmkqhdffksampegyvqertiffkddgnyktraevkf..egdtl 119
+                              ++h f+k  + e y ++  +f   d +y+trae+ f  e+dtl
+  sp|Q5HUW5|TRMA_CAMJR  11 TLDEKHSFIKKYFKEFYTKDFKLFASKDKHYRTRAELSFyhENDTL 56 
+                           55679********************************985567777 PP
+
+  == domain 2  score: -2.5 bits;  conditional E-value: 3.5
+            EMBOSS_001 127 gidfkedgnilghkleynyns 147
+                             ++++  ni g+k+ y +n+
+  sp|Q5HUW5|TRMA_CAMJR 155 TENLRQTLNIQGRKIFYEFNN 175
+                           556677889999999999986 PP
+
+>> sp|Q7SY07|EIF1A_DANRE  Probable RNA-binding protein EIF1AD OS=Danio rerio OX=7955 GN=eif1ad PE=2 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   12.7   0.0   8.6e-05       2.3      69     116 ..      84     130 ..      34     139 .. 0.88
+
+  Alignments for each domain:
+  == domain 1  score: 12.7 bits;  conditional E-value: 8.6e-05
+             EMBOSS_001  69 qcfsrypdhmkqhdffksampegyvqertiffkddgnyktraevkfeg 116
+                              f  y dh+ qh       peg+ ++rt   +++g  k r+e k e 
+  sp|Q7SY07|EIF1A_DANRE  84 ISFILYRDHI-QHLRKLGVWPEGFQEDRTSGERNEGTQKERSEEKEEE 130
+                            5688999**8.687788999***********************98653 PP
+
+>> sp|Q54YN2|MAAI_DICDI  Maleylacetoacetate isomerase OS=Dictyostelium discoideum OX=44689 GN=mai PE=3 SV=1
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   11.8   0.0   0.00016       4.4     160     207 ..      28      75 ..      11      89 .. 0.87
+
+  Alignments for each domain:
+  == domain 1  score: 11.8 bits;  conditional E-value: 0.00016
+            EMBOSS_001 160 gikvnfkirhniedgsvqladhyqqntpigdgpvllpdnhylstqsal 207
+                            ik  +k  h ++dg  q +d+y +  p+   p l  d h +    a+
+  sp|Q54YN2|MAAI_DICDI  28 KIKYEYKAIHLLKDGGQQKSDEYSKLNPMKAIPTLEIDGHIIGQSLAI 75 
+                           58999***********************************99876665 PP
+
+>> sp|A1VZH5|TRMA_CAMJJ  tRNA/tmRNA (uracil-C(5))-methyltransferase OS=Campylobacter jejuni subsp. jejuni serotype O:23/
+   #    score  bias  c-Evalue  i-Evalue hmmfrom  hmm to    alifrom  ali to    envfrom  env to     acc
+ ---   ------ ----- --------- --------- ------- -------    ------- -------    ------- -------    ----
+   1 ?   13.0   1.0   6.6e-05       1.8      76     119 ..      11      56 ..       2      64 .. 0.85
+   2 ?   -2.9   0.1       4.9   1.3e+05     147     157 ..     135     145 ..      98     176 .. 0.52
+
+  Alignments for each domain:
+  == domain 1  score: 13.0 bits;  conditional E-value: 6.6e-05
+            EMBOSS_001  76 dhmkqhdffksampegyvqertiffkddgnyktraevkf..egdtl 119
+                              ++h f+k  + e y ++  +f   d +y+trae+ f  e+dtl
+  sp|A1VZH5|TRMA_CAMJJ  11 TLDEKHSFIKKYFKEFYTKDFKLFTSKDKHYRTRAELSFyhENDTL 56 
+                           55679********************************985567777 PP
+
+  == domain 2  score: -2.9 bits;  conditional E-value: 4.9
+            EMBOSS_001 147 shnvyimadkq 157
+                           s+n++i    +
+  sp|A1VZH5|TRMA_CAMJJ 135 SNNLHINLIAR 145
+                           23333333333 PP
+
+
+
+
+
+Internal pipeline statistics summary:
+-------------------------------------
+Query model(s):                            1  (238 nodes)
+Target sequences:                     571609  (206878625 residues searched)
+Passed MSV filter:                     11522  (0.0201571); expected 11432.2 (0.02)
+Passed bias filter:                     9660  (0.0168997); expected 11432.2 (0.02)
+Passed Vit filter:                       494  (0.000864227); expected 571.6 (0.001)
+Passed Fwd filter:                        21  (3.67384e-05); expected 5.7 (1e-05)
+Initial search space (Z):             571609  [actual number of targets]
+Domain search space  (domZ):              21  [number of targets reported over threshold]
+# CPU time: 3.06u 0.17s 00:00:03.23 Elapsed: 00:00:01.71
+# Mc/sec: 28710.56
+//
+# Alignment of 13 hits satisfying inclusion thresholds saved to: /nfs/public/rw/es/projects/wp-jdispatcher/sources/prod-hl/jobs/hmmer3_phmmer/rest/20260929/2242/hmmer3_phmmer-R20260929-224219-0053-11220614-p1m.sto
+[ok]
+# Number of hits displayed: 50

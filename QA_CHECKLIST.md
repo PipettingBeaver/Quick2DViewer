@@ -29,6 +29,37 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Homolog search with phmmer — 0.52.0
+
+**Should do.** With a protein sequence loaded, one click searches Swiss-Prot with HMMER phmmer
+(EBI) and adds one Homologs row per significant hit, feeding conservation, the match-quality
+colouring and the predictor tooltips without needing an external HHpred run.
+
+**Try (normal use).**
+1. Load a well-known protein (GFP works well), then Analyze → **Search Homologs (phmmer)…**
+   *Expect:* a status line counts up while the job runs (usually under a minute), then the
+   Homologs rows appear under the existing tracks, numbered from #1 (or after any .hhr rows).
+2. Look at the first row.
+   *Expect:* a solid band of teal `=`/`|` glyphs for a close homolog; the ℹ tooltip says
+   "phmmer homolog", with E-value, score, identity and aligned columns, citing HMMER phmmer.
+3. Run it again with the Conservation row visible.
+   *Expect:* new rows continue the numbering (no overwrite), and Conservation is recomputed from
+   all homolog sequences when "Include HHR homolog sequences" is on.
+4. Guide → homolog step, answer "No" to the HHpred question.
+   *Expect:* the step offers "Search homologs (phmmer)" next to the HHpred route.
+
+**Edge cases (symptom → likely cause).**
+- Hits below HMMER's inclusion threshold do not get rows. Expected: the domain scan treats `?`
+  domains the same way; only HMMER-significant hits are imported.
+- A very short or low-complexity sequence returns no hits. Expected: nothing to import; the status
+  line says so and no rows are added (not a bug).
+- The E-value cut-off is the provider's `E=1e-3` parameter (Options → Data Sources shows the
+  capability); changing it changes how many hits are reported.
+- Live-service failures (queue full, network) surface in the status line and the Debugging
+  console; that is not an app bug.
+
+---
+
 ### Empty rules in the rules list — 0.51.0
 
 **Should do.** A rule that currently marks no residue is greyed and tagged "(Empty)" in the
@@ -993,6 +1024,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 285 | Load the missing source with the Tracks tab open (attach a structure) | The marker clears without switching tabs |
 | 286 | Remove that source again | The marker comes back |
 
+## 0.52.0 - homolog search with phmmer (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 287 | Load GFP, Analyze → Search Homologs (phmmer) | Status line runs; ~13 Homologs rows appear, numbered from #1 |
+| 288 | Inspect row #1 and its ℹ tooltip | Solid teal `=`/`|` band; tooltip names phmmer with E-value/score/identity |
+| 289 | Run it again | Numbering continues; no rows overwritten |
+| 290 | Check Conservation with homologs included | Recomputes from the phmmer sequences too |
+| 291 | Run it with no sequence loaded | Error toast, no job submitted |
+| 292 | Import an .hhr first, then run phmmer | phmmer rows continue after the .hhr numbers |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
@@ -1050,4 +1092,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6z. 273–277 (duplicate viewport with rules - fixed 0.50.1; check 273 first).
 6aa. 278–282 (preset cards vanish while guiding + dead RSA presets - fixed 0.50.2/0.50.3; check 278 first).
 6ab. 283–286 (empty rules in the rules list - new 0.51.0; card at the top, check 283 first).
+6ac. 287–292 (homolog search with phmmer - new 0.52.0; card at the top, check 287 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

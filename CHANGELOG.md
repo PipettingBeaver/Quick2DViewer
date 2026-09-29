@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-09-25
+
+### Added
+
+- **Homolog search with HMMER phmmer (EBI).** Analyze -> "Search Homologs (phmmer)…" (or the
+  button in Input Data, or the guide's homolog step) submits the current sequence to the EBI Job
+  Dispatcher (`hmmer3_phmmer`, Swiss-Prot, `E=1e-3`), parses HMMER's text output and adds one
+  Homologs row per significant hit (top 30; numbering continues after any imported .hhr). The rows
+  feed conservation, the Homologs match-quality colouring and the predictor tooltips exactly like
+  an imported .hhr - no external HHpred run needed for a first-pass MSA.
+  - `parsePhmmerHits()`: query length; the full-sequence scores table (E-value, score, domain
+    count, and the inclusion threshold deciding significance); every domain's alignment, including
+    wrapped blocks, query gaps (`.`), target gaps (`-`) and lowercase insertion residues. The
+    posterior-probability line (`*`/0-9/`.`) maps onto the existing HHpred glyph scale
+    (`|`/`=`/`+`/`:`/`.`), and identity is computed from the alignment.
+  - `runHomologSearch()` mirrors the domain scan: task lockout, live status line, progress, toasts,
+    and refreshes conservation, the viewer, the track manager and the Input Data summary.
+  - `applyPhmmerHits()` sanitizes the hit id for the track key (`sp|P42212|GFP_AEQVI` ->
+    `HL_01_sp_P42212_GFP_AEQVI`) while the row label and tooltip show the real id;
+    `nextHomologRank()` now numbers both .hhr imports and searches. Only hits above HMMER's
+    inclusion threshold become rows, like the domain scan's significant domains.
+  - `buildHomologPredictorInfo()` is source-aware: phmmer rows report E-value, score, identity and
+    aligned columns, and cite HMMER phmmer.
+  - Tests: a real EBI phmmer output (GFP vs Swiss-Prot, `tests/fixtures/phmmer-gfp.out`) is parsed
+    end to end - 21 reported hits, 13 above the inclusion threshold, 237/238 identity for the top
+    hit, glyphs restricted to the HHpred scale, multi-domain and gapped hits, rank continuation,
+    real hit ids in labels, predictor tooltip and conservation inclusion.
+
 ## [0.51.0] - 2026-09-25
 
 ### Added

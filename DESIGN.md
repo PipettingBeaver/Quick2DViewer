@@ -409,6 +409,33 @@ BLOSUM62 (`blosum62Score` already exists) rather than HHpred posterior
 probabilities, so the rows must be labelled with their own source, e.g.
 "BLAST (aligned)", to keep provenance honest.
 
+### Shipped: phmmer homolog search (v0.52.0)
+
+`homolog_search` is now a real capability (`ebi_phmmer`, `hmmer3_phmmer`,
+Swiss-Prot, `E=1e-3`) and Analyze -> *Search Homologs (phmmer)…* (or the Input Data
+button, or the guide's homolog step) runs it, parses HMMER's text output and adds
+`HL_` rows. Three details worth recording:
+
+- **The glyphs did not need building.** HMMER's text output carries a
+  posterior-probability line (`*` = 1.0, digits = int(10p), `.` = < 0.05, blank at
+  gaps), so phmmer rows reuse the HHpred match-quality scale directly
+  (`*`->`|`, 8-9->`=`, 6-7->`+`, 3-5->`:`, else `.`). No BLOSUM62 reconstruction was
+  needed and `buildHomologTrackString` needed no changes.
+- **Significance is HMMER's own call**: only hits above the inclusion threshold
+  become rows (the same rule the domain scan applies to `!` vs `?` domains), which
+  is why the provider asks for `E=1e-3` - the parameter is `E`; the `evalue`
+  parameter does not control the reporting cut-off.
+- Parsing traps handled: `== domain` headers are indented; alignments wrap every
+  ~100 columns with blank lines between the wrap blocks (same domain, so blanks
+  must not end a segment); the query line's sequence starts at
+  `prefix + start-number + space` (not just the prefix) and the target, match and
+  posterior lines are padded to that same offset; lowercase target residues are
+  insertions aligned to query gaps; target gaps are `-`.
+
+Still open from this section: BLAST as an alternative provider, and realigning
+hits whose HSPs do not cover the reference (the Foldseek path's
+`alignVariantToReference` trick).
+
 ### Guide layout: short form vs step card (v0.28.0)
 
 The guide has three layers, and each now has exactly one job:

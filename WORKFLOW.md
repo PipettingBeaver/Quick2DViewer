@@ -204,7 +204,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- What are you closing on?: Variant triage / Binding interface / Construct design / Figure / report
+- What are you closing on?: Characterizing an unresolved fold / Variant triage / Binding interface / Construct design / Figure / report
 
 **Promoted when.** Always. It is where the collected evidence is combined.
 
