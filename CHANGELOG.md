@@ -14,6 +14,32 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.5] - 2026-10-01
+
+### Added
+
+- **Reference numbering offset (global + per-track).** Imported data sometimes uses different
+  numbering than the loaded sequence (a construct missing its N-terminus, a mature chain, a table
+  numbered from another start). Input Data now has a **Numbering offset** (source position + offset =
+  reference position) plus an **override for the active row**, applied to the positional imports that
+  cannot be aligned - topology sources, UniProt features and experimental rows - while sequences that
+  can be aligned (models, variant FASTAs, homolog hits) keep their alignment placement and report
+  their own shift. Everything re-derives from its raw data, so changing the offset re-places
+  immediately, is logged with the shift, and travels in the session save.
+- **Partial HSP coverage is now visible, and partial hits are realigned.** BLAST/Foldseek HSPs are
+  local, so a short row is normal there; a phmmer or HHpred hit that short is worth a look.
+  - Rows covering under 95% carry an amber **(partial N%)** tag, the tooltip names the covered range
+    ("Coverage: 50% (residues 2-3)."), and the read-out counts them with the lowest coverage.
+  - The homolog search then **fetches each partial hit's full UniProt sequence** (capped at 8, before
+    conservation is recomputed) and merges it in: columns the HSP already covered keep their own
+    glyphs, the newly covered ones use the BLOSUM62 scale, and the tooltip says so
+    ("Realigned from P42212 (columns outside the original HSP use BLOSUM62 glyphs)."). Verified live:
+    8 of 13 BLAST hits realigned, e.g. GFPL_CLASP +52 columns to 96% coverage.
+  - Failures are counted and logged, never fatal.
+  - Tests: the shift helper, all three offset-aware imports, the per-track override, re-placement from
+    raw data, persistence, the coverage helper/tag/tooltip/read-out, the merge semantics (HSP columns
+    win) and the graceful failure path.
+
 ## [0.66.4] - 2026-10-01
 
 ### Changed

@@ -1211,6 +1211,93 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('partial realignment: merge keeps the HSP glyphs, fills the rest');
+ctxRun(`
+    parsedTracks = { AA: 'MKVW', 'HL_02_part': ' |||' };
+    homologHitsInfo = { 'HL_02_part': { rank: 2, hitId: 'sp|B|PART', source: 'BLAST', aaTrack: ' VW ' } };
+`);
+const mergeFilled = ctxRun(`mergeRealignedSequence('HL_02_part', 'MKVW', 'MKVW')`);
+assert(mergeFilled === 2, 'the merge fills only the uncovered columns (got ' + mergeFilled + ')');
+assert(ctxRun(`parsedTracks['HL_02_part']`) === '||||', 'the row becomes full-length while the HSP columns keep their glyphs (got "' + ctxRun(`parsedTracks['HL_02_part']`) + '")');
+assert(ctxRun(`homologHitsInfo['HL_02_part'].aaTrack`) === 'MVWW', 'the AA track gains the uncovered residues while keeping the HSP columns (got "' + ctxRun(`homologHitsInfo['HL_02_part'].aaTrack`) + '")');
+assert(ctxRun(`homologCoverageRange('HL_02_part').pct`) === 100, 'so the partial tag disappears');
+assert(ctxRun(`mergeRealignedSequence('HL_02_part', 'MKVW', 'MKVW')`) === 0, 'a second merge has nothing left to fill');
+ctxRun(`homologHitsInfo['HL_02_part'].realigned = { accession: 'B', filled: 2 };`);
+assert(/Realigned from B/.test(ctxRun(`buildHomologPredictorInfo('HL_02_part').useCase`)), 'the tooltip says the row was realigned and why the glyphs mix');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {};`);
+
+section('partial HSP coverage: helper, row tag, tooltip, read-out');
+ctxRun(`
+    parsedTracks = { AA: 'MKVW', 'HL_01_full': '||||', 'HL_02_part': ' |||', 'HL_03_tiny': '|   ', 'HL_04_none': '    ' };
+    homologHitsInfo = {
+        'HL_01_full': { rank: 1, hitId: 'sp|A|FULL', source: 'phmmer', aaTrack: 'MKVW', stats: { 'E-value': '1e-5' } },
+        'HL_02_part': { rank: 2, hitId: 'sp|B|PART', source: 'BLAST', aaTrack: ' VW ', stats: { 'E-value': '1e-3' } },
+        'HL_03_tiny': { rank: 3, hitId: 'sp|C|TINY', source: 'BLAST', aaTrack: 'M   ', stats: {} },
+        'HL_04_none': { rank: 4, hitId: 'sp|D|NONE', source: 'BLAST', aaTrack: '    ', stats: {} }
+    };
+`);
+const covFull = ctxRun(`homologCoverageRange('HL_01_full')`);
+assert(covFull.pct === 100 && covFull.from === 1 && covFull.to === 4, 'a full row reports 100% over 1-4');
+const covPart = ctxRun(`homologCoverageRange('HL_02_part')`);
+assert(Math.round(covPart.pct) === 50 && covPart.from === 2 && covPart.to === 3, 'a partial row reports its range (got ' + Math.round(covPart.pct) + '% ' + covPart.from + '-' + covPart.to + ')');
+assert(ctxRun(`homologCoverageRange('HL_04_none')`) === null, 'an empty row reports nothing (no tag)');
+assert(/Coverage: 50% \(residues 2-3\)/.test(ctxRun(`buildHomologPredictorInfo('HL_02_part').useCase`)), 'the tooltip names the covered range (got "' + ctxRun(`buildHomologPredictorInfo('HL_02_part').useCase`) + '")');
+assert(!/Coverage:/.test(ctxRun(`buildHomologPredictorInfo('HL_01_full').useCase`)), 'a full row gets no coverage note');
+const insPartial = ctxRun(`computeGuideInsights().map(x => x.text).join(' ')`);
+assert(/homolog row\(s\) cover only part of the sequence/.test(insPartial), 'the read-out counts partial rows (got "' + insPartial.slice(0, 80) + '")');
+assert(/lowest 25%/.test(insPartial), 'and names the lowest coverage');
+// The row tag is rendered by buildTrackRow (walk the stub DOM).
+const tagProbe = ctxRun(`
+    (function () {
+        function findTags(el, out) {
+            (el.children || []).forEach(c => {
+                if (c && c.className === 'track-partial-tag') out.push(c.textContent || c._text || '');
+                findTags(c, out);
+            });
+            return out;
+        }
+        const full = buildTrackRow('HL_01_full', parsedTracks, 4, false);
+        const part = buildTrackRow('HL_02_part', parsedTracks, 4, false);
+        return { full: findTags(full, []), part: findTags(part, []) };
+    })()
+`);
+assert(tagProbe.part.length === 1 && tagProbe.part[0].indexOf('partial 50%') !== -1, 'a partial row carries the amber (partial N%) tag (got ' + JSON.stringify(tagProbe.part) + ')');
+assert(tagProbe.full.length === 0, 'a full row does not');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {};`);
+
+section('reference numbering offset: global + per-track, re-applied from raw data');
+assert(ctxRun(`shiftStateString('MMM', 2, 6)`) === '  MMM ', 'a state string shifts right and pads (got "' + ctxRun(`shiftStateString('MMM', 2, 6)`) + '")');
+assert(ctxRun(`shiftStateString('  MMM ', -2, 6)`) === 'MMM   ', 'and left, dropping what falls off');
+assert(ctxRun(`shiftStateString('MMM', 0, 3)`) === 'MMM', 'zero offset is a pass-through');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(10) };
+    topologySources = [{ name: 'Phobius', state: 'MMM' }];
+    uniprotFeatures = { accession: 'P00001', features: [{ type: 'Active site', start: 1, end: 2, description: 'x' }] };
+    uniprotFeatureTracks = {};
+    experimentalTracksInfo = { 'DMS_EXP': { label: 'DMS', kind: 'dms', rows: [{ pos: 1, val: 0.9 }, { pos: 2, val: 0.8 }, { pos: 11, val: 0.1 }] } };
+    referenceOffset = 5; trackOffsets = {};
+    applyReferenceOffset && null;
+`);
+assert(ctxRun(`applyReferenceOffset(1, null)`) === 6, 'the helper shifts a position by the global offset');
+ctxRun(`applyTopologySources();`);
+assert(ctxRun(`parsedTracks['TP_Phobius'].indexOf('M')`) === 5 && ctxRun(`(parsedTracks['TP_Phobius'].match(/M/g) || []).length`) === 3, 'topology segments land at the shifted positions (got index ' + ctxRun(`parsedTracks['TP_Phobius'].indexOf('M')`) + ')');
+ctxRun(`applyUniProtFeatures();`);
+assert(ctxRun(`(function () { const k = Object.keys(parsedTracks).find(x => x.startsWith('UP_')); return k ? parsedTracks[k].indexOf('\u25a0') : -1; })()`) === 5, 'UniProt features shift too');
+ctxRun(`remapExperimentalTrack('DMS_EXP');`);
+assert(ctxRun(`parsedTracks['DMS_EXP'][5].val`) === 0.9 && ctxRun(`experimentalTracksInfo['DMS_EXP'].outOfRange`) === 1, 'experimental rows shift, and out-of-range positions are counted (got ' + ctxRun(`experimentalTracksInfo['DMS_EXP'].outOfRange`) + ')');
+// per-track override beats the global
+ctxRun(`trackOffsets = { 'TP_Phobius': -1 }; applyTopologySources();`);
+assert(ctxRun(`parsedTracks['TP_Phobius'].indexOf('M')`) === 0, 'a per-track override wins over the global offset');
+// changing the offset re-places from the raw data (nothing is lost)
+ctxRun(`referenceOffset = 0; trackOffsets = {}; applyReferenceOffset && null; remapExperimentalTrack('DMS_EXP'); applyTopologySources(); applyUniProtFeatures();`);
+assert(ctxRun(`parsedTracks['DMS_EXP'][0].val`) === 0.9 && ctxRun(`parsedTracks['TP_Phobius'].indexOf('M')`) === 0, 'resetting the offset re-places everything from its raw data');
+// applyReferenceNumbering re-applies + reports
+ctxRun(`actionLog = []; referenceOffset = 2; applyReferenceNumbering();`);
+assert(ctxRun(`(function () { const e = actionLog.find(x => x.kind === 'import' && x.label.indexOf('reference numbering applied') !== -1); return !!e && e.detail.indexOf('global +2') !== -1; })()`), 'applying a numbering change is reported with the shift (got ' + ctxRun(`JSON.stringify(actionLog.filter(e => e.kind === 'import'))`) + ')');
+ctxRun(`referenceOffset = 0; trackOffsets = {}; parsedTracks = {}; topologySources = []; uniprotFeatures = null; uniprotFeatureTracks = {}; experimentalTracksInfo = {}; actionLog = [];`);
+assert(HTML.indexOf('id="refOffsetInput"') !== -1 && HTML.indexOf('id="trackOffsetInput"') !== -1 && HTML.indexOf('id="refOffsetSummary"') !== -1, 'Input Data has the numbering controls');
+assert(ctxRun(`Object.prototype.hasOwnProperty.call(gatherPersistableState(), 'referenceOffset') && Object.prototype.hasOwnProperty.call(gatherPersistableState(), 'trackOffsets')`), 'the numbering travels in the session save');
+
 section('legacy saves (pre-0.23.0): tolerated, and explained');
 sandbox.__preLegacy = ctxRun(`JSON.stringify(gatherPersistableState())`);
 ctxRun(`
@@ -3143,6 +3230,18 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
         parsedTracks = {}; pdbLookupEntries = []; uniprotAccession = null; actionLog = [];
         SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].adapter = 'rcsbSequenceSearch';
     `);
+
+    // realignPartialHomologs fails gracefully when the fetch does (the harness
+    // fetch stub answers ok:false), counting the hit instead of throwing.
+    ctxRun(`
+        parsedTracks = { AA: 'MKVW', 'HL_02_part': ' |||' };
+        homologHitsInfo = { 'HL_02_part': { rank: 2, hitId: 'sp|P42212|GFP_AEQVI', source: 'BLAST', aaTrack: ' VW ' } };
+        actionLog = [];
+    `);
+    const realignRes = await ctxRun(`realignPartialHomologs(['HL_02_part'], null)`);
+    assert(realignRes.considered === 1 && realignRes.failed === 1 && realignRes.realigned === 0, 'an unfetchable hit is counted, not thrown (got ' + JSON.stringify(realignRes) + ')');
+    assert(ctxRun(`actionLog.some(e => e.kind === 'api' && e.label.indexOf('realign failed') !== -1)`), 'and the failure is logged (got ' + ctxRun(`JSON.stringify(actionLog.map(e => e.kind + ':' + e.label))`) + ')');
+    ctxRun(`parsedTracks = {}; homologHitsInfo = {}; actionLog = [];`);
 
     // A bad PDB id is rejected before any request (fetchPdbEntry is async).
     assert((await ctxRun(`fetchPdbEntry('nope')`)) === false, 'a bad PDB id is rejected before any request');

@@ -1316,6 +1316,7 @@
         .coachmark-on .rp-suggested { box-shadow:0 0 0 2px #ddd6fe; }
         .track-row.track-empty { opacity:0.55; }
         .track-empty-tag { margin-left: 6px; font-size: 0.68rem; color: #94a3b8; font-style: italic; }
+        .track-partial-tag { margin-left: 6px; font-size: 0.68rem; color: #b45309; font-style: italic; }
         .task-running { opacity:0.85; cursor:progress; }
         .task-running::after {
             content:''; display:inline-block; width:9px; height:9px; margin-left:6px;
@@ -2077,6 +2078,15 @@
                     </span>
                 </div>
                 <div id="inputDataSummary" class="data-box" style="font-size:0.78rem; white-space:pre-wrap; line-height:1.5;">No data loaded yet.</div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+                    <label for="refOffsetInput" style="font-size:0.72rem; color:#475569;" title="Source position + offset = reference position. Applies to imported tables that cannot be aligned: topology sources, UniProt features and experimental rows.">Numbering offset</label>
+                    <input type="number" id="refOffsetInput" value="0" step="1" style="width:64px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">
+                    <button type="button" class="copy-btn" onclick="setReferenceOffset(document.getElementById('refOffsetInput').value)" style="padding:2px 8px;">Apply</button>
+                    <label for="trackOffsetInput" style="font-size:0.72rem; color:#475569;" title="Per-track override for the active row; empty clears it">override for active row</label>
+                    <input type="number" id="trackOffsetInput" step="1" style="width:64px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">
+                    <button type="button" class="copy-btn" onclick="setTrackOffset(activeRowKey, document.getElementById('trackOffsetInput').value)" style="padding:2px 8px;">Apply</button>
+                    <span id="refOffsetSummary" style="font-size:0.72rem; color:#94a3b8;"></span>
+                </div>
                 <div id="structureFetchStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
@@ -4477,6 +4487,13 @@ async function runHomologSearch() {
         }
         const added = applyHomologHits(parsed, source);
         logAction('api', source + ': ' + parsed.hits.length + ' hit(s) parsed -> ' + added + ' track(s)');
+        // Partial HSPs: realign the hit's full UniProt sequence where possible,
+        // before conservation is recomputed from the homolog tracks.
+        const newKeys = Object.keys(homologHitsInfo).filter(k => homologHitsInfo[k].source === source && !homologHitsInfo[k].realigned);
+        const re = await realignPartialHomologs(newKeys, setStatus);
+        if (re.considered) {
+            logAction('api', 'partial hits realigned', re.realigned + ' of ' + re.considered + ' realigned (' + re.filled + ' column(s) filled)' + (re.failed ? ', ' + re.failed + ' not fetchable' : ''));
+        }
         recomputeConservationScores();
         renderViewer(parsedTracks);
         populateCrossRefDropdown();
@@ -4496,6 +4513,69 @@ async function runHomologSearch() {
         endGuideTask('annotation', 'Homolog search failed: ' + m, 'error');
     }
 }
+// Merges a realigned full-length sequence into an existing homolog row: the
+// columns the HSP already covered keep their own glyphs, the rest get BLOSUM62
+// glyphs against the reference (the scale BLAST/Foldseek rows use). Returns how
+// many columns were filled.
+function mergeRealignedSequence(key, aligned, reference) {
+    const info = homologHitsInfo[key];
+    const ref = String(reference || '');
+    if (!info || !aligned || aligned.length !== ref.length) return 0;
+    const track = (parsedTracks[key] || '').split('');
+    const aaTrack = (info.aaTrack || '').split('');
+    while (aaTrack.length < ref.length) aaTrack.push(' ');
+    let filled = 0;
+    for (let i = 0; i < ref.length; i++) {
+        if (aaTrack[i] && aaTrack[i] !== ' ') continue;   // keep the HSP's own column
+        const res = aligned[i];
+        if (!res || res === '-' || res === ' ') continue;
+        aaTrack[i] = res;
+        track[i] = foldseekQualityChar(ref[i], res);
+        filled++;
+    }
+    if (!filled) return 0;
+    parsedTracks[key] = track.join('');
+    info.aaTrack = aaTrack.join('');
+    return filled;
+}
+// Partial HSPs are local by nature. When the hit is a UniProt entry we can do
+// better: fetch its full sequence and align it onto the reference, so the row
+// shows the whole homolog instead of one HSP's window (which also improves the
+// conservation tally). Capped, sequential, and failures are counted, not fatal.
+async function realignPartialHomologs(keys, setStatus) {
+    const ref = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!ref) return { realigned: 0, failed: 0, considered: 0, filled: 0 };
+    const partial = (keys || []).filter(k => {
+        const c = homologCoverageRange(k);
+        return c && c.pct < 95;
+    }).slice(0, 8);
+    let realigned = 0, failed = 0, filled = 0;
+    for (let n = 0; n < partial.length; n++) {
+        const key = partial[n];
+        const info = homologHitsInfo[key];
+        const acc = homologAccession(info && info.hitId);
+        if (!acc) { failed++; continue; }
+        try {
+            if (setStatus) setStatus('Realigning ' + acc + ' onto the reference (' + (n + 1) + '/' + partial.length + ')\u2026');
+            const resp = await fetchWithTimeout('https://rest.uniprot.org/uniprotkb/' + encodeURIComponent(acc) + '.fasta', {}, 30000);
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const fasta = await resp.text();
+            const seq = fasta.split(/\r?\n/).filter(l => l && l[0] !== '>').join('').replace(/[^A-Za-z]/g, '');
+            if (seq.length < 3) throw new Error('empty sequence');
+            const aligned = alignVariantToReference(seq, ref);
+            const got = mergeRealignedSequence(key, aligned, ref);
+            if (!got) throw new Error('nothing new aligned');
+            info.realigned = { accession: acc, filled: got, source: 'UniProt' };
+            realigned++;
+            filled += got;
+        } catch (e) {
+            failed++;
+            logAction('api', 'realign failed for ' + ((info && info.hitId) || key), e && e.message ? e.message : String(e));
+        }
+    }
+    return { realigned, failed, considered: partial.length, filled };
+}
+
 // Number imported homologs globally (continues after any HL_ rows already
 // loaded), shared by the .hhr import and the phmmer search.
 function nextHomologRank() {
@@ -4773,8 +4853,9 @@ function applyUniProtFeatures() {
         const key = uniprotTypeKey(type);
         const cat = UNIPROT_TYPE_CATEGORIES[type];
         const track = new Array(aaLen).fill(' ');
+        const off = offsetForTrack(key);
         features.forEach(f => {
-            const s = Math.max(1, f.start), e = Math.min(aaLen, f.end);
+            const s = Math.max(1, f.start + off), e = Math.min(aaLen, f.end + off);
             for (let i = s; i <= e; i++) track[i - 1] = UNIPROT_MARKER;
         });
         parsedTracks[key] = track.join('');
@@ -4900,16 +4981,95 @@ function parseTopologyText(text, totalLength) {
     return { name: 'Topology', state: arr.join('') };
 }
 
+// --- Reference numbering offset ---------------------------------------------
+// Imported data sometimes uses different numbering than the loaded sequence: a
+// construct without its N-terminal residues, a mature chain, a feature table
+// numbered from another start. `referenceOffset` shifts every imported position
+// onto the reference (source position + offset = reference position) and
+// `trackOffsets` overrides it per track. Sequences that can be aligned (models,
+// variant FASTAs, homolog hits) are placed by alignment and report their own
+// shift; the offset is for positional tables that cannot be aligned. Everything
+// re-derives from its raw data, so changing the offset re-places immediately.
+let referenceOffset = 0;
+let trackOffsets = {}; // { trackKey: offset }
+function offsetForTrack(trackKey) {
+    if (trackKey && trackOffsets[trackKey] != null) return trackOffsets[trackKey];
+    return referenceOffset;
+}
+function applyReferenceOffset(pos, trackKey) {
+    const off = offsetForTrack(trackKey);
+    return pos + (Number.isFinite(off) ? off : 0);
+}
+function referenceOffsetSummary() {
+    const bits = [];
+    if (referenceOffset) bits.push('global ' + (referenceOffset > 0 ? '+' : '') + referenceOffset);
+    const perTrack = Object.keys(trackOffsets).filter(k => trackOffsets[k]);
+    if (perTrack.length) bits.push(perTrack.length + ' per-track override' + (perTrack.length === 1 ? '' : 's'));
+    return bits.join(', ');
+}
+// Shifts a per-residue state string (positive = the source starts later in the
+// reference), padding/truncating to the reference length.
+function shiftStateString(state, offset, totalLength) {
+    const src = String(state || '');
+    const len = totalLength || src.length;
+    const off = Number.isFinite(offset) ? Math.round(offset) : 0;
+    if (!off) return padTopologyState(src, len);
+    const out = new Array(len).fill(' ');
+    for (let i = 0; i < src.length; i++) {
+        const target = i + off;
+        if (target >= 0 && target < len) out[target] = src[i];
+    }
+    return out.join('');
+}
+// Re-places every offset-aware import after the numbering changes.
+function applyReferenceNumbering() {
+    const bits = [];
+    if (topologySources.length) { applyTopologySources(); bits.push('topology'); }
+    if (uniprotFeatures) { applyUniProtFeatures(); bits.push('UniProt features'); }
+    Object.keys(experimentalTracksInfo || {}).forEach(k => { if (remapExperimentalTrack(k)) bits.push('experimental'); });
+    renderViewer(parsedTracks);
+    refreshTrackManagerIfVisible();
+    schedulePersist();
+    const summary = referenceOffsetSummary();
+    if (bits.length) {
+        logAction('import', 'reference numbering applied', (summary || 'no offset') + ' to ' + bits.join(', '));
+        showToast('Reference numbering ' + (summary || '(no offset)') + ' applied to ' + bits.join(', ') + '.', 'info');
+    }
+    syncReferenceNumberingControls();
+    return bits;
+}
+function setReferenceOffset(value) {
+    const n = parseInt(value, 10);
+    referenceOffset = Number.isFinite(n) ? n : 0;
+    applyReferenceNumbering();
+}
+function setTrackOffset(trackKey, value) {
+    if (!trackKey) { showToast('Select a row first: the override applies to the active row.', 'info'); return; }
+    const n = parseInt(value, 10);
+    if (value === '' || value == null || !Number.isFinite(n)) delete trackOffsets[trackKey];
+    else trackOffsets[trackKey] = n;
+    applyReferenceNumbering();
+}
+function syncReferenceNumberingControls() {
+    const g = document.getElementById('refOffsetInput');
+    if (g && document.activeElement !== g) g.value = String(referenceOffset || 0);
+    const t = document.getElementById('trackOffsetInput');
+    if (t && document.activeElement !== t) t.value = (activeRowKey && trackOffsets[activeRowKey] != null) ? String(trackOffsets[activeRowKey]) : '';
+    const sum = document.getElementById('refOffsetSummary');
+    if (sum) sum.textContent = referenceOffsetSummary() ? ('applied: ' + referenceOffsetSummary()) : 'no offset applied';
+}
+
 // Rebuilds the TP_ string tracks (one per source + a consensus when >=2) from
 // topologySources, aligned to the reference AA length.
 function applyTopologySources() {
     const aaLen = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     Object.keys(parsedTracks).forEach(k => { if (k.startsWith('TP_')) delete parsedTracks[k]; });
     if (!aaLen) { renderViewer(parsedTracks); return; }
-    const sources = topologySources.map(s => ({ name: s.name, state: padTopologyState(s.state || '', aaLen) }));
-    sources.forEach(s => {
-        parsedTracks['TP_' + s.name.replace(/[^A-Za-z0-9]+/g, '_')] = s.state;
+    const sources = topologySources.map(s => {
+        const key = 'TP_' + s.name.replace(/[^A-Za-z0-9]+/g, '_');
+        return { name: s.name, key, state: shiftStateString(s.state || '', offsetForTrack(key), aaLen) };
     });
+    sources.forEach(s => { parsedTracks[s.key] = s.state; });
     if (sources.length >= 2) {
         const consensus = new Array(aaLen).fill(' ');
         for (let i = 0; i < aaLen; i++) {
@@ -6164,6 +6324,28 @@ function pearsonR(xs, ys) {
     const den = Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
     return den ? cov / den : null;
 }
+// Rebuilds an experimental row from its stored table, applying the numbering
+// offset - so changing the offset re-places the values instead of losing them.
+function remapExperimentalTrack(key) {
+    const info = experimentalTracksInfo[key];
+    if (!info || !Array.isArray(info.rows)) return null;
+    const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!total) return null;
+    const vals = new Array(total).fill(null).map(() => ({ val: null, type: 'exp' }));
+    let mapped = 0, outOfRange = 0;
+    info.rows.forEach(r => {
+        const pos = applyReferenceOffset(r.pos, key);
+        if (pos < 1 || pos > total) { outOfRange++; return; }
+        vals[pos - 1] = { val: r.val, type: 'exp' };
+        mapped++;
+    });
+    parsedTracks[key] = vals;
+    info.values = mapped;
+    info.outOfRange = outOfRange;
+    const numbers = vals.filter(v => v.val != null).map(v => v.val);
+    info.mean = numbers.length ? numbers.reduce((a, b) => a + b, 0) / numbers.length : 0;
+    return info;
+}
 function addExperimentalTrack() {
     const nameEl = document.getElementById('expNameInput');
     const kindEl = document.getElementById('expKindSelect');
@@ -6180,19 +6362,14 @@ function addExperimentalTrack() {
         showToast('Could not read any values: expected "position value" lines.', 'error');
         return;
     }
-    const vals = new Array(total).fill(null).map(() => ({ val: null, type: 'exp' }));
-    let mapped = 0, outOfRange = 0;
-    rows.forEach(r => {
-        if (r.pos < 1 || r.pos > total) { outOfRange++; return; }
-        vals[r.pos - 1] = { val: r.val, type: 'exp' };
-        mapped++;
-    });
     const slug = label.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'data';
     const key = slug + '_EXP';
-    parsedTracks[key] = vals;
-    const numbers = vals.filter(v => v.val != null).map(v => v.val);
-    const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
-    experimentalTracksInfo[key] = { label, kind, values: mapped, mean };
+    experimentalTracksInfo[key] = { label, kind, rows };
+    remapExperimentalTrack(key);
+    const info = experimentalTracksInfo[key];
+    const vals = parsedTracks[key];
+    const mapped = info.values, outOfRange = info.outOfRange || 0;
+    const mean = info.mean;
     setTrackMeta(key, { source: 'Experimental', color: '#8b5cf6', label, kind });
     // A descriptive read-out against conservation when both exist.
     const cons = parsedTracks.CONSERVATION;
@@ -7745,6 +7922,16 @@ function computeGuideInsights() {
         const quality = validationSummaryText(v.summary);
         out.push({ level: 'info', text: 'PDBe validation (' + v.pdbId + '): ' + (worst || 'no flagged residues') + (quality ? '; entry quality ' + quality : '') + '.' });
     }
+    const partialHomologs = Object.keys(homologHitsInfo || {})
+        .map(k => ({ k, cov: homologCoverageRange(k) }))
+        .filter(x => x.cov && x.cov.pct < 95);
+    if (partialHomologs.length) {
+        partialHomologs.sort((a, b) => a.cov.pct - b.cov.pct);
+        const worst = partialHomologs[0];
+        out.push({ level: 'info', text: partialHomologs.length + ' homolog row(s) cover only part of the sequence (lowest ' +
+            Math.round(worst.cov.pct) + '%, residues ' + worst.cov.from + '-' + worst.cov.to + '). Local HSPs explain it for BLAST/Foldseek; ' +
+            'for phmmer or HHpred a short hit is worth a look.' });
+    }
     if (Object.keys(variantEffectResults || {}).length) {
         const subs = Object.keys(variantEffectResults);
         const perProvider = [];
@@ -8207,6 +8394,7 @@ function renderWorkflowGuide() {
 }
 
 function renderInputDataModal() {
+    syncReferenceNumberingControls();
     const dmBtn = document.getElementById('btnDomainScan');
     if (dmBtn) {
         const scanned = Object.keys(parsedTracks).some(k => k.startsWith('DM_'));
@@ -9164,7 +9352,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.4';
+const APP_VERSION = '0.66.5';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11326,11 +11514,13 @@ function buildHomologPredictorInfo(trackKey) {
             { range: '= / +', desc: 'Moderate-to-good match.' },
             { range: ': / .', desc: 'Weak match.' }
         ]),
-        useCase: isPhmmer
+        useCase: (isPhmmer
             ? `E-value=${s['E-value'] || '?'}, score=${s.Score || '?'}, Identities=${s.Identities || '?'}, Aligned_cols=${s['Aligned_cols'] || '?'}`
             : (isBlast
                 ? `E-value=${s['E-value'] || '?'}, bits=${s.Score || '?'}, Identities=${s.Identities || '?'}, Aligned_cols=${s['Aligned_cols'] || '?'}, HSPs=${s.HSPs || '?'}`
-                : `Probab=${s.Probab || '?'}%, E-value=${s['E-value'] || '?'}, Identities=${s.Identities || '?'}, Aligned_cols=${s.Aligned_cols || '?'}`),
+                : `Probab=${s.Probab || '?'}%, E-value=${s['E-value'] || '?'}, Identities=${s.Identities || '?'}, Aligned_cols=${s.Aligned_cols || '?'}`)) +
+            (function () { const c = homologCoverageRange(trackKey); return (c && c.pct < 95) ? ' Coverage: ' + Math.round(c.pct) + '% (residues ' + c.from + '-' + c.to + ').' : ''; })() +
+            ((homologHitsInfo[trackKey] && homologHitsInfo[trackKey].realigned) ? ' Realigned from ' + homologHitsInfo[trackKey].realigned.accession + ' (columns outside the original HSP use BLOSUM62 glyphs).' : ''),
         citation: isPhmmer ? 'HMMER phmmer (Eddy lab)' : (isBlast ? 'NCBI BLAST (Altschul et al.)' : (isFoldseek ? 'Foldseek (van Kempen et al.)' : 'HHpred / HHsearch (Söding lab)'))
     };
 }
@@ -13032,6 +13222,18 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
         emptyTag.textContent = '(Empty)';
         emptyTag.title = 'No residue in this track is annotated: the prediction or import found nothing for this protein.';
         labelEl.appendChild(emptyTag);
+    }
+    if (key.startsWith('HL_')) {
+        const cov = homologCoverageRange(key);
+        if (cov && cov.pct < 95) {
+            const partialTag = document.createElement('span');
+            partialTag.className = 'track-partial-tag';
+            partialTag.textContent = '(partial ' + Math.round(cov.pct) + '%)';
+            partialTag.title = 'This hit covers residues ' + cov.from + '-' + cov.to + ' of ' + cov.total +
+                ' (' + Math.round(cov.pct) + '%). BLAST HSPs are local, so a partial row is expected there; a ' +
+                'phmmer or HHpred hit this short is worth a look.';
+            labelEl.appendChild(partialTag);
+        }
     }
 
     const predictorInfo = getPredictorInfo(key);
@@ -16744,6 +16946,8 @@ function gatherPersistableState() {
         homologHitsInfo: homologHitsInfo,
         validationHitsInfo: validationHitsInfo,
         experimentalTracksInfo: experimentalTracksInfo,
+        referenceOffset: referenceOffset,
+        trackOffsets: trackOffsets,
         keyedVariantsInfo: keyedVariantsInfo,
         graphHighlights: graphHighlights,
         // These back derived tracks (TP_/UP_/DM_), so without them a restored
@@ -17125,6 +17329,8 @@ function applyPersistedState(state) {
     homologHitsInfo = state.homologHitsInfo || {};
     validationHitsInfo = state.validationHitsInfo || {};
     experimentalTracksInfo = state.experimentalTracksInfo || {};
+    referenceOffset = Number.isFinite(state.referenceOffset) ? state.referenceOffset : 0;
+    trackOffsets = (state.trackOffsets && typeof state.trackOffsets === 'object') ? state.trackOffsets : {};
     keyedVariantsInfo = state.keyedVariantsInfo || {};
     graphHighlights = state.graphHighlights || {};
     topologySources = Array.isArray(state.topologySources) ? state.topologySources : [];
@@ -17431,6 +17637,26 @@ function homologConfidencePercent(info) {
     if (isNaN(e)) return null;
     return Math.max(0, Math.min(100, -10 * Math.log10(Math.max(e, 1e-300))));
 }
+// Where a homolog row covers the reference: percent, first and last residue.
+// BLAST HSPs are local, so partial rows are normal there; the tag, the tooltip
+// and the read-out say so instead of letting a short row look like a full
+// alignment.
+function homologCoverageRange(key) {
+    const info = homologHitsInfo[key];
+    const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const aa = info && typeof info.aaTrack === 'string' ? info.aaTrack : '';
+    if (!total || aa.length !== total) return null;
+    let first = -1, last = -1, n = 0;
+    for (let i = 0; i < aa.length; i++) {
+        if (aa[i] === ' ') continue;
+        if (first === -1) first = i;
+        last = i;
+        n++;
+    }
+    if (!n) return null;
+    return { pct: (n / total) * 100, from: first + 1, to: last + 1, total };
+}
+
 // Coverage: the share of reference residues where the homolog actually has an
 // aligned residue. Read from the stored aaTrack (blank = no residue), which is
 // union-correct even when BLAST HSPs overlap; Aligned_cols is the fallback.
@@ -17807,6 +18033,8 @@ async function resetAllData() {
     homologHitsInfo = {};
     validationHitsInfo = {};
     experimentalTracksInfo = {};
+    referenceOffset = 0;
+    trackOffsets = {};
     keyedVariantsInfo = {};
     conservationMetric = 'shannon';
     conservationIncludeHHR = true;

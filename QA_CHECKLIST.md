@@ -1366,6 +1366,19 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.5 - numbering offset + partial-HSP realignment (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 403 | Load a sequence, set Numbering offset to +20, import an experimental table at positions 1-3 | The values land at 21-23; the status/log says "global +20" |
+| 404 | Change the offset again | Values re-place from the stored table (nothing is lost); out-of-range counted |
+| 405 | Paste topology segments with an offset set | The source shifts; the consensus follows |
+| 406 | Fetch a UniProt entry with an offset set | Feature rows shift by the same amount |
+| 407 | Give the active row its own override, then clear it | The override wins, then falls back to the global |
+| 408 | Run a BLAST search with weak/local hits | Partial rows carry "(partial N%)"; the tooltip names the range |
+| 409 | Watch the same run's log | "partial hits realigned: N of M realigned (X columns filled)" |
+| 410 | Hover a realigned row | The tooltip says it was realigned and why the glyphs mix |
+
 ## 0.66.3 - self-driven state round (quick rows)
 
 | # | Try | Watch for |
@@ -1551,4 +1564,5 @@ Driven end to end with the app's own runners against the live services; no actio
 6ar. 383–390 (experimental per-residue data - new 0.65.0; check 383 first).
 6as. 391–397 (methods report completeness - 0.66.0; check 391 first).
 6at. 398–402 (self-driven state round - 0.66.3; the X-items it closes are noted in their rows).
+6au. 403–410 (numbering offset + partial-HSP realignment - new 0.66.5; check 403 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
