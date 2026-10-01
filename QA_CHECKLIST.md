@@ -1366,6 +1366,18 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.7 - Tracks tab vs quick controls + row polish (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 416 | Open the Tracks tab | "Track Visibility (full manager)" + the role line + "Quick controls (View as / Color) ↗" |
+| 417 | Open the Track Control popover | "Full manager ↗" in its header; clicking it opens the sidebar list |
+| 418 | Filter a track in the popover, then look at the tab | The row says "(filtered)" (loaded, not drawn) |
+| 419 | Hover the first row of a type | Its chevron strengthens from the subtle default |
+| 420 | Select a row (band/variant click) | The whole row tints, not just the label chip |
+| 421 | Tab through both surfaces | Focus rings intact; links reachable |
+| 422 | Reload | Hidden/filtered states and the colour mode persist (unchanged) |
+
 ## 0.66.6 - model score colour mode (quick rows)
 
 | # | Try | Watch for |
@@ -1576,4 +1588,5 @@ Driven end to end with the app's own runners against the live services; no actio
 6at. 398–402 (self-driven state round - 0.66.3; the X-items it closes are noted in their rows).
 6au. 403–410 (numbering offset + partial-HSP realignment - new 0.66.5; check 403 first).
 6av. 411–415 (model score colour mode - new 0.66.6; check 411 first).
+6aw. 416–422 (Tracks tab vs quick controls + row polish - new 0.66.7; check 417 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

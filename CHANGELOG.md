@@ -14,6 +14,25 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.7] - 2026-10-01
+
+### Changed
+
+- **The Tracks tab and the Track Control popover now have defined roles and cross-link both ways**
+  (#2c). The sidebar section is titled **"Track Visibility (full manager)"** with a one-line
+  description (every track, grouped by type, own show/hide) and its link relabelled
+  **"Quick controls (View as / Color) ↗"**; the popover's header gains **"Full manager ↗"**, which
+  closes it and opens the sidebar list (`openTrackManagerFromPopover()` - the inverse of the existing
+  link). Shared behaviour is unchanged (both route visibility through the same state), and a track
+  filtered in the popover now says **"(filtered)"** in the full manager instead of just looking
+  missing.
+- **Track-row polish** (#2d): the per-type chevrons (one sits on the first row of every type) are
+  subtle until hovered or open, the active row now tints the whole row rather than just the label
+  chip (`.track-row:has(.track-label.active-row)`), and row background changes transition instead of
+  snapping.
+- Verified in the browser: the popover header reads "Track Controls | Hide All | Full manager ↗ |
+  Reset"; the full manager shows "(Empty) (filtered) [Quick2D]"; the active row tints end to end.
+
 ## [0.66.6] - 2026-10-01
 
 ### Added

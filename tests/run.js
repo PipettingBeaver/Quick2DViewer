@@ -930,7 +930,7 @@ ctxRun(`guideAnswers = {}; parsedTracks = {}; cachedStructureTexts = {}; domainH
 
 section('rules panel polish + modern citations');
 // the Tracks tab's own submenu is no longer called "Tracks"
-assert(HTML.indexOf('<summary>Track Visibility</summary>') !== -1, 'the Tracks tab submenu is called Track Visibility');
+assert(HTML.indexOf('<summary>Track Visibility (full manager)</summary>') !== -1, 'the Tracks tab submenu is called Track Visibility (full manager)');
 assert(HTML.indexOf('<summary>Tracks</summary>') === -1, 'the confusing "Tracks > Tracks" pairing is gone');
 // the coachmark names what fits this protein
 ctxRun(`guideProfile = { membrane: 'yes' }; guideAnswers = {}; parsedTracks = { AA: 'MKV', 'TM_Quick2D': 'EEE' };`);
@@ -1210,6 +1210,38 @@ assert(/^Conservation: highly conserved .*; Structure context: buried .*; Curate
 assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-agnostic');
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
+
+section('#2c/#2d: Tracks tab vs quick controls - roles, links, row polish');
+assert(HTML.indexOf('Track Visibility (full manager)') !== -1, 'the tab names itself the full manager');
+assert(HTML.indexOf('Every track, grouped by type') !== -1, 'with a one-line role description');
+assert(HTML.indexOf('Quick controls (View as / Color) ↗') !== -1, 'and its link to the popover says what lives there');
+assert(HTML.indexOf('id="trackManagerSection"') !== -1, 'the section id is unchanged (deep links keep working)');
+assert(ctxRun(`typeof openTrackManagerFromPopover`) === 'function', 'the inverse link exists');
+assert(ctxRun(`(function () { openTrackManagerFromPopover(); const p = document.getElementById('side-panel-tracks'); return p && !p.hidden; })()`) === true, 'and it switches to the Tracks tab');
+const tctlHead = ctxRun(`
+    (function () {
+        function find(el, out) {
+            (el.children || []).forEach(c => { if (c && c.textContent) out.push(c.textContent); find(c, out); });
+            return out;
+        }
+        const pop = document.createElement('div');
+        buildTctlMasterList(pop);
+        return find(pop, []);
+    })()
+`);
+assert(tctlHead.some(x => x.indexOf('Full manager') !== -1), 'the popover header carries the Full manager link (got ' + JSON.stringify(tctlHead.slice(0, 6)) + ')');
+// filtered tracks are named in the tab, not silently missing
+ctxRun(`
+    parsedTracks = { AA: 'MKV', SS_PSIPRED: 'HHH' };
+    trackControlState.filtered = { SS_PSIPRED: true };
+    trackManagerExpanded = { SS: true };
+    renderTrackManager();
+`);
+const tmHtml = ctxRun(`document.getElementById('trackManagerList').innerHTML`);
+assert(tmHtml.indexOf('(filtered)') !== -1, 'a filtered track says so in the full manager (got a list without the tag)');
+ctxRun(`trackControlState.filtered = {}; trackManagerExpanded = {}; parsedTracks = {};`);
+assert(HTML.indexOf('.track-row:has(.track-label.active-row)') !== -1, 'the active row tints the whole row (not just the label)');
+assert(/opacity: 0\.55;/.test(HTML), 'the per-type chevrons are subtle until hovered');
 
 section('model score colour mode (HL): gradient + tooltip stat');
 ctxRun(`

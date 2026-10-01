@@ -495,7 +495,11 @@
             width: max-content;
             min-width: 100%;
         }
+        .track-row { transition: background-color 0.12s ease; }
         .track-row:hover { background-color: #f1f5f9; }
+        /* The active row's label is painted blue; tint the whole row so the
+           selection reads as a row, not just a label chip. */
+        .track-row:has(.track-label.active-row) { background-color: #eef2ff; }
         /* Subtle separator between track types (inset shadow = layout-neutral). */
         .track-row.track-group-first { box-shadow: inset 0 1px 0 #e2e8f0; }
         /* Pinned top block: residue-position markers + the AA sequence line.
@@ -961,7 +965,7 @@
            scrolling away with the rest of the graph content. Wraps instead
            of truncating since these titles are longer than a row label. */
         .graph-header.has-chevron { padding-left: 24px; } /* clears the chevron */
-        .graph-header:hover .tctl-chevron { color: #475569; }
+        .graph-header:hover .tctl-chevron { color: #475569; opacity: 1; }
         .graph-header {
             display: flex;
             align-items: center;
@@ -1482,11 +1486,15 @@
             color: #94a3b8;
             border: none;
             user-select: none;
-            transition: background 0.12s ease, color 0.12s ease;
+            /* Subtle by default: the first row of every type carries a chevron,
+               and at full strength they read as clutter. Full strength on hover
+               or when that group's popover is open. */
+            opacity: 0.55;
+            transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
         }
-        .track-label:hover .tctl-chevron { color: #475569; }
+        .track-label:hover .tctl-chevron { color: #475569; opacity: 1; }
         .tctl-chevron:hover { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
-        .tctl-chevron.state-on { color: #2563eb; }
+        .tctl-chevron.state-on { color: #2563eb; opacity: 1; }
         .track-label.active-row .tctl-chevron { color: rgba(255,255,255,0.9); }
         .track-label.active-row .tctl-chevron:hover { background: rgba(255,255,255,0.2); color: #fff; }
 
@@ -2324,9 +2332,13 @@
 
             <div class="sidebar-panel" id="side-panel-tracks" hidden>
                 <details class="workflow-section qa-new" id="trackManagerSection" open>
-                    <summary>Track Visibility</summary>
+                    <summary>Track Visibility (full manager)</summary>
+                    <p style="font-size:0.72rem; color:#64748b; margin:0 0 6px; line-height:1.4;">
+                        Every track, grouped by type, with its own show/hide. View as, Color, Filter and
+                        per-type Config live in the quick controls popover.
+                    </p>
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:6px;">
-                        <button type="button" class="tctl-link" onclick="openTrackControlsFromSidebar()" title="Open the compact Track Controls popover (View as + per-track filter)">Track Controls ↗</button>
+                        <button type="button" class="tctl-link" onclick="openTrackControlsFromSidebar()" title="Open the quick controls popover: per-type View as / Color / Config, per-track overrides and Filter">Quick controls (View as / Color) ↗</button>
                         <span style="display:flex; gap:4px;">
                             <button type="button" class="tm-mini" onclick="trackManagerExpandAll(true)" title="Expand all types">+</button>
                             <button type="button" class="tm-mini" onclick="trackManagerExpandAll(false)" title="Collapse all types">−</button>
@@ -8588,6 +8600,17 @@ function showRulesPanel() {
     renderRulesList();
 }
 
+// The popover is the quick view; this jumps to the full manager (the sidebar
+// Tracks tab) with its section expanded - the inverse of the link below.
+function openTrackManagerFromPopover() {
+    closeTctlPopup();
+    switchSidebarTab('tracks');
+    const sec = document.getElementById('trackManagerSection');
+    if (sec) {
+        sec.open = true;
+        if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' });
+    }
+}
 function openTrackControlsFromSidebar() {
     switchSidebarTab('tracks');
     const tab = Array.from(document.querySelectorAll('.sidebar-tab')).find(b => b.dataset.tab === 'tracks');
@@ -8634,6 +8657,7 @@ function renderTrackManager() {
                     '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
                     '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) +
                     (isTrackEmpty(k) ? ' <em style="color:#94a3b8;" title="Nothing annotated: the import found nothing for this protein">(Empty)</em>' : '') +
+                    (!vis ? ' <em style="color:#b45309;" title="Filtered out in the quick controls popover; the track is loaded but not drawn">(filtered)</em>' : '') +
                     ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
                     '<button type="button" class="tm-remove" data-k="' + structureEscapeHtml(k) + '" onclick="confirmRemoveTrack(this.dataset.k)" title="Remove this track and its data">×</button>' +
                     '</div>';
@@ -9352,7 +9376,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.6';
+const APP_VERSION = '0.66.7';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9973,6 +9997,10 @@ function buildTctlMasterList(pop) {
         tctlAfterChange();
     });
     actions.appendChild(hideAll);
+    const fullBtn = mkEl('button', 'tctl-head-btn', 'Full manager \u2197');
+    fullBtn.title = 'Open the sidebar Track Visibility list (every track, grouped by type)';
+    fullBtn.addEventListener('click', openTrackManagerFromPopover);
+    actions.appendChild(fullBtn);
     const resetBtn = mkEl('button', 'tctl-head-btn', 'Reset');
     resetBtn.title = 'Reset every type, track, and view setting to its default';
     resetBtn.addEventListener('click', () => {
