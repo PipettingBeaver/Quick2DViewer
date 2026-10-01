@@ -1010,6 +1010,56 @@ ctxRun(`clearGuideCoachmark();`);
 assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'and is restored to its pre-guidance state');
 ctxRun(`guideCoachmark = null; appliedCoachmarkKind = undefined;`);
 
+section('template table: identity, confidence, coverage, structure, exports');
+assert(ctxRun(`parseIdentityPercent('237/238 (100%)')`) === 100, 'identity parses the percentage out of "x/y (z%)" (was parseFloat -> 237)');
+assert(ctxRun(`parseIdentityPercent('95/230 (41%)')`) === 41, 'and for partial identities');
+assert(ctxRun(`parseIdentityPercent('0.98')`) === 98, 'a 0-1 fraction becomes a percentage (Foldseek)');
+assert(ctxRun(`parseIdentityPercent('98')`) === 98, 'a bare number is already a percentage');
+assert(ctxRun(`parseIdentityPercent('41%')`) === 41, 'a percent string parses');
+assert(ctxRun(`parseIdentityPercent('')`) === null && ctxRun(`parseIdentityPercent(null)`) === null, 'missing identity is null, not NaN');
+assert(ctxRun(`parseIdentityPercent(0.5)`) === 50, 'a numeric fraction works too');
+assert(ctxRun(`homologConfidencePercent({ stats: { Probab: '92.3' } })`) === 92.3, 'confidence prefers the source probability (HHpred/Foldseek)');
+assert(ctxRun(`homologConfidencePercent({ stats: { 'E-value': '1e-10' } })`) === 100, 'phmmer/BLAST confidence comes from the E-value (1e-10 -> 100)');
+assert(ctxRun(`homologConfidencePercent({ stats: { 'E-value': '1e-3' } })`) === 30, 'and scales 10 points per decade (1e-3 -> 30)');
+assert(ctxRun(`homologConfidencePercent({ stats: { 'E-value': '0' } })`) === 100, 'an exact match (E=0) clamps to 100');
+assert(ctxRun(`homologConfidencePercent({ stats: {} })`) === null, 'no probability and no E-value is null');
+assert(ctxRun(`homologCoveragePercent({ aaTrack: 'MMMM      ' }, 10)`) === 40, 'coverage counts aligned residues in aaTrack (union, not summed HSP columns)');
+assert(ctxRun(`homologCoveragePercent({ stats: { Aligned_cols: '5' } }, 10)`) === 50, 'Aligned_cols is the fallback when aaTrack is absent');
+assert(ctxRun(`homologAccession('sp|P42212|GFP_AEQVI')`) === 'P42212', 'accession extracted from a UniProt-style id');
+assert(ctxRun(`homologAccession('P42212')`) === 'P42212', 'a bare accession is accepted');
+assert(ctxRun(`homologAccession('7MDF_A')`) === null, 'a PDB id is not an accession');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(10), 'HL_01_sp_P42212_GFP_AEQVI': '|'.repeat(10), 'HL_02_7mdf': '|'.repeat(10) };
+    cachedStructureTexts = {};
+    homologHitsInfo = {
+        HL_01_sp_P42212_GFP_AEQVI: { rank: 1, hitId: 'sp|P42212|GFP_AEQVI', hitDesc: 'GFP', source: 'phmmer',
+            stats: { 'E-value': '1e-10', Identities: '10/10 (100%)', Aligned_cols: '10' }, aaTrack: 'MMMMMMMMMM' },
+        HL_02_7mdf: { rank: 2, hitId: '7MDF_A', hitDesc: 'template', source: 'HHpred',
+            stats: { Probab: '95.0', 'E-value': '1e-30', Identities: '8/10 (80%)', Aligned_cols: '10' }, aaTrack: 'MMMM      ' }
+    };
+`);
+const tplRows = ctxRun(`homologTemplateMetrics()`);
+assert(tplRows.length === 2, 'both homologs produce rows');
+const tplPhmmer = tplRows.filter(r => r.source === 'phmmer')[0];
+const tplHhpred = tplRows.filter(r => r.source === 'HHpred')[0];
+assert(tplPhmmer.ident === 100 && tplPhmmer.confidence === 100 && Math.abs(tplPhmmer.coverage - 100) < 1e-9, 'phmmer row: identity 100, E-value confidence 100, coverage 100');
+assert(tplPhmmer.score != null && Math.abs(tplPhmmer.score - 100) < 1e-9, 'phmmer row now scores (was N/A without Probab) (got ' + tplPhmmer.score + ')');
+assert(tplPhmmer.accession === 'P42212' && tplPhmmer.hasPdb === false, 'phmmer row reports its accession for the AlphaFold structure cell');
+assert(tplHhpred.ident === 80 && Math.abs(tplHhpred.coverage - 40) < 1e-9, 'HHpred row: identity 80, coverage from aaTrack 40');
+assert(Math.abs(tplHhpred.score - 30.4) < 1e-6, 'HHpred score = confidence x identity x coverage / 10000 (got ' + tplHhpred.score + ')');
+assert(tplHhpred.hasPdb === true && tplHhpred.pdbId === '7MDF', 'HHpred row reports its PDB entry');
+assert(tplRows[0].source === 'phmmer', 'rows sort by the unified score across sources');
+const tsv = ctxRun(`homologTableTSV()`);
+assert(tsv.split('\n').length === 3 && tsv.indexOf('Confidence %') !== -1 && tsv.indexOf('AlphaFold P42212') !== -1, 'the table exports as TSV with the structure column');
+const tplReport = ctxRun(`buildMethodsReport()`);
+assert(tplReport.indexOf('## Template quality') !== -1, 'the methods report carries the template table');
+assert(tplReport.indexOf('Best homolog identity: 100%') !== -1, 'and the best-identity line no longer prints the raw count (was 237%)');
+assert(tplReport.indexOf('| 1 | sp|P42212|GFP_AEQVI | phmmer | 100.0% |') !== -1, 'with the ranked row');
+const insights = ctxRun(`computeGuideInsights().map(x => x.text).join(' ')`);
+assert(insights.indexOf('Best homolog identity is 100%') !== -1, 'the guide read-out uses the parsed percentage');
+assert(HTML.indexOf('Copy table (TSV)') !== -1 && HTML.indexOf('Homolog Templates</h4>') !== -1, 'the section has a copy button and no longer says "(HHpred)"');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {}; cachedStructureTexts = {};`);
+
 section('BLAST homolog provider: parser + provider wiring (real EBI output fixture)');
 sandbox.__blastFixture = BLAST_FIXTURE;
 const blast = ctxRun(`parseBlastHits(JSON.parse(window.__blastFixture))`);

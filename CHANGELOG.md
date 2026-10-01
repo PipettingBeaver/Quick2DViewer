@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-09-25
+
+### Fixed
+
+- **The Homolog Templates table showed identity as a raw count and left every phmmer/BLAST row
+  unranked.** `parseFloat("237/238 (100%)")` returned 237, so the Identity column read "237.0%", the
+  template score was inflated, and the same wrong number reached the guide read-out ("Best homolog
+  identity is 237%") and the methods report ("Best homolog identity: 237%"). Foldseek's 0-1 fraction
+  read as "1.0%". `parseIdentityPercent()` now handles all three shapes ("x/y (z%)", "z%", 0-1).
+  - `Probab` existed only for HHpred (and Foldseek's prob), so phmmer/BLAST rows showed "-" and a
+    null template score. `homologConfidencePercent()` derives one from the E-value where there is no
+    probability (10 points per decade: 1e-3 -> 30, 1e-10 -> 100), so **every source now scores and
+    ranks together** (verified: 28 mixed rows, zero unscored).
+  - Coverage now counts aligned residues in the stored `aaTrack` (union-correct even when BLAST HSPs
+    overlap) with `Aligned_cols` as the fallback, instead of summing HSP columns.
+
+### Changed
+
+- **The table is now source-aware.** Columns are `# | Homolog | Confidence | E-value | Identity |
+  Coverage | Structure | Template score`, with tooltips explaining the confidence basis and the score
+  formula (confidence x identity x coverage / 10000). **Structure** resolves cached files, auto-fetchable
+  PDB entries, and - for accession hits - the AlphaFold model (`AlphaFold P42212`); the 3D action now
+  fetches that model for phmmer/BLAST hits instead of only explaining that no PDB id matches
+  (`fetchAlphaFoldModelText()` extracted and shared, `p3dHomologStructureFile()` matches
+  `AlphaFold_<accession>` files). A **Copy table (TSV)** button exports the ranking, and the methods
+  report gained a "## Template quality" section with the ranked table. Heading/empty-state copy no
+  longer says "(HHpred)" or "attach an .hhr file".
+  - Tests: identity parsing across shapes, confidence mapping (probability, E-value decades, E=0,
+    neither), coverage from aaTrack and the fallback, accession extraction, mixed-source metrics
+    (phmmer now scores 100, HHpred 79.8), sort order, TSV, methods report and guide read-out.
+
 ## [0.53.0] - 2026-09-25
 
 ### Added

@@ -29,6 +29,37 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Homolog Templates table upgrade — 0.54.0
+
+**Should do.** The Data modal's Homolog Templates table ranks every Homologs row - .hhr, phmmer,
+BLAST or Foldseek - by one comparable template score, with correct identity, source-aware
+confidence, real coverage, and a structure cell that resolves to a cached file, a PDB entry or the
+AlphaFold model for the hit's accession.
+
+**Try (normal use).**
+1. Load GFP, run **Search homologs (phmmer)**, then switch the picker to **BLAST** and run again;
+   optionally import an .hhr and run Foldseek. Open **Data → Homolog Templates**.
+   *Expect:* one table, all sources mixed and sorted by Template score; the top row (GFP itself)
+   shows 100.0% identity, 100.0% confidence, 100.0% coverage, "AlphaFold P42212", score 100.0 ★ best.
+2. Look at a Foldseek row and an HHpred row.
+   *Expect:* Foldseek identity reads as a percentage (92.0%, not 1.0%), HHpred shows its probability
+   (95.0%) and "PDB xxxx"; neither shows N/A for the score.
+3. Press **Copy table (TSV)**.
+   *Expect:* the ranking copies with the same columns; paste it into a spreadsheet.
+4. Export **Methods summary (.md)**.
+   *Expect:* a "## Template quality" section with the ranked table, and "Best homolog identity: 100%"
+   (not the old raw count like 237%).
+
+**Edge cases (symptom → likely cause).**
+- A row with no probability and no E-value still shows "-" for Confidence and N/A for the score.
+  Expected: nothing to rank on; this is only reachable with hand-edited data.
+- Press **3D** on a phmmer/BLAST row. *Expect:* the AlphaFold model for that accession downloads
+  and renders; if the service is offline the notice says AlphaFold DB covers UniProt entries and
+  suggests attaching a PDB/CIF.
+- BLAST rows covering only part of the sequence show coverage < 100%. Expected: HSP coverage.
+
+---
+
 ### BLAST homolog provider — 0.53.0
 
 **Should do.** The homolog search can run through EBI NCBI-BLAST instead of phmmer, chosen from a
@@ -1081,6 +1112,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 301 | Pick BLAST while it is unreachable (or phmmer) | Status line names the failed provider, then the other runs |
 | 302 | Analyze menu label | Says "Search Homologs (HMMER/BLAST)…" |
 
+## 0.54.0 - Homolog Templates table upgrade (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 303 | Data → Homolog Templates with mixed sources | One sorted table; no N/A scores; identity as a percentage everywhere |
+| 304 | Check the Identity column against the source | phmmer/BLAST/HHpred "x/y (z%)" and Foldseek fractions all read as percentages |
+| 305 | Check Confidence and its tooltip | Probability for HHpred/Foldseek; E-value-derived for phmmer/BLAST |
+| 306 | Check Structure on an accession hit | "AlphaFold <accession>"; PDB entries show "PDB xxxx"; cached files "✓ cached" |
+| 307 | Press 3D on a phmmer/BLAST row | AlphaFold model downloads and renders |
+| 308 | Copy table (TSV) + Methods summary (.md) | Table copies; report has "## Template quality" and a correct best identity |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **UI copy tone (rework wanted).** Several strings are still tool-centric or imperative where a
@@ -1145,4 +1187,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6ac. 287–292 (homolog search with phmmer - new 0.52.0; card at the top, check 287 first).
 6ad. 293–296 (homologs route question + duplicate buttons - 0.52.1; check 293 first).
 6ae. 297–302 (BLAST homolog provider - new 0.53.0; card at the top, check 297 first).
+6af. 303–308 (Homolog Templates table upgrade - 0.54.0; card at the top, check 303 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

@@ -453,6 +453,21 @@ true, with two corrections:
 Still open: realigning hits whose HSPs do not cover the reference, and deciding
 whether a hit with only partial HSP coverage should be flagged in the row.
 
+### Shipped: one ranking for every source (v0.54.0)
+
+The Data modal's Homolog Templates table now scores all four sources together.
+Confidence is the source probability where one exists (HHpred Probab, Foldseek
+prob) and an E-value-derived value otherwise (phmmer/BLAST: `-10*log10(E)`,
+clamped 0-100, i.e. 10 points per decade), so the score stays interpretable and
+the column tooltip says which basis applies. Coverage counts aligned residues in
+the stored `aaTrack` rather than summing HSP columns (union-correct for
+overlapping BLAST HSPs), identity parsing handles "x/y (z%)" / "%" / 0-1, and
+the Structure column resolves cached files, RCSB PDB entries and - for accession
+hits - the AlphaFold model, which the 3D action fetches on demand. The table is
+also in the methods report and copies as TSV. The identity bug this pass fixed
+(`parseFloat("237/238 (100%)")` = 237) had been leaking into the methods report,
+which is exactly the kind of number that should never reach a write-up.
+
 ### Guide layout: short form vs step card (v0.28.0)
 
 The guide has three layers, and each now has exactly one job:
