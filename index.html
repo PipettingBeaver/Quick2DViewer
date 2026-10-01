@@ -9352,7 +9352,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.5';
+const APP_VERSION = '0.66.6';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9910,7 +9910,7 @@ function buildGroupColorCell(g) {
     });
     sel.value = modes.some(([v]) => v === cur) ? cur : modes[0][0];
     sel.title = g === 'HL'
-        ? 'What each homolog column colour means: the match quality of that homolog (default; shared glyph scale - HHpred match probability, phmmer posterior, or a BLOSUM62 substitution class for BLAST/Foldseek), the per-column conservation, or the residue type'
+        ? 'What each homolog column colour means: the match quality of that homolog (default; shared glyph scale - HHpred match probability, phmmer posterior, or a BLOSUM62 substitution class for BLAST/Foldseek), the per-column conservation, the residue type, or the model score (one comparable 0-100 confidence per hit: the source probability where it has one, otherwise E-value-derived; the tooltip names the raw statistic)'
         : 'What the row colours mean';
     sel.addEventListener('change', () => {
         setGroupColorMode(g, sel.value);
@@ -12686,7 +12686,7 @@ function isTrackGroupAASeq(g) { return !!trackControlState.aaSeq[g]; }
 // know that. "Conservation" makes a column uniform by evidence, "Residue type"
 // makes it uniform by residue identity.
 const GROUP_COLOR_MODES = {
-    HL: [['quality', 'Match quality'], ['conservation', 'Conservation'], ['residue', 'Residue type']]
+    HL: [['quality', 'Match quality'], ['conservation', 'Conservation'], ['residue', 'Residue type'], ['score', 'Model score']]
 };
 function groupColorModes(g) { return GROUP_COLOR_MODES[g] || []; }
 function getGroupColorMode(g) {
@@ -13319,7 +13319,8 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     // per-column conservation band instead of HHpred match-quality.
     const consColorMode = group === 'HL' && !fullBar && isTrackGroupConsColored('HL');
     const residueColorMode = group === 'HL' && !fullBar && getGroupColorMode('HL') === 'residue';
-    const showHHAA = aaMode || consColorMode || residueColorMode;
+    const scoreColorMode = group === 'HL' && !fullBar && getGroupColorMode('HL') === 'score';
+    const showHHAA = aaMode || consColorMode || residueColorMode || scoreColorMode;
     const aaTrackForRow = showHHAA ? (homologHitsInfo[key] && homologHitsInfo[key].aaTrack) || null : null;
     const queryAAFallback = showHHAA && !aaTrackForRow && typeof tracks.AA === 'string' ? tracks.AA : null;
     // Conservation scores used by the CONSERVATION row: prefer the cached
@@ -13552,9 +13553,13 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     ? ((aaTrackForRow && aaTrackForRow[i]) || (queryAAFallback && queryAAFallback[i]) || '')
                     : '';
                 const residueBg = residueColorMode ? residueColorFor(letterForCell) : '';
+                // Score mode: one colour per row from the hit's comparable
+                // 0-100 confidence (continuous gradient).
+                const score = scoreColorMode ? homologScoreFor(key) : null;
                 // Full-bar paints every covered column the strongest-match teal,
                 // making the whole homolog row one solid hit bar.
-                cellEl.style.backgroundColor = fullBar ? '#0891b2' : (residueBg || (band ? band.bg : bg));
+                cellEl.style.backgroundColor = fullBar ? '#0891b2'
+                    : (score ? modelScoreColor(score.conf) : (residueBg || (band ? band.bg : bg)));
                 const glyphBasis = homologGlyphBasis(key);
                 if (showHHAA) {
                     // The pre-loop glyph pass laid the per-column match-quality
@@ -13566,8 +13571,10 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     let aaChar = aaTrackForRow ? (aaTrackForRow[i] || ' ') : (queryAAFallback ? (queryAAFallback[i] || ' ') : ' ');
                     if (aaChar !== ' ') {
                         const span = setGlyph(cellEl, aaChar, gridCellW);
-                        if (!fullBar) span.style.color = (band && band.fg) ? band.fg : fg;
-                        cellEl.title = consColorMode
+                        if (!fullBar) span.style.color = score ? (score.conf >= 80 ? '#ffffff' : '#1e293b') : ((band && band.fg) ? band.fg : fg);
+                        cellEl.title = scoreColorMode
+                            ? `Residue ${i + 1}: ${aaChar} - model score ${score ? score.conf : 'n/a'}` + (score && score.raw ? ` (${score.raw})` : '')
+                            : consColorMode
                             ? `Residue ${i + 1}: homolog AA '${aaChar}' (conservation ${consForCell != null ? consForCell.toFixed(3) : 'n/a'}, ${conservationMetric})`
                             : (residueColorMode
                                 ? `Residue ${i + 1}: homolog AA '${aaChar}' (coloured by residue type)`
@@ -17655,6 +17662,37 @@ function homologCoverageRange(key) {
     }
     if (!n) return null;
     return { pct: (n / total) * 100, from: first + 1, to: last + 1, total };
+}
+
+// The row's model score for the "Model score" colour mode: one comparable
+// 0-100 confidence per hit (the source's own probability where it has one,
+// otherwise the E-value-derived value the template table uses), with the raw
+// statistic kept for the tooltip.
+function homologScoreFor(key) {
+    const info = homologHitsInfo[key];
+    if (!info) return null;
+    const conf = homologConfidencePercent(info);
+    if (conf == null) return null;
+    const st = info.stats || {};
+    const raw = (st.Probab != null && st.Probab !== '') ? (st.Probab + '% probability')
+        : (st['E-value'] ? ('E-value ' + st['E-value'])
+        : (st.Score ? ('score ' + st.Score) : ''));
+    return { conf: Math.round(conf), raw };
+}
+// Continuous low-to-high gradient for that mode.
+const MODEL_SCORE_STOPS = [[0, [254, 226, 226]], [50, [253, 230, 138]], [80, [167, 243, 208]], [100, [15, 118, 110]]];
+function modelScoreColor(conf) {
+    const v = Math.max(0, Math.min(100, Number(conf) || 0));
+    for (let i = 1; i < MODEL_SCORE_STOPS.length; i++) {
+        const p0 = MODEL_SCORE_STOPS[i - 1][0], c0 = MODEL_SCORE_STOPS[i - 1][1];
+        const p1 = MODEL_SCORE_STOPS[i][0], c1 = MODEL_SCORE_STOPS[i][1];
+        if (v <= p1) {
+            const t = (v - p0) / ((p1 - p0) || 1);
+            return 'rgb(' + c0.map((c, k) => Math.round(c + (c1[k] - c) * t)).join(',') + ')';
+        }
+    }
+    const last = MODEL_SCORE_STOPS[MODEL_SCORE_STOPS.length - 1][1];
+    return 'rgb(' + last.join(',') + ')';
 }
 
 // Coverage: the share of reference residues where the homolog actually has an

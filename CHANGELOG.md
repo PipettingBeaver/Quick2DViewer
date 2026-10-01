@@ -14,6 +14,22 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.6] - 2026-10-01
+
+### Added
+
+- **"Model score" colour mode for homolog rows** - the Foldseek TM-score idea, generalised to every
+  source. A fourth option in Track Control's Color column, alongside Match quality, Conservation and
+  Residue type: each hit gets one comparable 0-100 confidence (the source's own probability where it
+  has one - HHpred, Foldseek - otherwise the E-value decade scale used by the template table) shaded
+  as a continuous light-red -> amber -> green -> teal gradient. The AA letters show over the shading
+  (white on dark), the tooltip names the raw statistic ("model score 99 (98.5% probability)",
+  "model score 50 (E-value 1e-5)"), and a hit with neither probability nor E-value is left unshaded.
+  - Verified in the browser: HHpred 98.5% -> teal 99; Foldseek 85% -> green 85; BLAST 1e-5 -> amber
+    50; BLAST 1e-2 -> 20; the gradient interpolates and clamps.
+  - Tests: the score helper per source, gradient endpoints/interpolation/clamping, the mode list, and
+    the updated colour-mode assertions.
+
 ## [0.66.5] - 2026-10-01
 
 ### Added

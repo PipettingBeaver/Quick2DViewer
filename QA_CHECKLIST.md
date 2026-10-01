@@ -1366,6 +1366,16 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.6 - model score colour mode (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 411 | Track Control → Color → **Model score** (homologs) | Rows shade light-red (low) to teal (high) confidence; letters stay readable |
+| 412 | Hover a shaded cell | "model score N (98.5% probability)" / "(E-value 1e-5)" - the raw statistic |
+| 413 | A hit with no probability and no E-value | Left unshaded (no misleading colour) |
+| 414 | Switch back to Match quality | The glyph colours return; the mode is remembered per group |
+| 415 | Reload | The chosen mode sticks (persisted with the session) |
+
 ## 0.66.5 - numbering offset + partial-HSP realignment (quick rows)
 
 | # | Try | Watch for |
@@ -1565,4 +1575,5 @@ Driven end to end with the app's own runners against the live services; no actio
 6as. 391–397 (methods report completeness - 0.66.0; check 391 first).
 6at. 398–402 (self-driven state round - 0.66.3; the X-items it closes are noted in their rows).
 6au. 403–410 (numbering offset + partial-HSP realignment - new 0.66.5; check 403 first).
+6av. 411–415 (model score colour mode - new 0.66.6; check 411 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

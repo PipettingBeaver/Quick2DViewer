@@ -1211,6 +1211,27 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('model score colour mode (HL): gradient + tooltip stat');
+ctxRun(`
+    parsedTracks = { AA: 'MKV' };
+    homologHitsInfo = {
+        'HL_01_a': { rank: 1, hitId: 'sp|P1|A', source: 'HHpred', stats: { Probab: '98.5', 'E-value': '1e-40' } },
+        'HL_02_b': { rank: 2, hitId: 'sp|P2|B', source: 'BLAST', stats: { 'E-value': '1e-5', Score: '120.4' } },
+        'HL_03_c': { rank: 3, hitId: 'sp|P3|C', source: 'BLAST', stats: { 'E-value': '1e-2' } },
+        'HL_04_d': { rank: 4, hitId: 'sp|P4|D', source: 'phmmer', stats: {} }
+    };
+`);
+assert(ctxRun(`homologScoreFor('HL_01_a').conf`) === 99 && /98.5% probability/.test(ctxRun(`homologScoreFor('HL_01_a').raw`)), 'a probability source scores by its probability (got ' + ctxRun(`JSON.stringify(homologScoreFor('HL_01_a'))`) + ')');
+assert(ctxRun(`homologScoreFor('HL_02_b').conf`) === 50 && /E-value 1e-5/.test(ctxRun(`homologScoreFor('HL_02_b').raw`)), 'an E-value source uses the decade scale and keeps the raw E-value (got ' + ctxRun(`JSON.stringify(homologScoreFor('HL_02_b'))`) + ')');
+assert(ctxRun(`homologScoreFor('HL_04_d')`) === null, 'a hit with neither probability nor E-value has no score (no shading)');
+assert(ctxRun(`modelScoreColor(0)`) === 'rgb(254,226,226)' && ctxRun(`modelScoreColor(100)`) === 'rgb(15,118,110)', 'the gradient runs light-red to teal (got ' + ctxRun(`modelScoreColor(0)`) + ' .. ' + ctxRun(`modelScoreColor(100)`) + ')');
+const midColor = ctxRun(`modelScoreColor(65)`);
+assert(midColor !== ctxRun(`modelScoreColor(0)`) && midColor !== ctxRun(`modelScoreColor(100)`), 'and interpolates in between (got ' + midColor + ')');
+assert(ctxRun(`modelScoreColor(500)`) === 'rgb(15,118,110)' && ctxRun(`modelScoreColor(-5)`) === 'rgb(254,226,226)', 'out-of-range values clamp');
+assert(ctxRun(`groupColorModes('HL').map(x => x[0]).join(',')`) === 'quality,conservation,residue,score', 'the Color column offers the new mode');
+assert(ctxRun(`groupColorModes('HL').map(x => x[1]).join(',')`).indexOf('Model score') !== -1, 'named "Model score"');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {};`);
+
 section('partial realignment: merge keeps the HSP glyphs, fills the rest');
 ctxRun(`
     parsedTracks = { AA: 'MKVW', 'HL_02_part': ' |||' };
@@ -2382,7 +2403,7 @@ assert(HTML.indexOf("'Color')") !== -1, 'and the header still labels the Color c
 section('Track Control: the Color column (homolog colouring)');
 ctxRun(`trackControlState = getDefaultTrackControlState();`);
 assert(ctxRun(`getGroupColorMode('HL')`) === 'quality', 'homologs default to match-quality colouring');
-assert(ctxRun(`groupColorModes('HL').length`) === 3, 'homologs offer three colour modes');
+assert(ctxRun(`groupColorModes('HL').length`) === 4, 'homologs offer four colour modes');
 assert(ctxRun(`groupColorModes('SS').length`) === 0, 'a type without a choice reports none');
 // selecting a mode keeps the legacy flag in step
 ctxRun(`setGroupColorMode('HL', 'conservation');`);
@@ -2407,7 +2428,7 @@ const hlCell = ctxRun(`
         return opts.join(',');
     })()
 `);
-assert(hlCell === 'quality,conservation,residue', 'the homolog cell offers all three modes');
+assert(hlCell === 'quality,conservation,residue,score', 'the homolog cell offers all four modes (got ' + hlCell + ')');
 const ssCell = ctxRun(`
     (function () {
         var cell = buildGroupColorCell('SS');
