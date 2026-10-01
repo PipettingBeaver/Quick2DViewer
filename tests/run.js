@@ -1211,6 +1211,50 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('Options: data-source categories + guide deep links');
+assert(HTML.indexOf('id="optDataCategory"') !== -1 && HTML.indexOf('id="optDataCategoryHint"') !== -1, 'Options -> Data Sources has a category dropdown and a hint line');
+const catPanels = ctxRun(`Object.keys(DATA_CATEGORY_HINTS)`);
+assert(catPanels.join(',') === 'uniprot,conservation,topology,domains,homologs,structure,foldseek,variants,services', 'nine categories are declared (got ' + catPanels.join(',') + ')');
+assert(catPanels.every(n => HTML.indexOf('id="optCat-' + n + '"') !== -1), 'and every category has a panel in the markup');
+const switchProbe = ctxRun(`
+    (function () {
+        switchDataCategory('domains');
+        const domHidden = document.getElementById('optCat-domains').hidden;
+        const homHidden = document.getElementById('optCat-homologs').hidden;
+        const hint = document.getElementById('optDataCategoryHint').textContent;
+        switchDataCategory('nope');
+        const fallback = optDataCategory;
+        switchDataCategory('domains');
+        return { domHidden, homHidden, hint, fallback };
+    })()
+`);
+assert(switchProbe.domHidden === false && switchProbe.homHidden === true, 'switching shows exactly one panel');
+assert(/hmmscan/.test(switchProbe.hint) && /NCBIfam/.test(switchProbe.hint), 'and sets the category description (got "' + switchProbe.hint.slice(0, 50) + '")');
+assert(switchProbe.fallback === 'uniprot', 'an unknown category falls back to the first one');
+const deepProbe = ctxRun(`
+    (function () {
+        openDataSources('foldseek');
+        return { cat: optDataCategory, hidden: document.getElementById('optCat-foldseek').hidden };
+    })()
+`);
+assert(deepProbe.cat === 'foldseek' && deepProbe.hidden === false, 'openDataSources deep-links into a category');
+assert(ctxRun(`(function () { openTopologyPanel(); return optDataCategory; })()`) === 'topology', 'openTopologyPanel now deep-links to the topology category');
+assert(ctxRun(`(function () { focusUniProtSection(); return optDataCategory; })()`) === 'uniprot', 'and the UniProt focus helper to the UniProt category');
+// The capability controls moved out of the Input Data row into their panels.
+['btnDomainScan', 'btnHomologSearch', 'btnTopologyPredict', 'btnValidation', 'btnEsmfold', 'btnVariantEffects', 'btnFoldseekSearch'].forEach(id => {
+    const panelFor = { btnDomainScan: 'optCat-domains', btnHomologSearch: 'optCat-homologs', btnTopologyPredict: 'optCat-topology', btnValidation: 'optCat-structure', btnEsmfold: 'optCat-structure', btnVariantEffects: 'optCat-variants', btnFoldseekSearch: 'optCat-foldseek' }[id];
+    assert(HTML.indexOf('id="' + id + '"') > HTML.indexOf('id="' + panelFor + '"'), id + ' lives inside ' + panelFor);
+});
+assert(HTML.indexOf('Data sources&hellip;') !== -1, 'Input Data keeps a single Data sources… button');
+assert(HTML.indexOf('id="btnFetchPdb"') !== -1 && HTML.indexOf('id="structureFetchStatus"') !== -1, 'and the PDB fetch with its status (it is an import path)');
+assert(HTML.indexOf('Open UniProt') !== -1 && HTML.indexOf('Open RCSB PDB') !== -1 && HTML.indexOf('Open DeepTMHMM') !== -1 && HTML.indexOf('Open HHpred') !== -1, 'each category offers its website as the manual fallback');
+// Guide links
+const guideStepIds = ctxRun(`WORKFLOW_STEPS.map(s => s.id)`);
+assert(guideStepIds.every(id => ctxRun(`STEP_DATA_CATEGORY['${id}']`) !== undefined), 'every guide step maps to a data category');
+ctxRun(`renderWorkflowGuide();`);
+const catGuideHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(catGuideHtml.indexOf('\u2699 Data sources') !== -1 && catGuideHtml.indexOf('openDataSources(') !== -1, 'the guide renders a Data sources link that deep-links into Options');
+
 section('RCSB PDB entry fetch (by id)');
 assert(HTML.indexOf('id="pdbFetchId"') !== -1 && HTML.indexOf('id="btnFetchPdb"') !== -1, 'Input Data has a PDB-id box and fetch button');
 assert(HTML.indexOf('id="structureFetchStatus"') !== -1, 'with its own status line');

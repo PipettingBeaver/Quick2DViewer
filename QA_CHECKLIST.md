@@ -1353,6 +1353,21 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.62.0 - category-based Data Sources (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 361 | Options → Data Sources | A "Data source" dropdown (9 categories); one panel at a time, with a short description |
+| 362 | Switch categories | Exactly one panel shows; the hint under the dropdown changes |
+| 363 | Any panel | Its provider picker / action / status live there, plus an "Open the website ↗" link |
+| 364 | Input Data → "Data sources…" | Opens Options at UniProt lookup |
+| 365 | Guide → any step → "⚙ Data sources" | Opens Options at that step's category (all eight steps) |
+| 366 | Guide → topology step → "Paste topology…" | Still opens the topology category (the paste box) |
+| 367 | Run a job from a panel | The status line updates inside that panel; the Log records it |
+| 368 | Input Data after a job | Summary intact; the PDB fetch and its status are still there |
+| 369 | Website links | Each opens the matching site as the manual fallback |
+| 370 | Switch to another Options tab and back | The last data category is remembered |
+
 ## 0.61.0 - fetch PDB entry by id (quick rows)
 
 | # | Try | Watch for |
@@ -1462,4 +1477,5 @@ needs a full card.
 6al. 341–348 (activity log + 3D console cleanup - new 0.59.0; card at the top, check 343 first).
 6am. 349–356 (PDBe structure validation - new 0.60.0; card at the top, check 349 first).
 6an. 357–360 (fetch PDB entry by id - new 0.61.0; check 357 first).
+6ao. 361–370 (category-based Data Sources - new 0.62.0; check 361 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

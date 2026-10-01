@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.62.0] - 2026-09-25
+
+### Changed
+
+- **Options -> Data Sources is now category-based.** The Loaded Data row had grown to ten controls;
+  Data Sources now has a **"Data source" dropdown** (UniProt lookup / Conservation scoring /
+  Membrane topology / Domain families / Homolog search / Structure models & validation / Structural
+  homology / Variant effects / External services & activity log) showing **one panel at a time**,
+  each with a short description, its own controls (provider pickers, action button, status line) and
+  an **"Open the website ↗"** link as the manual fallback when an API is down.
+  - The capability controls moved out of Input Data's row into their panels; Input Data keeps the
+    PDB fetch (it is an import path) and gains a single **"Data sources…"** button.
+  - **Guide pairing:** every step keeps its direct action and gains a **"⚙ Data sources"** link that
+    opens Options at the matching category (`STEP_DATA_CATEGORY`); `openTopologyPanel()` and
+    `focusUniProtSection()` deep-link there too, and switching to the Data Sources tab restores the
+    last category (`switchDataCategory()` + per-category hints).
+  - Also fixed: the Input Data row replacement had dropped the header row's closing `</div>` -
+    markup re-verified balanced (230/230) with the depth profile matching the previous commit at
+    every section boundary.
+  - Tests: category declaration/panels, single-panel switching, hint text, unknown-category
+    fallback, deep links, control placement per panel, website links, the Input Data button, and the
+    guide link for every step.
+
 ## [0.61.0] - 2026-09-25
 
 ### Added
