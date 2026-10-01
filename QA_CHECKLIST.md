@@ -693,7 +693,7 @@ swatch, the track name and its provenance, and the residue detail.
 | X4 | Load data while a rule exists | Rules now re-evaluate on every data change. A `RULE_` row must appear/disappear as its inputs change; nothing should hang on a 600 aa sequence with 8 rules |
 | X5 | Undo a step you had **manually marked done** | Undo removes the data but deliberately keeps the override — so the card can read "done (you)" with nothing loaded. Is that understandable, or confusing? |
 | X6 | Use the wizard's `Open HHpred ↗` / `Open a predictor ↗` actions | Popup blockers may swallow `window.open`; the button must not look broken if it does |
-| X7 | Turn **File → New-feature highlights** on | The purple markers should cover every new section; anything new that is *not* marked is a gap in the convention |
+| X7 | Turn **File → New-feature highlights** on | *Convention retired (0.66.3):* the marker set lapsed once the QA cards took over; the toggle still works for ad-hoc marking, but nothing is expected to be marked |
 
 ## 0.16.0 — design pass
 
@@ -1365,6 +1365,16 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.3 - self-driven state round (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 398 | Import an experimental row, reload, hover it | Label/kind survive (fixed: the info map is now persisted) |
+| 399 | Reload, then remove one restored row of each type | Only that row (and its info entry) goes - verified |
+| 400 | Remove a row while the Guide card is open | The card stays open - verified in a browser |
+| 401 | Undo a step you marked done | The override survives; the card reads "done (you)" - verified |
+| 402 | File → New-feature highlights | The toggle works; the marking convention is retired (nothing expected marked) |
+
 ## 0.66.0 - methods report completeness (quick rows)
 
 | # | Try | Watch for |
@@ -1541,4 +1551,5 @@ needs a full card.
 6aq. 378–382 (the loaded name feeds the lookups - new 0.64.0; check 378 first).
 6ar. 383–390 (experimental per-residue data - new 0.65.0; check 383 first).
 6as. 391–397 (methods report completeness - 0.66.0; check 391 first).
+6at. 398–402 (self-driven state round - 0.66.3; the X-items it closes are noted in their rows).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
