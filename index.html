@@ -1997,7 +1997,8 @@
                     <button type="button" onclick="menuBarAction('rules')">Analysis Rules…</button>
                     <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
                     <button type="button" onclick="menuBarAction('domains')">Scan Domains (HMMER)…</button>
-                    <button type="button" onclick="menuBarAction('homologs')">Search Homologs (HMMER/BLAST)…</button>
+                    <button type="button" onclick="menuBarAction('homologs_phmmer')">Search Homologs (phmmer)…</button>
+                    <button type="button" onclick="menuBarAction('homologs_blast')">Search Homologs (BLAST)…</button>
                     <button type="button" onclick="menuBarAction('crosschecks')">Cross-checks…</button>
                     <button type="button" onclick="menuBarAction('ensemble')">Ensemble variance…</button>
                 </div>
@@ -2136,6 +2137,14 @@
             <strong>Coiled-Coil Domains (CC)</strong><br>
             Combines predictions from: <span class="tool-name">COILS, PCOILS, MARCOIL</span>.<br>
             Flags heptad-repeat alpha-helical segments likely to form coiled coils.
+        </span></span></div>
+        <div class="legend-item"><div class="box" style="background:#0891b2;"></div> Homologs: match quality<span class="info-icon">ⓘ<span class="tooltip-content">
+            <strong>Homologs (HL) rows</strong><br>
+            One row per hit from HHpred, phmmer, BLAST or Foldseek. The glyph scale is shared - <strong>|</strong> strongest, then <strong>=</strong>, <strong>+</strong>, <strong>:</strong>, <strong>.</strong> weakest - but what it measures depends on the search:<br>
+            <strong>HHpred</strong>: HHsearch match probability per column.<br>
+            <strong>phmmer</strong>: HMMER posterior probability.<br>
+            <strong>BLAST / Foldseek</strong>: BLOSUM62 substitution class (identical / positive / other).<br>
+            Hover any cell for the exact basis, or the row's ℹ for the hit's E-value, identity and coverage.
         </span></span></div>
         <div class="legend-item" id="legendPlddtRow" hidden>
             <span style="font-weight:600; font-size:0.8rem;">pLDDT:</span>
@@ -3981,6 +3990,12 @@ async function runDomainScan() {
 // .hhr does; the difference is that phmmer reports per-column posterior
 // probabilities rather than HHpred's match probabilities (parsePhmmerHits maps
 // them onto the same glyph scale).
+// The Analyze menu offers each homolog provider explicitly; the picker in Input
+// Data is set to match, so the two controls never disagree.
+function setHomologProvider(id) {
+    const sel = document.getElementById('homologProvider');
+    if (sel && id) sel.value = id;
+}
 async function runHomologSearch() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     if (!seq) { showToast('Nothing to search yet: the homolog search runs against the loaded sequence.', 'error'); return; }
@@ -7511,6 +7526,8 @@ function menuBarAction(action) {
         case 'interfaces': showInterfacesPanel(); break;
         case 'domains': runDomainScan(); break;
         case 'homologs': runHomologSearch(); break;
+        case 'homologs_phmmer': setHomologProvider('ebi_phmmer'); runHomologSearch(); break;
+        case 'homologs_blast': setHomologProvider('ebi_blast'); runHomologSearch(); break;
         case 'crosschecks': showCrossCheckPanel(); break;
         case 'ensemble': showEnsemblePanel(); break;
         case 'json': exportFullSave(); break;
@@ -8138,7 +8155,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.55.0';
+const APP_VERSION = '0.55.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -8696,7 +8713,7 @@ function buildGroupColorCell(g) {
     });
     sel.value = modes.some(([v]) => v === cur) ? cur : modes[0][0];
     sel.title = g === 'HL'
-        ? 'What each homolog column colour means: the match quality of that homolog (default), the per-column conservation, or the residue type'
+        ? 'What each homolog column colour means: the match quality of that homolog (default; shared glyph scale - HHpred match probability, phmmer posterior, or a BLOSUM62 substitution class for BLAST/Foldseek), the per-column conservation, or the residue type'
         : 'What the row colours mean';
     sel.addEventListener('change', () => {
         setGroupColorMode(g, sel.value);
@@ -10243,6 +10260,18 @@ function buildHomologTrackString(hit, queryLength) {
     return { track: track.join(''), aaTrack: aaTrack.join('') };
 }
 
+// The HL glyph scale is shared, but what it measures depends on the search that
+// produced the row: HHsearch match probability (HHpred), HMMER posterior
+// probability (phmmer), or a BLOSUM62 substitution class (BLAST, Foldseek). The
+// cell tooltips and the legend say which basis applies, so a BLAST row never
+// claims to show an HHpred probability.
+function homologGlyphBasis(trackKey) {
+    const src = String((homologHitsInfo[trackKey] || {}).source || '');
+    if (/phmmer/i.test(src)) return 'phmmer posterior probability';
+    if (/blast/i.test(src)) return 'BLAST substitution score (BLOSUM62)';
+    if (/foldseek/i.test(src)) return 'Foldseek substitution score (BLOSUM62)';
+    return 'HHpred match probability';
+}
 function buildHomologPredictorInfo(trackKey) {
     const hit = homologHitsInfo[trackKey];
     if (!hit) return null;
@@ -11974,6 +12003,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 // Full-bar paints every covered column the strongest-match teal,
                 // making the whole homolog row one solid hit bar.
                 cellEl.style.backgroundColor = fullBar ? '#0891b2' : (residueBg || (band ? band.bg : bg));
+                const glyphBasis = homologGlyphBasis(key);
                 if (showHHAA) {
                     // The pre-loop glyph pass laid the per-column match-quality
                     // glyph (e.g. '.') into every string cell, so clear it here:
@@ -11989,14 +12019,14 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                             ? `Residue ${i + 1}: homolog AA '${aaChar}' (conservation ${consForCell != null ? consForCell.toFixed(3) : 'n/a'}, ${conservationMetric})`
                             : (residueColorMode
                                 ? `Residue ${i + 1}: homolog AA '${aaChar}' (coloured by residue type)`
-                                : `Residue ${i + 1}: homolog AA '${aaChar}' (HHpred match quality '${char}')`);
+                                : `Residue ${i + 1}: homolog AA '${aaChar}' (${glyphBasis} '${char}')`);
                     } else {
                         cellEl.title = consColorMode
                             ? `Residue ${i + 1}: conservation ${consForCell != null ? consForCell.toFixed(3) : 'n/a'} (${conservationMetric})`
-                            : `Residue ${i + 1}: HHpred match quality '${char}' (uncovered by template)`;
+                            : `Residue ${i + 1}: ${glyphBasis} '${char}' (uncovered by template)`;
                     }
                 } else {
-                    cellEl.title = `Residue ${i + 1}: HHpred match quality '${char}'`;
+                    cellEl.title = `Residue ${i + 1}: ${glyphBasis} '${char}'`;
                 }
 } else if (char === ' ' || char === '-' || char === '\t') {
                 cellEl.classList.add('cell-space');

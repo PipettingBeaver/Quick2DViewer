@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.1] - 2026-09-25
+
+### Changed
+
+- **The Analyze menu offers each homolog provider explicitly**: "Search Homologs (phmmer)…" and
+  "Search Homologs (BLAST)…", instead of one combined entry that ran whatever the Input Data picker
+  happened to be set to. Each entry calls `setHomologProvider()` and then runs, so the menu and the
+  panel picker never disagree.
+- **Homolog glyph wording is source-aware.** A BLAST (or phmmer/Foldseek) row's cell tooltips used to
+  say "HHpred match quality", which was wrong for anything that was not an HHpred hit. They now name
+  the actual basis via `homologGlyphBasis()`: HHpred match probability, phmmer posterior probability,
+  or a BLOSUM62 substitution class for BLAST/Foldseek. The legend gained a "Homologs: match quality"
+  entry explaining that the glyph scale (`|` strongest ... `.` weakest) is deliberately shared across
+  sources so rows stay comparable at a glance, while the quantity behind it depends on the search;
+  Track Control's Color description says the same.
+
 ## [0.55.0] - 2026-09-25
 
 ### Added

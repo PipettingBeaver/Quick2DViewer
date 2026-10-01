@@ -1161,6 +1161,15 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 313 | Cross-check TM footer | Names the consensus N-terminus and disagreement columns |
 | 314 | A source row's list line | "N TM residues in M segment(s)" (not "N segments") |
 
+## 0.55.1 - per-provider menu + source-aware glyph wording (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 315 | Analyze → **Search Homologs (BLAST)…** | Runs BLAST directly; the Input Data picker shows BLAST afterwards |
+| 316 | Analyze → **Search Homologs (phmmer)…** | Runs phmmer; the picker follows it |
+| 317 | Hover the cells of a BLAST (or phmmer/Foldseek) row | Tooltip names that basis ("BLAST substitution score (BLOSUM62)"), never "HHpred match quality" |
+| 318 | Show Legend → the Homologs entry | Explains the shared glyph scale and that the meaning depends on the source |
+
 ## Pending live checks (API calls + UI integration) — test later
 
 These are cheap to check by hand when you next have a session with the services up; nothing here
@@ -1241,4 +1250,5 @@ needs a full card.
 6ae. 297–302 (BLAST homolog provider - new 0.53.0; card at the top, check 297 first).
 6af. 303–308 (Homolog Templates table upgrade - 0.54.0; card at the top, check 303 first).
 6ag. 309–314 (topology consensus completion - new 0.55.0; card at the top, check 310 first).
+6ah. 315–318 (per-provider menu + source-aware glyph wording - 0.55.1; check 317 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

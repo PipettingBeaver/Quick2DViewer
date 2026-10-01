@@ -1043,6 +1043,17 @@ assert(srcList.indexOf('Consensus (2 sources)') !== -1 && srcList.indexOf('disag
 assert(srcList.indexOf('Predictor A') !== -1 && srcList.indexOf('Predictor B') !== -1, 'alongside the source list');
 ctxRun(`parsedTracks = {}; topologySources = [];`);
 
+section('homolog glyph wording is source-aware');
+assert(ctxRun(`homologGlyphBasis('HL_missing')`) === 'HHpred match probability', 'without an info entry the basis defaults to HHpred');
+ctxRun(`homologHitsInfo = { HL_a: { source: 'phmmer' }, HL_b: { source: 'BLAST' }, HL_c: { source: 'Foldseek' }, HL_d: { source: 'HHpred' } };`);
+assert(ctxRun(`homologGlyphBasis('HL_a')`) === 'phmmer posterior probability', 'a phmmer row names its posterior probability');
+assert(ctxRun(`homologGlyphBasis('HL_b')`) === 'BLAST substitution score (BLOSUM62)', 'a BLAST row names its BLOSUM62 basis (was "HHpred match quality")');
+assert(ctxRun(`homologGlyphBasis('HL_c')`) === 'Foldseek substitution score (BLOSUM62)', 'a Foldseek row too');
+assert(ctxRun(`homologGlyphBasis('HL_d')`) === 'HHpred match probability', 'and an HHpred row keeps its own wording');
+ctxRun(`homologHitsInfo = {};`);
+assert(HTML.indexOf('HHpred match quality') === -1, 'no cell tooltip hardcodes "HHpred match quality" any more');
+assert(HTML.indexOf('Homologs: match quality') !== -1 && HTML.indexOf('HMMER posterior probability') !== -1, 'the legend explains the shared glyph scale and the per-source basis');
+
 section('template table: identity, confidence, coverage, structure, exports');
 assert(ctxRun(`parseIdentityPercent('237/238 (100%)')`) === 100, 'identity parses the percentage out of "x/y (z%)" (was parseFloat -> 237)');
 assert(ctxRun(`parseIdentityPercent('95/230 (41%)')`) === 41, 'and for partial identities');
@@ -1137,7 +1148,7 @@ assert(ctxRun(`(function () {
            /ncbiblast/.test(caps[1].url) && caps[1].params.database === 'uniprotkb_swissprot';
 })()`), 'the capability offers phmmer then BLAST with the verified database value');
 assert(HTML.indexOf('id="homologProvider"') !== -1 && HTML.indexOf('value="ebi_blast"') !== -1, 'Input Data has a provider picker including BLAST');
-assert(HTML.indexOf('Search Homologs (HMMER/BLAST)') !== -1, 'the Analyze menu names both providers');
+assert(HTML.indexOf('Search Homologs (phmmer)…') !== -1 && HTML.indexOf('Search Homologs (BLAST)…') !== -1, 'the Analyze menu offers each provider explicitly');
 ctxRun(`parsedTracks = {}; homologHitsInfo = {}; graphHighlights = {};`);
 
 section('guide: phmmer is offered, and resolver extra actions render');
@@ -1265,7 +1276,16 @@ const consSeqs = ctxRun(`
 assert(consSeqs >= 13, 'phmmer homolog sequences feed conservation when the option is on (got ' + consSeqs + ')');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.homolog_search.providers[0].url`).indexOf('hmmer3_phmmer') !== -1, 'the phmmer capability points at the EBI job tool');
 assert(ctxRun(`typeof runHomologSearch`) === 'function', 'runHomologSearch is wired');
-assert(HTML.indexOf("menuBarAction('homologs')") !== -1, 'the Analyze menu offers the homolog search');
+assert(ctxRun(`
+    (function () {
+        setHomologProvider('ebi_blast');
+        const sel = document.getElementById('homologProvider');
+        const v = sel.value;
+        setHomologProvider('ebi_phmmer');
+        return v;
+    })()
+`) === 'ebi_blast', 'the menu provider helper sets the picker (so the two controls agree)');
+assert(HTML.indexOf("menuBarAction('homologs_phmmer')") !== -1 && HTML.indexOf("menuBarAction('homologs_blast')") !== -1, 'the Analyze menu offers the homolog search per provider');
 assert(HTML.indexOf('id="homologSearchStatus"') !== -1, 'the Input Data modal has a status line for it');
 assert(HTML.indexOf('id="btnHomologSearch"') !== -1, 'and a button');
 ctxRun(`parsedTracks = {}; homologHitsInfo = {}; graphHighlights = {};`);
