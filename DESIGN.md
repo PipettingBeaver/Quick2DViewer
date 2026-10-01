@@ -432,9 +432,26 @@ button, or the guide's homolog step) runs it, parses HMMER's text output and add
   posterior lines are padded to that same offset; lowercase target residues are
   insertions aligned to query gaps; target gaps are `-`.
 
-Still open from this section: BLAST as an alternative provider, and realigning
-hits whose HSPs do not cover the reference (the Foldseek path's
-`alignVariantToReference` trick).
+### Shipped: BLAST as the second provider (v0.53.0)
+
+The `homolog_search` capability now offers NCBI-BLAST after phmmer, and Input
+Data has a provider picker (`opts.prefer` in `runCapability()` reorders the list;
+the other provider stays as a fallback). What the section above predicted held
+true, with two corrections:
+
+- **No realignment was needed for the common case.** The JSON renderer carries
+  `hsp_qseq`/`hsp_hseq` per HSP, so each HSP becomes a segment directly - the
+  `alignVariantToReference` fallback is only relevant for hits whose HSPs leave
+  gaps over the reference (they show as partial rows, which is honest).
+- **The glyphs are BLOSUM62 via `foldseekQualityChar`** (identical `|`, positive
+  `:`, otherwise `.`), the same derivation Foldseek rows already use, and the
+  predictor tooltip now switches bands/citation by source (phmmer posterior,
+  BLAST/Foldseek BLOSUM62, HHpred match probability).
+- Quirk worth keeping: the ncbiblast `database` value is `uniprotkb_swissprot`
+  (plain `swissprot` is rejected), and unlike hmmer3 it does have a JSON renderer.
+
+Still open: realigning hits whose HSPs do not cover the reference, and deciding
+whether a hit with only partial HSP coverage should be flagged in the row.
 
 ### Guide layout: short form vs step card (v0.28.0)
 

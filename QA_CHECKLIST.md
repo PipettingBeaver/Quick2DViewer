@@ -29,6 +29,32 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### BLAST homolog provider — 0.53.0
+
+**Should do.** The homolog search can run through EBI NCBI-BLAST instead of phmmer, chosen from a
+picker in Input Data; BLAST hits become Homologs rows attributed to BLAST, with BLOSUM62-based
+match colouring and a BLAST-specific tooltip.
+
+**Try (normal use).**
+1. Load GFP, Input Data → set the provider picker to **BLAST (NCBI)**, press **Find homologs**.
+   *Expect:* a status line counts up, then ~13 Homologs rows appear; the first row's tooltip says
+   "BLAST homolog" with E-value, bits, identity, aligned columns and HSP count, citing NCBI BLAST.
+2. Compare with the phmmer run (picker back to phmmer).
+   *Expect:* phmmer rows are denser (posterior probability per column); BLAST rows are sparser
+   (pairwise HSP coverage), and both feed conservation when the option is on.
+3. Leave the picker on BLAST and run with the sequence already having phmmer rows.
+   *Expect:* BLAST rows continue the numbering; nothing is overwritten.
+
+**Edge cases (symptom → likely cause).**
+- A BLAST row covers only part of the sequence. Expected: BLAST HSPs are local; the row shows the
+  aligned region only (unlike phmmer's profile coverage). Worth flagging if it confuses.
+- Choosing BLAST while the BLAST service is down falls back to phmmer (and vice versa); the status
+  line names the provider that failed before the retry.
+- The provider picker only affects the homolog search; the UniProt accession lookup keeps its own
+  BLAST setting.
+
+---
+
 ### Homolog search with phmmer — 0.52.0
 
 **Should do.** With a protein sequence loaded, one click searches Swiss-Prot with HMMER phmmer
@@ -1044,6 +1070,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 295 | Answer **Both** | Search homologs (phmmer) leads, .hhr attach is the secondary button, HHpred link alongside - each control exactly once |
 | 296 | Restore an old session whose answer was "Not yet" | The "Both" pill shows as answered (migrated), and the action matches |
 
+## 0.53.0 - BLAST homolog provider (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 297 | Input Data → provider picker → BLAST → Find homologs (GFP) | ~13 Homologs rows, attributed to BLAST |
+| 298 | Hover the first BLAST row's ℹ | "BLAST homolog", E-value/bits/identity/HSPs, NCBI BLAST citation |
+| 299 | Compare row texture with a phmmer run | BLAST rows sparser (HSP coverage), phmmer denser (per-column posterior) |
+| 300 | Run BLAST after phmmer | Numbering continues; both sets coexist and count towards conservation |
+| 301 | Pick BLAST while it is unreachable (or phmmer) | Status line names the failed provider, then the other runs |
+| 302 | Analyze menu label | Says "Search Homologs (HMMER/BLAST)…" |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **UI copy tone (rework wanted).** Several strings are still tool-centric or imperative where a
@@ -1107,4 +1144,5 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 6ab. 283–286 (empty rules in the rules list - new 0.51.0; card at the top, check 283 first).
 6ac. 287–292 (homolog search with phmmer - new 0.52.0; card at the top, check 287 first).
 6ad. 293–296 (homologs route question + duplicate buttons - 0.52.1; check 293 first).
+6ae. 297–302 (BLAST homolog provider - new 0.53.0; card at the top, check 297 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

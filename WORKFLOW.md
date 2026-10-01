@@ -107,7 +107,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - Conservation is only as good as the alignment depth, so check how many sequences went in.
 - phmmer rows colour by HMMER posterior probability; HHpred rows by match probability. Both feed the same conservation tally.
 
-**In-app action.** `Load .hhr / variant FASTA…` · `Search homologs (phmmer)` · `Copy sequence (FASTA)` · `Download FASTA`
+**In-app action.** `Load .hhr / variant FASTA…` · `Search homologs (in-app)` · `Copy sequence (FASTA)` · `Download FASTA`
 
 **Guided questions** (the answers choose the concrete action offered).
 

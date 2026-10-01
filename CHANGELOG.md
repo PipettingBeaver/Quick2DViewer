@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-09-25
+
+### Added
+
+- **EBI NCBI-BLAST joins phmmer as a homolog-search provider.** Input Data now has a provider picker
+  (phmmer / BLAST); the Analyze menu entry and the button are provider-agnostic, and the guide's
+  in-app action mentions both. Whichever is chosen, the other stays in the capability as a fallback,
+  so one service being down does not stop the search.
+  - `runCapability()` takes `opts.prefer`, which moves the chosen provider to the front of the list
+    (unknown ids are ignored); `runHomologSearch()` reads the picker and dispatches on the result
+    type - HMMER text for phmmer, Job Dispatcher JSON for BLAST.
+  - `parseBlastHits()` reads `hits[].hit_hsps[]`: one segment per HSP with `hsp_query_from`
+    coordinates, `hsp_qseq`/`hsp_hseq` as the aligned pair, and per-column glyphs from the HSP
+    alignment via `foldseekQualityChar` (BLOSUM62: identical `|`, positive `:`, otherwise `.`).
+    Hit ids are rebuilt UniProt-style (`sp|P42212|GFP_AEQVI`) from the db/acc/id fields, and
+    identity, aligned columns, bits and HSP count go into the tooltip stats.
+  - `applyPhmmerHits()` became `applyHomologHits(parsed, source)`, and `buildHomologPredictorInfo()`
+    is now four-way source aware: phmmer (posterior bands), BLAST and Foldseek (BLOSUM62 bands),
+    HHpred (match-probability bands), each with its own category, stats line and citation.
+  - Verified live: the database value for ncbiblast is `uniprotkb_swissprot` (plain `swissprot` is
+    rejected) and the JSON renderer exists, unlike hmmer3. GFP vs Swiss-Prot returns 13 hits; the
+    real response is committed as a test fixture.
+  - Tests: BLAST JSON parsing (13 hits, UniProt-style ids, 237/238 identity, glyph set `.:| `,
+    equal-length HSP strings), BLAST attribution and tooltip, provider registry order and database
+    value, the picker and menu markup, and `opts.prefer` (preferred first, unknown ignored).
+
 ## [0.52.1] - 2026-09-25
 
 ### Changed

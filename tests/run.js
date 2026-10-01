@@ -12,6 +12,7 @@ const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf-8');
 const CHANGELOG = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf-8');
 const WORKFLOW_MD = fs.readFileSync(path.join(ROOT, 'WORKFLOW.md'), 'utf-8');
 const PHMMER_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/phmmer-gfp.out'), 'utf-8');
+const BLAST_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/blast-gfp.json'), 'utf-8');
 
 // ---------- DOM stubs ----------
 function makeEl() {
@@ -1009,6 +1010,53 @@ ctxRun(`clearGuideCoachmark();`);
 assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'and is restored to its pre-guidance state');
 ctxRun(`guideCoachmark = null; appliedCoachmarkKind = undefined;`);
 
+section('BLAST homolog provider: parser + provider wiring (real EBI output fixture)');
+sandbox.__blastFixture = BLAST_FIXTURE;
+const blast = ctxRun(`parseBlastHits(JSON.parse(window.__blastFixture))`);
+assert(blast && blast.queryLength === 238, 'query length read from the BLAST JSON (got ' + (blast && blast.queryLength) + ')');
+assert(blast.hits.length === 13, 'all reported hits parsed (got ' + blast.hits.length + ')');
+const bFirst = blast.hits[0];
+assert(bFirst.hitId === 'sp|P42212|GFP_AEQVI', 'UniProt-style hit id rebuilt from db/acc/id (got ' + bFirst.hitId + ')');
+assert(bFirst.stats.Identities === '237/238 (100%)' || /^237\/238/.test(bFirst.stats.Identities), 'identity computed from the HSP alignment (got ' + bFirst.stats.Identities + ')');
+assert(bFirst.segments.length === 1 && bFirst.segments[0].qStart === 1 && bFirst.segments[0].qSeq.length === 238, 'the HSP covers the query from residue 1');
+assert(bFirst.significant === true, 'hits within the provider cut-off are significant');
+const bGlyphs = ctxRun(`(function () {
+    const p = parseBlastHits(JSON.parse(window.__blastFixture));
+    const chars = {};
+    p.hits.forEach(h => h.segments.forEach(s => { for (const c of s.qualityChars) chars[c] = true; }));
+    return Object.keys(chars).join('');
+})()`);
+assert(bGlyphs.length > 0 && bGlyphs.split('').every(c => '.:| '.indexOf(c) !== -1),
+    'BLAST glyphs are BLOSUM62-based (identical |, positive :, else .) (got "' + bGlyphs + '")');
+assert(ctxRun(`(function () {
+    const p = parseBlastHits(JSON.parse(window.__blastFixture));
+    return p.hits.every(h => h.segments.every(s => s.tSeq.length === s.qSeq.length));
+})()`), 'every HSP has query and target strings of equal length');
+const bApplied = ctxRun(`
+    (function () {
+        parsedTracks = { AA: 'M'.repeat(238) };
+        homologHitsInfo = {}; graphHighlights = {};
+        const p = parseBlastHits(JSON.parse(window.__blastFixture));
+        const n = applyHomologHits(p, 'BLAST');
+        const key = Object.keys(homologHitsInfo)[0];
+        const info = homologHitsInfo[key] || {};
+        const pred = buildHomologPredictorInfo(key) || {};
+        return { n, source: info.source, category: pred.category, useCase: pred.useCase, bands: (pred.bands || []).map(b => b.range).join('') };
+    })()
+`);
+assert(bApplied.n === 13 && bApplied.source === 'BLAST', 'BLAST hits become Homologs rows attributed to BLAST');
+assert(/blast/i.test(bApplied.category), 'the predictor tooltip names BLAST');
+assert(/E-value=/.test(bApplied.useCase) && /HSPs=/.test(bApplied.useCase), 'and reports E-value, bits, identity and HSP count');
+assert(bApplied.bands === '|:.', 'with BLOSUM62-based band meanings');
+assert(ctxRun(`(function () {
+    const caps = SERVICE_REGISTRY.capabilities.homolog_search.providers;
+    return caps.length === 2 && caps[0].id === 'ebi_phmmer' && caps[1].id === 'ebi_blast' &&
+           /ncbiblast/.test(caps[1].url) && caps[1].params.database === 'uniprotkb_swissprot';
+})()`), 'the capability offers phmmer then BLAST with the verified database value');
+assert(HTML.indexOf('id="homologProvider"') !== -1 && HTML.indexOf('value="ebi_blast"') !== -1, 'Input Data has a provider picker including BLAST');
+assert(HTML.indexOf('Search Homologs (HMMER/BLAST)') !== -1, 'the Analyze menu names both providers');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {}; graphHighlights = {};`);
+
 section('guide: phmmer is offered, and resolver extra actions render');
 const hstep = ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'homologs')`);
 assert((hstep.extraActions || []).some(a => a.run === 'runHomologSearch()'), 'the homologs step carries the phmmer action in its own list (so it shows in every state and in WORKFLOW.md)');
@@ -1026,7 +1074,7 @@ const merged = ctxRun(`
 assert(merged.hasExtra, 'a resolver extra action now flows through resolveStepAction (was silently dropped)');
 assert(merged.hasOwn, 'and the step\'s own extra actions are kept');
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.find(s => s.id === 'homologs')).extraActions.some(a => a.run === 'runHomologSearch()')`), 'the resolved homologs action exposes the phmmer button');
-assert(WORKFLOW_MD.indexOf('Search homologs (phmmer)') !== -1, 'the generated workflow doc lists it too');
+assert(WORKFLOW_MD.indexOf('Search homologs (in-app)') !== -1, 'the generated workflow doc lists it too');
 const routeQ = ctxRun(`STEP_QUESTIONS.homologs[0]`);
 assert(/HHpred, phmmer, or both/.test(routeQ.label), 'the homologs question offers the routes agnostically (got "' + routeQ.label + '")');
 assert(routeQ.options.map(o => o.value).join(',') === 'hhpred,phmmer,both', 'with HHpred / phmmer / both as the answers');
@@ -1093,7 +1141,7 @@ const applied = ctxRun(`
         homologHitsInfo = {};
         parsedTracks['HL_05_old'] = 'M'.repeat(238);
         const p = parsePhmmerHits(window.__phmmerFixture);
-        const n = applyPhmmerHits(p);
+        const n = applyHomologHits(p, 'phmmer');
         const keys = Object.keys(parsedTracks).filter(k => k.startsWith('HL_')).sort();
         const newKeys = keys.filter(k => k !== 'HL_05_old');
         const info = homologHitsInfo[newKeys[0]] || {};
@@ -2181,7 +2229,7 @@ assert(HTML.indexOf("guideAnswers.homologs.hhpred = 'hhpred'") !== -1, 'the migr
 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'no');`);
 nextBlk = sliceNext(ctxRun(`document.getElementById('guidePanel').innerHTML`));
-assert(nextBlk.indexOf('Search homologs (phmmer)') !== -1, 'the legacy "not yet" answer now leads with the in-app search');
+assert(nextBlk.indexOf('Search homologs (in-app)') !== -1, 'the legacy "not yet" answer now leads with the in-app search');
 assert(nextBlk.indexOf('Open HHpred') !== -1 && nextBlk.indexOf('PDB_mmCIF70') !== -1, 'and still offers the HHpred route with its format guidance');
 assert(nextBlk.indexOf('Copy sequence (FASTA)') !== -1, 'the short form shows the Copy sequence (FASTA) helper beside the action');
 assert((nextBlk.match(/Copy sequence \(FASTA\)/g) || []).length === 1, 'exactly once - the accessory no longer duplicates it');
@@ -2447,6 +2495,20 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     `);
     const result = await ctxRun(`runCapability('__test', {})`);
     assert(result === 'second-provider-result', 'runCapability falls through a failing provider to the next');
+
+    // opts.prefer (the homolog-search provider picker): preferred provider first,
+    // the others stay as fallbacks.
+    ctxRun(`
+        SERVICE_ADAPTERS.__first = async () => 'first-provider-result';
+        SERVICE_ADAPTERS.__second = async () => 'second-provider-result';
+        SERVICE_REGISTRY.capabilities.__test2 = { label: 'Test2', providers: [
+            { id: 'a', label: 'A', adapter: '__first' },
+            { id: 'b', label: 'B', adapter: '__second' }
+        ] };
+    `);
+    assert((await ctxRun(`runCapability('__test2', {}, null, { prefer: 'b' })`)) === 'second-provider-result', 'opts.prefer runs the preferred provider first');
+    assert((await ctxRun(`runCapability('__test2', {})`)) === 'first-provider-result', 'without a preference the declared order stands');
+    assert((await ctxRun(`runCapability('__test2', {}, null, { prefer: 'nope' })`)) === 'first-provider-result', 'an unknown preference is ignored');
 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
