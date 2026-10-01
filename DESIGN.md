@@ -71,7 +71,13 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
 - **HMMER** — start with **hmmscan** (Pfam/CATH/Gene3D) → domain-architecture
   tracks; built generically so phmmer/jackhmmer can be added later.
 - **MPI clipboard wizard** — HHpred (done) + HHblits worth adding; Modeller /
-  Clustal / MMseqs2 / PDBsum are redundant or superseded.
+  Clustal / MMseqs2 / PDBsum are redundant or superseded. (Checked 2026-09: the
+  EBI Job Dispatcher has no hhblits/hhpred service, so HHblits stays a clipboard
+  hand-off - the MPI toolkit has no CORS API.)
+- **AlphaMissense** — variant effect predictions (done, v0.56.0): the AlphaFold DB
+  entry's `amAnnotationsUrl` CSV is fetched on demand and only the loaded variants'
+  substitutions are kept. Same accession requirement as the AlphaFold model fetch,
+  and human-only coverage (the file simply does not exist otherwise).
 
 ## 7. Analysis frameworks
 

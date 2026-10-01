@@ -1043,6 +1043,62 @@ assert(srcList.indexOf('Consensus (2 sources)') !== -1 && srcList.indexOf('disag
 assert(srcList.indexOf('Predictor A') !== -1 && srcList.indexOf('Predictor B') !== -1, 'alongside the source list');
 ctxRun(`parsedTracks = {}; topologySources = [];`);
 
+section('AlphaMissense variant effect predictions');
+const tok1 = ctxRun(`parseSubstitutionToken('R175H')`);
+assert(tok1 && tok1.ref === 'R' && tok1.pos === 175 && tok1.alt === 'H', 'a one-letter substitution token parses (R175H)');
+const tok2 = ctxRun(`parseSubstitutionToken('p.Arg175His')`);
+assert(tok2 && tok2.ref === 'R' && tok2.pos === 175 && tok2.alt === 'H', 'a three-letter token parses (p.Arg175His)');
+assert(ctxRun(`parseSubstitutionToken('p.R175H')`).alt === 'H', 'the p. prefix is tolerated');
+assert(ctxRun(`parseSubstitutionToken('variant 3')`) === null, 'a plain label yields no token');
+assert(ctxRun(`parseSubstitutionToken('R175R')`) === null, 'a synonymous token is not a substitution');
+ctxRun(`
+    parsedTracks = { AA: 'MSKGEELFTGVVPILVELD', VAR_v1: 'MSKGEELFTGVVPILVELD', VAR_v2: 'MSKGEELFTGVVPILVELD' };
+    keyedVariantsInfo = {
+        v1: { aligned: 'MSKGEELFTGVVPILVELD', raw: 'MSKGEELFTGVVPILVELD', desc: 'R8H' },
+        v2: { aligned: 'MSKGEELFTGVVPILVELD', raw: 'MSKGEELFTGVVPILVELD', desc: '' }
+    };
+`);
+assert(ctxRun(`parseVariantSubstitutions('v1').length`) === 1 && ctxRun(`parseVariantSubstitutions('v1')[0].ref`) === 'R', 'the header token is preferred for a variant substitution');
+ctxRun(`keyedVariantsInfo.v2.aligned = 'MSKGEELFHGVVPILVELD';`); // differs at position 9
+const v2subs = ctxRun(`parseVariantSubstitutions('v2')`);
+assert(v2subs.length === 1 && v2subs[0].pos === 9 && v2subs[0].alt === 'H', 'without a token the alignment difference is used (got pos ' + v2subs[0].pos + ')');
+const amCsv = ctxRun(`parseAlphaMissenseCsv([
+    'protein_variant,am_pathogenicity,am_class',
+    'R8H,0.92,Path',
+    'G9A,0.31,Amb',
+    'V10L,0.02,LBen',
+    'L11P,0.71,LPath'
+].join(String.fromCharCode(10)), ['R8H', 'G9A', 'NOPE'])`);
+assert(Object.keys(amCsv).length === 2, 'the CSV keeps only the requested substitutions (got ' + Object.keys(amCsv).length + ')');
+assert(amCsv.R8H.cls === 'pathogenic' && amCsv.R8H.score === 0.92, 'the abbreviated class Path parses as pathogenic');
+assert(amCsv.G9A.cls === 'ambiguous', 'the CSV value Amb normalises to ambiguous');
+assert(ctxRun(`normalizeAlphaMissenseClass('LPath')`) === 'likely_pathogenic' && ctxRun(`normalizeAlphaMissenseClass('LBen')`) === 'likely_benign', 'the other abbreviations normalise too');
+ctxRun(`alphaMissenseScores = parseAlphaMissenseCsv([
+    'protein_variant,am_pathogenicity,am_class',
+    'R8H,0.92,LPath',
+    'V10L,0.02,LBen'
+].join(String.fromCharCode(10)), ['R8H', 'V10L']);`);
+assert(ctxRun(`alphaMissenseFor({ ref: 'R', pos: 8, alt: 'H' }).label`) === 'pathogenic or likely pathogenic', 'a lookup labels the pathogenic class');
+assert(ctxRun(`alphaMissenseFor({ ref: 'V', pos: 10, alt: 'L' }).label`) === 'benign or likely benign', 'and the benign class');
+assert(ctxRun(`alphaMissenseFor({ ref: 'X', pos: 1, alt: 'Y' })`) === null, 'an unknown substitution has no entry');
+ctxRun(`activeRowKey = 'VAR_v1';`);
+ctxRun(`updateVariantFastaSection();`);
+assert(ctxRun(`document.getElementById('variantFastaLabel').textContent`).indexOf('AlphaMissense: pathogenic or likely pathogenic') !== -1, 'the variant panel names the AlphaMissense class');
+const amInsights = ctxRun(`computeGuideInsights().map(x => x.text).join(' ')`);
+assert(amInsights.indexOf('AlphaMissense') !== -1 && amInsights.indexOf('1 of 2 variant substitution(s)') !== -1, 'the guide read-out counts the pathogenic substitutions');
+ctxRun(`const origHom = STEP_ACTION_RESOLVERS.homologs;`);
+const amActions = ctxRun(`
+    (function () {
+        setStepAnswer('homologs', 'hhpred', 'phmmer');
+        const act = resolveStepAction(WORKFLOW_STEPS.find(s => s.id === 'homologs'));
+        clearStepAnswers('homologs');
+        return act.extraActions.map(a => a.run);
+    })()
+`);
+assert(amActions.indexOf('fetchVariantEffectPredictions()') !== -1, 'with variants loaded the guide offers the AlphaMissense action');
+assert(HTML.indexOf('id="btnVariantEffects"') !== -1 && HTML.indexOf('id="variantEffectStatus"') !== -1, 'Input Data has the button and status line');
+ctxRun(`parsedTracks = {}; keyedVariantsInfo = {}; alphaMissenseScores = {}; alphaMissenseAccession = ''; activeRowKey = null;`);
+
 section('homolog glyph wording is source-aware');
 assert(ctxRun(`homologGlyphBasis('HL_missing')`) === 'HHpred match probability', 'without an info entry the basis defaults to HHpred');
 ctxRun(`homologHitsInfo = { HL_a: { source: 'phmmer' }, HL_b: { source: 'BLAST' }, HL_c: { source: 'Foldseek' }, HL_d: { source: 'HHpred' } };`);

@@ -29,6 +29,34 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### AlphaMissense variant effects — 0.56.0
+
+**Should do.** With a UniProt accession and a variant FASTA loaded, one button fetches the
+AlphaMissense substitution scores and reports each variant's pathogenicity class in the viewer
+tooltips, the variant panel, the status line and the guide read-out.
+
+**Try (normal use).**
+1. Load a human protein with an accession (TP53/P04637 works), attach a variant FASTA naming the
+   substitution (e.g. `>R175H`), then Input Data → **Predict variant effects (AlphaMissense)**.
+   *Expect:* status "AlphaMissense (P04637): 1 of 1 substitution(s) matched - 0 pathogenic,
+   1 likely pathogenic, ...".
+2. Hover the variant row's mismatch cell.
+   *Expect:* tooltip ends "; AlphaMissense: pathogenic or likely pathogenic (0.99)".
+3. Select the variant row and look at the FASTA Segment label.
+   *Expect:* it names the same class.
+4. Open the Guide with the scores loaded.
+   *Expect:* a read-out line counting pathogenic substitutions; the homologs step offers the action.
+
+**Edge cases (symptom → likely cause).**
+- A non-human protein: status explains AlphaMissense annotations exist for human proteins only
+  (the AFDB entry has no `amAnnotationsUrl`).
+- A variant header with no substitution token: the alignment difference is used instead (check the
+  "N of M matched" count; several differences are all looked up).
+- No accession loaded: toast asks for one (same rule as the AlphaFold fetch).
+- Scores are memory-only: a restored session re-fetches with one click.
+
+---
+
 ### Topology consensus completion — 0.55.0
 
 **Should do.** Paste topology predictors under Options → Data Sources → Topology; the majority-vote
@@ -1170,6 +1198,18 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 317 | Hover the cells of a BLAST (or phmmer/Foldseek) row | Tooltip names that basis ("BLAST substitution score (BLOSUM62)"), never "HHpred match quality" |
 | 318 | Show Legend → the Homologs entry | Explains the shared glyph scale and that the meaning depends on the source |
 
+## 0.56.0 - AlphaMissense variant effects (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 319 | Human protein + variant FASTA → Predict variant effects | Status: N of M substitutions matched, with class counts |
+| 320 | Hover the variant's mismatch cell | "; AlphaMissense: pathogenic or likely pathogenic (0.99)" |
+| 321 | Select the variant row | FASTA Segment label names the class |
+| 322 | Guide read-out | Counts the pathogenic substitutions for that accession |
+| 323 | Guide homologs step with variants loaded | Offers "Predict variant effects (AlphaMissense)" |
+| 324 | A non-human protein | Clear message that annotations exist for human proteins only |
+| 325 | A variant header with no token (e.g. `>var1`) | Falls back to the alignment difference |
+
 ## Pending live checks (API calls + UI integration) — test later
 
 These are cheap to check by hand when you next have a session with the services up; nothing here
@@ -1251,4 +1291,5 @@ needs a full card.
 6af. 303–308 (Homolog Templates table upgrade - 0.54.0; card at the top, check 303 first).
 6ag. 309–314 (topology consensus completion - new 0.55.0; card at the top, check 310 first).
 6ah. 315–318 (per-provider menu + source-aware glyph wording - 0.55.1; check 317 first).
+6ai. 319–325 (AlphaMissense variant effects - new 0.56.0; card at the top, check 319 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

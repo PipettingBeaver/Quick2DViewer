@@ -2076,6 +2076,8 @@
                         </select>
                         <button type="button" id="btnHomologSearch" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="runHomologSearch()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Search Swiss-Prot for homologs (phmmer or NCBI-BLAST) and add one Homologs row per significant hit">Find homologs</button>
+                        <button type="button" id="btnVariantEffects" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="fetchVariantEffectPredictions()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Look up AlphaMissense pathogenicity for the loaded variant substitutions (needs a UniProt accession; AlphaMissense covers human proteins)">Predict variant effects (AlphaMissense)</button>
                         <select id="foldseekDb" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Foldseek search database">
                             <option value="afdb50">afdb50 (AlphaFoldDB)</option>
                             <option value="pdb100">pdb100 (PDB)</option>
@@ -2091,6 +2093,7 @@
                 <div id="foldseekStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="domainScanStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="homologSearchStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+                <div id="variantEffectStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -3083,6 +3086,12 @@ let homologHitsInfo = {};
 // '-'-gaps matching the AA track's index space, plus the raw text/name so the
 // Data modal and Options can show origin info. Track key: "VAR_<idx>_<name>".
 let keyedVariantsInfo = {}; // { variantKey: { aligned, raw, name } }
+// AlphaMissense pathogenicity for the loaded variants' substitutions, keyed
+// "R175H" ({ score, cls }). Fetched on demand from the AlphaFold DB annotation
+// file and kept in memory only: the full table is ~7,500 rows per protein, so
+// only the substitutions the variants actually carry are retained.
+let alphaMissenseScores = {};
+let alphaMissenseAccession = '';
 // Per-column conservation scoring for the CONSERVATION object track (details
 // in the Options > Conservation Scoring section). Greg at 2-state, Wu-Kabat.)
 let conservationMetric = 'shannon'; // 'shannon' | 'jsd' | 'wukabat'
@@ -6253,16 +6262,20 @@ const STEP_ACTION_RESOLVERS = {
         // from older sessions used 'ready'/'no'; map them so a restored session
         // keeps working instead of silently losing its action.
         const choice = a.hhpred === 'ready' ? 'hhpred' : (a.hhpred === 'no' ? 'both' : a.hhpred);
+        // With variants loaded, the AlphaMissense lookup belongs on this step.
+        const variantExtra = Object.keys(keyedVariantsInfo || {}).length
+            ? [{ label: 'Predict variant effects (AlphaMissense)', run: 'fetchVariantEffectPredictions()' }] : [];
         if (choice === 'phmmer' || choice === 'both') return {
             label: 'Search homologs (in-app)',
             run: 'runHomologSearch()',
-            extraActions: choice === 'both' ? [{ label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')" }] : [],
+            extraActions: (choice === 'both' ? [{ label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')" }] : []).concat(variantExtra),
             hint: 'The in-app search queries Swiss-Prot with phmmer (HMMER) by default; the picker in Input Data switches it to NCBI-BLAST for a pairwise search. One Homologs row per significant hit; the rows feed conservation, the match-quality colouring and the predictor tooltips.' +
                 (choice === 'both' ? ' Attach the HHpred .hhr afterwards if you ran one - the two sets coexist and both count towards conservation. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling.' : '')
         };
         if (choice === 'hhpred') return {
             label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()',
             accessory: { label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')" },
+            extraActions: variantExtra,
             hint: 'Run MPI\'s HHpred (Copy sequence (FASTA) is below) and attach the resulting .hhr; its hits become Homologs rows and feed the templates table. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Alternatively, you can search Swiss-Prot in-app with phmmer.'
         };
         return null;
@@ -6870,6 +6883,11 @@ function computeGuideInsights() {
     }
     if (guideProfile.membrane === 'yes' && !keys.some(k => k.startsWith('TM_') || k.startsWith('SP_'))) {
         out.push({ level: 'warn', text: 'You flagged a membrane/secreted protein, but no TM or signal-peptide track is loaded.' });
+    }
+    if (Object.keys(alphaMissenseScores || {}).length) {
+        const vals = Object.keys(alphaMissenseScores).map(k => alphaMissenseScores[k]);
+        const path = vals.filter(v => v.cls === 'pathogenic' || v.cls === 'likely_pathogenic').length;
+        out.push({ level: 'info', text: 'AlphaMissense (' + (alphaMissenseAccession || 'accession') + '): ' + path + ' of ' + vals.length + ' variant substitution(s) pathogenic or likely pathogenic.' });
     }
     if (guideProfile.variants === 'yes' && !keys.some(k => k.startsWith('VAR_')) && !parsedTracks.CONSERVATION) {
         out.push({ level: 'warn', text: 'Variant evaluation is flagged, but no variant FASTA (or conservation row) is loaded yet.' });
@@ -8155,7 +8173,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.55.1';
+const APP_VERSION = '0.56.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -10794,6 +10812,129 @@ function getVariantAATrack(trackKey) {
 
 // FASTA header/description for a VAR_ track: the full '>' line (verbatim)
 // captured at import, or '' when it wasn't parsed/present.
+// A substitution token in a variant label: "R175H" or "p.Arg175His" (the
+// author's own naming), three-letter codes included.
+function parseSubstitutionToken(text) {
+    const t = String(text || '');
+    let m = t.match(/\b([A-Z][a-z]{2})(\d+)([A-Z][a-z]{2})\b/);
+    if (m) {
+        const r = RESIDUE_3TO1[m[1].toUpperCase()], a = RESIDUE_3TO1[m[3].toUpperCase()];
+        if (r && a && r !== a) return { ref: r, pos: parseInt(m[2], 10), alt: a };
+    }
+    m = t.match(/\b([A-Z])(\d+)([A-Z])\b/);
+    if (m && m[1] !== m[3]) return { ref: m[1], pos: parseInt(m[2], 10), alt: m[3] };
+    return null;
+}
+// The substitution(s) a variant carries: the header token when the FASTA names
+// one (authoritative), else read off the alignment by comparing the variant's
+// aligned sequence with the reference.
+function parseVariantSubstitutions(name) {
+    const info = (keyedVariantsInfo && keyedVariantsInfo[name]) ? keyedVariantsInfo[name] : null;
+    if (!info) return [];
+    const fromHeader = parseSubstitutionToken(info.desc || '') || parseSubstitutionToken(name);
+    if (fromHeader) return [fromHeader];
+    const ref = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const al = info.aligned || '';
+    const out = [];
+    for (let i = 0; i < ref.length && i < al.length; i++) {
+        const a = al[i];
+        if (!a || a === '-' || a === ' ' || a === ref[i]) continue;
+        out.push({ ref: ref[i], pos: i + 1, alt: a });
+    }
+    return out;
+}
+// The AlphaFold DB file abbreviates the classes (Ben / LBen / Amb / LPath /
+// Path); the long forms are accepted too so hand-made tables work.
+function normalizeAlphaMissenseClass(raw) {
+    const c = String(raw || '').toLowerCase();
+    if (c === 'pathogenic' || c === 'path') return 'pathogenic';
+    if (c === 'likely_pathogenic' || c === 'likely pathogenic' || c === 'lpath') return 'likely_pathogenic';
+    if (c === 'benign' || c === 'ben') return 'benign';
+    if (c === 'likely_benign' || c === 'likely benign' || c === 'lben') return 'likely_benign';
+    return 'ambiguous'; // 'Amb'
+}
+function alphaMissenseClassLabel(cls) {
+    if (cls === 'pathogenic' || cls === 'likely_pathogenic') return 'pathogenic or likely pathogenic';
+    if (cls === 'benign' || cls === 'likely_benign') return 'benign or likely benign';
+    return 'ambiguous';
+}
+// "protein_variant,am_pathogenicity,am_class" -> { R175H: { score, cls } },
+// keeping only the requested substitutions.
+function parseAlphaMissenseCsv(csv, wantedKeys) {
+    const want = {};
+    (wantedKeys || []).forEach(k => { want[k] = true; });
+    const any = Object.keys(want).length === 0;
+    const out = {};
+    String(csv || '').split(/\r?\n/).forEach((line, i) => {
+        if (!line) return;
+        if (i === 0 && /protein_variant/i.test(line)) return;
+        const parts = line.split(',');
+        if (parts.length < 3) return;
+        const key = parts[0].trim();
+        if (!key || (!any && !want[key])) return;
+        const score = parseFloat(parts[1]);
+        out[key] = { score: isNaN(score) ? null : score, cls: normalizeAlphaMissenseClass(parts[2]) };
+    });
+    return out;
+}
+// The AlphaMissense entry for a substitution, or null when it was not fetched.
+function alphaMissenseFor(sub) {
+    if (!sub) return null;
+    const key = sub.ref + sub.pos + sub.alt;
+    const hit = alphaMissenseScores[key];
+    if (!hit) return null;
+    return { key, score: hit.score, cls: hit.cls, label: alphaMissenseClassLabel(hit.cls) };
+}
+// Fetches AlphaMissense for the loaded variants (AlphaFold DB annotation file).
+async function fetchVariantEffectPredictions() {
+    const names = Object.keys(keyedVariantsInfo || {}).filter(n => keyedVariantsInfo[n] && typeof keyedVariantsInfo[n].aligned === 'string');
+    if (!names.length) { showToast('Attach a variant FASTA first: AlphaMissense scores substitutions, so it needs variants.', 'error'); return; }
+    const derived = deriveLookupDefaults();
+    const acc = uniprotAccession || (derived && derived.accession) || '';
+    if (!acc) { showToast('AlphaMissense is keyed by UniProt accession. Load a protein with one (or fetch its entry) first.', 'error'); return; }
+    const wanted = [];
+    names.forEach(n => { parseVariantSubstitutions(n).forEach(s => { const k = s.ref + s.pos + s.alt; if (wanted.indexOf(k) === -1) wanted.push(k); }); });
+    if (!wanted.length) { showToast('No substitution could be read from the variant headers or the alignment, so there is nothing to look up.', 'error'); return; }
+    if (!beginGuideTask('annotation', 'AlphaMissense lookup for ' + acc)) return;
+    const statusEl = document.getElementById('variantEffectStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('annotation'); return; }
+        setStatus('Looking up AlphaMissense annotations for ' + acc + '\u2026');
+        const metaResp = await fetchWithTimeout('https://alphafold.ebi.ac.uk/api/prediction/' + encodeURIComponent(acc), { headers: { Accept: 'application/json' } }, 30000);
+        if (!metaResp.ok) throw new Error('AlphaFold DB lookup HTTP ' + metaResp.status);
+        const meta = await metaResp.json();
+        const entry = Array.isArray(meta) ? meta[0] : meta;
+        const url = entry && entry.amAnnotationsUrl;
+        if (!url) throw new Error('no AlphaMissense annotations for ' + acc + ' (they exist for human proteins)');
+        setStatus('Downloading the AlphaMissense table\u2026');
+        const csvResp = await fetchWithTimeout(url, {}, 60000);
+        if (!csvResp.ok) throw new Error('annotation download HTTP ' + csvResp.status);
+        alphaMissenseScores = parseAlphaMissenseCsv(await csvResp.text(), wanted);
+        alphaMissenseAccession = acc;
+        const found = Object.keys(alphaMissenseScores).length;
+        renderViewer(parsedTracks);
+        updateVariantFastaSection();
+        refreshInputDataModalIfVisible();
+        const counts = { pathogenic: 0, likely_pathogenic: 0, ambiguous: 0, benign: 0 };
+        Object.keys(alphaMissenseScores).forEach(k => {
+            const c = alphaMissenseScores[k].cls;
+            if (c === 'pathogenic') counts.pathogenic++;
+            else if (c === 'likely_pathogenic') counts.likely_pathogenic++;
+            else if (c === 'benign' || c === 'likely_benign') counts.benign++;
+            else counts.ambiguous++;
+        });
+        setStatus('AlphaMissense (' + acc + '): ' + found + ' of ' + wanted.length + ' substitution(s) matched - ' +
+            counts.pathogenic + ' pathogenic, ' + counts.likely_pathogenic + ' likely pathogenic, ' +
+            counts.ambiguous + ' ambiguous, ' + counts.benign + ' benign.');
+        endGuideTask('annotation', 'AlphaMissense: ' + (counts.pathogenic + counts.likely_pathogenic) + ' of ' + found + ' substitution(s) pathogenic or likely pathogenic', 'info');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('AlphaMissense lookup failed: ' + m);
+        endGuideTask('annotation', 'AlphaMissense lookup failed: ' + m, 'error');
+    }
+}
+
 function getVariantDescription(trackKey) {
     const name = trackKey.startsWith('VAR_') ? trackKey.slice(4) : trackKey;
     const info = keyedVariantsInfo ? keyedVariantsInfo[name] : null;
@@ -10820,7 +10961,10 @@ function updateVariantFastaSection() {
             ? ranges.map(([s, e]) => aa.substring(s, e + 1)).join(',')
             : aa;
         display.textContent = variantCopyText;
-        label.textContent = 'Variant sequence (' + formatTrackLabel(key) + '):';
+        const subs = parseVariantSubstitutions(key.slice(4));
+        const amHit = subs.length ? alphaMissenseFor(subs[0]) : null;
+        label.textContent = 'Variant sequence (' + formatTrackLabel(key) + ')' +
+            (amHit ? ' - AlphaMissense: ' + amHit.label + (amHit.score != null ? ' (' + amHit.score.toFixed(2) + ')' : '') : '') + ':';
         section.style.display = 'block';
         btn.disabled = false;
     } else {
@@ -11920,8 +12064,11 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     }
                 }
                 const varDescLine = varDesc ? formatTrackLabel(key) + ': ' + varDesc + '\n' : '';
+                const amHit = (varChar !== ' ' && varChar !== '-' && isMismatch)
+                    ? alphaMissenseFor({ ref: refChar, pos: i + 1, alt: varChar }) : null;
                 cellEl.title = varDescLine + (varChar !== ' ' && varChar !== '-'
-                    ? (isMismatch ? `Residue ${i + 1}: variant AA '${varChar}' (mismatch vs reference '${refChar}')` : `Residue ${i + 1}: variant AA '${varChar}' (matches reference)`)
+                    ? (isMismatch ? `Residue ${i + 1}: variant AA '${varChar}' (mismatch vs reference '${refChar}')` : `Residue ${i + 1}: variant AA '${varChar}' (matches reference)`) +
+                      (amHit ? `; AlphaMissense: ${amHit.label}${amHit.score != null ? ' (' + amHit.score.toFixed(2) + ')' : ''}` : '')
                     : `Residue ${i + 1}: variant (no aligned residue)`);
             }
             else if (key.startsWith('UP_')) {

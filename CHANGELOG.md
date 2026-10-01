@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-09-25
+
+### Added
+
+- **AlphaMissense variant effect predictions.** For a protein with a UniProt accession and a loaded
+  variant FASTA, Input Data -> **Predict variant effects (AlphaMissense)** looks up the substitution
+  scores from the AlphaFold DB annotation file (`amAnnotationsUrl`, CORS-enabled) and reports the
+  pathogenicity class per variant. Verified live: TP53 R175H -> likely pathogenic (0.9857).
+  - `parseVariantSubstitutions()` reads the substitution from the variant's header token (`R175H`,
+    `p.Arg175His` - three-letter codes included) and falls back to comparing the variant's aligned
+    sequence with the reference when the header carries no token.
+  - `parseAlphaMissenseCsv()` keeps only the substitutions the loaded variants carry (the full table
+    is ~7,500 rows per protein, so nothing bulky is stored) and normalises the file's abbreviated
+    classes (`Ben` / `LBen` / `Amb` / `LPath` / `Path`). Scores stay in memory; the button re-fetches.
+  - Surfaced in the variant row's cell tooltip ("; AlphaMissense: pathogenic or likely pathogenic
+    (0.99)"), the variant FASTA-segment label, the Input Data status line (class counts), a guide
+    read-out, and the guide's homologs step offers the action whenever variants are loaded.
+  - Tests: token parsing (one- and three-letter, `p.` prefix, synonymous rejected), header vs
+    alignment fallback, CSV filtering and class normalisation, lookups and labels, the panel label,
+    the guide read-out and action.
+
 ## [0.55.1] - 2026-09-25
 
 ### Changed
