@@ -14,6 +14,25 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.9] - 2026-10-01
+
+### Added
+
+- **Model-vs-model RMSD matrix in the ensemble panel** (#4b). `computeEnsembleVariance()` now also
+  returns a symmetric pairwise RMSD matrix over the shared residues (capped at 12 models), plus the
+  mean pairwise RMSD and the most divergent pair. The panel renders it as a heat-tinted table
+  (pale = agreeing, warm = divergent) with the pair summary underneath, the activity log records the
+  stats, and the methods report gains an ensemble line (mean RMSF + mean pairwise RMSD).
+
+### Fixed
+
+- **`kabschSuperpose()`'s RMSD was always 0** - found by the new matrix test. The quaternion formula
+  omitted the reference set's squared-norm term, so `(|P|^2 - 2*lambda_max)/n` was always negative
+  and clamped to zero: the ensemble panel's "RMSD to first" column has read 0.00 A for every model
+  since 0.34.0. The formula now includes `|Q|^2` (verified: a translated copy superposes to ~0 A,
+  a perturbed one reports 0.22 A on a 3-residue toy model). The RMSF values themselves were
+  unaffected - they use the fitted coordinates, not this number.
+
 ## [0.66.8] - 2026-10-01
 
 ### Added

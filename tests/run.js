@@ -1211,6 +1211,38 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('#4b: model-vs-model RMSD matrix in the ensemble panel');
+ctxRun(`
+    parsedTracks = { AA: 'MKV' };
+    cachedStructureTexts = {
+        'modelA.pdb': ['ATOM      1  CA  MET A   1       0.000   0.000   0.000  1.00  0.00           C','ATOM      2  CA  LYS A   2       3.800   0.000   0.000  1.00  0.00           C','ATOM      3  CA  VAL A   3       3.800   3.800   0.000  1.00  0.00           C'].join(String.fromCharCode(10)),
+        'modelB.pdb': ['ATOM      1  CA  MET A   1      10.000   5.000  -3.000  1.00  0.00           C','ATOM      2  CA  LYS A   2      13.800   5.000  -3.000  1.00  0.00           C','ATOM      3  CA  VAL A   3      13.800   8.800  -3.000  1.00  0.00           C'].join(String.fromCharCode(10)),
+        'modelC.pdb': ['ATOM      1  CA  MET A   1       0.000   0.000   0.000  1.00  0.00           C','ATOM      2  CA  LYS A   2       3.800   0.000   0.000  1.00  0.00           C','ATOM      3  CA  VAL A   3       3.800   3.800   2.000  1.00  0.00           C'].join(String.fromCharCode(10))
+    };
+    actionLog = [];
+`);
+const ens = ctxRun(`computeEnsembleVariance(['modelA.pdb', 'modelB.pdb', 'modelC.pdb'])`);
+assert(ens.ok === true, 'the ensemble computes (got ' + (ens && ens.message) + ')');
+assert(ens.rmsdMatrix && ens.rmsdMatrix.length === 3 && ens.rmsdMatrix[0].length === 3, 'a 3x3 matrix comes back');
+assert(ens.rmsdMatrix[0][0] === 0 && ens.rmsdMatrix[1][1] === 0 && ens.rmsdMatrix[2][2] === 0, 'the diagonal is zero');
+assert(ens.rmsdMatrix[0][1] < 0.01, 'a pure translation superposes to ~0 A (got ' + ens.rmsdMatrix[0][1] + ')');
+assert(ens.rmsdMatrix[1][0] === ens.rmsdMatrix[0][1] && ens.rmsdMatrix[2][0] === ens.rmsdMatrix[0][2], 'the matrix is symmetric');
+assert(ens.rmsdMatrix[0][2] > 0.1 && ens.rmsdMatrix[0][2] > ens.rmsdMatrix[0][1] * 10, 'a perturbed model reports a real difference, far above the translated pair (got ' + ens.rmsdMatrix[0][2] + ' vs ' + ens.rmsdMatrix[0][1] + ')');
+assert(ens.pairMean > 0 && ens.pairMax && ens.pairMax.v >= ens.pairMean, 'the pair statistics follow the matrix');
+ctxRun(`lastEnsembleResult = null; renderEnsembleSummary(computeEnsembleVariance(['modelA.pdb', 'modelB.pdb', 'modelC.pdb']));`);
+const ensHtml = ctxRun(`document.getElementById('ensembleResults').innerHTML`);
+assert(ensHtml.indexOf('Pairwise RMSD') !== -1 && ensHtml.indexOf('Mean pairwise RMSD') !== -1, 'the panel renders the matrix and its summary (got a table without it)');
+assert((ensHtml.match(/<td style="background:rgb\(/g) || []).length >= 6, 'matrix cells carry the heat tint');
+assert(ctxRun(`rmsdTint(0, 5)`) === 'rgb(248,250,252)' && ctxRun(`rmsdTint(5, 5)`) === 'rgb(254,202,202)', 'the tint runs pale to warm');
+assert(ctxRun(`rmsdTint(2, 0)`) !== ctxRun(`rmsdTint(0, 0)`), 'and handles a zero max without dividing by zero');
+ctxRun(`
+    lastEnsembleResult = computeEnsembleVariance(['modelA.pdb', 'modelB.pdb', 'modelC.pdb']);
+    parsedTracks.EV_RMSF = lastEnsembleResult.values;
+`);
+const ensReport = ctxRun(`buildMethodsReport()`);
+assert(/Ensemble: mean RMSF .* mean pairwise RMSD .* A/.test(ensReport), 'the methods report carries the ensemble line (got "' + (ensReport.match(/Ensemble:[^\n]*/) || ['?'])[0] + '")');
+ctxRun(`parsedTracks = {}; cachedStructureTexts = []; lastEnsembleResult = null; actionLog = [];`);
+
 section('#4a: colour the 3D model by any track');
 assert(HTML.indexOf('id="p3dColorSelect"') !== -1, 'the 3D toolbar has a colour picker');
 assert(HTML.indexOf('id="p3dColorBtn"') === -1, 'the old cycle button is gone (the picker replaced it)');

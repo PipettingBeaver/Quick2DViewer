@@ -5280,12 +5280,16 @@ function kabschSuperpose(mobile, reference) {
         [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
         [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]
     ];
-    let sumSq = 0;
+    // Quaternion RMSD: sqrt((|P|^2 + |Q|^2 - 2*lambda_max)/n) over the centred
+    // sets. The reference's own squared norm is essential - without it the
+    // expression is always negative and every RMSD clamps to 0 (which is what
+    // the ensemble table showed for every model since 0.34.0).
+    let sumSq = 0, sumSqRef = 0;
     for (let i = 0; i < n; i++) {
-        const sq = P[i].x * P[i].x + P[i].y * P[i].y + P[i].z * P[i].z;
-        sumSq += sq;
+        sumSq += P[i].x * P[i].x + P[i].y * P[i].y + P[i].z * P[i].z;
+        sumSqRef += Q[i].x * Q[i].x + Q[i].y * Q[i].y + Q[i].z * Q[i].z;
     }
-    const rmsd = Math.sqrt(Math.max(0, (sumSq - 2 * eig.value) / n));
+    const rmsd = Math.sqrt(Math.max(0, (sumSq + sumSqRef - 2 * eig.value) / n));
     const apply = (p) => {
         const dx = p.x - cm.x, dy = p.y - cm.y, dz = p.z - cm.z;
         return {
@@ -5339,6 +5343,28 @@ function computeEnsembleVariance(fileNames) {
         m.byIdx.forEach((p, idx) => moved.set(idx, fit.apply(p)));
         return { model: m, points: moved, rmsd: fit.rmsd };
     }).filter(Boolean);
+    // Pairwise RMSD over the shared residues: which models disagree most, as a
+    // symmetric matrix (diagonal 0). Capped so a large ensemble stays cheap.
+    const rmsdMatrix = [];
+    const modelNames = aligned.map(a => a.model.file);
+    if (aligned.length <= 12) {
+        for (let a = 0; a < aligned.length; a++) {
+            rmsdMatrix.push([]);
+            for (let b = 0; b < aligned.length; b++) {
+                if (b < a) { rmsdMatrix[a].push(rmsdMatrix[b][a]); continue; }
+                if (b === a) { rmsdMatrix[a].push(0); continue; }
+                const fit = kabschSuperpose(common.map(idx => aligned[b].model.byIdx.get(idx)), common.map(idx => aligned[a].model.byIdx.get(idx)));
+                rmsdMatrix[a].push(fit ? fit.rmsd : null);
+            }
+        }
+    }
+    let pairSum = 0, pairN = 0, pairMax = null;
+    rmsdMatrix.forEach((row, a) => row.forEach((v, b) => {
+        if (b <= a || v == null) return;
+        pairSum += v; pairN++;
+        if (!pairMax || v > pairMax.v) pairMax = { a, b, v };
+    }));
+
     // Fluctuation about the ensemble mean position for every residue covered by
     // at least two superposed models.
     const rmsf = [];
@@ -5373,7 +5399,10 @@ function computeEnsembleVariance(fileNames) {
         ok: true, total, values, mean, max,
         models: aligned.map(a => ({ file: a.model.file, chain: a.model.chain, residues: a.model.n, rmsd: a.rmsd, offset: a.model.offset })),
         common: common.length,
-        covered: present.length
+        covered: present.length,
+        rmsdMatrix, modelNames,
+        pairMean: pairN ? pairSum / pairN : null,
+        pairMax
     };
 }
 // Colour scale for RMSF (Å): tight blue through to very mobile red.
@@ -5385,7 +5414,14 @@ function rmsfColor(v) {
     if (v < 5) return '#fb923c';
     return '#ef4444';
 }
+// Light heat tint for the RMSD matrix: models that agree stay pale, divergent
+// pairs warm up.
+function rmsdTint(v, max) {
+    const f = Math.max(0, Math.min(1, (Number(v) || 0) / (max || 1)));
+    return 'rgb(' + Math.round(248 + f * 6) + ',' + Math.round(250 - f * 48) + ',' + Math.round(252 - f * 50) + ')';
+}
 // Runs the analysis for the chosen models, writes the EV_RMSF row and reports.
+let lastEnsembleResult = null; // for the methods report, when a run happened this session
 function runEnsembleVariance() {
     const picked = [];
     const wrap = document.getElementById('ensembleModelList');
@@ -5400,6 +5436,11 @@ function runEnsembleVariance() {
     if (!res.ok) { setStatus(res.message); showToast('Ensemble variance: ' + res.message, 'error'); return null; }
     parsedTracks.EV_RMSF = res.values;
     setTrackMeta('EV_RMSF', { source: 'Ensemble', color: '#f97316' });
+    lastEnsembleResult = res;
+    if (res.pairMean != null) {
+        logAction('analysis', 'ensemble RMSD matrix', 'mean pairwise ' + res.pairMean.toFixed(2) + ' A' +
+            (res.pairMax ? ', max ' + res.pairMax.v.toFixed(2) + ' A (models ' + (res.pairMax.a + 1) + ' vs ' + (res.pairMax.b + 1) + ')' : ''));
+    }
     renderViewer(parsedTracks);
     refreshTrackManagerIfVisible();
     renderEnsembleSummary(res);
@@ -5424,6 +5465,23 @@ function renderEnsembleSummary(res) {
             (m.rmsd == null ? '-' : m.rmsd.toFixed(2) + ' A') + '</td></tr>';
     });
     html += '</tbody></table>';
+    if (res.rmsdMatrix && res.rmsdMatrix.length) {
+        const names = res.modelNames || [];
+        const flat = res.rmsdMatrix.reduce((acc, row) => acc.concat(row), []).filter(v => v != null);
+        const maxV = flat.length ? Math.max.apply(null, flat) : 0.001;
+        html += '<div style="font-size:0.7rem; color:#475569; margin-top:8px;">Pairwise RMSD (A, over ' + res.common + ' shared residues):</div>';
+        html += '<table class="metrics-table" style="font-size:0.68rem; margin-top:2px;"><thead><tr><th></th>' +
+            names.map((n, i) => '<th title="' + structureEscapeHtml(n) + '">' + (i + 1) + '</th>').join('') + '</tr></thead><tbody>';
+        res.rmsdMatrix.forEach((row, a) => {
+            html += '<tr><td title="' + structureEscapeHtml(names[a] || '') + '">' + (a + 1) + '</td>' +
+                row.map(v => '<td style="background:' + (v == null ? '#f8fafc' : rmsdTint(v, maxV)) + ';">' +
+                    (v == null ? '-' : v.toFixed(2)) + '</td>').join('') + '</tr>';
+        });
+        html += '</tbody></table>';
+        html += '<div style="font-size:0.68rem; color:#64748b; margin-top:3px;">Rows/columns are the models above, in order (hover a number for its file). Mean pairwise RMSD ' +
+            (res.pairMean == null ? '-' : res.pairMean.toFixed(2) + ' A') +
+            (res.pairMax ? '; most divergent: ' + (res.pairMax.a + 1) + ' vs ' + (res.pairMax.b + 1) + ' (' + res.pairMax.v.toFixed(2) + ' A)' : '') + '.</div>';
+    }
     const shifted = res.models.filter(m => m.offset);
     if (shifted.length) {
         html += '<div style="font-size:0.68rem; color:#b45309; margin-top:4px;">Aligned by sequence (their numbering differs from the reference): ' +
@@ -6809,7 +6867,7 @@ function renderActionLog() {
     const body = document.getElementById('actionLogBody');
     if (!body) return;
     if (!actionLog.length) { body.textContent = '(no actions recorded yet this session)'; return; }
-    const kindWord = (k) => ({ click: 'Click', api: 'API', task: 'Task', import: 'Import', attach: 'Attach', render: 'Render', download: 'Fetch', error: 'Error', export: 'Export' }[k] || k);
+    const kindWord = (k) => ({ click: 'Click', api: 'API', task: 'Task', import: 'Import', attach: 'Attach', render: 'Render', download: 'Fetch', error: 'Error', export: 'Export', analysis: 'Analysis' }[k] || k);
     body.textContent = actionLog.slice().reverse()
         .map(e => e.t + '  ' + (kindWord(e.kind) + '        ').slice(0, 9) + e.label + (e.detail ? '   [' + e.detail + ']' : ''))
         .join('\n');
@@ -8095,6 +8153,11 @@ function buildMethodsReport() {
             L.push('');
         }
         if (parsedTracks.CONSERVATION) L.push('- Conservation metric: ' + (parsedTracks.CONSERVATION.metric || 'shannon') + (conservationIncludeHHR ? ' (incl. HHR homologs)' : ''));
+        if (lastEnsembleResult && lastEnsembleResult.pairMean != null) {
+            L.push('- Ensemble: mean RMSF ' + lastEnsembleResult.mean.toFixed(2) + ' A over ' + lastEnsembleResult.models.length +
+                ' models; mean pairwise RMSD ' + lastEnsembleResult.pairMean.toFixed(2) + ' A' +
+                (lastEnsembleResult.pairMax ? ' (max ' + lastEnsembleResult.pairMax.v.toFixed(2) + ' A)' : ''));
+        }
         if (topologySources.length) L.push('- Topology sources: ' + topologySources.map(s => s.name).join(', '));
         const topoSum = (typeof topologyConsensusSummary === 'function') ? topologyConsensusSummary() : null;
         if (topoSum) {
@@ -9376,7 +9439,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.8';
+const APP_VERSION = '0.66.9';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

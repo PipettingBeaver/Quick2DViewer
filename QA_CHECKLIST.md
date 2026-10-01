@@ -1366,6 +1366,17 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.9 - ensemble RMSD matrix + the RMSD formula fix (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 429 | Attach 2+ models, run Ensemble variance | A "Pairwise RMSD" table appears with a heat tint and the pair summary |
+| 430 | Compare two models that differ only by position | ~0.00 A (superposition removes it) |
+| 431 | Compare models that really differ | A non-zero RMSD, warm tint; the log records mean/max |
+| 432 | The "RMSD to first" column | Now real numbers (was 0.00 for every model - fixed) |
+| 433 | Export the methods report | An "Ensemble: mean RMSF ... mean pairwise RMSD ..." line |
+| 434 | One model only | The panel explains it needs an ensemble (unchanged) |
+
 ## 0.66.8 - colour the 3D model by any track (quick rows)
 
 | # | Try | Watch for |
@@ -1601,4 +1612,5 @@ Driven end to end with the app's own runners against the live services; no actio
 6av. 411–415 (model score colour mode - new 0.66.6; check 411 first).
 6aw. 416–422 (Tracks tab vs quick controls + row polish - new 0.66.7; check 417 first).
 6ax. 423–428 (colour the 3D model by any track - new 0.66.8; check 424 first).
+6ay. 429–434 (ensemble RMSD matrix + formula fix - new 0.66.9; check 432 first - it was silently wrong).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
