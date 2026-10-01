@@ -14,6 +14,27 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.8] - 2026-10-01
+
+### Added
+
+- **Colour the 3D model by any evidence track** (#4a). The 3D toolbar's cycle button becomes a picker
+  listing the base schemes (white / spectrum / chain / hydro / conservation) plus every track the
+  viewer can speak for: **validation rows** (flagged residues amber, the rest grey), **experimental
+  data**, **pLDDT** and **RSA** (the same low-to-high ramp as the Model score colour mode),
+  **rules** (the rule's colour against grey), **interfaces** (the chain colour) and the **topology
+  consensus** (its inside/TM/outside/signal/conflict colours). Anything visible in 1D can now be seen
+  on the structure, through the same residue->colour path the selection and conservation modes
+  already used.
+  - `p3dColorsForTrack(key)` builds the map (numeric tracks normalise min-max onto the ramp;
+    character tracks highlight flagged residues; unassigned consensus positions stay base-coloured);
+    `onP3DColorSelectChange()` switches between base and track schemes; the picker rebuilds on every
+    toolbar update and keeps its value when a track vanishes, with `syncP3DConservationMode()` now
+    also clearing a stale track scheme so the toolbar can never lie.
+  - Tests: the map builders per track kind (numeric ramp endpoints/interpolation, character
+    highlight vs grey, rule colour, consensus state colours, missing track -> empty), the picker's
+    value/change handling, the stale-track fallback, and the toolbar markup.
+
 ## [0.66.7] - 2026-10-01
 
 ### Changed

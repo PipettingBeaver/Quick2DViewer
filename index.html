@@ -3074,8 +3074,8 @@
         <select id="p3dModelSelect" class="q2dv-select" onchange="onP3DModelChange()" title="Which structure the selection colors map onto"></select>
         <button type="button" id="p3dLockBtn" class="tb-btn tb-btn-secondary" onclick="toggleP3DLock()"
             title="Lock/unlock: when locked, selection changes stop updating the 3D coloring">Lock Model</button>
-        <button type="button" id="p3dColorBtn" class="tb-btn tb-btn-secondary" onclick="cycleP3DBaseColor()"
-            title="Cycle the base (non-selected) model's Py3Dmol color scheme">Color: white</button>
+        <select id="p3dColorSelect" class="q2dv-select" onchange="onP3DColorSelectChange(this.value)"
+            title="Colour the model by a base scheme, or by any evidence track (validation, experimental data, rules, interfaces, pLDDT, RSA, topology consensus)"></select>
     </div>
     <div class="p3d-stage">
         <div id="p3dContainer"></div>
@@ -9376,7 +9376,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.7';
+const APP_VERSION = '0.66.8';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -15799,8 +15799,7 @@ function updateP3DToolbar() {
         sizeEl.textContent = p3dLarge ? '-' : '+';
         sizeEl.title = p3dLarge ? 'Make the 3D viewer smaller' : 'Make the 3D viewer larger';
     }
-    const colorEl = document.getElementById('p3dColorBtn');
-    if (colorEl) colorEl.textContent = 'Color: ' + (P3D_BASE_SCHEMES[p3dBaseSchemeIdx] || 'white');
+    updateP3DColorOptions();
 }
 
 function placeP3DViewer() {
@@ -15867,6 +15866,71 @@ function toggleP3DSize() {
         p3dSafeRender();
     }, 0);
     updateP3DToolbar();
+}
+// The 3D colour picker: base schemes (white/spectrum/chain/hydro/conservation)
+// plus every evidence track the viewer can speak for. A track scheme colours
+// the whole model from that row - the same residue->colour path the selection
+// and conservation modes use - so anything visible in 1D can be seen on the
+// structure.
+let p3dTrackScheme = null;
+function p3dColorSelectValue() {
+    if (p3dTrackScheme && parsedTracks[p3dTrackScheme]) return 'track:' + p3dTrackScheme;
+    return 'base:' + p3dBaseSchemeIdx;
+}
+function updateP3DColorOptions() {
+    const sel = document.getElementById('p3dColorSelect');
+    if (!sel) return;
+    const opts = P3D_BASE_SCHEMES.map((name, i) => ({ value: 'base:' + i, label: 'Base: ' + name }));
+    Object.keys(parsedTracks || {})
+        .filter(k => k === 'TP_Consensus' || k.startsWith('VAL_') || k.startsWith('RULE_') || k.startsWith('IF_') ||
+                     k.endsWith('_EXP') || k.endsWith('_pLDDT') || k.endsWith('_RSA'))
+        .forEach(k => opts.push({ value: 'track:' + k, label: formatTrackLabel(k) }));
+    sel.innerHTML = opts.map(o => '<option value="' + structureEscapeHtml(o.value) + '">' +
+        structureEscapeHtml(o.label) + '</option>').join('');
+    sel.value = p3dColorSelectValue();
+    if (sel.selectedIndex === -1 && opts.length) sel.value = 'base:' + p3dBaseSchemeIdx;
+}
+function onP3DColorSelectChange(value) {
+    if (String(value).indexOf('track:') === 0) {
+        p3dTrackScheme = String(value).slice(6);
+    } else if (String(value).indexOf('base:') === 0) {
+        p3dTrackScheme = null;
+        const i = parseInt(String(value).slice(5), 10);
+        p3dBaseSchemeIdx = Number.isFinite(i) ? Math.max(0, Math.min(P3D_BASE_SCHEMES.length - 1, i)) : 0;
+    }
+    updateP3DToolbar();
+    if (p3dLoaded && p3dView) updateP3DColoring();
+}
+// Residue -> hex map for one track (0-based reference indices, the convention
+// selectionResidueColors uses). Numeric tracks (pLDDT, RSA, experimental) use
+// the same low-to-high ramp as the Model score colour mode; character tracks
+// paint their flagged residues in the track colour against grey; the topology
+// consensus uses its state colours.
+function p3dColorsForTrack(key) {
+    const map = new Map();
+    const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const t = key ? parsedTracks[key] : null;
+    if (!t || !total) return map;
+    const paint = (i, hex) => { if (i >= 0 && i < total) map.set(i, hex); };
+    if (Array.isArray(t)) {
+        const vals = t.filter(x => x && x.val != null).map(x => x.val);
+        if (!vals.length) return map;
+        const min = Math.min.apply(null, vals);
+        const span = (Math.max.apply(null, vals) - min) || 1;
+        t.forEach((x, i) => {
+            if (!x || x.val == null) return;
+            paint(i, modelScoreColor(Math.round(((x.val - min) / span) * 100)));
+        });
+        return map;
+    }
+    if (key === 'TP_Consensus') {
+        for (let i = 0; i < total; i++) if (TOPOLOGY_STATE_COLORS[t[i]]) paint(i, TOPOLOGY_STATE_COLORS[t[i]]);
+        return map;
+    }
+    const meta = getTrackMeta(key);
+    const hex = (meta && meta.color) || (key.startsWith('VAL_') ? VALIDATION_COLOR : '#0891b2');
+    for (let i = 0; i < total; i++) paint(i, (t[i] && t[i] !== ' ') ? hex : '#e2e8f0');
+    return map;
 }
 function cycleP3DBaseColor() {
     p3dBaseSchemeIdx = (p3dBaseSchemeIdx + 1) % P3D_BASE_SCHEMES.length;
@@ -16376,6 +16440,11 @@ function applyP3DColoring(resiColors, statusLabel) {
 // the default and keep the toolbar honest (this runs even with the viewer
 // closed, so the button label cannot lie).
 function syncP3DConservationMode() {
+    if (p3dTrackScheme && !parsedTracks[p3dTrackScheme]) {
+        p3dTrackScheme = null;
+        updateP3DToolbar();
+        return true;
+    }
     if (!isP3DConservationMode()) return false;
     if (hasConservationData()) return false;
     p3dBaseSchemeIdx = Math.max(0, P3D_BASE_SCHEMES.indexOf('white'));
@@ -16388,6 +16457,13 @@ function updateP3DColoring() {
     if (!p3dViewerOpen || p3dLocked) return;
     refreshP3DModelOptions();
     if (!p3dLoaded || !p3dView || !p3dModel) return;
+    // A track scheme colours the whole model from that row; if the row is gone
+    // (removed), fall back to the base scheme instead of colouring nothing.
+    if (p3dTrackScheme && !parsedTracks[p3dTrackScheme]) { p3dTrackScheme = null; updateP3DToolbar(); }
+    if (p3dTrackScheme) {
+        applyP3DColoring(p3dColorsForTrack(p3dTrackScheme), formatTrackLabel(p3dTrackScheme));
+        return;
+    }
     // Conservation mode colors the whole model by per-residue conservation
     // (independent of the selection), so it takes priority over selection
     // coloring when it is the active base scheme.

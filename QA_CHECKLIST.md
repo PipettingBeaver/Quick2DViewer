@@ -1366,6 +1366,17 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.8 - colour the 3D model by any track (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 423 | Open the 3D viewer with validation rows loaded | The toolbar picker lists the base schemes **and** the tracks (validation, pLDDT/RSA, rules, interfaces, consensus) |
+| 424 | Pick a validation row | Flagged residues amber on the model, the rest grey; the status counts matched residues |
+| 425 | Pick an experimental or pLDDT track | A low-to-high ramp over the model (same family as Model score) |
+| 426 | Pick a rule | Matching residues in the rule's colour against grey |
+| 427 | Remove the chosen track, then re-render | The picker falls back to a base scheme (no dead colouring, toolbar honest) |
+| 428 | Switch back to a base scheme | The base colouring returns; selection colouring still works |
+
 ## 0.66.7 - Tracks tab vs quick controls + row polish (quick rows)
 
 | # | Try | Watch for |
@@ -1589,4 +1600,5 @@ Driven end to end with the app's own runners against the live services; no actio
 6au. 403–410 (numbering offset + partial-HSP realignment - new 0.66.5; check 403 first).
 6av. 411–415 (model score colour mode - new 0.66.6; check 411 first).
 6aw. 416–422 (Tracks tab vs quick controls + row polish - new 0.66.7; check 417 first).
+6ax. 423–428 (colour the 3D model by any track - new 0.66.8; check 424 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

@@ -1211,6 +1211,47 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('#4a: colour the 3D model by any track');
+assert(HTML.indexOf('id="p3dColorSelect"') !== -1, 'the 3D toolbar has a colour picker');
+assert(HTML.indexOf('id="p3dColorBtn"') === -1, 'the old cycle button is gone (the picker replaced it)');
+ctxRun(`
+    parsedTracks = {
+        AA: 'MKVW',
+        'm_pLDDT': [{ val: 10, type: 'plddt' }, { val: null, type: 'plddt' }, { val: 90, type: 'plddt' }, { val: 50, type: 'plddt' }],
+        'VAL_1ABC_A': '  ! ',
+        'RULE_r1': ' |  ',
+        TP_Consensus: 'iM? '
+    };
+    trackMeta = {};
+    setTrackMeta('RULE_r1', { source: 'Rule', color: '#ff0000', ruleName: 'R1' });
+    analysisRules = [{ id: 'r1', name: 'R1', color: '#ff0000', mode: 'all', enabled: true, conditions: [] }];
+`);
+const numMap = ctxRun(`(function () { const m = p3dColorsForTrack('m_pLDDT'); return { size: m.size, min: m.get(0), max: m.get(2), mid: m.get(3) }; })()`);
+assert(numMap.size === 3, 'a numeric track colours its non-null positions only (got ' + numMap.size + ')');
+assert(numMap.min === 'rgb(254,226,226)' && numMap.max === 'rgb(15,118,110)', 'the lowest value gets the ramp start and the highest its end (got ' + numMap.min + ' / ' + numMap.max + ')');
+assert(numMap.mid !== numMap.min && numMap.mid !== numMap.max, 'and values in between interpolate');
+const valMap = ctxRun(`(function () { const m = p3dColorsForTrack('VAL_1ABC_A'); return { size: m.size, flagged: m.get(2), clean: m.get(0) }; })()`);
+assert(valMap.size === 4 && valMap.flagged === '#f59e0b' && valMap.clean === '#e2e8f0', 'a character track paints flagged residues in its colour and the rest grey (got ' + JSON.stringify(valMap) + ')');
+const ruleMap = ctxRun(`p3dColorsForTrack('RULE_r1').get(1)`);
+assert(ruleMap === '#ff0000', 'a rule track uses the rule colour (got ' + ruleMap + ')');
+const topoMap = ctxRun(`(function () { const m = p3dColorsForTrack('TP_Consensus'); return { inside: m.get(0), tm: m.get(1), conflict: m.get(2), none: m.get(3) }; })()`);
+const topoColors = ctxRun(`[TOPOLOGY_STATE_COLORS.i, TOPOLOGY_STATE_COLORS.M, TOPOLOGY_STATE_COLORS['?']].join(',')`).split(',');
+assert(topoMap.inside === topoColors[0] && topoMap.tm === topoColors[1] && topoMap.conflict === topoColors[2], 'the topology consensus uses its state colours (got ' + JSON.stringify(topoMap) + ')');
+assert(topoMap.none === undefined, 'unassigned consensus positions stay base-coloured');
+assert(ctxRun(`p3dColorsForTrack('nope').size`) === 0 && ctxRun(`p3dColorsForTrack(null).size`) === 0, 'a missing track yields an empty map (no throw)');
+ctxRun(`onP3DColorSelectChange('track:VAL_1ABC_A');`);
+assert(ctxRun(`p3dTrackScheme`) === 'VAL_1ABC_A' && ctxRun(`p3dColorSelectValue()`) === 'track:VAL_1ABC_A', 'choosing a track scheme records it');
+ctxRun(`onP3DColorSelectChange('base:2');`);
+assert(ctxRun(`p3dTrackScheme`) === null && ctxRun(`p3dBaseSchemeIdx`) === 2, 'choosing a base scheme clears the track and sets the index');
+ctxRun(`onP3DColorSelectChange('nonsense');`);
+assert(ctxRun(`p3dTrackScheme`) === null && ctxRun(`p3dBaseSchemeIdx`) === 2, 'an unknown value changes nothing');
+ctxRun(`p3dTrackScheme = 'VAL_1ABC_A';`);
+assert(ctxRun(`(function () { const before = p3dTrackScheme; delete parsedTracks['VAL_1ABC_A']; syncP3DConservationMode(); return before + '->' + p3dTrackScheme; })()`) === 'VAL_1ABC_A->null', 'removing the chosen track clears the scheme (fallback, no dead colouring)');
+ctxRun(`updateP3DColorOptions();`);
+const selHtml = ctxRun(`document.getElementById('p3dColorSelect').innerHTML`);
+assert(selHtml.indexOf('Base: white') !== -1 && selHtml.indexOf('TP_Consensus') !== -1, 'the picker lists the base schemes and the available tracks (got "' + selHtml.slice(0, 90) + '")');
+ctxRun(`parsedTracks = {}; trackMeta = {}; analysisRules = []; p3dTrackScheme = null; p3dBaseSchemeIdx = 0;`);
+
 section('#2c/#2d: Tracks tab vs quick controls - roles, links, row polish');
 assert(HTML.indexOf('Track Visibility (full manager)') !== -1, 'the tab names itself the full manager');
 assert(HTML.indexOf('Every track, grouped by type') !== -1, 'with a one-line role description');
