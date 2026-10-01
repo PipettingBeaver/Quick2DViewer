@@ -2659,7 +2659,7 @@
         <details class="options-accordion" id="optSecTopology" style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <summary>Topology (membrane)</summary>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
-                Paste the output of a topology predictor (TMHMM segments like <code>inside 1 11</code> / <code>TMhelix 12 30</code>, or a DeepTMHMM JSON) to add it as a per-residue inside / TM-helix / outside track. Add two or more sources to also get a majority-vote <strong>Consensus</strong> track.
+                Paste the output of a topology predictor to add it as a per-residue inside / TM-helix / outside track: TMHMM/Phobius segments (<code>inside 1 11</code>, <code>TMhelix 12 30</code>), a DeepTMHMM JSON, or a TOPCONS-style per-residue line (<code>TOPCONS  ooooMMMMiiii</code>). Add two or more sources to also get a majority-vote <strong>Consensus</strong> track; columns where they disagree are marked <code>?</code> rather than guessed.
             </p>
             <textarea id="topologyPasteInput" placeholder="inside        1   11&#10;TMhelix      12   30&#10;outside      31   45&#10;…"
                 style="width: 100%; box-sizing: border-box; min-height: 80px; padding: 6px; font-family: monospace; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 4px;"></textarea>
@@ -4345,8 +4345,8 @@ function onUniprotAccessionInput() {
 // etc.); each source becomes a per-residue inside/outside/TM-helix track, plus
 // a majority-vote "Consensus" track when two or more sources are loaded.
 let topologySources = []; // [{ name, state }]: state is a per-residue char string (i/M/o/S/space)
-const TOPOLOGY_STATE_COLORS = { i: '#bfdbfe', o: '#bbf7d0', M: '#e98cd3', S: '#fde68a' };
-const TOPOLOGY_STATE_LABELS = { i: 'Inside', o: 'Outside', M: 'TM helix', S: 'Signal peptide' };
+const TOPOLOGY_STATE_COLORS = { i: '#bfdbfe', o: '#bbf7d0', M: '#e98cd3', S: '#fde68a', '?': '#fca5a5' };
+const TOPOLOGY_STATE_LABELS = { i: 'Inside', o: 'Outside', M: 'TM helix', S: 'Signal peptide', '?': 'Sources disagree (no majority)' };
 
 function normalizeTopologyState(word) {
     const w = String(word || '').toLowerCase().trim();
@@ -4392,7 +4392,34 @@ function parseTopologyText(text, totalLength) {
         if (!state || isNaN(start) || isNaN(end)) continue;
         segments.push({ state, start, end });
     }
-    if (!segments.length) return null;
+    if (!segments.length) {
+        // (c) per-residue run lines, as TOPCONS and friends print them:
+        // "TOPCONS  oooooMMMMMiiii" (the name is optional). Runs shorter than
+        // 10 characters are ignored so ordinary words cannot be misread.
+        const runs = [];
+        for (const line of text.split('\n')) {
+            const t = line.trim();
+            if (!t || t[0] === '#' || t[0] === '>') continue;
+            // The name must be separated by whitespace or a colon; without that
+            // requirement the optional name group ate the start of a bare run
+            // ("ooooMMMMMMiiii" parsed as name "oooo" + run "MMMMMMiiii").
+            const m = t.match(/^(?:([A-Za-z_][A-Za-z0-9_.-]*)[\s:]+)?([oOiImMsS]{10,})$/);
+            if (!m) continue;
+            const state = Array.from(m[2]).map(ch => {
+                const c = ch.toLowerCase();
+                return c === 'm' ? 'M' : (c === 'i' ? 'i' : (c === 'o' ? 'o' : 'S'));
+            }).join('');
+            runs.push({ name: (m[1] || '').trim(), state });
+        }
+        if (runs.length) {
+            // TOPCONS prints its own (already multi-method) consensus among the
+            // method lines; prefer it, else take the longest run.
+            const preferred = runs.find(r => /^topcons$/i.test(r.name)) ||
+                runs.slice().sort((a, b) => b.state.length - a.state.length)[0];
+            return { name: preferred.name || 'Topology', state: padTopologyState(preferred.state, totalLength) };
+        }
+        return null;
+    }
     const maxEnd = segments.reduce((mx, s) => Math.max(mx, s.end), 0);
     const len = Math.max(totalLength || 0, maxEnd);
     const arr = new Array(len).fill(' ');
@@ -4416,12 +4443,29 @@ function applyTopologySources() {
             const votes = {};
             sources.forEach(s => { const c = s.state[i]; if (c && c !== ' ') votes[c] = (votes[c] || 0) + 1; });
             const entries = Object.keys(votes).sort((a, b) => votes[b] - votes[a]);
-            if (entries.length && (entries.length === 1 || votes[entries[0]] > votes[entries[1]])) consensus[i] = entries[0];
+            if (!entries.length) continue;
+            if (entries.length === 1 || votes[entries[0]] > votes[entries[1]]) consensus[i] = entries[0];
+            else consensus[i] = '?'; // tie: flag the disagreement instead of leaving it blank
         }
         parsedTracks['TP_Consensus'] = consensus.join('');
     }
     renderViewer(parsedTracks);
     schedulePersist();
+}
+
+// What the majority-vote consensus says at a glance: the N-terminus call, the
+// number of TM segments, and how many columns the sources disagree on (marked
+// "?" in the consensus row rather than guessed away).
+function topologyConsensusSummary() {
+    const state = (typeof parsedTracks['TP_Consensus'] === 'string') ? parsedTracks['TP_Consensus'] : '';
+    if (!state) return null;
+    const counts = { i: 0, o: 0, M: 0, S: 0, '?': 0 };
+    let nterm = null;
+    for (const ch of state) {
+        if (counts[ch] != null) counts[ch]++;
+        if (!nterm && (ch === 'i' || ch === 'o' || ch === 'M' || ch === 'S')) nterm = ch;
+    }
+    return { counts, nterm, tmSegments: (state.match(/M+/g) || []).length, length: state.length, sources: topologySources.length };
 }
 
 // Adds a topology source from pasted text (named "Topology N" unless given).
@@ -4451,12 +4495,24 @@ function renderTopologySourceList() {
     if (!topologySources.length) { wrap.innerHTML = '<span style="color:#94a3b8; font-size:0.75rem;">No topology sources added.</span>'; return; }
     let html = '<div style="display:flex; flex-direction:column; gap:4px;">';
     topologySources.forEach((s, i) => {
-        const tmCount = (s.state.match(/M/g) || []).length;
+        // Count runs, not residues: "5 M residues" is not "5 segments".
+        const tmResidues = (s.state.match(/M/g) || []).length;
+        const tmSegments = (s.state.match(/M+/g) || []).length;
         html += '<div style="display:flex; align-items:center; gap:6px; font-size:0.75rem;">' +
-            '<span style="flex:1;">' + structureEscapeHtml(s.name) + ': ' + tmCount + ' TM helix/TM-helix segments</span>' +
+            '<span style="flex:1;">' + structureEscapeHtml(s.name) + ': ' + tmResidues + ' TM residue' + (tmResidues === 1 ? '' : 's') +
+            ' in ' + tmSegments + ' segment' + (tmSegments === 1 ? '' : 's') + '</span>' +
             '<button type="button" class="copy-btn" onclick="removeTopologySource(' + i + ')" style="padding:1px 8px;">remove</button></div>';
     });
     html += '</div>';
+    const sum = topologyConsensusSummary();
+    if (sum) {
+        html += '<div style="font-size:0.72rem; color:#475569; margin-top:6px;">Consensus (' + sum.sources + ' sources): N-terminus ' +
+            (sum.nterm ? (TOPOLOGY_STATE_LABELS[sum.nterm] || sum.nterm).toLowerCase() : 'no call') +
+            ' \u00b7 ' + sum.tmSegments + ' TM segment' + (sum.tmSegments === 1 ? '' : 's') +
+            (sum.counts['?']
+                ? ' \u00b7 ' + sum.counts['?'] + ' disagreement column' + (sum.counts['?'] === 1 ? '' : 's') + ' (marked "?")'
+                : ' \u00b7 no disagreements') + '.</div>';
+    }
     wrap.innerHTML = html;
 }
 
@@ -4852,7 +4908,12 @@ function renderTmCrossCheckSummary(res) {
     html += '</tbody></table><div style="font-size:0.68rem; color:#64748b; margin-top:4px;">Track <code>XC_TM</code>: ' +
         '<code>=</code> both, <code>t</code> topology only, <code>q</code> Quick2D only, against ' +
         (res.consensus ? ('the ' + res.sources + '-source consensus') : 'the single topology source') +
-        ' and ' + res.tmKeys.length + ' Quick2D TM track(s).</div>';
+        ' and ' + res.tmKeys.length + ' Quick2D TM track(s).' +
+        (function () {
+            const sum = topologyConsensusSummary();
+            return (sum && sum.nterm) ? ' Consensus N-terminus: ' + (TOPOLOGY_STATE_LABELS[sum.nterm] || sum.nterm).toLowerCase() +
+                (sum.counts['?'] ? ', ' + sum.counts['?'] + ' disagreement column(s) marked "?"' : '') + '.' : '';
+        })() + '</div>';
     wrap.innerHTML = html;
 }
 function selectTmCrossCheckSegments(cls) {
@@ -7801,6 +7862,7 @@ function getPredictorInfo(trackKey) {
     if (trackKey.endsWith('_Cofactors')) return PREDICTOR_INFO.COFACTOR;
     if (trackKey.startsWith('HL_')) return buildHomologPredictorInfo(trackKey);
     if (trackKey.startsWith('DM_')) return buildDomainPredictorInfo(trackKey);
+    if (trackKey.startsWith('TP_')) return buildTopologyPredictorInfo(trackKey);
     if (trackKey.endsWith('_RMSF')) return {
         name: 'Ensemble variance (RMSF)',
         category: 'Structure ensemble',
@@ -8076,7 +8138,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.54.0';
+const APP_VERSION = '0.55.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11227,6 +11289,43 @@ function getTctlGroupsInOrder() {
 }
 function getTctlGroupCount(group) {
     return Object.keys(parsedTracks).filter(k => getTrackGroup(k) === group).length;
+}
+
+// Topology rows: a summary per source, and for the majority-vote consensus the
+// N-terminus call, TM segment count and how many columns the sources disagree on.
+function buildTopologyPredictorInfo(trackKey) {
+    const isConsensus = trackKey === 'TP_Consensus';
+    const state = (typeof parsedTracks[trackKey] === 'string') ? parsedTracks[trackKey] : '';
+    const counts = { i: 0, o: 0, M: 0, S: 0, '?': 0 };
+    for (const ch of state) { if (counts[ch] != null) counts[ch]++; }
+    const tmSegments = (state.match(/M+/g) || []).length;
+    const bands = [
+        { range: 'i', desc: 'Inside (cytoplasmic)' },
+        { range: 'o', desc: 'Outside (extracellular / lumenal)' },
+        { range: 'M', desc: 'Transmembrane helix' },
+        { range: 'S', desc: 'Signal peptide' }
+    ];
+    if (isConsensus) {
+        const sum = topologyConsensusSummary();
+        bands.push({ range: '?', desc: 'Sources disagree (no majority) - shown, not guessed away' });
+        const nterm = (sum && sum.nterm) ? (TOPOLOGY_STATE_LABELS[sum.nterm] || sum.nterm).toLowerCase() : 'no call';
+        return {
+            name: 'Topology consensus (' + ((sum && sum.sources) || 0) + ' source' + (((sum && sum.sources) === 1) ? '' : 's') + ')',
+            category: 'Membrane topology',
+            description: 'Majority vote across the pasted topology sources. A column without a majority is marked "?" rather than guessed, so a disagreement between predictors stays visible.',
+            bands,
+            useCase: 'N-terminus: ' + nterm + '. ' + tmSegments + ' TM segment(s), ' + counts.i + ' inside, ' + counts.o + ' outside, ' + counts.S + ' signal, ' + counts['?'] + ' disagreement column(s).',
+            citation: 'Majority vote over the loaded predictors (TMHMM, Phobius, DeepTMHMM, TOPCONS, ...)'
+        };
+    }
+    return {
+        name: formatTrackLabel(trackKey),
+        category: 'Membrane topology',
+        description: 'One predictor\'s per-residue call, pasted under Options \u2192 Data Sources \u2192 Topology. Add a second source to get the majority-vote consensus row.',
+        bands,
+        useCase: tmSegments + ' TM segment(s), ' + counts.i + ' inside, ' + counts.o + ' outside, ' + counts.S + ' signal.',
+        citation: 'Pasted topology prediction'
+    };
 }
 
 // --- Removing tracks -------------------------------------------------------

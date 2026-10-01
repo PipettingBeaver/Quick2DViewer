@@ -1010,6 +1010,39 @@ ctxRun(`clearGuideCoachmark();`);
 assert(ctxRun(`document.getElementById('crossCheckSection').open`) === false, 'and is restored to its pre-guidance state');
 ctxRun(`guideCoachmark = null; appliedCoachmarkKind = undefined;`);
 
+section('topology: TOPCONS input, disagreement flags, N-terminus read-out');
+const topcons = ctxRun(`parseTopologyText('TOPCONS  ooooMMMMMMiiii', 14)`);
+assert(topcons && topcons.name === 'TOPCONS', 'a TOPCONS-style per-residue run line parses (name kept) (got ' + (topcons && topcons.name) + ')');
+assert(topcons.state === 'ooooMMMMMMiiii', 'and maps to the inside/TM/outside state string (got ' + topcons.state + ')');
+const bareRun = ctxRun(`parseTopologyText('ooooMMMMMMiiii', 14)`);
+assert(bareRun && bareRun.name === 'Topology' && bareRun.state === 'ooooMMMMMMiiii', 'a bare run line parses too');
+const twoRuns = ctxRun(`parseTopologyText(['SPOCTOPUS  ooooMMMMMMiiii', 'TOPCONS  ooooMMMMMMiiii'].join(String.fromCharCode(10)), 14)`);
+assert(twoRuns && twoRuns.name === 'TOPCONS', 'when several method lines are pasted, the TOPCONS consensus line wins');
+assert(ctxRun(`parseTopologyText('miss', 4)`) === null, 'short words are not misread as topology runs');
+assert(ctxRun(`parseTopologyText(['inside 1 11', 'TMhelix 12 30'].join(String.fromCharCode(10)), 30)`).state.slice(0, 12) === 'iiiiiiiiiiiM', 'segment lines still parse (unchanged)');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(12) };
+    topologySources = [
+        { name: 'Predictor A', state: 'ooooMMMMiiii' },
+        { name: 'Predictor B', state: 'ooiiMMMMiiii' }
+    ];
+    applyTopologySources();
+`);
+const topoCons = ctxRun(`parsedTracks['TP_Consensus']`);
+assert(topoCons === 'oo??MMMMiiii', 'disagreements are flagged with ? instead of left blank (got ' + topoCons + ')');
+assert(ctxRun(`TOPOLOGY_STATE_COLORS['?']`) && ctxRun(`TOPOLOGY_STATE_LABELS['?']`), 'the conflict char has a colour and a label');
+const topoSum = ctxRun(`topologyConsensusSummary()`);
+assert(topoSum && topoSum.sources === 2 && topoSum.nterm === 'o', 'the summary reports the source count and N-terminus call');
+assert(topoSum.tmSegments === 1 && topoSum.counts['?'] === 2, 'and the TM segment count and disagreement columns');
+assert(ctxRun(`buildTopologyPredictorInfo('TP_Consensus').useCase`).indexOf('N-terminus: outside') !== -1, 'the consensus tooltip names the N-terminus');
+assert(/disagreement column/.test(ctxRun(`buildTopologyPredictorInfo('TP_Consensus').useCase`)), 'and counts the disagreements');
+assert(ctxRun(`buildTopologyPredictorInfo('TP_Predictor_A').useCase`).indexOf('TM segment') !== -1, 'a source row reports its own TM segments');
+ctxRun(`renderTopologySourceList();`);
+const srcList = ctxRun(`document.getElementById('topologySourceList').innerHTML`);
+assert(srcList.indexOf('Consensus (2 sources)') !== -1 && srcList.indexOf('disagreement column') !== -1, 'the topology panel shows the consensus read-out');
+assert(srcList.indexOf('Predictor A') !== -1 && srcList.indexOf('Predictor B') !== -1, 'alongside the source list');
+ctxRun(`parsedTracks = {}; topologySources = [];`);
+
 section('template table: identity, confidence, coverage, structure, exports');
 assert(ctxRun(`parseIdentityPercent('237/238 (100%)')`) === 100, 'identity parses the percentage out of "x/y (z%)" (was parseFloat -> 237)');
 assert(ctxRun(`parseIdentityPercent('95/230 (41%)')`) === 41, 'and for partial identities');

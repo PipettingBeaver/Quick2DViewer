@@ -29,6 +29,33 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Topology consensus completion — 0.55.0
+
+**Should do.** Paste topology predictors under Options → Data Sources → Topology; the majority-vote
+Consensus row marks columns the sources disagree on with a red `?` instead of blanking them, and the
+panel plus the row tooltips report the N-terminus call and segment/disagreement counts.
+
+**Try (normal use).**
+1. Paste a TMHMM-style segment list, then paste a TOPCONS per-residue line
+   (`TOPCONS  ooooMMMMMMiiii…`).
+   *Expect:* both become topology rows; a Consensus row appears once two sources are loaded.
+2. Find a column where the two sources disagree.
+   *Expect:* the consensus cell shows `?` in red, and the tooltip says "Sources disagree (no
+   majority)" - not a blank "no call".
+3. Look at the topology panel and hover the Consensus row's ℹ.
+   *Expect:* "Consensus (2 sources): N-terminus outside · N TM segment(s) · N disagreement column(s)",
+   and the tooltip gives the same breakdown.
+4. Run **Cross-check TM** with Quick2D TM loaded.
+   *Expect:* the footer names the consensus N-terminus and any disagreement columns.
+
+**Edge cases (symptom → likely cause).**
+- A pasted line of ordinary words is ignored (runs under 10 characters are not topology).
+- TOPCONS output with several method lines becomes one source (its consensus line), not five.
+- An odd-length run (fewer residues than the sequence) is padded; trailing columns read "no call".
+- A tie between two sources is `?`, not a majority - with three sources a 2:1 split still resolves.
+
+---
+
 ### Homolog Templates table upgrade — 0.54.0
 
 **Should do.** The Data modal's Homolog Templates table ranks every Homologs row - .hhr, phmmer,
@@ -1123,6 +1150,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 307 | Press 3D on a phmmer/BLAST row | AlphaFold model downloads and renders |
 | 308 | Copy table (TSV) + Methods summary (.md) | Table copies; report has "## Template quality" and a correct best identity |
 
+## 0.55.0 - topology consensus completion (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 309 | Paste a TOPCONS per-residue line in Options → Data Sources → Topology | It becomes a topology row named TOPCONS |
+| 310 | Paste two disagreeing sources | Consensus row appears; the tie column is a red "?" |
+| 311 | Hover the "?" cell and the Consensus ℹ | "Sources disagree (no majority)"; tooltip has N-terminus + counts |
+| 312 | Topology panel read-out | "Consensus (N sources): N-terminus …, N TM segment(s), N disagreement column(s)" |
+| 313 | Cross-check TM footer | Names the consensus N-terminus and disagreement columns |
+| 314 | A source row's list line | "N TM residues in M segment(s)" (not "N segments") |
+
 ## Pending live checks (API calls + UI integration) — test later
 
 These are cheap to check by hand when you next have a session with the services up; nothing here
@@ -1202,4 +1240,5 @@ needs a full card.
 6ad. 293–296 (homologs route question + duplicate buttons - 0.52.1; check 293 first).
 6ae. 297–302 (BLAST homolog provider - new 0.53.0; card at the top, check 297 first).
 6af. 303–308 (Homolog Templates table upgrade - 0.54.0; card at the top, check 303 first).
+6ag. 309–314 (topology consensus completion - new 0.55.0; card at the top, check 310 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

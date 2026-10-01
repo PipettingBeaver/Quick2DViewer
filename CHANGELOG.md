@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-09-25
+
+### Added
+
+- **Topology: TOPCONS input, visible disagreements, and an orientation read-out** - the last pieces
+  of the locked "orientation + consensus" decision. The consensus bar, majority vote and TM
+  cross-check already existed; this closes the gaps around them.
+  - `parseTopologyText()` now also accepts TOPCONS-style per-residue run lines
+    (`TOPCONS  ooooMMMMiiii`), with or without a leading method name, so the multi-method consensus
+    line can be pasted directly. When several method lines are pasted, the TOPCONS line wins (it is
+    itself a cross-method consensus); otherwise the longest run is used. Runs shorter than 10
+    characters are ignored so ordinary words cannot be misread.
+  - **Disagreements are flagged instead of blanked**: a column where the sources tie is marked `?`
+    (red `#fca5a5`) rather than left empty, so "no majority" is visible rather than looking like
+    "no data". Labels/colours for `?` added to `TOPOLOGY_STATE_COLORS`/`TOPOLOGY_STATE_LABELS`.
+  - `topologyConsensusSummary()` reports the N-terminus call, TM segment count and disagreement
+    columns. It drives the topology panel read-out ("Consensus (2 sources): N-terminus outside ·
+    1 TM segment · 1 disagreement column"), the TM cross-check footer, and the row tooltips:
+    `buildTopologyPredictorInfo()` gives every `TP_` row a summary and the consensus row the
+    N-terminus/disagreement breakdown (they previously had no description at all).
+  - Also fixed: the source list called M *residues* "segments" (5 residues = "5 segments"); it now
+    counts runs ("5 TM residues in 1 segment").
+  - Tests: run-line parsing (named, bare, multi-line preference, short words ignored, segments
+    unchanged), tie -> `?`, the summary fields, tooltips and the panel read-out.
+
 ## [0.54.0] - 2026-09-25
 
 ### Fixed
