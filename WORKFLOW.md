@@ -132,7 +132,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - pLDDT > 70 is confident, 50-70 tentative and < 50 unreliable. Read it per region, not per protein.
 - RSA says whether a residue is buried; a variant in a buried position is usually more disruptive.
 
-**In-app action.** `Attach / predict structure…` · `Fetch PDB entry…` · `Fetch validation (PDBe)` · `Ensemble variance…`
+**In-app action.** `Attach / predict structure…` · `Fetch PDB entry…` · `Fetch validation (PDBe)` · `Import experimental data…` · `Ensemble variance…`
 
 **Guided questions** (the answers choose the concrete action offered).
 

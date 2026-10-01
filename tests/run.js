@@ -1211,6 +1211,41 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('experimental per-residue data (DMS / HDX / any table)');
+assert(ctxRun(`GRAPH_TYPES.indexOf('EXP')`) !== -1, 'experimental data is a graph-capable type');
+assert(ctxRun(`getTrackGroup('DMS_tolerance_EXP')`) === 'EXP', 'its tracks group under Experimental');
+assert(ctxRun(`trackGroupLabel('EXP')`) === 'Experimental', 'with a proper group label');
+const expTwoCol = ctxRun(`parseExperimentalTable(['# position value', '1 0.42', '2\t0.55', '3,0.91', '4:0.10', '5;0.20', '', 'nonsense'].join(String.fromCharCode(10)))`);
+assert(expTwoCol.length === 5 && expTwoCol[0].pos === 1 && expTwoCol[1].val === 0.55 && expTwoCol[4].pos === 5, 'two-column forms (space/tab/comma/colon/semicolon) all parse, comments and junk skipped (got ' + expTwoCol.length + ')');
+const expSeries = ctxRun(`parseExperimentalTable('0.2 0.3 0.9 0.4 0.5')`);
+assert(expSeries.length === 5 && expSeries[2].val === 0.9 && expSeries[2].pos === 3, 'a single series of five values becomes positions 1..5');
+assert(ctxRun(`parseExperimentalTable('1 0.5')`).length === 1, 'a single short line is not mistaken for a series');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(10), CONSERVATION: { metric: 'shannon', values: [0.9, 0.9, 0.9, 0.9, 0.9, 0.4, 0.4, 0.4, 0.4, 0.4] } };
+    experimentalTracksInfo = {};
+    document.getElementById('expNameInput').value = 'DMS tolerance';
+    document.getElementById('expKindSelect').value = 'dms';
+    document.getElementById('expPasteInput').value = ['1 0.10','2 0.20','3 0.15','4 0.90','5 0.80','6 0.70','7 0.60','8 0.50','9 0.40','10 0.30'].join(String.fromCharCode(10));
+    addExperimentalTrack();
+`);
+assert(ctxRun(`Array.isArray(parsedTracks['DMS_tolerance_EXP'])`) === true, 'the importer adds a numeric row (got ' + ctxRun(`Object.keys(parsedTracks).filter(k => k.endsWith('_EXP')).join(',')`) + ')');
+assert(ctxRun(`parsedTracks['DMS_tolerance_EXP'][3].val`) === 0.9 && ctxRun(`parsedTracks['DMS_tolerance_EXP'][3].type`) === 'exp', 'with { val, type } entries at the right positions');
+assert(ctxRun(`formatTrackLabel('DMS_tolerance_EXP')`) === 'DMS tolerance (experimental)', 'the row label uses the given label');
+assert(ctxRun(`isGraphCapable(getTrackGroup('DMS_tolerance_EXP'))`) === true, 'and it plots as the experimental graph type (the group is the type)');
+const expTip = ctxRun(`(function () { const info = getPredictorInfo('DMS_tolerance_EXP'); return { cat: info.category, desc: info.description, use: info.useCase }; })()`);
+assert(/Experimental/.test(expTip.cat) && /DMS tolerance/.test(expTip.desc) && /tolerated/.test(expTip.desc), 'the tooltip names the label and the kind meaning (got "' + expTip.desc.slice(0, 60) + '")');
+assert(/10 value\(s\)/.test(expTip.use) && /range/.test(expTip.use), 'and summarises the values');
+const expStatus = ctxRun(`document.getElementById('expStatus').textContent`);
+assert(/Added "DMS tolerance": 10 value\(s\)/.test(expStatus), 'the status confirms what was added (got "' + expStatus.slice(0, 60) + '")');
+assert(/correlation with conservation r=-?0\.\d+/.test(expStatus), 'and reports the conservation correlation (got "' + expStatus + '")');
+assert(ctxRun(`ruleNumericValue('EXP:DMS_tolerance_EXP', 3)`) === 0.9, 'the row is usable as a rule source (EXP:)');
+assert(ctxRun(`parsedTracks['DMS_tolerance_EXP'][9].val`) === 0.3, 'every position maps');
+assert(ctxRun(`(function () { const v = new Array(10).fill(null).map(() => ({ val: null, type: 'exp' })); return true; })()`), 'null-valued positions stay null');
+ctxRun(`parsedTracks = {}; experimentalTracksInfo = {};`);
+assert(HTML.indexOf('id="expPasteInput"') !== -1 && HTML.indexOf('id="expKindSelect"') !== -1 && HTML.indexOf('id="btnAddExp"') !== -1, 'the Experimental category has the importer controls');
+assert(HTML.indexOf('id="optCat-experimental"') !== -1, 'and its own panel');
+assert(ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'structure').extraActions.some(a => a.run.indexOf('experimental') !== -1)`), 'the guide structure step links to it');
+
 section('PDB entry lookup (sequence or accession)');
 const pdbProvs = ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers.map(p => p.id)`);
 assert(pdbProvs.join(',') === 'pdbe_best_structures,rcsb_sequence,rcsb_text', 'the lookup offers PDBe best structures, the RCSB sequence search, then the name search (got ' + pdbProvs.join(',') + ')');
@@ -1238,7 +1273,7 @@ ctxRun(`pdbLookupEntries = []; renderPdbLookupResults();`);
 section('Options: data-source categories + guide deep links');
 assert(HTML.indexOf('id="optDataCategory"') !== -1 && HTML.indexOf('id="optDataCategoryHint"') !== -1, 'Options -> Data Sources has a category dropdown and a hint line');
 const catPanels = ctxRun(`Object.keys(DATA_CATEGORY_HINTS)`);
-assert(catPanels.join(',') === 'uniprot,conservation,topology,domains,homologs,structure,foldseek,variants,services', 'nine categories are declared (got ' + catPanels.join(',') + ')');
+assert(catPanels.join(',') === 'uniprot,conservation,topology,domains,homologs,structure,experimental,foldseek,variants,services', 'ten categories are declared (got ' + catPanels.join(',') + ')');
 assert(catPanels.every(n => HTML.indexOf('id="optCat-' + n + '"') !== -1), 'and every category has a panel in the markup');
 const switchProbe = ctxRun(`
     (function () {
@@ -2303,7 +2338,7 @@ ctxRun(`
     parsedTracks = { AA: 'M'.repeat(5), EV_RMSF: [{ val: 0.4, type: 'rmsf' }, { val: 1.2, type: 'rmsf' }, { val: 2.4, type: 'rmsf' }, { val: null, type: 'rmsf' }, { val: 0.9, type: 'rmsf' }] };
     graphMode = { pLDDT: false, RSA: false, EV: false }; graphHighlights = {};
 `);
-assert(ctxRun(`GRAPH_TYPES.join(',')`) === 'pLDDT,RSA,EV', 'the ensemble type is declared graph-capable');
+assert(ctxRun(`GRAPH_TYPES.join(',')`) === 'pLDDT,RSA,EV,EXP', 'the graph-capable types are pLDDT, RSA, ensemble variance and experimental data');
 assert(ctxRun(`isGraphCapable('EV')`) === true && ctxRun(`isGraphCapable('SS')`) === false, 'capability is explicit, not implicit');
 assert(ctxRun(`isGraphType('EV')`) === false, 'graph mode is off by default');
 // the scale drives the axis (auto max, one decimal, RMSF label)

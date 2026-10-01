@@ -2590,6 +2590,7 @@
                 <option value="domains">Domain families</option>
                 <option value="homologs">Homolog search</option>
                 <option value="structure">Structure models &amp; validation</option>
+                <option value="experimental">Experimental data (DMS / HDX)</option>
                 <option value="foldseek">Structural homology (Foldseek)</option>
                 <option value="variants">Variant effects</option>
                 <option value="services">External services &amp; activity log</option>
@@ -2748,6 +2749,28 @@
             <div id="validationStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             <div id="pdbLookupStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             <div id="pdbLookupResults" style="margin-top:6px;"></div>
+        </div>
+
+        <div id="optCat-experimental" class="opt-cat" hidden>
+            <h4 style="margin: 18px 0 4px; color: #0f172a; font-size: 0.95rem;">Experimental per-residue data</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                The lab-measured layer: DMS mutation tolerance, HDX protection, NMR order parameters or any per-residue score. Paste <code>position value</code> lines (space, tab, comma, colon or semicolon), or one series of at least five values. The row plots like the ensemble-variance row (switch it to a graph in Track Control's View as) and is cross-read against conservation.
+            </p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
+                <input type="text" id="expNameInput" placeholder="Label (e.g. DMS tolerance)" style="width:200px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
+                <select id="expKindSelect" class="q2dv-select" style="font-size:0.78rem; padding:4px 6px;" title="What the numbers are, for the interpretation text">
+                    <option value="dms">DMS tolerance</option>
+                    <option value="hdx">HDX protection</option>
+                    <option value="nmr">NMR order (S2)</option>
+                    <option value="other">Other score</option>
+                </select>
+            </div>
+            <textarea id="expPasteInput" rows="4" style="width:100%; font-size:0.75rem; font-family:monospace; padding:6px; border:1px solid #cbd5e1; border-radius:4px;" placeholder="1  0.42&#10;2  0.55&#10;3  0.91&#10;…"></textarea>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+                <button type="button" id="btnAddExp" class="tb-btn tb-btn-secondary" onclick="addExperimentalTrack()" style="font-size:0.78rem; padding:4px 10px;">Add experimental row</button>
+                <span style="font-size:0.72rem; color:#94a3b8;">values map 1:1 onto the reference sequence</span>
+            </div>
+            <div id="expStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
         </div>
 
         <div id="optCat-foldseek" class="opt-cat" hidden>
@@ -3095,10 +3118,10 @@ let p3dRemotePending = false; // one RCSB fetch at a time (guard against re-entr
 let cachedStructureIndex = {}; // fileName -> { hash, ext, size }
 let missingStructureRefs = []; // structure files referenced but not in the cache
 
-let graphMode = { pLDDT: false, RSA: false, EV: false }; // per-type graph view: these types render as overlaid graphs instead of heatmap rows
+let graphMode = { pLDDT: false, RSA: false, EV: false, EXP: false }; // per-type graph view: these types render as overlaid graphs instead of heatmap rows
 // Types that *can* be shown as a graph. Adding one here (plus a scale in
 // graphScaleForGroup and a legend row) is all the plotting code needs.
-const GRAPH_TYPES = ['pLDDT', 'RSA', 'EV'];
+const GRAPH_TYPES = ['pLDDT', 'RSA', 'EV', 'EXP'];
 window.addEventListener('mouseup', handleMouseUp);
 
 // --- Modal dialog helpers ---------------------------------------------------
@@ -5411,6 +5434,7 @@ function getRuleNumericSources() {
     plddt.forEach(k => out.push({ id: 'pLDDT:' + k, label: formatTrackLabel(k) + ' pLDDT' }));
     rsa.forEach(k => out.push({ id: 'RSA:' + k, label: formatTrackLabel(k) + ' RSA' }));
     Object.keys(parsedTracks).filter(k => k.endsWith('_RMSF')).forEach(k => out.push({ id: 'RMSF:' + k, label: formatTrackLabel(k) + ' RMSF (A)' }));
+    Object.keys(parsedTracks).filter(k => k.endsWith('_EXP')).forEach(k => out.push({ id: 'EXP:' + k, label: formatTrackLabel(k) }));
     return out;
 }
 function ruleNumericValue(sourceId, i) {
@@ -5427,6 +5451,7 @@ function ruleNumericValue(sourceId, i) {
     if (sourceId.startsWith('pLDDT:')) return keyedNumericValue(sourceId, 6, '_pLDDT', i);
     if (sourceId.startsWith('RSA:')) return keyedNumericValue(sourceId, 4, '_RSA', i);
     if (sourceId.startsWith('RMSF:')) return keyedNumericValue(sourceId, 5, '_RMSF', i);
+    if (sourceId.startsWith('EXP:')) return keyedNumericValue(sourceId, 4, '_EXP', i);
     return null;
 }
 // A keyed numeric source ("RSA:<trackKey>"). The bare form ("RSA:", as the
@@ -6096,6 +6121,97 @@ async function findPdbEntries() {
     }
 }
 
+// --- Experimental per-residue data (DMS / HDX / NMR / any table) ------------
+// The one evidence layer the app had none of: numbers measured in the lab.
+// Two-column text (position value, separated by space/tab/comma/colon/semicolon)
+// or a single series of at least five values. Kept generic on purpose - the
+// label and kind say what it is; the row, graph and tooltips are the same.
+let experimentalTracksInfo = {}; // { 'DMS_tolerance_EXP': { label, kind, values, mean } }
+const EXPERIMENTAL_KINDS = {
+    dms: { label: 'DMS tolerance (higher = better tolerated)', hint: 'Deep mutational scanning: how well the protein tolerated changes at each position. High values usually line up with low conservation.' },
+    hdx: { label: 'HDX protection (higher = more protected)', hint: 'Hydrogen-deuterium exchange: protection per residue or segment. High values mark buried, slowly exchanging structure.' },
+    nmr: { label: 'NMR order (S2, 0-1)', hint: 'Backbone order parameters: 1 = rigid, 0 = flexible.' },
+    other: { label: 'Other experimental score', hint: 'Any per-residue measurement, plotted as-is.' }
+};
+function parseExperimentalTable(text) {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(l => l && l[0] !== '#');
+    if (!lines.length) return [];
+    // One long series line: "0.2 0.3 0.9 ..." (or comma separated).
+    if (lines.length === 1) {
+        const parts = lines[0].split(/[\s,;]+/).filter(Boolean);
+        if (parts.length >= 5 && parts.every(p => /^-?[\d.]+(?:[eE][-+]?\d+)?$/.test(p))) {
+            return parts.map((p, i) => ({ pos: i + 1, val: parseFloat(p) }));
+        }
+    }
+    const out = [];
+    lines.forEach(l => {
+        const m = l.match(/^(\d+)\s*[:,\t; ]\s*(-?[\d.]+(?:[eE][-+]?\d+)?)\s*$/);
+        if (!m) return;
+        const pos = parseInt(m[1], 10), val = parseFloat(m[2]);
+        if (pos >= 1 && isFinite(val)) out.push({ pos, val });
+    });
+    return out;
+}
+// Pearson correlation, used for the conservation cross-read-out.
+function pearsonR(xs, ys) {
+    const n = Math.min(xs.length, ys.length);
+    if (n < 3) return null;
+    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+    for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; sxx += xs[i] * xs[i]; syy += ys[i] * ys[i]; sxy += xs[i] * ys[i]; }
+    const cov = n * sxy - sx * sy;
+    const den = Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
+    return den ? cov / den : null;
+}
+function addExperimentalTrack() {
+    const nameEl = document.getElementById('expNameInput');
+    const kindEl = document.getElementById('expKindSelect');
+    const textEl = document.getElementById('expPasteInput');
+    const statusEl = document.getElementById('expStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    const label = ((nameEl && nameEl.value) || '').trim() || 'Experimental data';
+    const kind = (kindEl && kindEl.value) || 'other';
+    const rows = parseExperimentalTable(textEl ? textEl.value : '');
+    const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!total) { showToast('Load a sequence first: the table is mapped onto the reference residues.', 'error'); return; }
+    if (!rows.length) {
+        setStatus('Could not read any values: expected "position value" lines (or one series of at least five values).');
+        showToast('Could not read any values: expected "position value" lines.', 'error');
+        return;
+    }
+    const vals = new Array(total).fill(null).map(() => ({ val: null, type: 'exp' }));
+    let mapped = 0, outOfRange = 0;
+    rows.forEach(r => {
+        if (r.pos < 1 || r.pos > total) { outOfRange++; return; }
+        vals[r.pos - 1] = { val: r.val, type: 'exp' };
+        mapped++;
+    });
+    const slug = label.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'data';
+    const key = slug + '_EXP';
+    parsedTracks[key] = vals;
+    const numbers = vals.filter(v => v.val != null).map(v => v.val);
+    const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+    experimentalTracksInfo[key] = { label, kind, values: mapped, mean };
+    setTrackMeta(key, { source: 'Experimental', color: '#8b5cf6', label, kind });
+    // A descriptive read-out against conservation when both exist.
+    const cons = parsedTracks.CONSERVATION;
+    let corr = null;
+    if (cons && Array.isArray(cons.values)) {
+        const xs = [], ys = [];
+        for (let i = 0; i < total; i++) {
+            const v = vals[i].val, c = cons.values[i];
+            if (v != null && typeof c === 'number') { xs.push(v); ys.push(c); }
+        }
+        corr = pearsonR(xs, ys);
+    }
+    logAction('import', 'Experimental data "' + label + '" (' + (EXPERIMENTAL_KINDS[kind] || {}).label + ')',
+        mapped + ' value(s)' + (outOfRange ? ', ' + outOfRange + ' out of range' : '') + (corr != null ? ', r=' + corr.toFixed(2) + ' vs conservation' : ''));
+    renderViewer(parsedTracks);
+    refreshTrackManagerIfVisible();
+    schedulePersist();
+    setStatus('Added "' + label + '": ' + mapped + ' value(s)' + (outOfRange ? ', ' + outOfRange + ' out of range (1-' + total + ')' : '') +
+        ', mean ' + mean.toFixed(3) + (corr != null ? '; correlation with conservation r=' + corr.toFixed(2) : '') + '.');
+}
+
 // --- Experimental structure validation (PDBe) -------------------------------
 // The experimental counterpart of pLDDT: per-residue geometry outliers from the
 // wwPDB validation pipeline, for any species (any experimental entry). Author
@@ -6687,6 +6803,7 @@ const WORKFLOW_STEPS = [
         extraActions: [
             { label: 'Fetch PDB entry…', run: 'focusPdbFetch()' },
             { label: 'Fetch validation (PDBe)', run: 'runStructureValidation()' },
+            { label: 'Import experimental data…', run: "openDataSources('experimental')" },
             { label: 'Ensemble variance…', run: 'showEnsemblePanel()' }
         ],
         how: ['With two or more models attached, Ensemble variance measures where they disagree per residue (RMSF). Treat the mobile regions as tentative and the rigid core as settled.',
@@ -7415,6 +7532,7 @@ const DATA_CATEGORY_HINTS = {
     domains: 'Domain families: hmmscan (Pfam), or InterProScan which adds NCBIfam for bacterial and viral families.',
     homologs: 'Homologs: search Swiss-Prot in-app (phmmer or BLAST), or run HHpred externally and attach the .hhr in Input Data.',
     structure: 'Structural models: AlphaFold follows the accession, ESMFold folds the sequence, and validation reads wwPDB quality data for experimental entries.',
+    experimental: 'Lab measurements per residue (DMS tolerance, HDX protection, NMR order): paste "position value" lines and they become a row, a graph and a cross-read-out against conservation.',
     foldseek: 'Structural homology: search AFDB/PDB/Swiss-Prot by 3D structure (needs an attached model).',
     variants: 'Variant effects: AlphaMissense (human, needs an accession) plus conservation, structure context and curated features.',
     services: 'API calls are opt-in, and the activity log records every request and what came back.'
@@ -8638,6 +8756,22 @@ function getPredictorInfo(trackKey) {
     if (trackKey.startsWith('DM_')) return buildDomainPredictorInfo(trackKey);
     if (trackKey.startsWith('TP_')) return buildTopologyPredictorInfo(trackKey);
     if (trackKey.startsWith('VAL_')) return buildValidationPredictorInfo(trackKey);
+    if (trackKey.endsWith('_EXP')) {
+        const info = experimentalTracksInfo[trackKey] || {};
+        const kind = EXPERIMENTAL_KINDS[info.kind] || EXPERIMENTAL_KINDS.other;
+        const vals = ((parsedTracks[trackKey] || [])).filter(x => x && x.val != null).map(x => x.val);
+        return {
+            name: formatTrackLabel(trackKey),
+            category: 'Experimental data',
+            description: (info.label || 'Experimental per-residue data') + ' - ' + kind.label + '. ' + kind.hint,
+            bands: [],
+            useCase: vals.length
+                ? (vals.length + ' value(s), mean ' + (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(3) +
+                   ', range ' + Math.min.apply(null, vals).toFixed(2) + '-' + Math.max.apply(null, vals).toFixed(2) + '.')
+                : 'No values mapped.',
+            citation: 'Imported experimental data'
+        };
+    }
     if (trackKey.endsWith('_RMSF')) return {
         name: 'Ensemble variance (RMSF)',
         category: 'Structure ensemble',
@@ -8913,7 +9047,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.64.0';
+const APP_VERSION = '0.65.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -10272,6 +10406,10 @@ function formatTrackLabel(fullKey) {
         const base = fullKey.replace(/_RMSF$/, '');
         return (base && base !== 'EV') ? (base + ' RMSF') : 'Ensemble RMSF';
     }
+    if (fullKey.endsWith('_EXP')) {
+        const info = experimentalTracksInfo[fullKey];
+        return (info && info.label) ? (info.label + ' (experimental)') : fullKey.replace(/_EXP$/, '') + ' (experimental)';
+    }
     const isPlddt = fullKey.endsWith('_pLDDT');
     const isRsa = fullKey.endsWith('_RSA');
     const isCofactors = fullKey.endsWith('_Cofactors');
@@ -10315,6 +10453,7 @@ function getTrackCategoryOrder(key) {
     if (key.startsWith('RULE_')) return 10;
     if (key.startsWith('IF_')) return 11;
     if (key.startsWith('XC_')) return 12;
+    if (key.endsWith('_EXP')) return 13;
     if (key.endsWith('_RMSF')) return 13;
     // Cofactors/pLDDT-RSA rank below the conservation row so Heatmap rows line
     // up with Graph view, where structural tracks render as annotation rows
@@ -10334,6 +10473,7 @@ function graphScaleForGroup(g) {
     if (g === 'pLDDT') return { max: 100, tick: (v) => String(Math.round(v)), title: 'pLDDT (0-100)' };
     if (g === 'RSA') return { max: 1, tick: (v) => v.toFixed(2), title: 'RSA (0-1)' };
     if (g === 'EV') return { max: null, tick: (v) => v.toFixed(1), title: 'RMSF (A)' };
+    if (g === 'EXP') return { max: null, tick: (v) => v.toFixed(2), title: 'Experimental score' };
     return { max: 1, tick: (v) => v.toFixed(2), title: '' };
 }
 function graphMaxForGroup(g, keys) {
@@ -10350,6 +10490,7 @@ function graphTitleForGroup(g) {
     if (g === 'pLDDT') return 'pLDDT Confidence';
     if (g === 'RSA') return 'Relative Solvent Accessibility (RSA)';
     if (g === 'EV') return 'Ensemble variance (RMSF)';
+    if (g === 'EXP') return 'Experimental per-residue data';
     return trackGroupLabel(g);
 }
 function toggleGraphMode(g) {
@@ -12153,7 +12294,8 @@ const TRACK_GROUP_LABELS = {
     pLDDT: 'pLDDT',
     RSA: 'RSA',
     Cofactors: 'Cofactors',
-    other: 'Other'
+    other: 'Other',
+    EXP: 'Experimental'
 };
 let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {}, consColor: {}, colorMode: {}, viewOverride: {} };
 
@@ -12181,6 +12323,8 @@ function getTrackGroup(key) {
     if (key.startsWith('IF_')) return 'IF';
     if (key.startsWith('DM_')) return 'DM';
     if (key.startsWith('XC_')) return 'XC';
+    if (key.endsWith('_EXP')) return 'EXP';
+    if (key.endsWith('_EXP')) return 'EXP';
     if (key.endsWith('_RMSF')) return 'EV';
     if (key.startsWith('VAR_')) return 'VAR';
     if (key.endsWith('_pLDDT')) return 'pLDDT';

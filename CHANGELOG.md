@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.65.0] - 2026-09-25
+
+### Added
+
+- **Experimental per-residue data (DMS / HDX / NMR / any table)** - the lab-measured layer the app
+  had none of. Options -> Data Sources -> **Experimental data (DMS / HDX)**: give it a label and a
+  kind, paste `position value` lines (space, tab, comma, colon or semicolon) or one series of at
+  least five values, and it becomes:
+  - a numeric row (`<label>_EXP`) that groups under **Experimental**, plots through the same graph
+    machinery as ensemble variance (View as -> graph, auto-scaled, "Experimental score" axis) and is
+    usable in rules as `EXP:<key>`;
+  - a tooltip naming the label and kind with the value summary (count, mean, range);
+  - a **cross-read-out against conservation** (Pearson r) in the status line and the activity log.
+  - Kinds carry their interpretation (DMS tolerance / HDX protection / NMR order / other), and the
+    guide's structure step links to the category ("Import experimental data…").
+  - Tests: two-column forms plus the single-series rule and junk skipping, the importer end to end
+    (positions, {val,type} entries, label, group, graph capability, `EXP:` rule source, status and
+    correlation), and the panel markup.
+
 ## [0.64.0] - 2026-09-25
 
 ### Added

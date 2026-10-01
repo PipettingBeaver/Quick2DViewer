@@ -1353,6 +1353,19 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.65.0 - experimental per-residue data (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 383 | Options → Data Sources → Experimental data: label + kind + `position value` lines → Add | Status: "Added …, N value(s), mean …, correlation with conservation r=…" |
+| 384 | Switch the new row to a graph (Track Control → View as → graph) | Auto-scaled line plot, "Experimental score" axis, points per residue |
+| 385 | Hover the graph points / the row tooltip | Value tooltips; the ℹ names the label + kind meaning |
+| 386 | Paste one series of ≥5 numbers (no positions) | Positions 1..N assigned in order |
+| 387 | Paste junk / positions out of range | Clear message; out-of-range counted, not silently dropped |
+| 388 | Add a rule using `EXP:<key>` | The row is offered as a numeric rule source |
+| 389 | Import DMS tolerance with conservation loaded | r reported; sign makes sense against the conservation pattern |
+| 390 | Guide → structure step → "Import experimental data…" | Opens Options at the Experimental category |
+
 ## 0.64.0 - the loaded name feeds the lookups (quick rows)
 
 | # | Try | Watch for |
@@ -1502,4 +1515,5 @@ needs a full card.
 6ao. 361–370 (category-based Data Sources - new 0.62.0; check 361 first).
 6ap. 371–377 (find PDB entries from the sequence - new 0.63.0; check 371 first).
 6aq. 378–382 (the loaded name feeds the lookups - new 0.64.0; check 378 first).
+6ar. 383–390 (experimental per-residue data - new 0.65.0; check 383 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
