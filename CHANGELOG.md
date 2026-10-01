@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-09-25
+
+### Added
+
+- **The loaded name/identifier now feeds the PDB lookup too.** It already fed the UniProt lookup (a
+  Q2D `Protein ID:` line or a FASTA description is parsed by `parseProteinHeaderLine()` and
+  `deriveLookupDefaults()` pre-fills the lookup with an accession, or a name search) - but the PDB
+  lookup ignored it. Now:
+  - `findPdbEntries()` passes the parsed **protein name** alongside the sequence and accession, and
+  - a third provider, **RCSB name search** (full-text, CORS-verified), runs as the fallback when the
+    exact-sequence search finds nothing: "green fluorescent protein" finds **1GFL**, which exact
+    identity cannot (verified live).
+  - The Structure panel gains the missing first step - **Find UniProt accession** - so the ranked
+    PDBe path is one click from a name, and the lookup status names the fallback it will try.
+  - Live chain: Q2D-style label `GFP` -> UniProt controls pre-filled (search "GFP") -> sequence
+    lookup 4 exact hits -> name search 8 hits incl. 1GFL -> with P42212, ranked PDBe best structures.
+  - Tests: the three-provider registry, the name required by the text adapter, the parsed name and
+    accession travelling into the lookup, and the panel's two buttons.
+
 ## [0.63.0] - 2026-09-25
 
 ### Added

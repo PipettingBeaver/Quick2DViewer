@@ -1353,6 +1353,16 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.64.0 - the loaded name feeds the lookups (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 378 | Paste Q2D text with a `Protein ID:` line (or a FASTA header), then open Options → UniProt | The lookup is pre-filled (accession mode, or a name search with that name) |
+| 379 | Structure panel → Find PDB entries with a name but no accession | Sequence hits first; the status names the name fallback |
+| 380 | A sequence with no exact PDB match but a recognisable name | The name search returns entries (GFP → 1GFL) with titles |
+| 381 | Structure panel → Find UniProt accession | Resolves the name to an accession; Find PDB entries then ranks via PDBe |
+| 382 | A name with no PDB entries at all | "no entries match …" - a clear failure, logged |
+
 ## 0.63.0 - find PDB entries from the sequence (quick rows)
 
 | # | Try | Watch for |
@@ -1491,4 +1501,5 @@ needs a full card.
 6an. 357–360 (fetch PDB entry by id - new 0.61.0; check 357 first).
 6ao. 361–370 (category-based Data Sources - new 0.62.0; check 361 first).
 6ap. 371–377 (find PDB entries from the sequence - new 0.63.0; check 371 first).
+6aq. 378–382 (the loaded name feeds the lookups - new 0.64.0; check 378 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

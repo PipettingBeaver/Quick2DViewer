@@ -1213,7 +1213,8 @@ ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {};
 
 section('PDB entry lookup (sequence or accession)');
 const pdbProvs = ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers.map(p => p.id)`);
-assert(pdbProvs.join(',') === 'pdbe_best_structures,rcsb_sequence', 'the lookup offers PDBe best structures then the RCSB sequence search (got ' + pdbProvs.join(',') + ')');
+assert(pdbProvs.join(',') === 'pdbe_best_structures,rcsb_sequence,rcsb_text', 'the lookup offers PDBe best structures, the RCSB sequence search, then the name search (got ' + pdbProvs.join(',') + ')');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[2].url`).indexOf('search.rcsb.org') !== -1, 'the name search uses the same CORS-verified RCSB endpoint');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[0].url`).indexOf('best_structures') !== -1, 'the PDBe provider uses the verified endpoint');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].url`).indexOf('search.rcsb.org') !== -1, 'and the RCSB one the search API');
 ctxRun(`
@@ -1230,6 +1231,7 @@ assert(lookupHtml.indexOf('(no title)') === -1, 'and shows no placeholder noise 
 assert(ctxRun(`typeof SERVICE_ADAPTERS.rcsbEntryMeta`) === 'function', 'the GraphQL metadata fetch is shared by both providers');
 assert((lookupHtml.match(/fetchPdbEntry/g) || []).length === 2, 'every hit has a Fetch button that reuses the PDB fetch');
 assert(HTML.indexOf('id="btnPdbLookup"') !== -1 && HTML.indexOf('id="pdbLookupStatus"') !== -1 && HTML.indexOf('id="pdbLookupResults"') !== -1, 'the structure panel has the button, status and results list');
+assert((HTML.match(/Find UniProt accession/g) || []).length >= 2, 'and the first step (Find UniProt accession) is offered there too');
 assert(HTML.indexOf('use Find PDB entries in Options -> Structure') !== -1, 'and the PDB box points at it when an id is missing');
 ctxRun(`pdbLookupEntries = []; renderPdbLookupResults();`);
 
@@ -2966,6 +2968,21 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     assert(/Found 1 entry via RCSB sequence search/.test(ctxRun(`document.getElementById('pdbLookupStatus').textContent`)), 'the status names the source and count');
     assert(ctxRun(`document.getElementById('pdbLookupResults').innerHTML`).indexOf('2G16') !== -1, 'and the list renders');
     assert(ctxRun(`actionLog.some(e => e.kind === 'api' && /PDB lookup .*1 entry/.test(e.label))`), 'the activity log records it');
+    // The name from the loaded header travels with the lookup (the text-search fallback needs it).
+    ctxRun(`currentProteinLabel = 'sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria';`);
+    ctxRun(`
+        window.__lookupArgs = null;
+        SERVICE_ADAPTERS.__lookup_ok2 = async (provider, args) => { window.__lookupArgs = args; return { source: 'stub', entries: [] }; };
+        SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].adapter = '__lookup_ok2';
+    `);
+    await ctxRun(`findPdbEntries()`);
+    assert(ctxRun(`window.__lookupArgs && window.__lookupArgs.proteinName`) === 'Green fluorescent protein', 'the parsed protein name is passed to the lookup (got ' + ctxRun(`window.__lookupArgs && window.__lookupArgs.proteinName`) + ')');
+    assert(ctxRun(`window.__lookupArgs && window.__lookupArgs.accession`) === 'P42212', 'and the parsed accession, so the ranked PDBe path can be preferred');
+    assert((await ctxRun(`SERVICE_ADAPTERS.rcsbTextSearch({ url: 'x' }, {})`).then(() => 'no-throw', e => e.message)).indexOf('needs a protein name') !== -1, 'the name-search adapter requires a name');
+    ctxRun(`
+        currentProteinLabel = null;
+        SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].adapter = 'rcsbSequenceSearch';
+    `);
     ctxRun(`
         parsedTracks = {}; pdbLookupEntries = []; uniprotAccession = null; actionLog = [];
         SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].adapter = 'rcsbSequenceSearch';
