@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-09-25
+
+### Added
+
+- **Variant effects are now a modular provider framework**, so species coverage is a registry
+  concern instead of being hard-wired to AlphaMissense (human only). `VARIANT_EFFECT_PROVIDERS`
+  declares each source's coverage, requirements, availability test and run; the button (now
+  "Assess variant effects") runs every applicable provider, isolates failures, and merges the
+  results into one line per substitution used by the cell tooltips, the variant panel, the status
+  line and the guide read-out. Adding a species-specific API later (Ensembl VEP for plants/animals,
+  SIFT 4G, PROVEAN, ESM-1v) is one registry entry - nothing else changes.
+  - **Remote**: `alphamissense` (human, needs a UniProt accession) - unchanged behaviour, now a
+    provider.
+  - **Local, any species**: `conservation` (reads the Conservation row: highly/moderately conserved
+    or variable at the variant position), `structure` (RSA + pLDDT + SS at the position: buried and
+    ordered is high-impact context), and `curated` (UniProt features overlapping the position, e.g.
+    active/binding sites and natural variants).
+  - Coverage notes are shown in the UI, so it is always clear which sources can speak for the
+    current protein. Providers that do not apply are skipped with a clear message rather than
+    silently doing nothing.
+  - Research note (live-checked 2026-09): no verifiable species-general per-substitution API exists
+    today - Ensembl REST VEP answered 500 across the board (including `/info/ping`), SIFT 4G was
+    502, PROVEAN has no usable API, and the ESM Atlas exposes no variant endpoint. The local
+    providers cover those species in the meantime, and the registry is the hook for the APIs once
+    they are reachable.
+  - Tests: registry contents and coverage notes, availability gating (nothing applies until its
+    input arrives; all four apply once accession/tracks/features are loaded), each local provider's
+    output and levels, the merged line's ordering, and the display/read-out reading the merged map.
+
 ## [0.56.0] - 2026-09-25
 
 ### Added

@@ -491,6 +491,32 @@ the action it offers, so the two views cannot disagree. The description is only 
 the step card (no duplication), and an answered question collapses the short form
 to `action + hint`, which is what makes it feel reactive.
 
+## 15b. Variant effect providers — modular framework (v0.57.0)
+
+Variant effect prediction started as an AlphaMissense call (human only). It is
+now a provider registry (`VARIANT_EFFECT_PROVIDERS`) so species coverage is a
+configuration concern:
+
+| Provider | Kind | Coverage | Gives |
+|---|---|---|---|
+| `alphamissense` | remote | Human (UniProt proteome) | proteome-wide pathogenicity class per substitution |
+| `conservation` | local | Any species (needs homologs/variant FASTA) | how constrained the position is |
+| `structure` | local | Any species (needs an attached model) | buried/exposed, pLDDT, SS at the position |
+| `curated` | local | Species with curated entries | UniProt features overlapping the position |
+
+Contract: `coverage`, `kind`, `needs`, `available(ctx)`, `run(ctx) ->
+{ results: { 'R175H': { label, detail, level } }, summary }`. The UI runs every
+applicable provider (failures isolated), merges results per substitution and
+shows one line in the tooltips/panel/status/read-out.
+
+**Live check (2026-09) for the species-general APIs:** Ensembl REST VEP returned
+HTTP 500 for every request including `/info/ping`; SIFT 4G was 502; PROVEAN
+serves no usable API; the ESM Atlas has no variant endpoint. So the local
+providers are the honest universal answer for now, and the registry is the hook
+for VEP (plants/animals) or any successor when it is reachable. If VEP comes
+back, it needs protein->transcript mapping (UniProt xrefs) plus a
+`p.`-notation HGVS request - a self-contained provider entry.
+
 ## 16. Feature → guide taxonomy (v0.36.0)
 
 Every feature lands in one of these categories, and the category decides whether (and

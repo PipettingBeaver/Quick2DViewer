@@ -1081,11 +1081,15 @@ ctxRun(`alphaMissenseScores = parseAlphaMissenseCsv([
 assert(ctxRun(`alphaMissenseFor({ ref: 'R', pos: 8, alt: 'H' }).label`) === 'pathogenic or likely pathogenic', 'a lookup labels the pathogenic class');
 assert(ctxRun(`alphaMissenseFor({ ref: 'V', pos: 10, alt: 'L' }).label`) === 'benign or likely benign', 'and the benign class');
 assert(ctxRun(`alphaMissenseFor({ ref: 'X', pos: 1, alt: 'Y' })`) === null, 'an unknown substitution has no entry');
+// The display reads the merged provider map (not the raw AlphaMissense table).
+ctxRun(`variantEffectResults = { R8H: { alphamissense: { label: 'pathogenic or likely pathogenic', detail: '0.92', level: 'high' } } };`);
+assert(ctxRun(`variantEffectLine({ ref: 'R', pos: 8, alt: 'H' })`) === 'AlphaMissense: pathogenic or likely pathogenic (0.92)', 'the merged line phrases a provider result');
 ctxRun(`activeRowKey = 'VAR_v1';`);
 ctxRun(`updateVariantFastaSection();`);
 assert(ctxRun(`document.getElementById('variantFastaLabel').textContent`).indexOf('AlphaMissense: pathogenic or likely pathogenic') !== -1, 'the variant panel names the AlphaMissense class');
 const amInsights = ctxRun(`computeGuideInsights().map(x => x.text).join(' ')`);
-assert(amInsights.indexOf('AlphaMissense') !== -1 && amInsights.indexOf('1 of 2 variant substitution(s)') !== -1, 'the guide read-out counts the pathogenic substitutions');
+assert(amInsights.indexOf('Variant effect evidence') !== -1 && amInsights.indexOf('AlphaMissense 1 (1 high-impact)') !== -1, 'the guide read-out tallies the providers and their high-impact hits');
+ctxRun(`variantEffectResults = {};`);
 ctxRun(`const origHom = STEP_ACTION_RESOLVERS.homologs;`);
 const amActions = ctxRun(`
     (function () {
@@ -1098,6 +1102,61 @@ const amActions = ctxRun(`
 assert(amActions.indexOf('fetchVariantEffectPredictions()') !== -1, 'with variants loaded the guide offers the AlphaMissense action');
 assert(HTML.indexOf('id="btnVariantEffects"') !== -1 && HTML.indexOf('id="variantEffectStatus"') !== -1, 'Input Data has the button and status line');
 ctxRun(`parsedTracks = {}; keyedVariantsInfo = {}; alphaMissenseScores = {}; alphaMissenseAccession = ''; activeRowKey = null;`);
+
+section('variant effect providers: modular registry + local sources');
+const provIds = ctxRun(`Object.keys(VARIANT_EFFECT_PROVIDERS)`);
+assert(provIds.join(',') === 'alphamissense,conservation,structure,curated', 'the registry carries the remote provider plus three species-general local ones (got ' + provIds.join(',') + ')');
+assert(ctxRun(`VARIANT_EFFECT_PROVIDERS.conservation.coverage`).indexOf('Any species') !== -1, 'coverage notes say which sources speak for any species');
+const avail = ctxRun(`
+    (function () {
+        const ctx = { accession: '', substitutions: [] };
+        parsedTracks = { AA: 'M'.repeat(10) };
+        uniprotFeatureTracks = {};
+        const before = Object.keys(VARIANT_EFFECT_PROVIDERS).filter(id => VARIANT_EFFECT_PROVIDERS[id].available(ctx));
+        ctx.accession = 'P04637';
+        parsedTracks.CONSERVATION = { metric: 'shannon', values: new Array(10).fill(0.9) };
+        parsedTracks['m_pLDDT'] = Array.from({ length: 10 }, () => ({ val: 90, type: 'plddt' }));
+        uniprotFeatureTracks = { UP_Sites: { type: 'Site', features: [{ type: 'Active site', start: 5, end: 5, description: 'proton acceptor' }] } };
+        const after = Object.keys(VARIANT_EFFECT_PROVIDERS).filter(id => VARIANT_EFFECT_PROVIDERS[id].available(ctx));
+        return { before: before.join(','), after: after.join(',') };
+    })()
+`);
+assert(avail.before === '', 'with nothing loaded no provider applies (no misleading runs)');
+assert(avail.after === 'alphamissense,conservation,structure,curated', 'each source becomes applicable when its input arrives (got ' + avail.after + ')');
+const localRuns = ctxRun(`
+    (function () {
+        parsedTracks = { AA: 'M'.repeat(10), CONSERVATION: { metric: 'shannon', values: [0.9, 0.9, 0.9, 0.9, 0.9, 0.4, 0.4, 0.4, 0.4, 0.4] },
+            'm_pLDDT': Array.from({ length: 10 }, () => ({ val: 92, type: 'plddt' })),
+            'm_RSA': Array.from({ length: 10 }, () => ({ val: 0.08, type: 'rsa' })),
+            SS_PSIPRED: 'HHHHHCCCCC' };
+        uniprotFeatureTracks = { UP_Sites: { type: 'Site', features: [{ type: 'Active site', start: 3, end: 3, description: 'proton acceptor' }] } };
+        const ctx = { accession: 'P04637', substitutions: [{ key: 'M3H', sub: { ref: 'M', pos: 3, alt: 'H' } }, { key: 'M6H', sub: { ref: 'M', pos: 6, alt: 'H' } }] };
+        const cons = VARIANT_EFFECT_PROVIDERS.conservation.run(ctx);
+        const struc = VARIANT_EFFECT_PROVIDERS.structure.run(ctx);
+        const cur = VARIANT_EFFECT_PROVIDERS.curated.run(ctx);
+        return { cons: cons.results, struc: struc.results, cur: cur.results,
+                 consSummary: cons.summary, strucSummary: struc.summary };
+    })()
+`);
+assert(localRuns.cons.M3H.label === 'highly conserved' && localRuns.cons.M3H.level === 'high', 'conservation flags a conserved variant position as high');
+assert(localRuns.cons.M6H.label === 'variable' && localRuns.cons.M6H.level === 'low', 'and a variable one as low');
+assert(/buried/.test(localRuns.struc.M3H.label) && /pLDDT 92/.test(localRuns.struc.M3H.label) && /helix/.test(localRuns.struc.M3H.label), 'structure context reads RSA, pLDDT and SS at the position (got "' + localRuns.struc.M3H.label + '")');
+assert(localRuns.struc.M3H.level === 'high', 'buried + ordered is high-impact context');
+assert(localRuns.cur.M3H.label.indexOf('Active site') !== -1 && localRuns.cur.M3H.level === 'high', 'curated evidence names the overlapping UniProt feature');
+assert(!localRuns.cur.M6H, 'and stays silent where no feature overlaps');
+assert(localRuns.consSummary.indexOf('position(s) scored') !== -1, 'each provider reports its own summary for the status line');
+sandbox.__localRuns = localRuns;
+ctxRun(`
+    variantEffectResults = {};
+    mergeVariantEffectResults('conservation', window.__localRuns.cons);
+    mergeVariantEffectResults('structure', window.__localRuns.struc);
+    mergeVariantEffectResults('curated', window.__localRuns.cur);
+`);
+const mergedLine = ctxRun(`variantEffectLine({ ref: 'M', pos: 3, alt: 'H' })`);
+assert(/^Conservation: highly conserved .*; Structure context: buried .*; Curated \(UniProt\): Active site/.test(mergedLine), 'the merged line lists providers in registry order (got "' + mergedLine + '")');
+assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-agnostic');
+assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
+ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
 section('homolog glyph wording is source-aware');
 assert(ctxRun(`homologGlyphBasis('HL_missing')`) === 'HHpred match probability', 'without an info entry the basis defaults to HHpred');

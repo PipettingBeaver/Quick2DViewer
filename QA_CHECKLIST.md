@@ -29,6 +29,33 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Variant effect providers — 0.57.0
+
+**Should do.** One button ("Assess variant effects") runs every source that applies to the session -
+AlphaMissense (human), conservation, structure context, curated UniProt features - and merges their
+read-outs per substitution, so a non-human protein still gets useful evidence.
+
+**Try (normal use).**
+1. Load a non-human protein with homologs or a variant FASTA (e.g. an Arabidopsis entry with
+   conservation from a phmmer search), attach a model, and press **Assess variant effects**.
+   *Expect:* the status lists only the applicable providers (AlphaMissense is skipped - no
+   accession/human coverage); the tooltip shows Conservation + Structure context (+ Curated if the
+   entry has features).
+2. Do the same for human TP53 with an accession.
+   *Expect:* all four providers run; the merged tooltip line reads AlphaMissense, Conservation,
+   Structure context and Curated (UniProt) in that order.
+3. Fail one provider on purpose (offline, or block AlphaFold DB).
+   *Expect:* the status names that provider's failure and the others still report their results.
+
+**Edge cases (symptom → likely cause).**
+- With nothing loaded, the button says no source applies and lists what each needs.
+- A substitution the provider cannot place (position outside the track) simply gets no line from
+  that provider - the merged line shows the rest.
+- Providers are per-substitution; a variant whose header names one change gets one line even if the
+  alignment differs elsewhere.
+
+---
+
 ### AlphaMissense variant effects — 0.56.0
 
 **Should do.** With a UniProt accession and a variant FASTA loaded, one button fetches the
@@ -1210,6 +1237,17 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 324 | A non-human protein | Clear message that annotations exist for human proteins only |
 | 325 | A variant header with no token (e.g. `>var1`) | Falls back to the alignment difference |
 
+## 0.57.0 - variant effect providers (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 326 | Non-human protein + conservation + model → Assess variant effects | AlphaMissense skipped with a reason; Conservation + Structure report |
+| 327 | Human TP53 with accession | All four providers in one merged line |
+| 328 | Read the merged tooltip/panel line | Providers in registry order, each labelled |
+| 329 | Block one service and rerun | That provider fails in the status; the others still report |
+| 330 | Nothing loaded → press the button | Clear message listing what each provider needs |
+| 331 | Add a new provider (dev) | One registry entry; tooltips/status/read-out pick it up |
+
 ## Pending live checks (API calls + UI integration) — test later
 
 These are cheap to check by hand when you next have a session with the services up; nothing here
@@ -1292,4 +1330,5 @@ needs a full card.
 6ag. 309–314 (topology consensus completion - new 0.55.0; card at the top, check 310 first).
 6ah. 315–318 (per-provider menu + source-aware glyph wording - 0.55.1; check 317 first).
 6ai. 319–325 (AlphaMissense variant effects - new 0.56.0; card at the top, check 319 first).
+6aj. 326–331 (variant effect provider framework - new 0.57.0; card at the top, check 326 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

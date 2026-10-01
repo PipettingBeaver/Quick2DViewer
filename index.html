@@ -2077,7 +2077,7 @@
                         <button type="button" id="btnHomologSearch" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="runHomologSearch()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Search Swiss-Prot for homologs (phmmer or NCBI-BLAST) and add one Homologs row per significant hit">Find homologs</button>
                         <button type="button" id="btnVariantEffects" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="fetchVariantEffectPredictions()"
-                            style="font-size:0.72rem; padding:3px 8px;" title="Look up AlphaMissense pathogenicity for the loaded variant substitutions (needs a UniProt accession; AlphaMissense covers human proteins)">Predict variant effects (AlphaMissense)</button>
+                            style="font-size:0.72rem; padding:3px 8px;" title="Assess the loaded variant substitutions with every applicable source: AlphaMissense (human, needs an accession), conservation and structure context (any species), curated UniProt features">Assess variant effects</button>
                         <select id="foldseekDb" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Foldseek search database">
                             <option value="afdb50">afdb50 (AlphaFoldDB)</option>
                             <option value="pdb100">pdb100 (PDB)</option>
@@ -6264,7 +6264,7 @@ const STEP_ACTION_RESOLVERS = {
         const choice = a.hhpred === 'ready' ? 'hhpred' : (a.hhpred === 'no' ? 'both' : a.hhpred);
         // With variants loaded, the AlphaMissense lookup belongs on this step.
         const variantExtra = Object.keys(keyedVariantsInfo || {}).length
-            ? [{ label: 'Predict variant effects (AlphaMissense)', run: 'fetchVariantEffectPredictions()' }] : [];
+            ? [{ label: 'Assess variant effects', run: 'fetchVariantEffectPredictions()' }] : [];
         if (choice === 'phmmer' || choice === 'both') return {
             label: 'Search homologs (in-app)',
             run: 'runHomologSearch()',
@@ -6884,10 +6884,17 @@ function computeGuideInsights() {
     if (guideProfile.membrane === 'yes' && !keys.some(k => k.startsWith('TM_') || k.startsWith('SP_'))) {
         out.push({ level: 'warn', text: 'You flagged a membrane/secreted protein, but no TM or signal-peptide track is loaded.' });
     }
-    if (Object.keys(alphaMissenseScores || {}).length) {
-        const vals = Object.keys(alphaMissenseScores).map(k => alphaMissenseScores[k]);
-        const path = vals.filter(v => v.cls === 'pathogenic' || v.cls === 'likely_pathogenic').length;
-        out.push({ level: 'info', text: 'AlphaMissense (' + (alphaMissenseAccession || 'accession') + '): ' + path + ' of ' + vals.length + ' variant substitution(s) pathogenic or likely pathogenic.' });
+    if (Object.keys(variantEffectResults || {}).length) {
+        const subs = Object.keys(variantEffectResults);
+        const perProvider = [];
+        Object.keys(VARIANT_EFFECT_PROVIDERS).forEach(id => {
+            const p = VARIANT_EFFECT_PROVIDERS[id];
+            const n = subs.filter(k => variantEffectResults[k][id]).length;
+            if (!n) return;
+            const high = subs.filter(k => { const h = variantEffectResults[k][id]; return h && h.level === 'high'; }).length;
+            perProvider.push(p.label + ' ' + n + (high ? ' (' + high + ' high-impact)' : ''));
+        });
+        out.push({ level: 'info', text: 'Variant effect evidence: ' + perProvider.join(' \u00b7 ') + '.' });
     }
     if (guideProfile.variants === 'yes' && !keys.some(k => k.startsWith('VAR_')) && !parsedTracks.CONSERVATION) {
         out.push({ level: 'warn', text: 'Variant evaluation is flagged, but no variant FASTA (or conservation row) is loaded yet.' });
@@ -8173,7 +8180,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.56.0';
+const APP_VERSION = '0.57.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -10885,53 +10892,208 @@ function alphaMissenseFor(sub) {
     if (!hit) return null;
     return { key, score: hit.score, cls: hit.cls, label: alphaMissenseClassLabel(hit.cls) };
 }
-// Fetches AlphaMissense for the loaded variants (AlphaFold DB annotation file).
+// --- Variant effect providers (modular) -------------------------------------
+// One substitution can be judged by several sources. Every provider declares
+// what it needs, whether it applies to this session, how to run, and how to
+// phrase one substitution. The UI runs every available provider (each failure
+// isolated) and merges the results into one line per substitution. Adding a
+// species-specific API later - Ensembl VEP for plants/animals, SIFT 4G,
+// PROVEAN, ESM-1v - means adding one entry here and nothing else: the tooltips,
+// the variant panel, the status line and the guide read-out all read the merged
+// map. Coverage notes are shown in the UI so it is always clear which sources
+// can speak for the current protein.
+//   kind 'remote' fetches; 'local' derives from what is already loaded.
+//   available(ctx) -> does this provider apply?
+//   run(ctx) -> { results: { 'R175H': { label, detail, level } }, summary }
+//   level: 'high' | 'medium' | 'low' (drives tallies/emphasis)
+let variantEffectResults = {}; // { 'R175H': { providerId: { label, detail, level } } }
+let variantEffectRan = {};     // providerId -> { ok, count, message }
+const VARIANT_EFFECT_PROVIDERS = {
+    alphamissense: {
+        label: 'AlphaMissense',
+        coverage: 'Human (UniProt proteome)',
+        kind: 'remote',
+        needs: 'a UniProt accession',
+        available: (ctx) => !!ctx.accession,
+        run: async (ctx) => {
+            const metaResp = await fetchWithTimeout('https://alphafold.ebi.ac.uk/api/prediction/' + encodeURIComponent(ctx.accession), { headers: { Accept: 'application/json' } }, 30000);
+            if (!metaResp.ok) throw new Error('AlphaFold DB lookup HTTP ' + metaResp.status);
+            const meta = await metaResp.json();
+            const entry = Array.isArray(meta) ? meta[0] : meta;
+            const url = entry && entry.amAnnotationsUrl;
+            if (!url) throw new Error('no AlphaMissense annotations for ' + ctx.accession + ' (they exist for human proteins)');
+            const csvResp = await fetchWithTimeout(url, {}, 60000);
+            if (!csvResp.ok) throw new Error('annotation download HTTP ' + csvResp.status);
+            alphaMissenseScores = parseAlphaMissenseCsv(await csvResp.text(), ctx.substitutions.map(x => x.key));
+            alphaMissenseAccession = ctx.accession;
+            const results = {};
+            ctx.substitutions.forEach(({ key, sub }) => {
+                const hit = alphaMissenseFor(sub);
+                if (!hit) return;
+                results[key] = {
+                    label: hit.label,
+                    detail: hit.score != null ? hit.score.toFixed(2) : '',
+                    level: (hit.cls === 'pathogenic' || hit.cls === 'likely_pathogenic') ? 'high' : (hit.cls === 'ambiguous' ? 'medium' : 'low')
+                };
+            });
+            const n = { high: 0, medium: 0, low: 0 };
+            Object.keys(results).forEach(k => { n[results[k].level]++; });
+            return { results, summary: Object.keys(results).length + ' of ' + ctx.substitutions.length + ' substitution(s) matched (' + n.high + ' pathogenic, ' + n.medium + ' ambiguous, ' + n.low + ' benign)' };
+        }
+    },
+    conservation: {
+        label: 'Conservation',
+        coverage: 'Any species (needs homologs or a variant FASTA)',
+        kind: 'local',
+        needs: 'the Conservation row',
+        available: () => !!(parsedTracks && parsedTracks.CONSERVATION && Array.isArray(parsedTracks.CONSERVATION.values)),
+        run: (ctx) => {
+            const results = {};
+            const values = parsedTracks.CONSERVATION.values;
+            ctx.substitutions.forEach(({ key, sub }) => {
+                const v = values[sub.pos - 1];
+                if (typeof v !== 'number') return;
+                const label = v >= 0.8 ? 'highly conserved' : (v >= 0.5 ? 'moderately conserved' : 'variable');
+                results[key] = { label, detail: v.toFixed(2) + ' (' + (parsedTracks.CONSERVATION.metric || 'shannon') + ')', level: v >= 0.8 ? 'high' : (v >= 0.5 ? 'medium' : 'low') };
+            });
+            return { results, summary: Object.keys(results).length + ' position(s) scored from conservation' };
+        }
+    },
+    structure: {
+        label: 'Structure context',
+        coverage: 'Any species (needs an attached model)',
+        kind: 'local',
+        needs: 'an attached structure (pLDDT/RSA)',
+        available: () => {
+            const keys = Object.keys(parsedTracks || {});
+            return keys.some(k => k.endsWith('_pLDDT')) || keys.some(k => k.endsWith('_RSA'));
+        },
+        run: (ctx) => {
+            const results = {};
+            const keys = Object.keys(parsedTracks || {});
+            const rsaKeys = keys.filter(k => k.endsWith('_RSA'));
+            const plddtKeys = keys.filter(k => k.endsWith('_pLDDT'));
+            const ssKeys = keys.filter(k => k.startsWith('SS_'));
+            const meanAt = (ks, i) => {
+                const vals = ks.map(k => parsedTracks[k][i]).filter(x => x && x.val != null).map(x => x.val);
+                return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+            };
+            ctx.substitutions.forEach(({ key, sub }) => {
+                const i = sub.pos - 1;
+                const rsa = meanAt(rsaKeys, i);
+                const plddt = meanAt(plddtKeys, i);
+                const ssChar = (ssKeys.length && typeof parsedTracks[ssKeys[0]] === 'string') ? parsedTracks[ssKeys[0]][i] : ' ';
+                if (rsa == null && plddt == null) return;
+                const bits = [];
+                if (rsa != null) bits.push((rsa < 0.2 ? 'buried' : (rsa < 0.4 ? 'partly buried' : 'exposed')) + ' (RSA ' + rsa.toFixed(2) + ')');
+                if (plddt != null) bits.push('pLDDT ' + plddt.toFixed(0));
+                if (ssChar && ssChar !== ' ' && CELL_CHAR_MEANINGS[ssChar]) bits.push(CELL_CHAR_MEANINGS[ssChar]);
+                const ordered = plddt == null || plddt >= 70;
+                results[key] = {
+                    label: bits.join(', '),
+                    detail: '',
+                    level: (rsa != null && rsa < 0.2 && ordered) ? 'high' : ((rsa != null && rsa < 0.4) || !ordered ? 'medium' : 'low')
+                };
+            });
+            return { results, summary: Object.keys(results).length + ' position(s) contextualised from the model' };
+        }
+    },
+    curated: {
+        label: 'Curated (UniProt)',
+        coverage: 'Species with curated variants',
+        kind: 'local',
+        needs: 'a fetched UniProt entry',
+        available: () => Object.keys(uniprotFeatureTracks || {}).some(k => (uniprotFeatureTracks[k].features || []).length),
+        run: (ctx) => {
+            const results = {};
+            const keys = Object.keys(uniprotFeatureTracks || {});
+            ctx.substitutions.forEach(({ key, sub }) => {
+                for (const k of keys) {
+                    const f = uniprotFeatureAt(k, sub.pos - 1);
+                    if (!f) continue;
+                    results[key] = {
+                        // No detail suffix: the provider label already says UniProt.
+                        label: f.type + (f.description ? ' (' + f.description + ')' : ''),
+                        detail: '',
+                        level: /variant|mutagen|active|binding|site/i.test(f.type) ? 'high' : 'low'
+                    };
+                    break;
+                }
+            });
+            return { results, summary: Object.keys(results).length + ' curated feature(s) at variant positions' };
+        }
+    }
+};
+function mergeVariantEffectResults(providerId, results) {
+    Object.keys(results || {}).forEach(key => {
+        if (!variantEffectResults[key]) variantEffectResults[key] = {};
+        variantEffectResults[key][providerId] = results[key];
+    });
+}
+// One line per substitution for the tooltips/panel/read-outs: every provider's
+// read-out in registry order.
+function variantEffectLine(sub) {
+    if (!sub) return '';
+    const byProvider = variantEffectResults[sub.ref + sub.pos + sub.alt] || {};
+    const parts = [];
+    Object.keys(VARIANT_EFFECT_PROVIDERS).forEach(id => {
+        const hit = byProvider[id];
+        if (!hit) return;
+        parts.push(VARIANT_EFFECT_PROVIDERS[id].label + ': ' + hit.label + (hit.detail ? ' (' + hit.detail + ')' : ''));
+    });
+    return parts.join('; ');
+}
+// Runs every applicable provider and merges the results. Remote providers are
+// gated by the external-services opt-in once; a provider that fails reports its
+// own message and the others still run.
 async function fetchVariantEffectPredictions() {
     const names = Object.keys(keyedVariantsInfo || {}).filter(n => keyedVariantsInfo[n] && typeof keyedVariantsInfo[n].aligned === 'string');
-    if (!names.length) { showToast('Attach a variant FASTA first: AlphaMissense scores substitutions, so it needs variants.', 'error'); return; }
+    if (!names.length) { showToast('Attach a variant FASTA first: variant effects are scored per substitution.', 'error'); return; }
+    const substitutions = [];
+    names.forEach(n => parseVariantSubstitutions(n).forEach(sub => {
+        const key = sub.ref + sub.pos + sub.alt;
+        if (!substitutions.some(x => x.key === key)) substitutions.push({ key, sub, variant: n });
+    }));
+    if (!substitutions.length) { showToast('No substitution could be read from the variant headers or the alignment, so there is nothing to look up.', 'error'); return; }
     const derived = deriveLookupDefaults();
-    const acc = uniprotAccession || (derived && derived.accession) || '';
-    if (!acc) { showToast('AlphaMissense is keyed by UniProt accession. Load a protein with one (or fetch its entry) first.', 'error'); return; }
-    const wanted = [];
-    names.forEach(n => { parseVariantSubstitutions(n).forEach(s => { const k = s.ref + s.pos + s.alt; if (wanted.indexOf(k) === -1) wanted.push(k); }); });
-    if (!wanted.length) { showToast('No substitution could be read from the variant headers or the alignment, so there is nothing to look up.', 'error'); return; }
-    if (!beginGuideTask('annotation', 'AlphaMissense lookup for ' + acc)) return;
+    const ctx = { accession: uniprotAccession || (derived && derived.accession) || '', substitutions };
+    const applicable = Object.keys(VARIANT_EFFECT_PROVIDERS).filter(id => {
+        try { return VARIANT_EFFECT_PROVIDERS[id].available(ctx); } catch (e) { return false; }
+    });
+    if (!applicable.length) {
+        showToast('No variant-effect source applies to this session yet: AlphaMissense needs a UniProt accession, conservation needs the Conservation row, structure needs an attached model, and curated evidence needs a fetched UniProt entry.', 'error');
+        return;
+    }
+    if (!beginGuideTask('annotation', 'Variant effect assessment')) return;
     const statusEl = document.getElementById('variantEffectStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    const lines = [];
     try {
-        if (!(await ensureExternalServices())) { endGuideTask('annotation'); return; }
-        setStatus('Looking up AlphaMissense annotations for ' + acc + '\u2026');
-        const metaResp = await fetchWithTimeout('https://alphafold.ebi.ac.uk/api/prediction/' + encodeURIComponent(acc), { headers: { Accept: 'application/json' } }, 30000);
-        if (!metaResp.ok) throw new Error('AlphaFold DB lookup HTTP ' + metaResp.status);
-        const meta = await metaResp.json();
-        const entry = Array.isArray(meta) ? meta[0] : meta;
-        const url = entry && entry.amAnnotationsUrl;
-        if (!url) throw new Error('no AlphaMissense annotations for ' + acc + ' (they exist for human proteins)');
-        setStatus('Downloading the AlphaMissense table\u2026');
-        const csvResp = await fetchWithTimeout(url, {}, 60000);
-        if (!csvResp.ok) throw new Error('annotation download HTTP ' + csvResp.status);
-        alphaMissenseScores = parseAlphaMissenseCsv(await csvResp.text(), wanted);
-        alphaMissenseAccession = acc;
-        const found = Object.keys(alphaMissenseScores).length;
+        for (const id of applicable) {
+            const provider = VARIANT_EFFECT_PROVIDERS[id];
+            try {
+                setStatus('Running ' + provider.label + '\u2026');
+                if (provider.kind === 'remote' && !(await ensureExternalServices())) { endGuideTask('annotation'); return; }
+                const out = await provider.run(ctx);
+                const n = Object.keys((out && out.results) || {}).length;
+                mergeVariantEffectResults(id, (out && out.results) || {});
+                variantEffectRan[id] = { ok: true, count: n, message: (out && out.summary) || '' };
+                lines.push(provider.label + ': ' + ((out && out.summary) || n + ' result(s)'));
+            } catch (err) {
+                const m = err && err.message ? err.message : String(err);
+                variantEffectRan[id] = { ok: false, count: 0, message: m };
+                lines.push(provider.label + ' failed (' + m + ')');
+            }
+        }
         renderViewer(parsedTracks);
         updateVariantFastaSection();
         refreshInputDataModalIfVisible();
-        const counts = { pathogenic: 0, likely_pathogenic: 0, ambiguous: 0, benign: 0 };
-        Object.keys(alphaMissenseScores).forEach(k => {
-            const c = alphaMissenseScores[k].cls;
-            if (c === 'pathogenic') counts.pathogenic++;
-            else if (c === 'likely_pathogenic') counts.likely_pathogenic++;
-            else if (c === 'benign' || c === 'likely_benign') counts.benign++;
-            else counts.ambiguous++;
-        });
-        setStatus('AlphaMissense (' + acc + '): ' + found + ' of ' + wanted.length + ' substitution(s) matched - ' +
-            counts.pathogenic + ' pathogenic, ' + counts.likely_pathogenic + ' likely pathogenic, ' +
-            counts.ambiguous + ' ambiguous, ' + counts.benign + ' benign.');
-        endGuideTask('annotation', 'AlphaMissense: ' + (counts.pathogenic + counts.likely_pathogenic) + ' of ' + found + ' substitution(s) pathogenic or likely pathogenic', 'info');
+        setStatus('Variant effects: ' + lines.join(' \u00b7 ') + '.');
+        endGuideTask('annotation', 'Variant effects: ' + lines.join(' \u00b7 '), 'info');
     } catch (err) {
         const m = err && err.message ? err.message : String(err);
-        setStatus('AlphaMissense lookup failed: ' + m);
-        endGuideTask('annotation', 'AlphaMissense lookup failed: ' + m, 'error');
+        setStatus('Variant effect assessment failed: ' + m);
+        endGuideTask('annotation', 'Variant effect assessment failed: ' + m, 'error');
     }
 }
 
@@ -10962,9 +11124,9 @@ function updateVariantFastaSection() {
             : aa;
         display.textContent = variantCopyText;
         const subs = parseVariantSubstitutions(key.slice(4));
-        const amHit = subs.length ? alphaMissenseFor(subs[0]) : null;
+        const effectLine = subs.length ? variantEffectLine(subs[0]) : '';
         label.textContent = 'Variant sequence (' + formatTrackLabel(key) + ')' +
-            (amHit ? ' - AlphaMissense: ' + amHit.label + (amHit.score != null ? ' (' + amHit.score.toFixed(2) + ')' : '') : '') + ':';
+            (effectLine ? ' - ' + effectLine : '') + ':';
         section.style.display = 'block';
         btn.disabled = false;
     } else {
@@ -12064,11 +12226,11 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     }
                 }
                 const varDescLine = varDesc ? formatTrackLabel(key) + ': ' + varDesc + '\n' : '';
-                const amHit = (varChar !== ' ' && varChar !== '-' && isMismatch)
-                    ? alphaMissenseFor({ ref: refChar, pos: i + 1, alt: varChar }) : null;
+                const effectLine = (varChar !== ' ' && varChar !== '-' && isMismatch)
+                    ? variantEffectLine({ ref: refChar, pos: i + 1, alt: varChar }) : '';
                 cellEl.title = varDescLine + (varChar !== ' ' && varChar !== '-'
                     ? (isMismatch ? `Residue ${i + 1}: variant AA '${varChar}' (mismatch vs reference '${refChar}')` : `Residue ${i + 1}: variant AA '${varChar}' (matches reference)`) +
-                      (amHit ? `; AlphaMissense: ${amHit.label}${amHit.score != null ? ' (' + amHit.score.toFixed(2) + ')' : ''}` : '')
+                      (effectLine ? '; ' + effectLine : '')
                     : `Residue ${i + 1}: variant (no aligned residue)`);
             }
             else if (key.startsWith('UP_')) {
