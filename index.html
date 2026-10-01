@@ -2004,6 +2004,7 @@
                 </div>
             </div>
             <div class="menubar-item">
+                <button type="button" class="menubar-btn" onclick="openActionLog()" title="Everything this session: clicks, menu choices, API jobs and what came back - newest first">Log</button>
                 <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('export', this)">Export ▾</button>
                 <div class="menubar-menu" id="menubar-export" hidden>
                     <button type="button" onclick="menuBarAction('json')">Q2DV Data as JSON</button>
@@ -2808,7 +2809,7 @@
             <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; display:flex; gap:8px; flex-wrap:wrap;">
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openWorkflowDoc();" style="font-size:0.78rem; padding:4px 10px;">Workflow reference</button>
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openChangelogModal();" style="font-size:0.78rem; padding:4px 10px;">Changelog</button>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openActionLog();" style="font-size:0.78rem; padding:4px 10px;">Debugging console</button>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openActionLog();" style="font-size:0.78rem; padding:4px 10px;">Activity log</button>
             </div>
         </div>
     </div>
@@ -2818,14 +2819,14 @@
 <div class="modal-overlay" id="actionLogModal" role="dialog" aria-modal="true" aria-labelledby="actionLogTitle">
     <div class="modal-content" style="width: 720px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
-            <h3 id="actionLogTitle" style="margin: 0; color: #0f172a;">Debugging console</h3>
+            <h3 id="actionLogTitle" style="margin: 0; color: #0f172a;">Activity log</h3>
             <button onclick="closeActionLog()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
         </div>
         <p style="font-size:0.78rem; color:#64748b; margin: 12px 0 8px; line-height:1.4;">
-            The last 200 actions this session, newest first: clicks, menu choices, task starts/finishes,
-            imports, structure attaches, removals and exports. Session-only, nothing is sent anywhere.
-            Useful for reconstructing a workflow; <code>q2dvActions()</code> in the console returns the same
-            log as JSON (a starting point for macros).
+            The last 200 actions this session, newest first: clicks, menu choices, API jobs (submit, poll,
+            result, what was parsed) and task starts/finishes. Session-only, nothing is sent anywhere.
+            Useful for debugging a run that produced nothing, and for reconstructing a workflow;
+            <code>q2dvActions()</code> in the console returns the same log as JSON (a starting point for macros).
         </p>
         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
             <button type="button" class="copy-btn" onclick="copyActionLog(false)">Copy log</button>
@@ -3364,14 +3365,15 @@ const SERVICE_ADAPTERS = {
     // EBI Job Dispatcher: submit -> poll -> result JSON (BLAST, HMMER, …)
     async ebiJob(provider, args, onProgress) {
         const base = provider.url;
+        const tool = (String(base).match(/rest\/([^/]+)\//) || [])[1] || provider.label;
         const body = new URLSearchParams(Object.assign({ email: 'q2dv@example.com' }, provider.params || {}, { sequence: args.sequence })).toString();
         let jobId = '', runResp = null;
         for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
             try {
                 runResp = await fetchWithTimeout(base + 'run', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, 90000);
                 if (runResp.ok) jobId = (await runResp.text()).trim();
-                uniprotLog('submit attempt ' + (attempt + 1) + ': HTTP ' + (runResp ? runResp.status : '?') + (jobId ? ' job=' + jobId : ''));
-            } catch (e) { uniprotLog('submit attempt ' + (attempt + 1) + ' threw: ' + (e && e.message ? e.message : e)); }
+                uniprotLog('submit ' + tool + ': HTTP ' + (runResp ? runResp.status : '?') + (jobId ? ' job=' + jobId : ''));
+            } catch (e) { uniprotLog('submit ' + tool + ' attempt ' + (attempt + 1) + ' failed: ' + (e && e.message ? e.message : e)); }
         }
         if (!runResp || !runResp.ok) throw new Error('submit failed' + (runResp ? ' (HTTP ' + runResp.status + ')' : ''));
         if (!jobId) throw new Error('no job id returned');
@@ -3384,7 +3386,7 @@ const SERVICE_ADAPTERS = {
             await new Promise(r => setTimeout(r, 3000));
             try { status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 60000)).text()).trim(); }
             catch (e) { uniprotLog('poll ' + poll + ': status fetch failed, continuing'); continue; }
-            if (status !== lastLogged) { uniprotLog('poll ' + poll + ': status=' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
+            if (status !== lastLogged) { uniprotLog(tool + ' poll: ' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
             if (status === 'FINISHED') break;
             if (status === 'ERROR' || status === 'FAILURE' || status === 'NOT_FOUND' || status === 'FAILED') throw new Error('job ' + status);
             if (onProgress) onProgress('job ' + jobId + ' running… ' + elapsed() + 's (' + (status || 'queued') + ')');
@@ -3395,7 +3397,10 @@ const SERVICE_ADAPTERS = {
         const ext = provider.resultExt || 'json';
         const resultResp = await fetchWithTimeout(base + 'result/' + jobId + '/' + ext, {}, 60000);
         if (!resultResp.ok) throw new Error('result HTTP ' + resultResp.status);
-        return ext === 'json' ? await resultResp.json() : await resultResp.text();
+        const out = ext === 'json' ? await resultResp.json() : await resultResp.text();
+        const size = (typeof out === 'string') ? out.length + ' bytes' : (out && typeof out === 'object' ? Object.keys(out).length + ' key(s)' : '?');
+        uniprotLog(tool + ' result ready: ' + size + ' (' + ext + ', job ' + jobId + ')');
+        return out;
     },
     // ESMFold: POST text/plain sequence -> PDB text
     async esmfold(provider, args) {
@@ -3753,6 +3758,7 @@ function parseIprscanTsv(text) {
         if (isNaN(start) || isNaN(end)) return;
         rows.push({
             analysis: (f[3] || '').trim(),
+            length: parseInt(f[2], 10) || null,
             acc: (f[4] || '').trim(),
             desc: (f[5] || '').trim(),
             start, end,
@@ -3843,10 +3849,24 @@ async function runTopologyPrediction() {
         if (!(await ensureExternalServices())) { endGuideTask('topology'); return; }
         setStatus('Submitting InterProScan job (TMHMM, Phobius, SignalP). Usually a minute or two\u2026');
         const text = await runCapability('topology_prediction', { sequence: seq }, (m) => setStatus(m));
+        const iprRows = parseIprscanTsv(text);
+        // The TSV carries the sequence length it ran on (column 3); a mismatch
+        // means ranges are clipped to the loaded sequence.
+        const ranLength = iprRows.length ? iprRows[0].length : null;
+        if (ranLength && ranLength !== seq.length) {
+            uniprotLog('topology prediction ran on a ' + ranLength + ' aa sequence, the loaded one is ' + seq.length + ' aa - ranges clipped');
+        }
         const sources = parseIprscanTopology(text, seq.length);
-        if (!sources.length) { setStatus('No topology regions were returned.'); endGuideTask('topology', 'Topology prediction returned nothing', 'info'); return; }
+        if (!sources.length) {
+            logAction('api', 'Topology prediction: ' + iprRows.length + ' row(s) parsed, no TM/signal regions found - nothing added');
+            setStatus('No topology regions were returned (' + iprRows.length + ' row(s) parsed).');
+            endGuideTask('topology', 'Topology prediction returned nothing', 'info');
+            return;
+        }
+        logAction('api', 'Topology prediction: ' + iprRows.length + ' row(s) -> ' + sources.length + ' source(s)',
+            sources.map(x => x.name + ' ' + (x.state.match(/M+/g) || []).length + ' TM').join(', '));
         sources.forEach(s => addTopologyStateSource(s.state, s.name));
-        const summary = sources.map(s => s.name + ' ' + (s.state.match(/M/g) || []).length + ' TM').join(' \u00b7 ');
+        const summary = sources.map(x => x.name + ' ' + (x.state.match(/M+/g) || []).length + ' TM segment(s)').join(' \u00b7 ');
         const sum = topologyConsensusSummary();
         setStatus('Topology (InterProScan): ' + summary + (sum ? ' \u00b7 consensus ' + sum.tmSegments + ' TM, ' + sum.counts['?'] + ' disagreement column(s)' : '') + '.');
         endGuideTask('topology', 'Added ' + sources.length + ' topology source(s) from InterProScan (' + summary + ')', 'success');
@@ -4132,6 +4152,8 @@ async function runDomainScan() {
         const isIprscan = isIprscanTsv(text);
         const domains = isIprscan ? parseIprscanDomains(text) : parseHmmerDomains(text);
         const added = applyDomainTracks(domains, isIprscan ? 'InterProScan' : 'Pfam');
+        logAction('api', providerName + ': ' + domains.length + ' match(es) parsed -> ' + added + ' track(s)',
+            isIprscan ? 'InterProScan TSV' : 'HMMER text');
         renderViewer(parsedTracks);
         populateCrossRefDropdown();
         refreshInputDataModalIfVisible();
@@ -4189,6 +4211,7 @@ async function runHomologSearch() {
             showToast(source + ' searched a sequence of length ' + parsed.queryLength + ' but the loaded sequence is ' + seq.length + ' - importing anyway, but residue numbering may not line up.', 'error');
         }
         const added = applyHomologHits(parsed, source);
+        logAction('api', source + ': ' + parsed.hits.length + ' hit(s) parsed -> ' + added + ' track(s)');
         recomputeConservationScores();
         renderViewer(parsedTracks);
         populateCrossRefDropdown();
@@ -4247,7 +4270,10 @@ function applyHomologHits(parsed, source) {
 function uniprotLog(msg) {
     const stamp = new Date().toISOString().slice(11, 19);
     uniprotLogEntries.push('[' + stamp + '] ' + msg);
-    try { console.log('[Q2DV UniProt] ' + msg); } catch (e) {}
+    // The same lines belong in the user-facing activity log: an API job that
+    // returned nothing is exactly what someone opens the log to see.
+    logAction('api', msg);
+    try { console.log('[Q2DV api] ' + msg); } catch (e) {}
     const el = document.getElementById('uniprotAnnotationLog');
     if (el) el.textContent = uniprotLogEntries.join('\n');
 }
@@ -5968,6 +5994,9 @@ function logAction(kind, label, detail) {
         detail: detail == null ? '' : String(detail).slice(0, 200)
     });
     if (actionLog.length > ACTION_LOG_MAX) actionLog.splice(0, actionLog.length - ACTION_LOG_MAX);
+    // If the log is on screen, keep it current: the point is watching a run.
+    const openModal = document.getElementById('actionLogModal');
+    if (openModal && openModal.style && openModal.style.display === 'flex') renderActionLog();
     // Mirror the meaningful events to the console, but not raw clicks: a user
     // clicking around would otherwise flood the console they are debugging with.
     if (kind !== 'click') {
@@ -5993,8 +6022,9 @@ function renderActionLog() {
     const body = document.getElementById('actionLogBody');
     if (!body) return;
     if (!actionLog.length) { body.textContent = '(no actions recorded yet this session)'; return; }
+    const kindWord = (k) => ({ click: 'Click', api: 'API', task: 'Task', import: 'Import', attach: 'Attach', render: 'Render', download: 'Fetch', error: 'Error', export: 'Export' }[k] || k);
     body.textContent = actionLog.slice().reverse()
-        .map(e => e.t + '  ' + (e.kind + '        ').slice(0, 8) + e.label + (e.detail ? '   [' + e.detail + ']' : ''))
+        .map(e => e.t + '  ' + (kindWord(e.kind) + '        ').slice(0, 9) + e.label + (e.detail ? '   [' + e.detail + ']' : ''))
         .join('\n');
 }
 function copyActionLog(asJson) {
@@ -8350,7 +8380,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.58.0';
+const APP_VERSION = '0.59.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11252,10 +11282,12 @@ async function fetchVariantEffectPredictions() {
                 const n = Object.keys((out && out.results) || {}).length;
                 mergeVariantEffectResults(id, (out && out.results) || {});
                 variantEffectRan[id] = { ok: true, count: n, message: (out && out.summary) || '' };
+                logAction('api', provider.label + ': ' + n + ' result(s)', (out && out.summary) || '');
                 lines.push(provider.label + ': ' + ((out && out.summary) || n + ' result(s)'));
             } catch (err) {
                 const m = err && err.message ? err.message : String(err);
                 variantEffectRan[id] = { ok: false, count: 0, message: m };
+                logAction('error', provider.label + ' failed', m);
                 lines.push(provider.label + ' failed (' + m + ')');
             }
         }
@@ -14760,7 +14792,7 @@ function toggleP3DSize() {
     el.classList.toggle('p3d-small', !p3dLarge);
     window.setTimeout(() => {
         placeP3DViewer();
-        if (p3dView) { p3dView.resize(); p3dView.render(); }
+        p3dSafeRender();
     }, 0);
     updateP3DToolbar();
 }
@@ -14845,7 +14877,7 @@ function initP3DViewer() {
         outline: { color: 0x334155, width: 0.05 }
     });
     p3dLoaded = true;
-    window.addEventListener('resize', () => { if (p3dView && p3dViewerOpen) { p3dView.resize(); p3dView.render(); } });
+    window.addEventListener('resize', () => { if (p3dViewerOpen) p3dSafeRender(); });
 }
 
 // --- Structure cache + model dropdown --------------------------------------
@@ -14985,7 +15017,7 @@ async function p3dRemoteFetchForHomolog(hhKey) {
             setP3DNotice('Could not fetch "' + info.hitId + '" from RCSB PDB (unknown ID or offline?). ' +
                 'Attach a PDB/CIF file whose name matches "' + info.hitId + '", or check your connection and reselect.');
             setP3DStatus('Homolog: no structure');
-            if (p3dView) { try { p3dView.render(); } catch (e) {} }
+            p3dSafeRender();
         }
     } catch (err) {
         setP3DNotice('Could not fetch "' + info.hitId + '" from RCSB PDB. Attach a PDB/CIF file whose name matches "' +
@@ -15027,7 +15059,7 @@ async function fetchAlphaFoldForHomolog(hhKey, acc) {
         setP3DNotice('Could not fetch the AlphaFold model for ' + acc + ' (' + (err && err.message ? err.message : err) + '). ' +
             'AlphaFold DB covers UniProt entries; attach a PDB/CIF file whose name matches "' + (info.hitId || acc) + '" instead.');
         setP3DStatus('Homolog: no structure');
-        if (p3dView) { try { p3dView.render(); } catch (e) {} }
+        p3dSafeRender();
     } finally {
         p3dRemotePending = false;
         const selEl = document.getElementById('p3dModelSelect');
@@ -15221,11 +15253,27 @@ function selectionResidueColors(selRanges) {
     selRanges.forEach(([s, e]) => { for (let r = s; r <= e; r++) map.set(r, colorFor(r)); });
     return map;
 }
+// 3Dmol's built-in scheme names differ from the labels used here: it has no
+// 'spectrum' or 'hydro', so asking for those produced "Could not interpret
+// colorscheme ..." and silently kept the previous colours.
+const P3D_LIB_SCHEMES = { spectrum: 'residue', chain: 'chain', hydro: 'hydrophobicity' };
+// 3Dmol draws into a WebGL canvas; resizing or rendering while the viewer is
+// hidden (container has no size) produces framebuffer warnings and an
+// OffscreenCanvas ImageBitmap error that look alarming but mean nothing. Skip
+// until the container has real dimensions - the show path renders once visible.
+function p3dSafeRender() {
+    if (!p3dView) return;
+    const el = document.getElementById('p3dContainer');
+    if (el && (el.clientWidth < 2 || el.clientHeight < 2)) return;
+    try { p3dView.resize(); } catch (e) {}
+    try { p3dView.render(); } catch (e) {}
+}
 function baseP3DStyle() {
     const scheme = P3D_BASE_SCHEMES[p3dBaseSchemeIdx] || 'white';
     const style = { cartoon: {}, stick: {} };
-    if (scheme === 'white' || scheme === 'conservation') { style.cartoon.color = P3D_COLOR_HEX.white; style.stick.color = P3D_COLOR_HEX.white; }
-    else { style.cartoon.colorscheme = scheme; style.stick.colorscheme = scheme; }
+    const lib = P3D_LIB_SCHEMES[scheme];
+    if (!lib) { style.cartoon.color = P3D_COLOR_HEX.white; style.stick.color = P3D_COLOR_HEX.white; }
+    else { style.cartoon.colorscheme = lib; style.stick.colorscheme = lib; }
     return style;
 }
 function coloredP3DStyle(colorHex) {
@@ -15248,7 +15296,7 @@ function applyP3DColoring(resiColors, statusLabel) {
     if (p3dLocked) msg += ' (locked)';
     setP3DStatus(msg);
     p3dView.zoomTo();
-    p3dView.render();
+    p3dSafeRender();
 }
 // Runs on every selection change (wired into refreshChimeraxDisplay below).
 // The conservation colour scheme reads the CONSERVATION row, so removing that
@@ -15280,7 +15328,7 @@ function updateP3DColoring() {
         p3dView.setStyle({}, baseP3DStyle());
         setP3DStatus(p3dModelDisplayName() + ': no selection');
         p3dView.zoomTo();
-        p3dView.render();
+        p3dSafeRender();
         return;
     }
     applyP3DColoring(selectionResidueColors(selRanges));
@@ -15320,7 +15368,7 @@ function applyP3DConservationColoring() {
         p3dView.setStyle({}, baseP3DStyle());
         setP3DStatus(p3dModelDisplayName() + ': no conservation data');
         p3dView.zoomTo();
-        p3dView.render();
+        p3dSafeRender();
         return;
     }
     applyP3DColoring(resiColors, 'conservation-colored');
@@ -16891,7 +16939,7 @@ async function resetAllData() {
     p3dRemotePending = false;
     p3dModel = null;
     updateP3DModelInfo();
-    if (p3dView) { try { p3dView.removeAllModels(); } catch (err) {} try { p3dView.render(); } catch (err) {} }
+    if (p3dView) { try { p3dView.removeAllModels(); } catch (err) {} try { p3dSafeRender(); } catch (err) {} }
     homologHitsInfo = {};
     keyedVariantsInfo = {};
     conservationMetric = 'shannon';

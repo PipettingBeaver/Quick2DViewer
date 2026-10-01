@@ -1209,6 +1209,50 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('activity log + 3D guards');
+assert(HTML.indexOf('>Log</button>') !== -1, 'the menu bar has a top-level Log button');
+assert(HTML.indexOf('openActionLog()" title="Everything this session') !== -1, 'which opens the activity log');
+assert(HTML.indexOf('>Activity log</h3>') !== -1, 'the modal is named for users, not as a debugging console');
+const logProbe = ctxRun(`
+    (function () {
+        actionLog = [];
+        uniprotLog('submit iprscan5: HTTP 200 job=test-123');
+        const hasApi = actionLog.some(e => e.kind === 'api' && /submit iprscan5/.test(e.label));
+        const text = actionLogText(false);
+        return { hasApi, text };
+    })()
+`);
+assert(logProbe.hasApi, 'API lifecycle lines land in the activity log (not only the console)');
+ctxRun(`renderActionLog();`);
+const rendered = ctxRun(`document.getElementById('actionLogBody').textContent`);
+assert(rendered.indexOf('API') !== -1 && rendered.indexOf('submit iprscan5') !== -1, 'and the modal renders plain-word kinds (got "' + rendered.slice(0, 60) + '")');
+assert(ctxRun(`actionLogText(true)`) && JSON.parse(ctxRun(`actionLogText(true)`)).length >= 1, 'the JSON copy stays valid for macro work');
+// 3Dmol scheme names: the app labels map onto real 3Dmol schemes.
+assert(ctxRun(`P3D_LIB_SCHEMES.hydro`) === 'hydrophobicity' && ctxRun(`P3D_LIB_SCHEMES.spectrum`) === 'residue' && ctxRun(`P3D_LIB_SCHEMES.chain`) === 'chain', 'the 3D colour schemes map onto 3Dmol names (no more "could not interpret colorscheme")');
+const styleFor = (idx) => ctxRun(`(function(){ p3dBaseSchemeIdx = ${idx}; return baseP3DStyle(); })()`);
+assert(styleFor(3).cartoon.colorscheme === 'hydrophobicity', 'the hydro scheme asks 3Dmol for hydrophobicity');
+assert(styleFor(0).cartoon.color && !styleFor(0).cartoon.colorscheme, 'white stays a plain colour');
+assert(styleFor(4).cartoon.color && !styleFor(4).cartoon.colorscheme, 'conservation stays colour-driven (painted per residue)');
+// p3dSafeRender: renders when the container has size, skips when hidden, never recurses.
+const renderCalls = ctxRun(`
+    (function () {
+        let calls = 0;
+        p3dView = { resize: function () { calls++; }, render: function () { calls++; } };
+        const el = document.getElementById('p3dContainer');
+        el.clientWidth = 500; el.clientHeight = 400;
+        p3dSafeRender();
+        const visible = calls;
+        el.clientWidth = 0; el.clientHeight = 0;
+        p3dSafeRender();
+        const hidden = calls - visible;
+        p3dView = null;
+        return { visible, hidden };
+    })()
+`);
+assert(renderCalls.visible === 2, 'p3dSafeRender resizes and renders when the viewer has real size (got ' + renderCalls.visible + ')');
+assert(renderCalls.hidden === 0, 'and skips both while the container has no size (the framebuffer warnings)');
+ctxRun(`actionLog = [];`);
+
 section('homolog glyph wording is source-aware');
 assert(ctxRun(`homologGlyphBasis('HL_missing')`) === 'HHpred match probability', 'without an info entry the basis defaults to HHpred');
 ctxRun(`homologHitsInfo = { HL_a: { source: 'phmmer' }, HL_b: { source: 'BLAST' }, HL_c: { source: 'Foldseek' }, HL_d: { source: 'HHpred' } };`);

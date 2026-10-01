@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-09-25
+
+### Added
+
+- **A user-facing Activity log, reachable from the menu bar ("Log", between Analyze and Export).** The
+  existing action log now says what the app is doing in plain words and, crucially, what came back
+  from every API job: submit (tool, HTTP status, job id), poll status changes with elapsed time,
+  result size, and **what was parsed from it** ("Topology prediction: 36 row(s) -> 2 source(s)
+  [Phobius 12 TM, TMHMM 11 TM]"), or why nothing was added. It keeps the last 200 entries, updates
+  live while open, copies as text or JSON (`q2dvActions()`), and stays session-only. The modal is
+  renamed from "Debugging console" to "Activity log" (Help links to it too).
+  - `uniprotLog()` now also feeds the activity log (prefix changed to `[Q2DV api]`), so the API
+    lifecycle is in one place instead of only in Options -> Data Sources and the console.
+  - Runner summaries: domain scans log matches -> tracks (HMMER text vs InterProScan TSV), homolog
+    searches log hits -> tracks, variant-effect providers log per-provider results or failures.
+  - A prediction that ran on a different sequence length than the loaded one is logged explicitly
+    ("ran on a 355 aa sequence, the loaded one is 417 aa - ranges clipped"), which is exactly the
+    kind of silent-looking mismatch the log exists to surface.
+  - Macro recording saved as a future idea (the JSON log is the starting point; nothing built yet).
+
+### Fixed
+
+- **3D viewer console noise, considered and cleaned up:**
+  - `Could not interpret colorscheme hydro`: the app's labels did not match 3Dmol's scheme names, so
+    "hydro" and "spectrum" silently kept the previous colours. They now map to `hydrophobicity` and
+    `residue` (`P3D_LIB_SCHEMES`); white/conservation stay colour-driven as before.
+  - `OffscreenCanvas.transferToImageBitmap` + WebGL "Framebuffer not complete ... no width or
+    height": 3Dmol was asked to resize/render while the viewer was hidden (zero-size container).
+    `p3dSafeRender()` skips both until the container has real dimensions; the show path renders once
+    visible.
+  - Topology source summaries counted M **residues** as "TM" (215 instead of 12); they now count
+    segments, matching the source list wording.
+
 ## [0.58.0] - 2026-09-25
 
 ### Added

@@ -1262,6 +1262,30 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 330 | Nothing loaded → press the button | Clear message listing what each provider needs |
 | 331 | Add a new provider (dev) | One registry entry; tooltips/status/read-out pick it up |
 
+### Activity log — 0.59.0
+
+**Should do.** The "Log" button in the menu bar shows what the session is doing in plain words -
+clicks, menu choices, API submits/polls/results and what was parsed - newest first, updating live.
+
+**Try (normal use).**
+1. Press **Log**, then run something with an API (topology prediction, domain scan, phmmer).
+   *Expect:* submit -> poll -> result-size -> parse-summary lines appear live, plus task start/end.
+2. Run the InterProScan topology prediction on LacY.
+   *Expect:* "36 row(s) -> 2 source(s) [Phobius 12 TM, TMHMM 11 TM]" - the numbers to compare with
+   what appears in the viewer.
+3. Run a scan that finds nothing (e.g. topology on a soluble protein).
+   *Expect:* an explicit "N row(s) parsed, no TM/signal regions found - nothing added" instead of
+   silence.
+4. Copy as JSON and paste it back when reporting a problem.
+
+**Edge cases (symptom → likely cause).**
+- A prediction run on a different sequence length than the loaded one logs "ranges clipped" - check
+  the sequence you loaded.
+- The log is session-only and capped at 200 entries; JSON copy is the durable form.
+- 3D viewer open/close should no longer print colorscheme or framebuffer warnings to the console.
+
+---
+
 ## Reference systems (verified expectations) — use these to test
 
 | System | Accession | Class | Verified expectation | Exercises |
@@ -1285,6 +1309,19 @@ hmmscan/Pfam, InterProScan with NCBIfam (TIGRFAM/PRK/NF: bacterial and viral fam
 Foldseek (AFDB/PDB), ESMFold, the topology predictors and conservation. **Not integrated** (would
 need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial resistance), BV-BRC
 (bacterial/viral genomes), viral-specific databases. The capability/provider registry is the hook.
+
+## 0.59.0 - activity log + 3D console cleanup (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 341 | Menu bar between Analyze and Export | A "Log" button opens the Activity log |
+| 342 | Run any API job with the log open | Submit / poll / result-size / parse-summary lines appear live |
+| 343 | InterProScan topology on LacY (P02920) | Log: 36 row(s) -> 2 source(s) [Phobius 12 TM, TMHMM 11 TM] |
+| 344 | Topology on a soluble protein (e.g. GFP) | Log says no TM/signal regions found - nothing added |
+| 345 | Load a truncated sequence, then predict | Log warns the prediction ran on a different length (ranges clipped) |
+| 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
+| 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
+| 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
 ## Pending live checks (API calls + UI integration) — test later
 
@@ -1370,4 +1407,5 @@ needs a full card.
 6ai. 319–325 (AlphaMissense variant effects - new 0.56.0; card at the top, check 319 first).
 6aj. 326–331 (variant effect provider framework - new 0.57.0; card at the top, check 326 first).
 6ak. 332–340 + the reference-systems table (InterProScan topology/domains - new 0.58.0; check 332 first).
+6al. 341–348 (activity log + 3D console cleanup - new 0.59.0; card at the top, check 343 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
