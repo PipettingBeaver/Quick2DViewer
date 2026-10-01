@@ -1211,6 +1211,28 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('PDB entry lookup (sequence or accession)');
+const pdbProvs = ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers.map(p => p.id)`);
+assert(pdbProvs.join(',') === 'pdbe_best_structures,rcsb_sequence', 'the lookup offers PDBe best structures then the RCSB sequence search (got ' + pdbProvs.join(',') + ')');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[0].url`).indexOf('best_structures') !== -1, 'the PDBe provider uses the verified endpoint');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].url`).indexOf('search.rcsb.org') !== -1, 'and the RCSB one the search API');
+ctxRun(`
+    pdbLookupEntries = [
+        { id: '2G16', title: 'Structure of S65A Y66S GFP variant', method: 'X-ray diffraction', resolution: 2.0, coverage: 1, identity: 1 },
+        { id: '7PCA', title: '', method: '', resolution: null, coverage: null, identity: 1 }
+    ];
+    renderPdbLookupResults();
+`);
+const lookupHtml = ctxRun(`document.getElementById('pdbLookupResults').innerHTML`);
+assert(lookupHtml.indexOf('2G16') !== -1 && lookupHtml.indexOf('X-ray diffraction') !== -1 && lookupHtml.indexOf('2.00') !== -1, 'each hit shows id, title and method/resolution (got "' + lookupHtml.slice(0, 90) + '")');
+assert(lookupHtml.indexOf('coverage 100%') !== -1 && lookupHtml.indexOf('identity 100%') !== -1, 'plus coverage and identity when known');
+assert(lookupHtml.indexOf('(no title)') === -1, 'and shows no placeholder noise when metadata is missing');
+assert(ctxRun(`typeof SERVICE_ADAPTERS.rcsbEntryMeta`) === 'function', 'the GraphQL metadata fetch is shared by both providers');
+assert((lookupHtml.match(/fetchPdbEntry/g) || []).length === 2, 'every hit has a Fetch button that reuses the PDB fetch');
+assert(HTML.indexOf('id="btnPdbLookup"') !== -1 && HTML.indexOf('id="pdbLookupStatus"') !== -1 && HTML.indexOf('id="pdbLookupResults"') !== -1, 'the structure panel has the button, status and results list');
+assert(HTML.indexOf('use Find PDB entries in Options -> Structure') !== -1, 'and the PDB box points at it when an id is missing');
+ctxRun(`pdbLookupEntries = []; renderPdbLookupResults();`);
+
 section('Options: data-source categories + guide deep links');
 assert(HTML.indexOf('id="optDataCategory"') !== -1 && HTML.indexOf('id="optDataCategoryHint"') !== -1, 'Options -> Data Sources has a category dropdown and a hint line');
 const catPanels = ctxRun(`Object.keys(DATA_CATEGORY_HINTS)`);
@@ -2927,6 +2949,26 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     ctxRun(`
         parsedTracks = {}; topologySources = [];
         SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].adapter = 'ebiJob';
+    `);
+
+    // findPdbEntries end to end with a stubbed capability (no network).
+    ctxRun(`
+        externalServicesEnabled = true;
+        parsedTracks = { AA: 'M'.repeat(238) };
+        uniprotAccession = '';
+        pdbLookupEntries = [];
+        SERVICE_ADAPTERS.__lookup_ok = async () => ({ source: 'RCSB sequence search (exact identity)',
+            entries: [{ id: '2G16', title: 'GFP variant', method: 'X-ray diffraction', resolution: 2.0, coverage: 1, identity: 1 }] });
+        SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].adapter = '__lookup_ok';
+    `);
+    await ctxRun(`findPdbEntries()`);
+    assert(ctxRun(`pdbLookupEntries.length`) === 1, 'the lookup runner keeps the results (got ' + ctxRun(`pdbLookupEntries.length`) + ')');
+    assert(/Found 1 entry via RCSB sequence search/.test(ctxRun(`document.getElementById('pdbLookupStatus').textContent`)), 'the status names the source and count');
+    assert(ctxRun(`document.getElementById('pdbLookupResults').innerHTML`).indexOf('2G16') !== -1, 'and the list renders');
+    assert(ctxRun(`actionLog.some(e => e.kind === 'api' && /PDB lookup .*1 entry/.test(e.label))`), 'the activity log records it');
+    ctxRun(`
+        parsedTracks = {}; pdbLookupEntries = []; uniprotAccession = null; actionLog = [];
+        SERVICE_REGISTRY.capabilities.pdb_entry_lookup.providers[1].adapter = 'rcsbSequenceSearch';
     `);
 
     // A bad PDB id is rejected before any request (fetchPdbEntry is async).

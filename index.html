@@ -2737,11 +2737,15 @@
                     style="font-size:0.78rem; padding:4px 10px;" title="Predict a 3D structure with ESMFold and attach it">Predict structure (ESMFold)</button>
                 <button type="button" id="btnValidation" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="runStructureValidation()"
                     style="font-size:0.78rem; padding:4px 10px;" title="Fetch wwPDB validation outliers and quality scores for the attached experimental entry">Fetch validation (PDBe)</button>
+                <button type="button" id="btnPdbLookup" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="findPdbEntries()"
+                    style="font-size:0.78rem; padding:4px 10px;" title="Don't know a PDB id? Find experimental entries for the loaded protein: ranked best structures when an accession is known, else an exact-sequence search">Find PDB entries</button>
                 <a class="copy-btn" style="text-decoration:none;" href="https://alphafold.ebi.ac.uk/" target="_blank" rel="noopener">Open AlphaFold DB ↗</a>
                 <a class="copy-btn" style="text-decoration:none;" href="https://www.rcsb.org/" target="_blank" rel="noopener">Open RCSB PDB ↗</a>
             </div>
             <div id="esmfoldStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             <div id="validationStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+            <div id="pdbLookupStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+            <div id="pdbLookupResults" style="margin-top:6px;"></div>
         </div>
 
         <div id="optCat-foldseek" class="opt-cat" hidden>
@@ -3349,6 +3353,19 @@ const SERVICE_REGISTRY = {
                   resultExt: 'tsv', enabled: true },
             ],
         },
+        pdb_entry_lookup: {
+            label: 'Find PDB entries for the loaded protein',
+            providers: [
+                // Verified 2026-09, both CORS-enabled. PDBe best_structures ranks
+                // entries by resolution for a UniProt accession; the RCSB sequence
+                // search works from the sequence alone (exact identity, then 90%),
+                // with titles/resolutions from one GraphQL batch.
+                { id: 'pdbe_best_structures', label: 'PDBe best structures (accession)', adapter: 'pdbeBestStructures',
+                  url: 'https://www.ebi.ac.uk/pdbe/api/mappings/best_structures/', enabled: true },
+                { id: 'rcsb_sequence', label: 'RCSB sequence search', adapter: 'rcsbSequenceSearch',
+                  url: 'https://search.rcsb.org/rcsbsearch/v2/query', enabled: true },
+            ],
+        },
         structure_validation: {
             label: 'Experimental structure validation (PDBe)',
             providers: [
@@ -3512,6 +3529,74 @@ const SERVICE_ADAPTERS = {
         const size = (typeof out === 'string') ? out.length + ' bytes' : (out && typeof out === 'object' ? Object.keys(out).length + ' key(s)' : '?');
         uniprotLog(tool + ' result ready: ' + size + ' (' + ext + ', job ' + jobId + ')');
         return out;
+    },
+    // PDBe "best structures" for a UniProt accession: ranked by resolution, with
+    // coverage. Any species (it is about the protein, not the organism).
+    async pdbeBestStructures(provider, args) {
+        const acc = String(args.accession || '').trim().toUpperCase();
+        if (!acc) throw new Error('needs a UniProt accession');
+        const resp = await fetchWithTimeout(provider.url + encodeURIComponent(acc), {}, 30000);
+        if (!resp.ok) throw new Error('PDBe HTTP ' + resp.status);
+        const data = await resp.json();
+        const rows = (data && data[acc]) || [];
+        if (!rows.length) throw new Error('no structures for ' + acc);
+        const top = rows.slice(0, 8);
+        const meta = await SERVICE_ADAPTERS.rcsbEntryMeta(top.map(r => String(r.pdb_id || '').toUpperCase()).filter(Boolean));
+        return {
+            source: 'PDBe best structures',
+            accession: acc,
+            entries: top.map(r => ({
+                id: String(r.pdb_id || '').toUpperCase(),
+                title: (meta[String(r.pdb_id || '').toUpperCase()] || {}).title || '',
+                method: r.experimental_method || '',
+                resolution: r.resolution != null ? Number(r.resolution) : null,
+                coverage: r.coverage != null ? Number(r.coverage) : null,
+                identity: r.sequence_identity != null ? Number(r.sequence_identity) : null
+            })).filter(e => e.id)
+        };
+    },
+    // Titles + resolution for a set of entry ids, in one GraphQL call
+    // (best-effort: a failure leaves the ids usable).
+    async rcsbEntryMeta(ids) {
+        const meta = {};
+        if (!ids || !ids.length) return meta;
+        try {
+            const gq = JSON.stringify({ query: '{ entries(entry_ids: [' + ids.map(id => '"' + id + '"').join(',') + ']) { rcsb_id struct { title } rcsb_entry_info { resolution_combined } } }' });
+            const resp = await fetchWithTimeout('https://data.rcsb.org/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: gq }, 40000);
+            if (resp.ok) {
+                const data = await resp.json();
+                ((data.data && data.data.entries) || []).forEach(e => {
+                    const rc = e.rcsb_entry_info && e.rcsb_entry_info.resolution_combined;
+                    meta[e.rcsb_id] = { title: (e.struct && e.struct.title) || '', resolution: (rc && rc.length) ? Number(rc[0]) : null };
+                });
+            }
+        } catch (e) { /* metadata is best-effort */ }
+        return meta;
+    },
+    // RCSB sequence search from the sequence alone.
+    async rcsbSequenceSearch(provider, args) {
+        const seq = String(args.sequence || '');
+        if (!seq) throw new Error('needs a sequence');
+        const search = async (identity) => {
+            const body = JSON.stringify({
+                query: { type: 'terminal', service: 'sequence', parameters: { evalue_cutoff: 1, identity_cutoff: identity, sequence_type: 'protein', value: seq } },
+                return_type: 'entry',
+                request_options: { paginate: { start: 0, rows: 8 }, results_content_type: ['experimental'] }
+            });
+            const resp = await fetchWithTimeout(provider.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, 60000);
+            if (!resp.ok) throw new Error('RCSB search HTTP ' + resp.status);
+            const data = await resp.json();
+            return (data.result_set || []).map(r => r.identifier);
+        };
+        let ids = await search(1.0);
+        let identity = 1.0;
+        if (!ids.length) { ids = await search(0.9); identity = 0.9; }
+        if (!ids.length) throw new Error('no experimental entries match the sequence');
+        const meta = await SERVICE_ADAPTERS.rcsbEntryMeta(ids);
+        return {
+            source: 'RCSB sequence search (' + (identity === 1 ? 'exact identity' : Math.round(identity * 100) + '% identity') + ')',
+            entries: ids.map(id => Object.assign({ id, title: '', method: '', resolution: null, coverage: null, identity }, meta[id] || {}))
+        };
     },
     // PDBe validation: per-residue outlier summary + quality scores (any species,
     // experimental entries only - it is the experimental counterpart of pLDDT).
@@ -5924,6 +6009,61 @@ function computeInterfaces(chains, cutoff) {
     return { ids, residuesByChain, pairs };
 }
 
+// --- PDB entry lookup (sequence or accession) -------------------------------
+// "I have a sequence, which experimental entry is it?" - PDBe best structures
+// when an accession is known (ranked by resolution), else an RCSB exact-sequence
+// search. Each hit has a Fetch button, so the loop is: sequence -> entry ->
+// structure attached -> validation.
+let pdbLookupEntries = [];
+function renderPdbLookupResults() {
+    const wrap = document.getElementById('pdbLookupResults');
+    if (!wrap) return;
+    if (!pdbLookupEntries.length) { wrap.innerHTML = ''; return; }
+    let html = '<div style="display:flex; flex-direction:column; gap:4px;">';
+    pdbLookupEntries.forEach(e => {
+        const bits = [];
+        if (e.method) bits.push(e.method);
+        if (e.resolution != null) bits.push(Number(e.resolution).toFixed(2) + ' \u00c5');
+        if (e.coverage != null) bits.push('coverage ' + Math.round(e.coverage * 100) + '%');
+        if (e.identity != null) bits.push('identity ' + Math.round(e.identity * 100) + '%');
+        html += '<div style="display:flex; align-items:center; gap:8px; font-size:0.75rem;">' +
+            '<strong style="width:54px;">' + structureEscapeHtml(e.id) + '</strong>' +
+            '<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + structureEscapeHtml(e.title || '') + '">' +
+            structureEscapeHtml(e.title || '') +
+            (bits.length ? ' <span style="color:#94a3b8;">' + structureEscapeHtml(bits.join(' \u00b7 ')) + '</span>' : '') + '</span>' +
+            '<button type="button" class="copy-btn" onclick="fetchPdbEntry(\'' + structureEscapeHtml(e.id) + '\')" style="padding:2px 8px;" title="Download this entry from RCSB and attach it">Fetch</button>' +
+            '</div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+}
+async function findPdbEntries() {
+    const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!seq) { showToast('Load a protein sequence first: the lookup searches by sequence or accession.', 'error'); return; }
+    const derived = deriveLookupDefaults();
+    const accession = uniprotAccession || (derived && derived.accession) || '';
+    const prefer = accession ? 'pdbe_best_structures' : 'rcsb_sequence';
+    if (!beginGuideTask('structure', 'PDB entry lookup')) return;
+    const statusEl = document.getElementById('pdbLookupStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('structure'); return; }
+        setStatus(accession ? ('Looking up best structures for ' + accession + '\u2026') : 'Searching RCSB for the exact sequence\u2026');
+        const res = await runCapability('pdb_entry_lookup', { sequence: seq, accession }, (m) => setStatus(m), { prefer });
+        const entries = (res && res.entries) || [];
+        pdbLookupEntries = entries;
+        renderPdbLookupResults();
+        if (!entries.length) { setStatus('No PDB entries found.'); endGuideTask('structure', 'No PDB entries found', 'info'); return; }
+        logAction('api', 'PDB lookup (' + (res.source || '') + '): ' + entries.length + ' entr' + (entries.length === 1 ? 'y' : 'ies'), entries.slice(0, 5).map(e => e.id).join(', '));
+        setStatus('Found ' + entries.length + ' entr' + (entries.length === 1 ? 'y' : 'ies') + ' via ' + (res.source || 'lookup') + '. Press Fetch on one to attach it, then Fetch validation.');
+        endGuideTask('structure', 'Found ' + entries.length + ' PDB entr' + (entries.length === 1 ? 'y' : 'ies') + ' via ' + (res.source || 'lookup'), 'success');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('PDB lookup failed: ' + m);
+        endGuideTask('structure', 'PDB lookup failed: ' + m, 'error');
+    }
+}
+
 // --- Experimental structure validation (PDBe) -------------------------------
 // The experimental counterpart of pLDDT: per-residue geometry outliers from the
 // wwPDB validation pipeline, for any species (any experimental entry). Author
@@ -6026,7 +6166,7 @@ function focusPdbFetch() {
 }
 async function fetchPdbEntry(rawId) {
     const id = String(rawId || '').trim().toUpperCase();
-    if (!/^[0-9][A-Z0-9]{3}$/.test(id)) { showToast('Enter a four-character PDB id, e.g. 1GFL.', 'error'); return false; }
+    if (!/^[0-9][A-Z0-9]{3}$/.test(id)) { showToast('Enter a four-character PDB id, e.g. 1GFL - or use Find PDB entries in Options -> Structure to look one up from the sequence.', 'error'); return false; }
     if (!beginGuideTask('structure', 'RCSB fetch for ' + id)) return false;
     const statusEl = document.getElementById('structureFetchStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
@@ -8741,7 +8881,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.62.0';
+const APP_VERSION = '0.63.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

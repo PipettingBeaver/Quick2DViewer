@@ -1353,6 +1353,18 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.63.0 - find PDB entries from the sequence (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 371 | Load a sequence with no accession → Options → Structure → Find PDB entries | RCSB exact-identity hits with titles (GFP → 2G16, 2G5Z, 2G2S, 2G3D) |
+| 372 | Load a sequence **with** an accession (or fetch one) → Find PDB entries | PDBe best structures, ranked by resolution (P42212 → 2WUR 0.90 Å first) |
+| 373 | Press Fetch on a hit | Downloads and attaches it; the status says validation works now |
+| 374 | Then Fetch validation (PDBe) | Outlier rows for that entry |
+| 375 | Enter a nonsense id in the PDB box | Message points at Find PDB entries |
+| 376 | Block the network and press Find PDB entries | Clear failure message; the activity log has the reason |
+| 377 | A sequence with no experimental structure | "No experimental entries match the sequence" (not a crash) |
+
 ## 0.62.0 - category-based Data Sources (quick rows)
 
 | # | Try | Watch for |
@@ -1478,4 +1490,5 @@ needs a full card.
 6am. 349–356 (PDBe structure validation - new 0.60.0; card at the top, check 349 first).
 6an. 357–360 (fetch PDB entry by id - new 0.61.0; check 357 first).
 6ao. 361–370 (category-based Data Sources - new 0.62.0; check 361 first).
+6ap. 371–377 (find PDB entries from the sequence - new 0.63.0; check 371 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

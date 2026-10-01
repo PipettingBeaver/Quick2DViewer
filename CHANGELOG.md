@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-09-25
+
+### Added
+
+- **Find PDB entries from the sequence or accession** - the answer to "I have a sequence, which
+  experimental entry is it?". New capability `pdb_entry_lookup` with two CORS-verified providers:
+  - **PDBe best structures** (used when a UniProt accession is known): ranked by resolution with
+    coverage, e.g. P42212 -> 2WUR at 0.90 A first.
+  - **RCSB sequence search** (works from the sequence alone): exact identity first, then 90% for
+    close variants; titles and resolutions come from one RCSB GraphQL batch (`rcsbEntryMeta()`,
+    shared with the PDBe path, best-effort).
+  - The Structure panel gains **Find PDB entries**, a status line and a results list where every hit
+    shows id, title, method, resolution and coverage with a **Fetch** button that reuses the PDB
+    fetch - so the loop is sequence -> entry -> attached structure -> validation. The PDB-id box's
+    error message points at the lookup when an id is missing.
+  - Live-verified: the GFP sequence with no accession -> 4 exact hits (2G16, 2G5Z, 2G2S, 2G3D) with
+    titles; with P42212 -> 8 ranked entries; fetch 2G16 -> validation (2 chains, 8 clashes, geometry
+    89.1).
+  - Tests: provider registry and endpoints, the shared metadata helper, the results renderer
+    (bits + Fetch per hit, no placeholder noise), the runner end to end with a stubbed capability
+    (status, list, activity log), and the markup.
+
 ## [0.62.0] - 2026-09-25
 
 ### Changed
