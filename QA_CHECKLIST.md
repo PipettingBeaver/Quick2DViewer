@@ -1123,6 +1123,20 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 307 | Press 3D on a phmmer/BLAST row | AlphaFold model downloads and renders |
 | 308 | Copy table (TSV) + Methods summary (.md) | Table copies; report has "## Template quality" and a correct best identity |
 
+## Pending live checks (API calls + UI integration) — test later
+
+These are cheap to check by hand when you next have a session with the services up; nothing here
+needs a full card.
+
+| # | Do | Expect |
+|---|----|--------|
+| L1 | Analyze → Search Homologs, picker on **phmmer**, with a real sequence | Status line counts up; Homologs rows appear, attributed to phmmer; tooltip cites HMMER |
+| L2 | Same with the picker on **BLAST** | Rows appear attributed to BLAST; tooltip cites NCBI BLAST with HSP count |
+| L3 | Run both, then Data → Homolog Templates | Mixed-source table sorted by score, no N/A; Copy table (TSV) works |
+| L4 | Press **3D** on a phmmer/BLAST row | AlphaFold model downloads and renders (needs a UniProt accession hit) |
+| L5 | Pick BLAST while offline (or block the service) | Status names the failed provider, then the other one runs (fallback) |
+| L6 | Export Methods summary (.md) | "## Template quality" table with the same ranking; best identity is a real percentage |
+
 ## Known gaps / already-suspect areas (don't be surprised)
 
 - **UI copy tone (rework wanted).** Several strings are still tool-centric or imperative where a
