@@ -2,10 +2,24 @@
 
 All notable changes to Quick2DViewer will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+**Versioning (development, day-based).** Every push is a release, so the number doubles as a build
+identifier: the second number advances **once per day**, the third advances **per update within that
+day** (e.g. 0.66.1 -> 0.66.2 on the same day; the next day starts 0.67.0). Features and fixes are
+distinguished by the sections below, not by the number. Dates before 2026-10-01 were recorded as the
+same stale value and are not reliable; from 0.66.1 on they are the actual release dates. The 1.0.0
+milestone is reserved for the point where the feature set is declared stable (after the QA and copy
+sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
+
+## [0.66.1] - 2026-10-01
+
+### Changed
+
+- **Versioning policy is now day-based** (see above): same-day updates bump the third number, a new
+  day bumps the second. This release only records the policy and the corrected dates; no app change.
 
 ## [0.66.0] - 2026-09-25
 
