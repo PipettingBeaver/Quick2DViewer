@@ -14,6 +14,15 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.2] - 2026-10-01
+
+### Changed
+
+- **QA checklist refreshed for the sweep**: header updated to the current range and check
+  count, and a **Round 1** plan added at the top (cross-cutting X1-X7, the live checks
+  L1-L6, the newest feature cards, then the removal rows) with how to report failures.
+  Documentation only; no app change.
+
 ## [0.66.1] - 2026-10-01
 
 ### Changed

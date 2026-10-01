@@ -1,6 +1,6 @@
-# Q2DV — QA checklist for the current development session (v0.16.0 → v0.50.1)
+# Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.2)
 
-**Read this first.** Every item below has automated coverage in `npm test` (753 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1080 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -9,9 +9,21 @@ behaviour as unverified** until you have driven it by hand. The list is written 
 trying to break things, not for confirming they work — each row says what to do and
 what would count as a bug.
 
-**Current pass (0.50.1).** Start with rows 273–277 (the duplicate viewport that was
-reported and fixed) and the two live OPEN items under *Known gaps*; then follow the
-*Suggested order* at the bottom.
+**Round 1 (suggested first pass, ~1–2 h).** Drive these in order and stop as soon as
+something fails - report the row number, what you saw, and (for anything API- or
+state-related) **Log → Copy as JSON** pasted alongside. I only fix what the round turns
+up; no new features land while you are driving it.
+
+1. **X1–X7** - cross-cutting state coherence, the highest-severity class.
+2. **L1–L6** (under *Pending live checks*) - quick API plumbing: phmmer, BLAST, the
+   mixed template table + TSV, AlphaFold 3D, provider fallback, methods report.
+3. **The newest feature cards** (top of the list): experimental per-residue data (0.65.0),
+   methods report (0.66.0), PDB entry lookup (0.63.0/0.64.0), category Options (0.62.0),
+   PDBe validation (0.60.0).
+4. **Rows 27–38** - removal, the most destructive class.
+
+Then work down the *Suggested order* at the bottom for the full pass. Rows are grouped by
+the release that added them, so an old row still counts: nothing here has been retired.
 
 ## Feature test cards (newest first)
 
