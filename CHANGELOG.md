@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-09-25
+
+### Added
+
+- **Fetch a PDB entry by id from RCSB** - the control the validation message had been promising.
+  Input Data now has a PDB-id box and a **Fetch PDB entry** button (first in the Loaded Data row):
+  PDB format first (its file name matches the id, which the validation fetch looks for), CIF as the
+  fallback for very large entries, then attach + viewer/track refresh + activity-log entry
+  ("RCSB 1GFL 360126 bytes (pdb)"). The guide's structure step offers "Fetch PDB entry…" which opens
+  Input Data with the box focused. The validation message now points at it.
+  - Live-verified flow: type 1GFL -> Fetch PDB entry (360 KB) -> Fetch validation -> two chain rows,
+    76 clashes, 2 Ramachandran outliers.
+  - Tests: markup, helper wiring, bad-id rejection before any request, the guide extra, and the
+    focus helper.
+
 ## [0.60.0] - 2026-09-25
 
 ### Added

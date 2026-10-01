@@ -1211,6 +1211,15 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('RCSB PDB entry fetch (by id)');
+assert(HTML.indexOf('id="pdbFetchId"') !== -1 && HTML.indexOf('id="btnFetchPdb"') !== -1, 'Input Data has a PDB-id box and fetch button');
+assert(HTML.indexOf('id="structureFetchStatus"') !== -1, 'with its own status line');
+assert(ctxRun(`typeof fetchPdbEntry`) === 'function' && ctxRun(`typeof fetchPdbEntryFromInput`) === 'function' && ctxRun(`typeof focusPdbFetch`) === 'function', 'the fetch and focus helpers are wired');
+assert(ctxRun(`(function () { externalServicesEnabled = true; return true; })()`), 'external services can be enabled for the fetch tests');
+assert(ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'structure').extraActions.some(a => a.run === 'focusPdbFetch()')`), 'the guide structure step offers the fetch');
+assert(ctxRun(`(function () { openInputDataModal(); focusPdbFetch(); return true; })()`), 'focusPdbFetch opens Input Data without throwing');
+assert(HTML.indexOf('use Fetch PDB entry (e.g. 1GFL)') !== -1, 'the validation message points at the control that exists now');
+
 section('experimental structure validation (PDBe)');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_validation.providers[0].id`) === 'pdbe_validation', 'the validation capability points at the PDBe API');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_validation.providers[0].url`).indexOf('/pdbe/api/validation/') !== -1, 'with the verified base URL');
@@ -2875,6 +2884,9 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
         parsedTracks = {}; topologySources = [];
         SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].adapter = 'ebiJob';
     `);
+
+    // A bad PDB id is rejected before any request (fetchPdbEntry is async).
+    assert((await ctxRun(`fetchPdbEntry('nope')`)) === false, 'a bad PDB id is rejected before any request');
 
     // runStructureValidation end to end with the real PDBe fixtures (capability
     // stubbed; the mapping falls back to author numbering without a structure).

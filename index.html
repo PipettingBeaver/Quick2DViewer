@@ -2065,6 +2065,11 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:6px; flex-wrap:wrap;">
                     <h4 style="margin:0; color: #0f172a; font-size: 0.95rem;">Loaded Data</h4>
                     <span class="qa-new" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <input type="text" id="pdbFetchId" placeholder="PDB ID" maxlength="4"
+                            style="width:70px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px; text-transform:uppercase;"
+                            title="Four-character PDB entry id, e.g. 1GFL" aria-label="PDB entry id">
+                        <button type="button" id="btnFetchPdb" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="fetchPdbEntryFromInput()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Download an experimental entry from RCSB PDB by id and attach it; validation and the 3D viewer then work on it">Fetch PDB entry</button>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="autoLookupAccession()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
                         <button type="button" id="btnEsmfold" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
@@ -2105,6 +2110,7 @@
                 <div id="variantEffectStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="topologyPredictStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="validationStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+                <div id="structureFetchStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -5914,10 +5920,61 @@ function validationCandidateStructure() {
     }
     return null;
 }
+// Downloads an experimental entry from RCSB by id and attaches it. PDB format
+// first (its file name matches the id, which the validation fetch looks for),
+// CIF as the fallback for very large entries. Works for any species.
+function fetchPdbEntryFromInput() {
+    const el = document.getElementById('pdbFetchId');
+    return fetchPdbEntry(el ? el.value : '');
+}
+// Guide shortcut: open Input Data with the PDB-id box focused.
+function focusPdbFetch() {
+    openInputDataModal();
+    const el = document.getElementById('pdbFetchId');
+    if (el && el.focus) setTimeout(() => { try { el.focus(); } catch (e) {} }, 60);
+}
+async function fetchPdbEntry(rawId) {
+    const id = String(rawId || '').trim().toUpperCase();
+    if (!/^[0-9][A-Z0-9]{3}$/.test(id)) { showToast('Enter a four-character PDB id, e.g. 1GFL.', 'error'); return false; }
+    if (!beginGuideTask('structure', 'RCSB fetch for ' + id)) return false;
+    const statusEl = document.getElementById('structureFetchStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('structure'); return false; }
+        setStatus('Fetching ' + id + ' from RCSB PDB\u2026');
+        let text = '', ext = 'pdb';
+        const pdbResp = await fetchWithTimeout('https://files.rcsb.org/download/' + id + '.pdb', {}, 60000);
+        if (pdbResp.ok) {
+            text = await pdbResp.text();
+        } else {
+            setStatus('PDB format unavailable (' + pdbResp.status + '), trying CIF\u2026');
+            const cifResp = await fetchWithTimeout('https://files.rcsb.org/download/' + id + '.cif', {}, 60000);
+            if (!cifResp.ok) throw new Error('HTTP ' + pdbResp.status + '/' + cifResp.status);
+            text = await cifResp.text();
+            ext = 'cif';
+        }
+        if (!text || text.length < 100) throw new Error('empty response');
+        await attachStructureText(id + '.' + ext, text, ext, { source: 'RCSB PDB' });
+        logAction('download', 'RCSB ' + id, text.length + ' bytes (' + ext + ')');
+        renderViewer(parsedTracks);
+        refreshInputDataModalIfVisible();
+        refreshTrackManagerIfVisible();
+        schedulePersist();
+        setStatus('Fetched ' + id + ' (' + ext.toUpperCase() + ', ' + text.length + ' bytes). Fetch validation works on it now.');
+        endGuideTask('structure', 'Attached ' + id + ' from RCSB PDB', 'success');
+        return true;
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('RCSB fetch failed: ' + m);
+        endGuideTask('structure', 'RCSB fetch failed: ' + m, 'error');
+        showToast('Could not fetch ' + id + ' from RCSB (' + m + '). Check the id, or download it from rcsb.org and attach the file.', 'error');
+        return false;
+    }
+}
 async function runStructureValidation() {
     const cand = validationCandidateStructure();
     if (!cand) {
-        showToast('Validation needs an experimental PDB entry: attach one (e.g. 1GFL.pdb) or fetch it from RCSB.', 'error');
+        showToast('Validation needs an experimental PDB entry: use Fetch PDB entry (e.g. 1GFL), or attach a file named after the entry.', 'error');
         return;
     }
     if (!beginGuideTask('structure', 'PDBe validation for ' + cand.pdbId)) return;
@@ -6358,6 +6415,7 @@ const WORKFLOW_STEPS = [
         why: 'A model converts sequence annotations into spatial context: buried vs exposed, domain packing, and which residues form interfaces.',
         action: { label: 'Attach / predict structure…', run: 'openInputDataModal()' },
         extraActions: [
+            { label: 'Fetch PDB entry…', run: 'focusPdbFetch()' },
             { label: 'Fetch validation (PDBe)', run: 'runStructureValidation()' },
             { label: 'Ensemble variance…', run: 'showEnsemblePanel()' }
         ],
@@ -8547,7 +8605,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.60.0';
+const APP_VERSION = '0.61.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

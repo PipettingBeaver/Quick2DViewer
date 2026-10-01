@@ -1268,8 +1268,8 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 quality scores and shows them as per-chain rows, so experimental quality sits beside pLDDT.
 
 **Try (normal use).**
-1. Attach an experimental structure with a PDB-id-like file name (e.g. 1GFL.pdb), then Input Data →
-   **Fetch validation (PDBe)**.
+1. In Input Data type `1GFL` in the **PDB ID** box and press **Fetch PDB entry** (or attach a file
+   named after the entry), then press **Fetch validation (PDBe)**.
    *Expect:* "PDBe validation (1GFL): 2 chain row(s) - … | geometry 7.5, data 53.6, overall 11.5";
    two amber rows appear ("Validation 1GFL (chain A/B)").
 2. Hover a flagged cell and the row's ℹ.
@@ -1352,6 +1352,15 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.61.0 - fetch PDB entry by id (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 357 | Type `1GFL` in the PDB ID box → Fetch PDB entry | Status: "Fetched 1GFL (PDB, 360126 bytes)"; the 3D viewer can show it |
+| 358 | Then Fetch validation (PDBe) | Two chain rows, as in the validation card |
+| 359 | Enter `zzzz` | Rejected before any request, with the expected form explained |
+| 360 | Guide → structure step → "Fetch PDB entry…" | Opens Input Data with the box focused |
 
 ## 0.60.0 - PDBe structure validation (quick rows)
 
@@ -1452,4 +1461,5 @@ needs a full card.
 6ak. 332–340 + the reference-systems table (InterProScan topology/domains - new 0.58.0; check 332 first).
 6al. 341–348 (activity log + 3D console cleanup - new 0.59.0; card at the top, check 343 first).
 6am. 349–356 (PDBe structure validation - new 0.60.0; card at the top, check 349 first).
+6an. 357–360 (fetch PDB entry by id - new 0.61.0; check 357 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.
