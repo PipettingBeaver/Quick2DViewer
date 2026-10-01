@@ -14,6 +14,32 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.3] - 2026-10-01
+
+### Fixed
+
+- **The experimental-data row lost its meaning across a reload** (found by self-driving the QA
+  sweep's X1): the values survived in `parsedTracks` but `experimentalTracksInfo` (label, kind,
+  mean) was never persisted, so a restored session showed the row without its label, kind meaning
+  or the methods-report entry. It is now saved with the session, and `applyPersistedState()` also
+  rebuilds the derived track metas for experimental and validation rows (their colour/source lives
+  in `trackMeta`, which is not persisted) - the same treatment the rule rows already had.
+
+### Changed
+
+- **The "New-feature highlights" marking convention is retired.** It asked that every new section
+  carry a `qa-new` marker so unreviewed additions were easy to spot; only one marker survived (on a
+  row that has since been slimmed), because the QA checklist cards and the per-release rows took
+  over that job. The lone marker is removed and the CSS comment says so; the File menu toggle
+  remains for ad-hoc marking.
+
+### QA (self-driven round 1, state items)
+
+- **X1** found the reload bug above; **X2** (surgical removal of restored rows), **X3** (guide card
+  stays open across a removal, verified in a browser), **X4** (rule rows follow their input data)
+  and **X5** (undo keeps a manual override - the card reads "done (you)", verified in a browser)
+  all pass. X6 (popup blockers) remains yours to try; X7 is the retirement above.
+
 ## [0.66.2] - 2026-10-01
 
 ### Changed

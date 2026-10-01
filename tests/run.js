@@ -1211,6 +1211,73 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('X2/X4: removal of restored rows is surgical; rules follow the data');
+ctxRun(`
+    parsedTracks = { AA: 'MKV', 'HL_01_a': '|=:', 'HL_02_b': '|||', 'DM_X': '   ', 'UP_Sites': '  \u25a0', 'TP_A': 'iii', 'VAR_v1': 'MKV' };
+    homologHitsInfo = { 'HL_01_a': { rank: 1 }, 'HL_02_b': { rank: 2 } };
+    domainHitsInfo = { 'DM_X': { model: 'X' } };
+    uniprotFeatureTracks = { UP_Sites: { type: 'Site', features: [] } };
+    keyedVariantsInfo = { v1: { aligned: 'MKV' } };
+    topologySources = [{ name: 'A', state: 'iii' }];
+    graphHighlights = { 'HL_01_a': true };
+`);
+ctxRun(`removeTracks(['HL_01_a']);`);
+assert(ctxRun(`parsedTracks['HL_01_a'] === undefined && typeof parsedTracks['HL_02_b'] === 'string'`), 'removing one homolog removes only that row');
+assert(ctxRun(`homologHitsInfo['HL_01_a'] === undefined && !!homologHitsInfo['HL_02_b']`), 'and only that hit\'s info entry');
+assert(ctxRun(`graphHighlights['HL_01_a'] === undefined`), 'its highlight flag goes too');
+ctxRun(`removeTracks(['DM_X']); removeTracks(['UP_Sites']); removeTracks(['VAR_v1']); removeTracks(['TP_A']);`);
+assert(ctxRun(`domainHitsInfo['DM_X'] === undefined && parsedTracks['DM_X'] === undefined`), 'a domain row takes its family stats with it');
+assert(ctxRun(`uniprotFeatureTracks['UP_Sites'] === undefined`), 'a UniProt row takes its feature store');
+assert(ctxRun(`keyedVariantsInfo.v1 === undefined`), 'a variant row takes its sequence');
+assert(ctxRun(`topologySources.length === 0`), 'a topology row takes the pasted source it came from');
+ctxRun(`
+    parsedTracks = { AA: 'MKV', SS_PSIPRED: 'HHH' };
+    analysisRules = [{ id: 'x4', name: 'X4', color: '#ff0000', mode: 'all', enabled: true, conditions: [{ kind: 'categorical', source: 'group:SS', op: 'annotated', value: '' }] }];
+    rebuildRuleTracks();
+`);
+assert(ctxRun(`typeof parsedTracks['RULE_x4'] === 'string'`), 'a rule produces its row while its input exists');
+ctxRun(`removeTracks(['SS_PSIPRED']); rebuildRuleTracks();`);
+assert(ctxRun(`parsedTracks['RULE_x4'] === undefined`), 'and the row disappears when the input track is removed (X4: rules follow the data)');
+assert(ctxRun(`analysisRules.length === 1 && analysisRules[0].id === 'x4'`), 'while the rule definition itself stays');
+ctxRun(`parsedTracks = {}; analysisRules = []; homologHitsInfo = {}; domainHitsInfo = {}; uniprotFeatureTracks = {}; keyedVariantsInfo = {}; topologySources = []; graphHighlights = {};`);
+
+section('X1: session save/restore round-trip (self-driven QA)');
+ctxRun(`
+    parsedTracks = { AA: 'MKV', SS_PSIPRED: 'HHH', CONSERVATION: { metric: 'shannon', values: [0.5, 0.6, 0.7] },
+        'HL_01_sp_X_Y': '|=:', 'DM_PF00001': '   ', 'UP_Sites': '  \u25a0', 'TP_Phobius': 'iii', TP_Consensus: 'iii',
+        'm_pLDDT': [{ val: 90, type: 'plddt' }, { val: 80, type: 'plddt' }, { val: 70, type: 'plddt' }],
+        'DMS_EXP': [{ val: 0.1, type: 'exp' }, { val: 0.2, type: 'exp' }, { val: null, type: 'exp' }],
+        'VAL_1ABC_A': '  !' };
+    homologHitsInfo = { 'HL_01_sp_X_Y': { rank: 1, hitId: 'sp|X|Y', source: 'phmmer', stats: { 'E-value': '1e-5' }, aaTrack: 'MKV' } };
+    validationHitsInfo = { 'VAL_1ABC_A': { pdbId: '1ABC', chain: 'A', flags: { 2: ['clashes'] }, summary: { geometry_quality: 5 } } };
+    domainHitsInfo = { 'DM_PF00001': { model: 'Pfam:PF00001', database: 'InterProScan', description: 'X', domains: [] } };
+    uniprotFeatureTracks = { UP_Sites: { type: 'Site', category: 'site', color: '#ffffff', features: [{ type: 'Active site', start: 2, end: 2, description: 'x' }] } };
+    topologySources = [{ name: 'Phobius', state: 'iii' }];
+    experimentalTracksInfo = { 'DMS_EXP': { label: 'DMS tolerance', kind: 'dms', values: 2, mean: 0.15 } };
+    analysisRules = [{ id: 'r1', name: 'R', color: '#ff0000', mode: 'all', enabled: true, conditions: [{ kind: 'categorical', source: 'group:SS', op: 'annotated', value: '' }] }];
+    guideAnswers = { homologs: { hhpred: 'phmmer' } };
+    guideOverrides = { structure: 'done' };
+    guideProfile = { membrane: 'yes' };
+    graphMode = { pLDDT: true, RSA: false, EV: true, EXP: true };
+    graphHighlights = { 'HL_01_sp_X_Y': true };
+    currentProteinLabel = 'GFP test';
+`);
+sandbox.__saved = ctxRun(`JSON.stringify(gatherPersistableState())`);
+ctxRun(`resetAllData(); applyPersistedState(JSON.parse(window.__saved));`);
+const roundTrip = ctxRun(`
+    (function () {
+        const before = JSON.parse(window.__saved);
+        const after = JSON.parse(JSON.stringify(gatherPersistableState()));
+        delete before.savedAt; delete after.savedAt;
+        const diffs = [];
+        Object.keys(before).forEach(k => { if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) diffs.push(k); });
+        return { diffs, expInfo: after.experimentalTracksInfo, tracks: Object.keys(after.parsedTracks || {}).length };
+    })()
+`);
+assert(roundTrip.diffs.length === 0, 'every state-bearing key survives the round-trip (diffs: ' + roundTrip.diffs.join(', ') + ')');
+assert(roundTrip.expInfo && roundTrip.expInfo['DMS_EXP'] && roundTrip.expInfo['DMS_EXP'].kind === 'dms', 'the experimental row keeps its label/kind across a reload');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {}; validationHitsInfo = {}; domainHitsInfo = {}; uniprotFeatureTracks = {}; topologySources = []; experimentalTracksInfo = {}; analysisRules = []; guideAnswers = {}; guideOverrides = {}; guideProfile = {}; graphHighlights = {};`);
+
 section('methods report covers the newer evidence layers');
 ctxRun(`
     parsedTracks = { AA: 'M'.repeat(10), 'DMS_tolerance_EXP': Array.from({ length: 10 }, (_, i) => ({ val: i < 5 ? 0.9 : 0.2, type: 'exp' })),
