@@ -15,6 +15,8 @@ const PHMMER_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/phmmer-gf
 const BLAST_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/blast-gfp.json'), 'utf-8');
 const IPR_TOPO_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-topology.tsv'), 'utf-8');
 const IPR_DOM_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-domains.tsv'), 'utf-8');
+const PDBE_OUTLIERS_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-outliers.json'), 'utf-8');
+const PDBE_QUALITY_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-quality.json'), 'utf-8');
 
 // ---------- DOM stubs ----------
 function makeEl() {
@@ -1208,6 +1210,51 @@ assert(/^Conservation: highly conserved .*; Structure context: buried .*; Curate
 assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-agnostic');
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
+
+section('experimental structure validation (PDBe)');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_validation.providers[0].id`) === 'pdbe_validation', 'the validation capability points at the PDBe API');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_validation.providers[0].url`).indexOf('/pdbe/api/validation/') !== -1, 'with the verified base URL');
+assert(ctxRun(`validationTypeLabel('ramachandran_outliers')`) === 'Ramachandran outlier' && ctxRun(`validationTypeLabel('clashes')`) === 'clash', 'outlier types get human labels');
+assert(ctxRun(`validationTypeLabel('clashes', true)`) === 'clashes', 'and real plurals (not "clashs")');
+sandbox.__pdbeOut = JSON.parse(PDBE_OUTLIERS_FIXTURE);
+sandbox.__pdbeQ = JSON.parse(PDBE_QUALITY_FIXTURE);
+assert(ctxRun(`validationSummaryText(window.__pdbeQ['1gfl'])`) === 'geometry 7.5, data 53.6, overall 11.5', 'the quality summary reads the PDBe scores (got "' + ctxRun(`validationSummaryText(window.__pdbeQ['1gfl'])`) + '")');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(238) };
+    validationHitsInfo = {};
+`);
+const valAdded = ctxRun(`applyValidationTracks('1GFL', window.__pdbeOut['1gfl'], window.__pdbeQ['1gfl'], null)`);
+assert(valAdded === 2, 'one validation row per chain with outliers - 1GFL is a dimer, so two (got ' + valAdded + ')');
+const valKey = ctxRun(`Object.keys(parsedTracks).filter(k => k.startsWith('VAL_'))[0]`);
+assert(valKey === 'VAL_1GFL_A', 'keyed by entry and chain (got ' + valKey + ')');
+assert(ctxRun(`(parsedTracks['VAL_1GFL_A'].match(/!/g) || []).length`) > 30, 'the flagged residues are marked');
+assert(ctxRun(`formatTrackLabel('VAL_1GFL_A')`) === 'Validation 1GFL (chain A)', 'the row label names the entry and chain');
+const valFlags = ctxRun(`
+    (function () {
+        const info = validationHitsInfo['VAL_1GFL_A'];
+        const counts = {};
+        Object.keys(info.flags).forEach(i => info.flags[i].forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+        return counts;
+    })()
+`);
+assert(valFlags.clashes === 38 && valFlags.ramachandran_outliers === 1, 'the real 1GFL outlier counts survive the mapping (got ' + JSON.stringify(valFlags) + ')');
+const valInfo = ctxRun(`buildValidationPredictorInfo('VAL_1GFL_A')`);
+assert(/PDBe/.test(valInfo.category) && /38 clashes/.test(valInfo.useCase) && /geometry 7.5/.test(valInfo.useCase), 'the tooltip reports the breakdown and the entry quality (got "' + valInfo.useCase + '")');
+assert(HTML.indexOf('id="btnValidation"') !== -1 && HTML.indexOf('id="validationStatus"') !== -1, 'Input Data has the fetch button and status');
+assert(ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'structure').extraActions.some(a => a.run === 'runStructureValidation()')`), 'the guide structure step offers the fetch');
+assert(ctxRun(`typeof TRACK_REMOVERS.VAL`) === 'function', 'removal unpicks the validation info map');
+assert(ctxRun(`Object.prototype.hasOwnProperty.call(gatherPersistableState(), 'validationHitsInfo')`), 'and the info travels in the session save');
+ctxRun(`parsedTracks = {}; validationHitsInfo = {};`);
+const valCand = ctxRun(`
+    (function () {
+        cachedStructureTexts = { '1GFL.pdb': 'x', 'model.pdb': 'x', '7MDF_A.pdb': 'x' };
+        const c = validationCandidateStructure();
+        const m = validationCandidateStructure();
+        return { file: c ? c.file : null, pdbId: c ? c.pdbId : null };
+    })()
+`);
+assert(valCand.pdbId === '1GFL' && valCand.file === '1GFL.pdb', 'the candidate finder picks the PDB-id-like entry (got ' + valCand.file + ')');
+ctxRun(`cachedStructureTexts = {};`);
 
 section('activity log + 3D guards');
 assert(HTML.indexOf('>Log</button>') !== -1, 'the menu bar has a top-level Log button');
@@ -2827,6 +2874,28 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     ctxRun(`
         parsedTracks = {}; topologySources = [];
         SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].adapter = 'ebiJob';
+    `);
+
+    // runStructureValidation end to end with the real PDBe fixtures (capability
+    // stubbed; the mapping falls back to author numbering without a structure).
+    sandbox.__valOut = JSON.parse(PDBE_OUTLIERS_FIXTURE);
+    sandbox.__valQ = JSON.parse(PDBE_QUALITY_FIXTURE);
+    ctxRun(`
+        externalServicesEnabled = true;
+        parsedTracks = { AA: 'M'.repeat(238) };
+        validationHitsInfo = {};
+        cachedStructureTexts = { '1GFL.pdb': 'HEADER' };
+        SERVICE_ADAPTERS.__val_ok = async () => ({ pdbId: '1GFL', outliers: window.__valOut['1gfl'], summary: window.__valQ['1gfl'] });
+        SERVICE_REGISTRY.capabilities.structure_validation.providers[0].adapter = '__val_ok';
+    `);
+    await ctxRun(`runStructureValidation()`);
+    assert(ctxRun(`Object.keys(parsedTracks).filter(k => k.startsWith('VAL_')).length`) === 2, 'the runner adds the validation rows (got ' + ctxRun(`Object.keys(parsedTracks).filter(k => k.startsWith('VAL_')).length`) + ')');
+    assert(/76 clashes/.test(ctxRun(`document.getElementById('validationStatus').textContent`)), 'the status line totals the outliers across chains (1GFL is a dimer: 76 clashes)');
+    assert(ctxRun(`actionLog.some(e => e.kind === 'api' && /PDBe validation 1GFL/.test(e.label))`), 'and the activity log records the fetch');
+    ctxRun(`
+        parsedTracks = {}; validationHitsInfo = {}; cachedStructureTexts = [];
+        SERVICE_REGISTRY.capabilities.structure_validation.providers[0].adapter = 'pdbeValidation';
+        actionLog = [];
     `);
 
     // opts.prefer (the homolog-search provider picker): preferred provider first,

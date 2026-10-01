@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-09-25
+
+### Added
+
+- **Experimental structure validation (PDBe) - the experimental counterpart of pLDDT.** For an
+  attached experimental entry, Input Data -> **Fetch validation (PDBe)** pulls the wwPDB per-residue
+  outlier summary and the entry's quality scores (CORS-verified) and adds one row per chain: amber
+  `!` markers on flagged residues, a tooltip naming the outlier types ("validation outlier(s) -
+  sidechain outlier (PDBe)"), a row tooltip with the breakdown and quality percentiles, a guide
+  read-out, a status line and an activity-log entry.
+  - New capability `structure_validation` (adapter `pdbeValidation`); outlier types covered:
+    Ramachandran, sidechain, clashes, RSRZ, bond angles/lengths, planarity, chirality.
+  - Author numbering is mapped onto the reference through the attached structure's chains (the same
+    alignment-based mapping as the interface/ensemble tracks), so a renumbered entry lands correctly;
+    one row per chain means a dimer reports both chains (verified live: 1GFL -> chains A+B, 76
+    clashes, 2 Ramachandran outliers across the two).
+  - `validationHitsInfo` travels in the session save and unpicks on removal (`TRACK_REMOVERS.VAL`);
+    `formatTrackLabel()` names the rows ("Validation 1GFL (chain A)").
+  - Real PDBe responses committed as fixtures; tests cover the labels (including real plurals - the
+    first pass said "clashs"), the quality summary, the mapping and counts, the candidate-structure
+    finder, the tooltip text, persistence, removal, and the runner end to end with the fixtures.
+
 ## [0.59.0] - 2026-09-25
 
 ### Added

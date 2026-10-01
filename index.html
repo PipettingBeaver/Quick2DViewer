@@ -2077,6 +2077,8 @@
                             style="font-size:0.72rem; padding:3px 8px;" title="Scan the sequence for domain families (hmmscan/Pfam by default, InterProScan with Pfam + NCBIfam optionally) and add one track per family">Scan domains</button>
                         <button type="button" id="btnTopologyPredict" data-task-step="topology" class="tb-btn tb-btn-secondary" onclick="runTopologyPrediction()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Predict membrane topology with InterProScan (TMHMM, Phobius, SignalP) and add each analysis as a topology source; works for any species">Predict topology (TMHMM/Phobius/SignalP)</button>
+                        <button type="button" id="btnValidation" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="runStructureValidation()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Fetch wwPDB validation outliers and quality scores for the attached experimental entry (PDBe) and add one row per chain">Fetch validation (PDBe)</button>
                         <select id="homologProvider" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Which service searches Swiss-Prot for homologs">
                             <option value="ebi_phmmer">phmmer (HMMER)</option>
                             <option value="ebi_blast">BLAST (NCBI)</option>
@@ -2102,6 +2104,7 @@
                 <div id="homologSearchStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="variantEffectStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="topologyPredictStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+                <div id="validationStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -3249,6 +3252,17 @@ const SERVICE_REGISTRY = {
                   resultExt: 'tsv', enabled: true },
             ],
         },
+        structure_validation: {
+            label: 'Experimental structure validation (PDBe)',
+            providers: [
+                // Verified 2026-09: CORS-enabled, per-residue outlier summary
+                // (ramachandran_outliers, sidechain_outliers, clashes, RSRZ,
+                // bond_angles, bond_lengths, planes, chirals) plus overall
+                // geometry/data quality scores for an experimental entry.
+                { id: 'pdbe_validation', label: 'PDBe validation API', adapter: 'pdbeValidation',
+                  url: 'https://www.ebi.ac.uk/pdbe/api/validation/', enabled: true },
+            ],
+        },
         topology_prediction: {
             label: 'Topology prediction (TMHMM / Phobius / SignalP)',
             providers: [
@@ -3401,6 +3415,22 @@ const SERVICE_ADAPTERS = {
         const size = (typeof out === 'string') ? out.length + ' bytes' : (out && typeof out === 'object' ? Object.keys(out).length + ' key(s)' : '?');
         uniprotLog(tool + ' result ready: ' + size + ' (' + ext + ', job ' + jobId + ')');
         return out;
+    },
+    // PDBe validation: per-residue outlier summary + quality scores (any species,
+    // experimental entries only - it is the experimental counterpart of pLDDT).
+    async pdbeValidation(provider, args) {
+        const id = String(args.pdbId || '').toLowerCase();
+        if (!/^[0-9][a-z0-9]{3}$/.test(id)) throw new Error('not a PDB id: ' + args.pdbId);
+        const base = provider.url;
+        const summaryResp = await fetchWithTimeout(base + 'summary_quality_scores/entry/' + id, {}, 30000);
+        if (!summaryResp.ok) throw new Error('quality summary HTTP ' + summaryResp.status);
+        const summary = await summaryResp.json();
+        const outlierResp = await fetchWithTimeout(base + 'residuewise_outlier_summary/entry/' + id, {}, 60000);
+        if (!outlierResp.ok) throw new Error('outlier summary HTTP ' + outlierResp.status);
+        const outliers = await outlierResp.json();
+        const o = outliers[id] || outliers;
+        if (!o || !o.molecules) throw new Error('no validation data for ' + id);
+        return { pdbId: id.toUpperCase(), summary: summary[id] || summary || {}, outliers: o };
     },
     // ESMFold: POST text/plain sequence -> PDB text
     async esmfold(provider, args) {
@@ -5797,6 +5827,129 @@ function computeInterfaces(chains, cutoff) {
     return { ids, residuesByChain, pairs };
 }
 
+// --- Experimental structure validation (PDBe) -------------------------------
+// The experimental counterpart of pLDDT: per-residue geometry outliers from the
+// wwPDB validation pipeline, for any species (any experimental entry). Author
+// numbering is mapped onto the reference through the attached structure's
+// chains, the same alignment-based mapping the interface/ensemble tracks use.
+const VALIDATION_MARKER = '!';
+const VALIDATION_COLOR = '#f59e0b';
+let validationHitsInfo = {}; // { 'VAL_1GFL_A': { pdbId, chain, flags: { refIdx: [types] }, summary } }
+// Outlier type -> short human label, singular and plural (appending an "s"
+// would give "clashs").
+const VALIDATION_TYPE_LABELS = {
+    ramachandran_outliers: ['Ramachandran outlier', 'Ramachandran outliers'],
+    sidechain_outliers: ['sidechain outlier', 'sidechain outliers'],
+    clashes: ['clash', 'clashes'],
+    RSRZ: ['RSRZ outlier', 'RSRZ outliers'],
+    bond_angles: ['bond-angle outlier', 'bond-angle outliers'],
+    bond_lengths: ['bond-length outlier', 'bond-length outliers'],
+    planes: ['planarity outlier', 'planarity outliers'],
+    chirals: ['chirality outlier', 'chirality outliers']
+};
+function validationTypeLabel(t, plural) {
+    const pair = VALIDATION_TYPE_LABELS[t];
+    if (!pair) return t;
+    return plural ? pair[1] : pair[0];
+}
+function validationSummaryText(summary) {
+    if (!summary) return '';
+    const bits = [];
+    if (summary.geometry_quality != null) bits.push('geometry ' + Number(summary.geometry_quality).toFixed(1));
+    if (summary.data_quality != null) bits.push('data ' + Number(summary.data_quality).toFixed(1));
+    if (summary.overall_quality != null) bits.push('overall ' + Number(summary.overall_quality).toFixed(1));
+    return bits.join(', ');
+}
+// Builds one VAL_ row per chain that carries outliers, mapping author numbering
+// onto the reference. Returns the number of rows added.
+function applyValidationTracks(pdbId, outliers, summary, chains) {
+    const totalLength = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    Object.keys(parsedTracks).forEach(k => { if (k.startsWith('VAL_')) delete parsedTracks[k]; });
+    validationHitsInfo = {};
+    if (!totalLength || !outliers || !outliers.molecules) return 0;
+    let added = 0;
+    (outliers.molecules || []).forEach(mol => {
+        (mol.chains || []).forEach(ch => {
+            const model = (ch.models || [])[0];
+            if (!model) return;
+            const byResSeq = new Map();
+            (model.residues || []).forEach(r => {
+                const types = r.outlier_types || [];
+                if (!types.length) return;
+                const num = parseInt(r.author_residue_number != null ? r.author_residue_number : r.residue_number, 10);
+                if (!isNaN(num)) byResSeq.set(num, types);
+            });
+            if (!byResSeq.size) return;
+            const chain = chains && chains[ch.struct_asym_id];
+            const resSeqToRef = new Map();
+            if (chain && chain.length) {
+                const mapping = mapChainToReference(chain, parsedTracks.AA);
+                chain.forEach((r, i) => { if (mapping.has(i) && !resSeqToRef.has(r.resSeq)) resSeqToRef.set(r.resSeq, mapping.get(i)); });
+            }
+            const track = new Array(totalLength).fill(' ');
+            const flags = {};
+            byResSeq.forEach((types, resSeq) => {
+                const i = resSeqToRef.has(resSeq) ? resSeqToRef.get(resSeq) : (resSeq - 1);
+                if (i < 0 || i >= totalLength) return;
+                track[i] = VALIDATION_MARKER;
+                flags[i] = types;
+            });
+            if (!Object.keys(flags).length) return;
+            const key = 'VAL_' + pdbId + (ch.struct_asym_id ? '_' + ch.struct_asym_id : '');
+            parsedTracks[key] = track.join('');
+            validationHitsInfo[key] = { pdbId, chain: ch.struct_asym_id, flags, summary: summary || {} };
+            setTrackMeta(key, { source: 'PDBe validation', color: VALIDATION_COLOR });
+            added++;
+        });
+    });
+    return added;
+}
+// The first cached structure whose file name looks like a PDB entry (1GFL,
+// 7MDF_A). Used by the fetch action and its guide extra.
+function validationCandidateStructure() {
+    const files = Object.keys(cachedStructureTexts || {}).filter(f => p3dUsableStructure(f));
+    for (const f of files) {
+        const m = structBaseName(f).match(/^([0-9][A-Za-z0-9]{3})(?:_([A-Za-z0-9]))?$/);
+        if (m) return { file: f, pdbId: m[1].toUpperCase(), chain: m[2] || null };
+    }
+    return null;
+}
+async function runStructureValidation() {
+    const cand = validationCandidateStructure();
+    if (!cand) {
+        showToast('Validation needs an experimental PDB entry: attach one (e.g. 1GFL.pdb) or fetch it from RCSB.', 'error');
+        return;
+    }
+    if (!beginGuideTask('structure', 'PDBe validation for ' + cand.pdbId)) return;
+    const statusEl = document.getElementById('validationStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('structure'); return; }
+        setStatus('Fetching PDBe validation for ' + cand.pdbId + '\u2026');
+        const res = await runCapability('structure_validation', { pdbId: cand.pdbId }, (m) => setStatus(m));
+        let chains = {};
+        try { chains = parseStructureChains(cachedStructureTexts[cand.file], structExt(cand.file)); } catch (e) { chains = {}; }
+        const added = applyValidationTracks(res.pdbId, res.outliers, res.summary, chains);
+        const counts = {};
+        Object.keys(validationHitsInfo).forEach(k => Object.keys(validationHitsInfo[k].flags).forEach(i => (validationHitsInfo[k].flags[i] || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; })));
+        const breakdown = Object.keys(counts).map(t => counts[t] + ' ' + validationTypeLabel(t, counts[t] !== 1)).join(', ');
+        const quality = validationSummaryText(res.summary);
+        logAction('api', 'PDBe validation ' + res.pdbId + ': ' + added + ' chain row(s)', breakdown + (quality ? ' | ' + quality : ''));
+        renderViewer(parsedTracks);
+        refreshTrackManagerIfVisible();
+        refreshInputDataModalIfVisible();
+        schedulePersist();
+        setStatus(added
+            ? ('PDBe validation (' + res.pdbId + '): ' + added + ' chain row(s) - ' + breakdown + (quality ? ' | ' + quality : '') + '.')
+            : ('PDBe validation (' + res.pdbId + '): no flagged residues.'));
+        endGuideTask('structure', 'PDBe validation: ' + (added ? breakdown : 'no flagged residues'), added ? 'info' : 'success');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('PDBe validation failed: ' + m);
+        endGuideTask('structure', 'PDBe validation failed: ' + m, 'error');
+    }
+}
+
 function applyInterfaceTracks(result, chains) {
     const totalLength = (parsedTracks.AA && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     Object.keys(parsedTracks).forEach(k => { if (k.startsWith('IF_')) delete parsedTracks[k]; });
@@ -6204,7 +6357,10 @@ const WORKFLOW_STEPS = [
         desc: 'Attach AlphaFold/PDB/CIF (or predict with ESMFold) for pLDDT, RSA, cofactors and the 3D view.',
         why: 'A model converts sequence annotations into spatial context: buried vs exposed, domain packing, and which residues form interfaces.',
         action: { label: 'Attach / predict structure…', run: 'openInputDataModal()' },
-        extraActions: [{ label: 'Ensemble variance…', run: 'showEnsemblePanel()' }],
+        extraActions: [
+            { label: 'Fetch validation (PDBe)', run: 'runStructureValidation()' },
+            { label: 'Ensemble variance…', run: 'showEnsemblePanel()' }
+        ],
         how: ['With two or more models attached, Ensemble variance measures where they disagree per residue (RMSF). Treat the mobile regions as tentative and the rigid core as settled.',
               'pLDDT > 70 is confident, 50-70 tentative and < 50 unreliable. Read it per region, not per protein.',
               'RSA says whether a residue is buried; a variant in a buried position is usually more disruptive.'],
@@ -7083,6 +7239,16 @@ function computeGuideInsights() {
     }
     if (guideProfile.membrane === 'yes' && !keys.some(k => k.startsWith('TM_') || k.startsWith('SP_'))) {
         out.push({ level: 'warn', text: 'You flagged a membrane/secreted protein, but no TM or signal-peptide track is loaded.' });
+    }
+    const valKeys = Object.keys(validationHitsInfo || {});
+    if (valKeys.length) {
+        const v = validationHitsInfo[valKeys[0]];
+        const counts = {};
+        valKeys.forEach(k => Object.keys(validationHitsInfo[k].flags || {}).forEach(i => (validationHitsInfo[k].flags[i] || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; })));
+        const worst = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3)
+            .map(t => counts[t] + ' ' + validationTypeLabel(t, counts[t] !== 1)).join(', ');
+        const quality = validationSummaryText(v.summary);
+        out.push({ level: 'info', text: 'PDBe validation (' + v.pdbId + '): ' + (worst || 'no flagged residues') + (quality ? '; entry quality ' + quality : '') + '.' });
     }
     if (Object.keys(variantEffectResults || {}).length) {
         const subs = Object.keys(variantEffectResults);
@@ -8105,6 +8271,7 @@ function getPredictorInfo(trackKey) {
     if (trackKey.startsWith('HL_')) return buildHomologPredictorInfo(trackKey);
     if (trackKey.startsWith('DM_')) return buildDomainPredictorInfo(trackKey);
     if (trackKey.startsWith('TP_')) return buildTopologyPredictorInfo(trackKey);
+    if (trackKey.startsWith('VAL_')) return buildValidationPredictorInfo(trackKey);
     if (trackKey.endsWith('_RMSF')) return {
         name: 'Ensemble variance (RMSF)',
         category: 'Structure ensemble',
@@ -8380,7 +8547,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.59.0';
+const APP_VERSION = '0.60.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9725,6 +9892,11 @@ function formatTrackLabel(fullKey) {
     if (fullKey.startsWith('DM_')) {
         const d = domainHitsInfo[fullKey];
         return (d && d.model) ? d.model : fullKey.slice(3).replace(/_/g, ' ');
+    }
+    if (fullKey.startsWith('VAL_')) {
+        const v = validationHitsInfo[fullKey];
+        const id = (v && v.pdbId) || fullKey.slice(4).replace(/_/g, ' ');
+        return 'Validation ' + id + (v && v.chain ? ' (chain ' + v.chain + ')' : '');
     }
     if (fullKey.startsWith('TP_')) {
         const label = fullKey.slice(3).replace(/_/g, ' ');
@@ -11832,6 +12004,36 @@ function getTctlGroupCount(group) {
     return Object.keys(parsedTracks).filter(k => getTrackGroup(k) === group).length;
 }
 
+// Experimental validation rows: what the flag means, which outlier types this
+// chain carries, and the entry's overall quality scores from PDBe.
+function buildValidationPredictorInfo(trackKey) {
+    const v = validationHitsInfo[trackKey];
+    if (!v) {
+        return {
+            name: formatTrackLabel(trackKey), category: 'Experimental structure validation',
+            description: 'PDBe validation outlier row. Re-run the fetch to repopulate its statistics.',
+            bands: [{ range: VALIDATION_MARKER, desc: 'Residue flagged by the wwPDB validation pipeline.' }],
+            useCase: '', citation: 'PDBe validation API'
+        };
+    }
+    const counts = {};
+    Object.keys(v.flags || {}).forEach(i => (v.flags[i] || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+    const breakdown = Object.keys(counts).map(t => counts[t] + ' ' + validationTypeLabel(t, counts[t] !== 1)).join(', ') || 'none';
+    const quality = validationSummaryText(v.summary);
+    return {
+        name: formatTrackLabel(trackKey) + ' - experimental quality',
+        category: 'Experimental structure validation (PDBe)',
+        description: 'Per-residue geometry outliers from the wwPDB validation pipeline for ' + v.pdbId + (v.chain ? ' chain ' + v.chain : '') +
+            '. The experimental counterpart of pLDDT: use it to judge how much to trust individual residues of this entry.',
+        bands: [
+            { range: VALIDATION_MARKER, desc: 'Flagged residue (hover a cell for the outlier types).' },
+            { range: ' ', desc: 'No validation outlier recorded.' }
+        ],
+        useCase: 'Flagged: ' + breakdown + (quality ? '. Entry quality percentiles: ' + quality + '.' : '.'),
+        citation: 'PDBe validation API (wwPDB validation pipeline)'
+    };
+}
+
 // Topology rows: a summary per source, and for the majority-vote consensus the
 // N-terminus call, TM segment count and how many columns the sources disagree on.
 function buildTopologyPredictorInfo(trackKey) {
@@ -11879,6 +12081,7 @@ const TRACK_REMOVERS = {
     HL: (keys) => keys.forEach(k => { delete homologHitsInfo[k]; }),
     // Pfam domains keep their per-family stats here.
     DM: (keys) => keys.forEach(k => { delete domainHitsInfo[k]; }),
+    VAL: (keys) => keys.forEach(k => { delete validationHitsInfo[k]; }),
     // UniProt rows mirror uniprotFeatureTracks; removing the last one clears the
     // fetch itself (the annotation step then reports "not done" again).
     UP: (keys) => keys.forEach(k => { delete uniprotFeatureTracks[k]; }),
@@ -12465,6 +12668,14 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 } else {
                     cellEl.title = `Residue ${i + 1}: (no topology assignment)`;
                 }
+            }
+            else if (key.startsWith('VAL_')) {
+                // Experimental validation row: flagged geometry outliers.
+                const v = validationHitsInfo[key];
+                const types = (v && v.flags && v.flags[i]) || null;
+                cellEl.title = types
+                    ? `Residue ${i + 1}: validation outlier(s) - ${types.map(validationTypeLabel).join(', ')} (PDBe)`
+                    : `Residue ${i + 1}: no validation outlier`;
             }
             else if (key.startsWith('RULE_')) {
                 // Analysis-rule track: matching residues flagged in the rule colour.
@@ -15907,6 +16118,7 @@ function gatherPersistableState() {
         structureFiles: uploadedStructureFiles,
         structureReferences: buildStructureReferences(),
         homologHitsInfo: homologHitsInfo,
+        validationHitsInfo: validationHitsInfo,
         keyedVariantsInfo: keyedVariantsInfo,
         graphHighlights: graphHighlights,
         // These back derived tracks (TP_/UP_/DM_), so without them a restored
@@ -16286,6 +16498,7 @@ function applyPersistedState(state) {
         if (r && r.hash) cachedStructureIndex[fn] = { hash: r.hash, ext: r.ext, size: r.size };
     });
     homologHitsInfo = state.homologHitsInfo || {};
+    validationHitsInfo = state.validationHitsInfo || {};
     keyedVariantsInfo = state.keyedVariantsInfo || {};
     graphHighlights = state.graphHighlights || {};
     topologySources = Array.isArray(state.topologySources) ? state.topologySources : [];
@@ -16941,6 +17154,7 @@ async function resetAllData() {
     updateP3DModelInfo();
     if (p3dView) { try { p3dView.removeAllModels(); } catch (err) {} try { p3dSafeRender(); } catch (err) {} }
     homologHitsInfo = {};
+    validationHitsInfo = {};
     keyedVariantsInfo = {};
     conservationMetric = 'shannon';
     conservationIncludeHHR = true;

@@ -1262,6 +1262,32 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 330 | Nothing loaded → press the button | Clear message listing what each provider needs |
 | 331 | Add a new provider (dev) | One registry entry; tooltips/status/read-out pick it up |
 
+### Experimental structure validation (PDBe) — 0.60.0
+
+**Should do.** For an attached experimental entry, one button pulls the wwPDB validation outliers and
+quality scores and shows them as per-chain rows, so experimental quality sits beside pLDDT.
+
+**Try (normal use).**
+1. Attach an experimental structure with a PDB-id-like file name (e.g. 1GFL.pdb), then Input Data →
+   **Fetch validation (PDBe)**.
+   *Expect:* "PDBe validation (1GFL): 2 chain row(s) - … | geometry 7.5, data 53.6, overall 11.5";
+   two amber rows appear ("Validation 1GFL (chain A/B)").
+2. Hover a flagged cell and the row's ℹ.
+   *Expect:* "Residue N: validation outlier(s) - sidechain outlier (PDBe)"; the ℹ lists the
+   breakdown and the quality percentiles.
+3. Open the Guide.
+   *Expect:* a read-out line with the worst outlier types and the entry quality.
+4. Remove the row (Tracks → ×).
+   *Expect:* it stays removed (the info map unpicks), and a restored session keeps the rows.
+
+**Edge cases (symptom → likely cause).**
+- No PDB-id-like structure attached: the button explains it needs an experimental entry.
+- A renumbered entry: rows are mapped through the chain alignment, so the flags land on the right
+  reference residues (check the status/log if something looks shifted).
+- Predicted models (AlphaFold/ESMFold) have no wwPDB validation - use pLDDT there.
+
+---
+
 ### Activity log — 0.59.0
 
 **Should do.** The "Log" button in the menu bar shows what the session is doing in plain words -
@@ -1299,6 +1325,10 @@ clicks, menu choices, API submits/polls/results and what was parsed - newest fir
 | SARS-CoV-2 spike | P0DTC2 | viral, signal + 1 TM | signal peptide + TM 1214-1234 | viral membrane case |
 | Influenza HA | P03452 | viral, signal + 1 TM | signal peptide + TM 529-549 | viral membrane case |
 
+**Validation test case:** 1GFL (GFP crystal structure, a dimer) - Fetch validation (PDBe) should
+give two rows (chains A+B), 76 clashes and 2 Ramachandran outliers across them, with the amber `!`
+markers on the flagged residues and the quality line "geometry 7.5, data 53.6, overall 11.5".
+
 **How to run a membrane case:** load the sequence (UniProt or FASTA) → **Predict topology
 (TMHMM/Phobius/SignalP)** → expect the source rows plus a Consensus row; check the N-terminus and
 any `?` conflicts; then **Scan domains** with the picker on InterProScan to see Pfam + NCBIfam
@@ -1322,6 +1352,19 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.60.0 - PDBe structure validation (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 349 | Attach 1GFL.pdb → Fetch validation (PDBe) | Two rows (chains A+B); 76 clashes, 2 Ramachandran outliers |
+| 350 | Hover a flagged cell | "validation outlier(s) - <type> (PDBe)" with real plurals |
+| 351 | Row ℹ tooltip | Breakdown + "geometry 7.5, data 53.6, overall 11.5" |
+| 352 | Guide read-out | Worst outlier types + entry quality for the entry |
+| 353 | Fetch with no PDB-id-like structure | Clear message that it needs an experimental entry |
+| 354 | Remove a validation row, then re-fetch | Removal sticks; re-fetch rebuilds it |
+| 355 | Activity log | "PDBe validation 1GFL: 2 chain row(s) [breakdown | quality]" |
+| 356 | Reload the session | Validation rows and tooltips survive (info map persisted) |
 
 ## Pending live checks (API calls + UI integration) — test later
 
@@ -1408,4 +1451,5 @@ needs a full card.
 6aj. 326–331 (variant effect provider framework - new 0.57.0; card at the top, check 326 first).
 6ak. 332–340 + the reference-systems table (InterProScan topology/domains - new 0.58.0; check 332 first).
 6al. 341–348 (activity log + 3D console cleanup - new 0.59.0; card at the top, check 343 first).
+6am. 349–356 (PDBe structure validation - new 0.60.0; card at the top, check 349 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

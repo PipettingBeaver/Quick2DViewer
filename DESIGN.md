@@ -82,6 +82,9 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
   conservation; NCBIfam now adds the bacterial/viral family models (TIGRFAM/PRK/NF). Dedicated
   pathogen resources (VFDB virulence, CARD AMR, BV-BRC genomes) are **not** integrated - candidates
   for the capability/provider registry once their CORS behaviour is verified.
+- **PDBe validation** — experimental structure quality (done, v0.60.0): per-residue wwPDB outlier
+  summary + entry quality scores, one `VAL_` row per chain, mapped onto the reference by sequence
+  alignment. Any species (it is about the experimental entry, not the organism).
 - **AlphaMissense** — variant effect predictions (done, v0.56.0): the AlphaFold DB
   entry's `amAnnotationsUrl` CSV is fetched on demand and only the loaded variants'
   substitutions are kept. Same accession requirement as the AlphaFold model fetch,
