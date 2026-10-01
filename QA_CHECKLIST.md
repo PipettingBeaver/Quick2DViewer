@@ -1353,6 +1353,18 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.0 - methods report completeness (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 391 | Fetch + validate an entry, then Export → Methods summary (.md) | A "Structure validation" section with the outlier breakdown and quality percentiles |
+| 392 | Import an experimental row with conservation loaded | An "Experimental per-residue data" section with mean and r |
+| 393 | Assess variant effects, then export | A "Variant effect evidence" section (per provider + per substitution) |
+| 394 | Load topology sources | "Topology consensus" in the evidence list (TM, N-terminus, conflicts) |
+| 395 | Scan domains | Domain families named with their database |
+| 396 | Any session with several sources | A "Data sources" provenance section listing what contributed |
+| 397 | A bare sequence-only session | The report still renders (no empty sections) |
+
 ## 0.65.0 - experimental per-residue data (quick rows)
 
 | # | Try | Watch for |
@@ -1516,4 +1528,5 @@ needs a full card.
 6ap. 371–377 (find PDB entries from the sequence - new 0.63.0; check 371 first).
 6aq. 378–382 (the loaded name feeds the lookups - new 0.64.0; check 378 first).
 6ar. 383–390 (experimental per-residue data - new 0.65.0; check 383 first).
+6as. 391–397 (methods report completeness - 0.66.0; check 391 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

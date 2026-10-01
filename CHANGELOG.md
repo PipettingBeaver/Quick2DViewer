@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-09-25
+
+### Changed
+
+- **The methods report now covers every evidence layer** (it predated the last several features):
+  - a **Structure validation** section: per entry, the outlier breakdown across chains plus the
+    quality percentiles (verified with a real fetch: 1GFL -> 57 sidechain outliers, 76 clashes, ...
+    | geometry 7.5, data 53.6, overall 11.5);
+  - an **Experimental per-residue data** section: label, kind meaning, value count, mean and the
+    conservation correlation;
+  - a **Variant effect evidence** section: per-provider tallies (including high-impact counts) and
+    the per-substitution results;
+  - **Topology consensus** detail in the evidence list (TM segments, N-terminus, disagreement
+    columns) alongside the source names;
+  - **domain families** named with their database (e.g. "Domain families (InterProScan: 1):
+    Pfam:PF01306");
+  - and a **Data sources** provenance section: homolog sources with hit counts, domain databases,
+    PDBe validation, topology sources, imported experimental data, and model/rule track sources.
+  - Tests seed every layer and assert the sections, wording and cross-read-outs; a live run
+    (fetch 1GFL -> validation + an experimental import) renders the real numbers.
+
 ## [0.65.0] - 2026-09-25
 
 ### Added

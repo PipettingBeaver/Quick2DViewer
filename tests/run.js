@@ -1211,6 +1211,42 @@ assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-ag
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
 
+section('methods report covers the newer evidence layers');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(10), 'DMS_tolerance_EXP': Array.from({ length: 10 }, (_, i) => ({ val: i < 5 ? 0.9 : 0.2, type: 'exp' })),
+        CONSERVATION: { metric: 'shannon', values: [0.9, 0.9, 0.9, 0.9, 0.9, 0.3, 0.3, 0.3, 0.3, 0.3] },
+        DM_PF01306: 'M'.repeat(10) };
+    experimentalTracksInfo = { DMS_tolerance_EXP: { label: 'DMS tolerance', kind: 'dms', values: 10, mean: 0.55 } };
+    validationHitsInfo = {
+        VAL_1GFL_A: { pdbId: '1GFL', chain: 'A', flags: { 1: ['sidechain_outliers'], 4: ['clashes', 'RSRZ'] }, summary: { geometry_quality: 7.55, data_quality: 53.59 } },
+        VAL_1GFL_B: { pdbId: '1GFL', chain: 'B', flags: { 2: ['clashes'] }, summary: { geometry_quality: 7.55, data_quality: 53.59 } }
+    };
+    variantEffectResults = { R175H: { alphamissense: { label: 'pathogenic or likely pathogenic', detail: '0.99', level: 'high' },
+                                     conservation: { label: 'highly conserved', detail: '0.97', level: 'high' } } };
+    domainHitsInfo = { DM_PF01306: { model: 'Pfam:PF01306', database: 'InterProScan', description: 'LacY/RafB permease family', domains: [] } };
+    topologySources = [{ name: 'Phobius', state: 'M'.repeat(10) }, { name: 'TMHMM', state: 'M'.repeat(10) }];
+    applyTopologySources();
+    homologHitsInfo = { HL_01_x: { rank: 1, hitId: 'sp|P42212|GFP_AEQVI', source: 'phmmer' }, HL_02_y: { rank: 2, hitId: 'sp|Q9U6Y3|GFPL_CLASP', source: 'BLAST' } };
+    analysisRules = []; guideProfile = {}; guideAnswers = {}; guideOverrides = {};
+`);
+const richReport = ctxRun(`buildMethodsReport()`);
+assert(richReport.indexOf('## Experimental structure validation') !== -1, 'the report has a validation section');
+const valLine = (richReport.match(/\*\*1GFL\*\*[^\n]*/) || ['?'])[0];
+assert(valLine.indexOf('(2 chains)') !== -1 && valLine.indexOf('2 clashes') !== -1 && valLine.indexOf('1 sidechain outlier') !== -1 && valLine.indexOf('1 RSRZ outlier') !== -1 && /quality percentiles: geometry 7\.5, data 53\.6/.test(valLine), 'with per-entry outlier counts across chains and the quality scores (got "' + valLine + '")');
+const expLine = (richReport.match(/\*\*DMS tolerance\*\*[^\n]*/) || ['?'])[0];
+assert(richReport.indexOf('## Experimental per-residue data') !== -1 && expLine.indexOf('DMS tolerance (higher = better tolerated)') !== -1 && expLine.indexOf('10 value(s), mean 0.550') !== -1 && /correlation with conservation r=-?\d+\.\d+/.test(expLine), 'the experimental section names the kind and the conservation correlation (got "' + expLine + '")');
+assert(richReport.indexOf('## Variant effect evidence') !== -1 && /R175H: AlphaMissense: pathogenic or likely pathogenic; Conservation: highly conserved/.test(richReport), 'the variant section lists per-provider results per substitution');
+assert(/AlphaMissense: 1 substitution\(s\), 1 high-impact/.test(richReport), 'and per-provider tallies');
+assert(richReport.indexOf('- Topology consensus: ') !== -1 && /TM segment\(s\), N-terminus/.test(richReport), 'the topology consensus detail is in the evidence list');
+assert(/Domain families \(InterProScan: 1\): Pfam:PF01306/.test(richReport), 'domain families are named with their database');
+assert(richReport.indexOf('## Data sources') !== -1 && /phmmer \(1 hit\)/.test(richReport) && /BLAST \(1 hit\)/.test(richReport), 'provenance lists the homolog sources');
+assert(/domain families: InterProScan \(1\)/.test(richReport) && /PDBe validation/.test(richReport) && /membrane topology \(Phobius, TMHMM\)/.test(richReport), 'plus domains, validation and topology');
+assert(/imported experimental data/.test(richReport), 'and the experimental import');
+ctxRun(`
+    parsedTracks = {}; experimentalTracksInfo = {}; validationHitsInfo = {}; variantEffectResults = {};
+    domainHitsInfo = {}; topologySources = []; homologHitsInfo = {};
+`);
+
 section('experimental per-residue data (DMS / HDX / any table)');
 assert(ctxRun(`GRAPH_TYPES.indexOf('EXP')`) !== -1, 'experimental data is a graph-capable type');
 assert(ctxRun(`getTrackGroup('DMS_tolerance_EXP')`) === 'EXP', 'its tracks group under Experimental');

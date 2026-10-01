@@ -7884,6 +7884,20 @@ function buildMethodsReport() {
         }
         if (parsedTracks.CONSERVATION) L.push('- Conservation metric: ' + (parsedTracks.CONSERVATION.metric || 'shannon') + (conservationIncludeHHR ? ' (incl. HHR homologs)' : ''));
         if (topologySources.length) L.push('- Topology sources: ' + topologySources.map(s => s.name).join(', '));
+        const topoSum = (typeof topologyConsensusSummary === 'function') ? topologyConsensusSummary() : null;
+        if (topoSum) {
+            L.push('- Topology consensus: ' + topoSum.tmSegments + ' TM segment(s), N-terminus ' +
+                (topoSum.nterm ? (TOPOLOGY_STATE_LABELS[topoSum.nterm] || topoSum.nterm).toLowerCase() : 'no call') +
+                (topoSum.counts['?'] ? ', ' + topoSum.counts['?'] + ' disagreement column(s)' : ', no disagreements'));
+        }
+        const dmKeysAll = Object.keys(domainHitsInfo || {});
+        if (dmKeysAll.length) {
+            const dbs = {};
+            dmKeysAll.forEach(k => { const d = domainHitsInfo[k] || {}; const db = d.database || 'Pfam'; dbs[db] = (dbs[db] || 0) + 1; });
+            const names = dmKeysAll.slice(0, 6).map(k => (domainHitsInfo[k] || {}).model || k.replace(/^DM_/, ''));
+            L.push('- Domain families (' + Object.keys(dbs).map(db => db + ': ' + dbs[db]).join(', ') + '): ' +
+                names.join(', ') + (dmKeysAll.length > 6 ? ', and ' + (dmKeysAll.length - 6) + ' more' : ''));
+        }
         if (uniprotFeatures && uniprotFeatures.accession) L.push('- UniProt entry: ' + uniprotFeatures.accession);
         if (uploadedStructureFiles && uploadedStructureFiles.length) L.push('- Structures attached: ' + uploadedStructureFiles.join(', '));
     }
@@ -7905,6 +7919,96 @@ function buildMethodsReport() {
         L.push('## TM cross-check');
         L.push('');
         L.push('- Agreement: ' + xc.pct + '% (' + xc.agree + ' both / ' + xc.topoOnly + ' topology-only / ' + xc.q2dOnly + ' Quick2D-only)');
+        L.push('');
+    }
+
+    // Experimental structure validation (PDBe), when fetched.
+    const valKeys = Object.keys(validationHitsInfo || {});
+    if (valKeys.length) {
+        L.push('## Experimental structure validation');
+        L.push('');
+        const byEntry = {};
+        valKeys.forEach(k => {
+            const v = validationHitsInfo[k] || {};
+            const e = byEntry[v.pdbId] = byEntry[v.pdbId] || { chains: 0, counts: {}, summary: v.summary };
+            e.chains++;
+            Object.keys(v.flags || {}).forEach(i => (v.flags[i] || []).forEach(t => { e.counts[t] = (e.counts[t] || 0) + 1; }));
+        });
+        Object.keys(byEntry).forEach(id => {
+            const e = byEntry[id];
+            const breakdown = Object.keys(e.counts).map(t => e.counts[t] + ' ' + validationTypeLabel(t, e.counts[t] !== 1)).join(', ') || 'no flagged residues';
+            const q = validationSummaryText(e.summary);
+            L.push('- **' + id + '** (' + e.chains + ' chain' + (e.chains === 1 ? '' : 's') + '): ' + breakdown + (q ? ' | quality percentiles: ' + q : ''));
+        });
+        L.push('');
+    }
+
+    // Experimental per-residue data (DMS / HDX / NMR / other), with the
+    // conservation cross-read-out.
+    const expKeys = Object.keys(experimentalTracksInfo || {});
+    if (expKeys.length) {
+        L.push('## Experimental per-residue data');
+        L.push('');
+        expKeys.forEach(k => {
+            const info = experimentalTracksInfo[k] || {};
+            const kind = EXPERIMENTAL_KINDS[info.kind] || EXPERIMENTAL_KINDS.other;
+            let r = null;
+            const cons = parsedTracks.CONSERVATION;
+            if (cons && Array.isArray(cons.values) && Array.isArray(parsedTracks[k])) {
+                const xs = [], ys = [];
+                parsedTracks[k].forEach((x, i) => {
+                    if (x && x.val != null && typeof cons.values[i] === 'number') { xs.push(x.val); ys.push(cons.values[i]); }
+                });
+                r = pearsonR(xs, ys);
+            }
+            L.push('- **' + (info.label || k) + '** (' + kind.label + '): ' + info.values + ' value(s), mean ' +
+                Number(info.mean || 0).toFixed(3) + (r != null ? ', correlation with conservation r=' + r.toFixed(2) : '') + '.');
+        });
+        L.push('');
+    }
+
+    // Variant effect evidence (per provider + per substitution).
+    const varKeys = Object.keys(variantEffectResults || {});
+    if (varKeys.length) {
+        L.push('## Variant effect evidence');
+        L.push('');
+        Object.keys(VARIANT_EFFECT_PROVIDERS).forEach(id => {
+            const n = varKeys.filter(k => variantEffectResults[k][id]).length;
+            if (!n) return;
+            const high = varKeys.filter(k => { const h = variantEffectResults[k][id]; return h && h.level === 'high'; }).length;
+            L.push('- ' + VARIANT_EFFECT_PROVIDERS[id].label + ': ' + n + ' substitution(s)' + (high ? ', ' + high + ' high-impact' : '') + '.');
+        });
+        varKeys.forEach(k => {
+            const parts = Object.keys(variantEffectResults[k]).map(id => (VARIANT_EFFECT_PROVIDERS[id] || {}).label + ': ' + variantEffectResults[k][id].label);
+            L.push('- ' + k + ': ' + parts.join('; '));
+        });
+        L.push('');
+    }
+
+    // Provenance: which external services contributed evidence this session.
+    const services = [];
+    const homologSources = {};
+    Object.keys(homologHitsInfo || {}).forEach(k => { const src = (homologHitsInfo[k] || {}).source || 'Homolog'; homologSources[src] = (homologSources[src] || 0) + 1; });
+    Object.keys(homologSources).forEach(src => services.push(src + ' (' + homologSources[src] + ' hit' + (homologSources[src] === 1 ? '' : 's') + ')'));
+    if (Object.keys(domainHitsInfo || {}).length) {
+        const dbs = {};
+        Object.keys(domainHitsInfo).forEach(k => { const db = (domainHitsInfo[k] || {}).database || 'Pfam'; dbs[db] = (dbs[db] || 0) + 1; });
+        services.push('domain families: ' + Object.keys(dbs).map(db => db + ' (' + dbs[db] + ')').join(', '));
+    }
+    if (valKeys.length) services.push('PDBe validation');
+    if (topologySources.length) services.push('membrane topology (' + topologySources.map(s => s.name).join(', ') + ')');
+    if (expKeys.length) services.push('imported experimental data');
+    const modelSources = {};
+    Object.keys(parsedTracks || {}).forEach(k => {
+        const meta = getTrackMeta(k);
+        const src = meta && meta.source;
+        if (src && /AlphaFold|ESMFold|RCSB|Foldseek|Interface|Rule|Experimental/i.test(src)) modelSources[src] = (modelSources[src] || 0) + 1;
+    });
+    Object.keys(modelSources).forEach(src => services.push(src + ' (' + modelSources[src] + ' track' + (modelSources[src] === 1 ? '' : 's') + ')'));
+    if (services.length) {
+        L.push('## Data sources');
+        L.push('');
+        services.forEach(x => L.push('- ' + x));
         L.push('');
     }
 
@@ -9047,7 +9151,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.65.0';
+const APP_VERSION = '0.66.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
