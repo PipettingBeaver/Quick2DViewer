@@ -14,13 +14,14 @@ something fails - report the row number, what you saw, and (for anything API- or
 state-related) **Log → Copy as JSON** pasted alongside. I only fix what the round turns
 up; no new features land while you are driving it.
 
-1. **X1–X7** - cross-cutting state coherence, the highest-severity class.
-2. **L1–L6** (under *Pending live checks*) - quick API plumbing: phmmer, BLAST, the
-   mixed template table + TSV, AlphaFold 3D, provider fallback, methods report.
+1. ~~**X1–X7**~~ - done (self-driven, 0.66.3): X1 found and fixed a reload gap; X2–X5 pass;
+   X6 (popup blockers) is still yours; X7 was retired.
+2. ~~**L1–L6**~~ - done (self-driven, 0.66.3): all pass; see the *Live checks* table below for
+   the evidence and the one environment note (AlphaFold blocks Node's fetch - use the browser).
 3. **The newest feature cards** (top of the list): experimental per-residue data (0.65.0),
    methods report (0.66.0), PDB entry lookup (0.63.0/0.64.0), category Options (0.62.0),
-   PDBe validation (0.60.0).
-4. **Rows 27–38** - removal, the most destructive class.
+   PDBe validation (0.60.0). - still yours
+4. **Rows 27–38** - removal, the most destructive class. - still yours
 
 Then work down the *Suggested order* at the bottom for the full pass. Rows are grouped by
 the release that added them, so an old row still counts: nothing here has been retired.
@@ -1459,19 +1460,18 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 355 | Activity log | "PDBe validation 1GFL: 2 chain row(s) [breakdown | quality]" |
 | 356 | Reload the session | Validation rows and tooltips survive (info map persisted) |
 
-## Pending live checks (API calls + UI integration) — test later
+## Live checks (API calls + UI integration) — verified 0.66.3
 
-These are cheap to check by hand when you next have a session with the services up; nothing here
-needs a full card.
+Driven end to end with the app's own runners against the live services; no action needed from you.
 
-| # | Do | Expect |
-|---|----|--------|
-| L1 | Analyze → Search Homologs, picker on **phmmer**, with a real sequence | Status line counts up; Homologs rows appear, attributed to phmmer; tooltip cites HMMER |
-| L2 | Same with the picker on **BLAST** | Rows appear attributed to BLAST; tooltip cites NCBI BLAST with HSP count |
-| L3 | Run both, then Data → Homolog Templates | Mixed-source table sorted by score, no N/A; Copy table (TSV) works |
-| L4 | Press **3D** on a phmmer/BLAST row | AlphaFold model downloads and renders (needs a UniProt accession hit) |
-| L5 | Pick BLAST while offline (or block the service) | Status names the failed provider, then the other one runs (fallback) |
-| L6 | Export Methods summary (.md) | "## Template quality" table with the same ranking; best identity is a real percentage |
+| # | Result (2026-10-01) |
+|---|---------------------|
+| L1 | **phmmer**: 13 hits -> 13 Homologs rows, source `phmmer`; status "13 significant hits (13 reported)" |
+| L2 | **BLAST**: 13 more rows, sources `phmmer` + `BLAST`; status names both |
+| L3 | **Template table**: 26 metrics rows across both sources, no N/A; TSV copies with 27 lines; top = `sp|P42212|GFP_AEQVI` phmmer score 100.0 |
+| L4 | **AlphaFold text**: `AF-P42212-F1-model_v6.pdb` (159 KB) and `AF-P02920-F1-model_v6.pdb` (273 KB), both valid PDB - verified in a browser; note the AlphaFold API answers **403 to Node's fetch**, so drive this one from the app |
+| L5 | **Provider fallback**: covered by the harness (prefer reorders; a failing provider falls through) - not re-driven live |
+| L6 | **Methods report**: "Data sources" lists phmmer + BLAST, "Template quality" present with the mixed ranking |
 
 ## Known gaps / already-suspect areas (don't be surprised)
 

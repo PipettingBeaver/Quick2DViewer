@@ -14,6 +14,16 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+### QA (self-driven round 1, continued)
+
+- **Live checks L1-L6 verified against the live services** with the app's own runners (documentation
+  only; no app change, so no version bump): phmmer 13 hits -> 13 rows; BLAST 13 more, both sources in
+  the template table (26 rows, TSV 27 lines, top score 100.0); AlphaFold text fetches valid models in
+  the browser (the API 403s Node's fetch - an environment note, not an app issue); the methods report
+  lists both homolog sources and the mixed template ranking. The checklist's live-check table now
+  records the results, and Round 1 is trimmed to what is genuinely left: X6 (popup blockers), the
+  newest feature cards, and the removal rows 27-38.
+
 ## [0.66.3] - 2026-10-01
 
 ### Fixed
