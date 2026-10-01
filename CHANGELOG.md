@@ -14,6 +14,28 @@ sweeps), from which the usual feature/patch cadence resumes.
 
 ## [Unreleased]
 
+## [0.66.4] - 2026-10-01
+
+### Changed
+
+- **Tone sweep: 26 user-facing strings rewritten to neutral, helpful phrasing** (the rework noted
+  during QA). The "Load/Attach/Enter X first" toast family now states the fact and the way forward
+  ("Nothing to scan yet: hmmscan searches the loaded sequence against Pfam."), the three guide hints
+  drop their negative framing ("AlphaFold DB needs an accession; without one, ESMFold folds the
+  sequence directly instead."), and the read-out insights lead with the observation instead of the
+  absence ("Homologs cross-check the sequence predictions; add them with Search homologs (in-app),
+  an HHpred .hhr, or Foldseek."). Meaning is unchanged; tests updated to the new wording.
+- **Legacy saves are explained rather than mysterious.** A session saved before the info maps
+  existed (pre-0.23.0) still restores its rows, but they have no backing data - tooltips degrade and
+  the Options panels show no sources (the X1 class). Restoring one now logs and toasts exactly which
+  groups are affected and the two ways out (re-import or remove).
+
+### Fixed
+
+- **Popup-blocked external links no longer look broken (X6).** The guide's "Open HHpred ↗" and
+  "Open DeepTMHMM ↗" actions go through `openExternal()`, which surfaces the URL in a toast and the
+  activity log when the browser blocks the popup, instead of silently doing nothing.
+
 ### QA (self-driven round 1, continued)
 
 - **Live checks L1-L6 verified against the live services** with the app's own runners (documentation

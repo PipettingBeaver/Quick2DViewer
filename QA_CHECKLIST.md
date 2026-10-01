@@ -693,7 +693,7 @@ swatch, the track name and its provenance, and the residue detail.
 | X3 | Remove rows while the **Guide** tab is open and the same step is expanded | The card must not collapse (open state is preserved by `data-step`), and the "Next:" card must update |
 | X4 | Load data while a rule exists | Rules now re-evaluate on every data change. A `RULE_` row must appear/disappear as its inputs change; nothing should hang on a 600 aa sequence with 8 rules |
 | X5 | Undo a step you had **manually marked done** | Undo removes the data but deliberately keeps the override — so the card can read "done (you)" with nothing loaded. Is that understandable, or confusing? |
-| X6 | Use the wizard's `Open HHpred ↗` / `Open a predictor ↗` actions | Popup blockers may swallow `window.open`; the button must not look broken if it does |
+| X6 | Use the wizard's `Open HHpred ↗` / `Open a predictor ↗` actions (0.66.4) | *Verified by design:* `openExternal()` surfaces the URL in a toast + the activity log when the popup is blocked; try it with popups blocked to see the fallback |
 | X7 | Turn **File → New-feature highlights** on | *Convention retired (0.66.3):* the marker set lapsed once the QA cards took over; the toggle still works for ad-hoc marking, but nothing is expected to be marked |
 
 ## 0.16.0 — design pass
@@ -1475,9 +1475,8 @@ Driven end to end with the app's own runners against the live services; no actio
 
 ## Known gaps / already-suspect areas (don't be surprised)
 
-- **UI copy tone (rework wanted).** Several strings are still tool-centric or imperative where a
-  neutral, helpful phrasing reads better ("No HHpred at hand?", "Is the HHpred .hhr ready?"). The
-  homologs step is the first pass (0.52.1); note other offenders here as they turn up, and prefer
+- **FIXED (0.66.4): UI copy tone.** The 26-string sweep is done (toasts, guide hints, read-out
+  insights). New strings should keep the same rule: state the fact and the way forward, prefer
   "Alternatively, you can ..." over warnings or commands.
 - **Rules and manual removal interplay.** Removing a `RULE_` row deletes its rule; there is
   no "hide the rule row but keep the rule" concept.
@@ -1491,9 +1490,9 @@ Driven end to end with the app's own runners against the live services; no actio
   console (console line + error capture) should say why.
 - **`group:pLDDT` / `group:RSA` are not offered** as categorical sources (those tracks hold
   objects, not chars) — use the numeric `pLDDT:`/`RSA:` sources instead.
-- **Older saves** (pre-0.23.0) have no `topologySources`/`uniprotFeatures`/`domainHitsInfo`,
-  so a restored old session can still show the inconsistency in X1. Worth deciding whether
-  to migrate or to warn.
+- **FIXED (0.66.4): older saves** are now explained on restore - a log entry + toast names the
+  groups whose rows have no backing data (topology/domain/UniProt feature) and the two ways out.
+  Migration is not possible (the backing data was never in the file).
 - **`prefers-reduced-motion`** is implemented as a blanket transition/animation reset; check
   it does not freeze something that relies on a transition to become visible.
 - **HMMER/Foldseek/ESMFold are live services**: a failure there is not necessarily an app bug.

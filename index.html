@@ -3797,7 +3797,7 @@ function toggleQaHighlights() {
 // RSA, cofactors and the 3D viewer all light up (tagged source 'ESMFold').
 async function predictStructureESMFold() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
-    if (!seq) { showToast('Load a sequence first, then predict a structure.', 'error'); return; }
+    if (!seq) { showToast('Nothing to fold yet: ESMFold needs a loaded sequence.', 'error'); return; }
     if (!beginGuideTask('structure', 'ESMFold prediction for a ' + seq.length + ' aa sequence')) return;
     const statusEl = document.getElementById('esmfoldStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
@@ -4106,7 +4106,7 @@ function parseIprscanDomains(text) {
 // paste. Works for any species (bacteria, viruses, plants, ...).
 async function runTopologyPrediction() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
-    if (!seq) { showToast('Load a protein sequence first: the topology prediction runs on the loaded sequence.', 'error'); return; }
+    if (!seq) { showToast('Nothing to predict yet: the topology prediction runs on the loaded sequence.', 'error'); return; }
     if (!beginGuideTask('topology', 'Topology prediction (TMHMM/Phobius/SignalP) running')) return;
     const statusEl = document.getElementById('topologyPredictStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
@@ -4401,7 +4401,7 @@ function applyDomainTracks(domains, database) {
 
 async function runDomainScan() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
-    if (!seq) { showToast('Load a protein sequence first. hmmscan searches the sequence against Pfam.', 'error'); return; }
+    if (!seq) { showToast('Nothing to scan yet: hmmscan searches the loaded sequence against Pfam.', 'error'); return; }
     // Lock synchronously, before any await, so a double click cannot start two jobs.
     if (!beginGuideTask('annotation', 'HMMER hmmscan (Pfam) search running')) return;
     const statusEl = document.getElementById('domainScanStatus');
@@ -4717,7 +4717,7 @@ async function fetchUniProtAnnotations() {
     if (!(await ensureExternalServices())) return;
     if (uniprotAnnotationMode === 'sequence') {
         const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
-        if (!seq) { showToast('Load a sequence first, then try Sequence mode.', 'error'); return; }
+        if (!seq) { showToast('Sequence mode needs a loaded sequence.', 'error'); return; }
         beginLookupStatus('sequence', 'BLAST (sequence) for a ' + seq.length + ' aa query');
         const acc = await resolveAccessionFromSequence(seq);
         if (!acc) { endLookupStatus(''); return; }
@@ -4726,7 +4726,7 @@ async function fetchUniProtAnnotations() {
         endLookupStatus('loaded annotations for ' + acc + '.');
     } else if (uniprotAnnotationMode === 'search') {
         const resolved = resolveUniProtSearchTerm();
-        if (!resolved.term) { showToast('Enter a search term first.', 'error'); return; }
+        if (!resolved.term) { showToast('Type a search term to look up an entry.', 'error'); return; }
         // Reflect the correction in the controls before running it, so what
         // actually ran is visible after the fact.
         const fieldEl = document.getElementById('uniprotSearchField');
@@ -4744,7 +4744,7 @@ async function fetchUniProtAnnotations() {
         renderUniProtSearchResults(results, resolved.term);
     } else {
         const acc = ((document.getElementById('uniprotAccessionInput') || {}).value || '').trim();
-        if (!acc) { showToast('Enter a UniProt accession first.', 'error'); return; }
+        if (!acc) { showToast('An accession is needed for that lookup - enter one, or resolve it from the sequence.', 'error'); return; }
         beginLookupStatus('accession', 'UniProt entry ' + acc);
         await useUniProtAccession(acc);
         endLookupStatus('loaded annotations for ' + acc + '.');
@@ -5263,7 +5263,7 @@ function renderEnsembleSummary(res) {
 }
 function selectEnsembleMobile() {
     const res = { values: parsedTracks.EV_RMSF };
-    if (!Array.isArray(res.values)) { showToast('Compute the ensemble variance first.', 'info'); return; }
+    if (!Array.isArray(res.values)) { showToast('Nothing to plot yet: run the ensemble variance from its panel.', 'info'); return; }
     const ranges = [];
     let start = -1;
     res.values.forEach((v, i) => {
@@ -6094,7 +6094,7 @@ function renderPdbLookupResults() {
 }
 async function findPdbEntries() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
-    if (!seq) { showToast('Load a protein sequence first: the lookup searches by sequence or accession.', 'error'); return; }
+    if (!seq) { showToast('Nothing to search yet: the lookup works from the loaded sequence or an accession.', 'error'); return; }
     const derived = deriveLookupDefaults();
     const accession = uniprotAccession || (derived && derived.accession) || '';
     const parsedLabel = parseProteinHeaderLine(currentProteinLabel);
@@ -6174,7 +6174,7 @@ function addExperimentalTrack() {
     const kind = (kindEl && kindEl.value) || 'other';
     const rows = parseExperimentalTable(textEl ? textEl.value : '');
     const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
-    if (!total) { showToast('Load a sequence first: the table is mapped onto the reference residues.', 'error'); return; }
+    if (!total) { showToast('Nothing to map yet: the table is mapped onto the reference residues.', 'error'); return; }
     if (!rows.length) {
         setStatus('Could not read any values: expected "position value" lines (or one series of at least five values).');
         showToast('Could not read any values: expected "position value" lines.', 'error');
@@ -6316,7 +6316,7 @@ function focusPdbFetch() {
 }
 async function fetchPdbEntry(rawId) {
     const id = String(rawId || '').trim().toUpperCase();
-    if (!/^[0-9][A-Z0-9]{3}$/.test(id)) { showToast('Enter a four-character PDB id, e.g. 1GFL - or use Find PDB entries in Options -> Structure to look one up from the sequence.', 'error'); return false; }
+    if (!/^[0-9][A-Z0-9]{3}$/.test(id)) { showToast('A four-character PDB id is needed (e.g. 1GFL) - or use Find PDB entries in Options -> Structure to look one up from the sequence.', 'error'); return false; }
     if (!beginGuideTask('structure', 'RCSB fetch for ' + id)) return false;
     const statusEl = document.getElementById('structureFetchStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
@@ -6419,7 +6419,7 @@ function applyInterfaceTracks(result, chains) {
 
 function runInterfaceAnalysis() {
     const files = Object.keys(cachedStructureTexts).filter(f => p3dUsableStructure(f));
-    if (!files.length) { showToast('Attach a multi-chain PDB/CIF (or predict one) first: interface analysis needs coordinates.', 'error'); return; }
+    if (!files.length) { showToast('Interface analysis needs coordinates: attach a multi-chain PDB/CIF, or predict one.', 'error'); return; }
     let file = files[0];
     if (p3dModel && p3dModel.kind === 'pdb' && cachedStructureTexts[p3dModel.fileName]) file = p3dModel.fileName;
     const ext = structExt(file);
@@ -7071,13 +7071,13 @@ const STEP_ACTION_RESOLVERS = {
         if (choice === 'phmmer' || choice === 'both') return {
             label: 'Search homologs (in-app)',
             run: 'runHomologSearch()',
-            extraActions: (choice === 'both' ? [{ label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')" }] : []).concat(variantExtra),
+            extraActions: (choice === 'both' ? [{ label: 'Open HHpred ↗', run: "openExternal('https://toolkit.tuebingen.mpg.de/tools/hhpred')" }] : []).concat(variantExtra),
             hint: 'The in-app search queries Swiss-Prot with phmmer (HMMER) by default; the picker in Input Data switches it to NCBI-BLAST for a pairwise search. One Homologs row per significant hit; the rows feed conservation, the match-quality colouring and the predictor tooltips.' +
                 (choice === 'both' ? ' Attach the HHpred .hhr afterwards if you ran one - the two sets coexist and both count towards conservation. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling.' : '')
         };
         if (choice === 'hhpred') return {
             label: 'Load .hhr / variant FASTA…', run: 'openInputDataModal()',
-            accessory: { label: 'Open HHpred ↗', run: "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')" },
+            accessory: { label: 'Open HHpred ↗', run: "openExternal('https://toolkit.tuebingen.mpg.de/tools/hhpred')" },
             extraActions: variantExtra,
             hint: 'Run MPI\'s HHpred (Copy sequence (FASTA) is below) and attach the resulting .hhr; its hits become Homologs rows and feed the templates table. HHpred accepts A3M/CLUSTAL/FASTA/STOCKHOLM; choose PDB_mmCIF70 or PDB_mmCIF30 for template-based modelling. Alternatively, you can search Swiss-Prot in-app with phmmer.'
         };
@@ -7094,7 +7094,7 @@ const STEP_ACTION_RESOLVERS = {
         if (model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (max 400 aa) and attaches the model.' + (singleChainGeneratorNote() ? ' ' + singleChainGeneratorNote() : '') };
         if (model === 'afdb') {
             if (acc) return { label: 'Fetch AlphaFold model (' + acc + ')', run: 'fetchAlphaFoldModel()', hint: 'Downloads the AlphaFold DB model for ' + acc + ' and attaches it.' + (singleChainGeneratorNote() ? ' ' + singleChainGeneratorNote() : '') };
-            return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'No UniProt accession is loaded, so AlphaFold DB cannot be queried. ESMFold folds the sequence directly instead.' };
+            return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'AlphaFold DB needs an accession; without one, ESMFold folds the sequence directly instead.' };
         }
         if (model === 'pdb') return { label: 'Attach PDB / CIF…', run: 'openInputDataModal()', hint: 'Attach the experimental model; pLDDT/RSA follow from it.' };
         // A declared assembly with only single-chain models has one API-able
@@ -7123,7 +7123,7 @@ const STEP_ACTION_RESOLVERS = {
         if (!hasStructure) {
             return {
                 label: 'Attach Structure(s)…', run: 'attachStructures()',
-                hint: 'Foldseek searches 3D structure, so attach a PDB/CIF (or predict one with ESMFold) first.'
+                hint: 'Foldseek searches 3D structure: attach a PDB/CIF, or predict one with ESMFold, to run it.'
             };
         }
         if (a.db) return {
@@ -7134,9 +7134,9 @@ const STEP_ACTION_RESOLVERS = {
     },
     topology(a) {
         if (a.predictor === 'none') return {
-            label: 'Open DeepTMHMM ↗', run: "window.open('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/','_blank')",
+            label: 'Open DeepTMHMM ↗', run: "openExternal('https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/')",
             accessory: { label: 'Copy sequence (FASTA)', run: 'copySequenceFasta()' },
-            hint: 'Use Copy sequence (FASTA) first, then paste it into DeepTMHMM and run the prediction. Paste its output into Options → Data Sources → Topology afterwards.'
+            hint: 'Copy sequence (FASTA) is below; paste it into DeepTMHMM, then bring its output back under Options → Data Sources → Topology.'
         };
         const names = { tmhmm: 'TMHMM', phobius: 'Phobius', deeptmhmm: 'DeepTMHMM' };
         if (names[a.predictor]) return { label: 'Paste ' + names[a.predictor] + ' output…', run: 'openTopologyPanel()', hint: 'Opens the topology paste box; two or more sources give a consensus bar.' };
@@ -7279,7 +7279,7 @@ function firstHomologPdbId() {
 }
 async function fetchBiologicalAssembly(pdbId, assemblyN) {
     const id = String(pdbId || '').trim().toUpperCase();
-    if (!isValidPdbId(id)) { showToast('Enter a 4-character PDB id (e.g. 1TNF) to fetch its biological assembly.', 'error'); return null; }
+    if (!isValidPdbId(id)) { showToast('A 4-character PDB id (e.g. 1TNF) fetches its biological assembly.', 'error'); return null; }
     const n = Math.max(1, parseInt(assemblyN, 10) || 1);
     if (!beginGuideTask('structure', 'RCSB biological assembly ' + id + ' (assembly ' + n + ')')) return null;
     const statusEl = document.getElementById('interfaceStatus');
@@ -7510,7 +7510,7 @@ function sequenceLength() {
     return (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
 }
 async function copySequenceFasta() {
-    if (!sequenceFastaText()) { showToast('Load a protein sequence first.', 'error'); return; }
+    if (!sequenceFastaText()) { showToast('A protein sequence is needed for this.', 'error'); return; }
     const ok = await copySequenceText();
     showToast(ok
         ? ('Sequence copied as FASTA (' + sequenceLength() + ' aa). Paste it with Ctrl+V.')
@@ -7518,7 +7518,7 @@ async function copySequenceFasta() {
 }
 function downloadSequenceFasta() {
     const text = sequenceFastaText();
-    if (!text) { showToast('Load a protein sequence first.', 'error'); return; }
+    if (!text) { showToast('A protein sequence is needed for this.', 'error'); return; }
     const label = (currentProteinLabel || 'sequence').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'sequence';
     downloadTextFile(label + '.fasta', text, 'text/plain');
     showToast('FASTA downloaded.', 'success');
@@ -7560,6 +7560,17 @@ function openDataSources(name) {
     openOptionsModal();
     switchOptionsTab('data');
     switchDataCategory(name || optDataCategory);
+}
+// Opens an external site in a new tab. If the browser blocks the popup the
+// click would otherwise look broken, so the URL is surfaced instead (X6).
+function openExternal(url) {
+    let win = null;
+    try { win = window.open(url, '_blank', 'noopener'); } catch (e) { win = null; }
+    if (!win) {
+        logAction('click', 'popup blocked', url);
+        showToast('The popup was blocked - open this link instead: ' + url, 'info');
+    }
+    return win;
 }
 function openTopologyPanel() {
     openDataSources('topology');
@@ -7705,7 +7716,7 @@ function computeGuideInsights() {
     }
     const hlKeys = keys.filter(k => k.startsWith('HL_'));
     if (!hlKeys.length) {
-        out.push({ level: 'warn', text: 'No homologs loaded, so nothing cross-checks the sequence predictions yet. Search homologs (phmmer) in-app, add an HHpred .hhr, or run Foldseek.' });
+        out.push({ level: 'warn', text: 'Homologs cross-check the sequence predictions; add them with Search homologs (in-app), an HHpred .hhr, or Foldseek.' });
     } else {
         let best = 0;
         try {
@@ -7713,16 +7724,16 @@ function computeGuideInsights() {
         } catch (e) { /* metrics are best-effort */ }
         out.push(best && best >= 30
             ? { level: 'info', text: 'Best homolog identity is ' + best.toFixed(0) + '%. Annotation transfer from templates is reasonable.' }
-            : { level: 'warn', text: 'No homolog above ~30% identity, so homology-based annotation transfer is weak. Lean on structural and curated evidence.' });
+            : { level: 'warn', text: 'The closest homolog is below ~30% identity, so annotation transfer from homology is weak; structural and curated evidence matter more here.' });
     }
     if (guideProfile.membrane === 'yes') {
         const tmKeys = keys.filter(k => k.startsWith('TM_'));
         if (tmKeys.length && tmKeys.every(k => isTrackEmpty(k))) {
-            out.push({ level: 'warn', text: 'You flagged this as membrane-associated, but every transmembrane prediction came back empty. Check the Quick2D run, or reconsider the membrane answer.' });
+            out.push({ level: 'warn', text: 'Membrane-associated was flagged, but every transmembrane prediction came back empty; check the Quick2D run, or revisit that answer.' });
         }
     }
     if (guideProfile.membrane === 'yes' && !keys.some(k => k.startsWith('TM_') || k.startsWith('SP_'))) {
-        out.push({ level: 'warn', text: 'You flagged a membrane/secreted protein, but no TM or signal-peptide track is loaded.' });
+        out.push({ level: 'warn', text: 'Membrane/secreted was flagged; adding a TM or signal-peptide track would let the topology checks run.' });
     }
     const valKeys = Object.keys(validationHitsInfo || {});
     if (valKeys.length) {
@@ -7747,7 +7758,7 @@ function computeGuideInsights() {
         out.push({ level: 'info', text: 'Variant effect evidence: ' + perProvider.join(' \u00b7 ') + '.' });
     }
     if (guideProfile.variants === 'yes' && !keys.some(k => k.startsWith('VAR_')) && !parsedTracks.CONSERVATION) {
-        out.push({ level: 'warn', text: 'Variant evaluation is flagged, but no variant FASTA (or conservation row) is loaded yet.' });
+        out.push({ level: 'warn', text: 'Variant evaluation is flagged; a variant FASTA (or a conservation row) is what it needs.' });
     }
     if (keys.some(k => k.startsWith('DM_')) && !uniprotFeatures) {
         out.push({ level: 'info', text: 'Pfam domains are in; fetching UniProt too would give curated boundaries to compare against.' });
@@ -7770,7 +7781,7 @@ function computeGuideInsights() {
         const hasDomainFamily = Object.keys(domainHitsInfo || {}).length > 0;
         const hasFoldseekHit = Object.keys(homologHitsInfo || {}).some(k => /Foldseek/i.test((homologHitsInfo[k] || {}).source || ''));
         if (!hasDomainFamily && !hasFoldseekHit) {
-            out.push({ level: 'info', text: 'No Pfam family and no structural relative are assigned yet, so the fold is unplaced. The Pfam scan (Analyze → Scan Domains) and a Foldseek search are the two routes that place it.' });
+            out.push({ level: 'info', text: 'The fold is unplaced: no Pfam family and no structural relative yet; the Pfam scan (Analyze → Scan Domains) and a Foldseek search are the two routes that place it.' });
         }
     } catch (e) { /* fold-placement read-out is advisory */ }
     try {
@@ -8043,7 +8054,7 @@ function buildMethodsReport() {
     return L.join('\n');
 }
 function exportMethodsReport() {
-    if (!parsedTracks.AA) { showToast('Load data first: the methods summary reports what has been evaluated.', 'error'); return; }
+    if (!parsedTracks.AA) { showToast('Nothing to summarise yet: the methods summary reports what has been evaluated.', 'error'); return; }
     const text = buildMethodsReport();
     const safe = (currentProteinLabel || 'session').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'session';
     downloadTextFile('q2dv-methods-' + safe + '-' + methodsReportDate() + '.md', text, 'text/markdown');
@@ -8554,7 +8565,7 @@ function openDrawerForManualPaste() {
 function confirmDrawerParse() {
     const text = document.getElementById('rawInput').value;
     if (!text.trim()) {
-        showToast('Paste or type some Quick2D text first.', 'error');
+        showToast('Nothing to parse yet: paste or type some Quick2D text.', 'error');
         return;
     }
     const beforeRef = parsedTracks;
@@ -9153,7 +9164,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.3';
+const APP_VERSION = '0.66.4';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -12034,7 +12045,7 @@ function variantEffectLine(sub) {
 // own message and the others still run.
 async function fetchVariantEffectPredictions() {
     const names = Object.keys(keyedVariantsInfo || {}).filter(n => keyedVariantsInfo[n] && typeof keyedVariantsInfo[n].aligned === 'string');
-    if (!names.length) { showToast('Attach a variant FASTA first: variant effects are scored per substitution.', 'error'); return; }
+    if (!names.length) { showToast('Variant effects are scored per substitution, so this needs a variant FASTA.', 'error'); return; }
     const substitutions = [];
     names.forEach(n => parseVariantSubstitutions(n).forEach(sub => {
         const key = sub.ref + sub.pos + sub.alt;
@@ -15430,7 +15441,7 @@ function openMetricsTable() {
 // without opening the Table modal first.
 function exportMetricsTableTSV() {
     const data = buildMetricsDelimited('\t');
-    if (!data) { showToast('Attach structure files (pLDDT/RSA) to export metrics.', 'error'); return; }
+    if (!data) { showToast('Metrics need structural tracks (pLDDT/RSA) to export.', 'error'); return; }
     const slug = data.region.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     if (downloadTextFile(`q2dv-metrics_${slug}_${stamp}.tsv`, data.text, 'text/tab-separated-values;charset=utf-8')) {
@@ -15442,7 +15453,7 @@ function exportMetricsTableTSV() {
 // separator, a quote, or a newline).
 function exportMetricsCSV() {
     const data = buildMetricsDelimited(',');
-    if (!data) { showToast('Attach structure files (pLDDT/RSA) to export metrics.', 'error'); return; }
+    if (!data) { showToast('Metrics need structural tracks (pLDDT/RSA) to export.', 'error'); return; }
     const slug = data.region.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     if (downloadTextFile(`q2dv-metrics_${slug}_${stamp}.csv`, data.text, 'text/csv;charset=utf-8')) {
@@ -17120,6 +17131,20 @@ function applyPersistedState(state) {
     uniprotFeatures = state.uniprotFeatures || null;
     uniprotFeatureTracks = state.uniprotFeatureTracks || {};
     domainHitsInfo = state.domainHitsInfo || {};
+    // A session saved before the info maps existed (pre-0.23.0) restores its rows
+    // but not their backing data: the rows still render, yet tooltips degrade and
+    // the Options panels show no sources. Say so once instead of leaving it a
+    // mystery (the X1 class), and point at the two ways out.
+    const legacyGroups = [];
+    const hasRow = (p) => Object.keys(parsedTracks).some(k => k.startsWith(p));
+    if (hasRow('TP_') && !topologySources.length) legacyGroups.push('topology');
+    if (hasRow('DM_') && !Object.keys(domainHitsInfo).length) legacyGroups.push('domain');
+    if (hasRow('UP_') && !Object.keys(uniprotFeatureTracks).length) legacyGroups.push('UniProt feature');
+    if (legacyGroups.length) {
+        logAction('import', 'legacy session restored', 'no backing data for: ' + legacyGroups.join(', '));
+        showToast('This session was saved by an older version: its ' + legacyGroups.join(', ') +
+            ' row(s) have no backing data, so tooltips and re-export are limited. Re-import them, or remove the rows.', 'info');
+    }
 
     const sel = state.selection || {};
     selectStart = sel.selectStart !== undefined ? sel.selectStart : null;

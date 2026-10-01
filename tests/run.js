@@ -289,7 +289,7 @@ assert(ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null
 
 ctxRun(`parsedTracks = { AA: 'MKV' };`);
 const ins = ctxRun(`computeGuideInsights()`);
-assert(ins.some(i => /No homologs/.test(i.text)), 'read-out flags missing homologs');
+assert(ins.some(i => /Homologs cross-check/.test(i.text)), 'read-out flags missing homologs');
 ctxRun(`parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 40 }, { val: 50 }] };`);
 assert(ctxRun(`computeGuideInsights()`).some(i => i.level === 'warn' && /Mean pLDDT is 45/.test(i.text)), 'low mean pLDDT raises a warning');
 ctxRun(`parsedTracks = { AA: 'MKV', 'm_pLDDT': [{ val: 90 }, { val: 88 }] };`);
@@ -369,7 +369,7 @@ assert(act.run === 'predictStructureESMFold()' && act.custom === true, 'ESMFold 
 assert(/400 aa/.test(act.hint), 'the resolved action carries a hint');
 ctxRun(`setStepAnswer('structure', 'model', 'afdb'); uniprotAccession = null; currentProteinLabel = null;`);
 let afAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
-assert(afAct.run === 'predictStructureESMFold()' && /No UniProt accession/.test(afAct.hint), 'AlphaFold answer without an accession falls back to ESMFold and says why');
+assert(afAct.run === 'predictStructureESMFold()' && /AlphaFold DB needs an accession/.test(afAct.hint), 'AlphaFold answer without an accession falls back to ESMFold and says why');
 ctxRun(`uniprotAccession = 'P42212';`);
 afAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'structure')[0])`);
 assert(afAct.run === 'fetchAlphaFoldModel()' && /P42212/.test(afAct.label), 'with an accession it offers the real AlphaFold DB fetch');
@@ -386,7 +386,7 @@ ctxRun(`setStepAnswer('topology', 'predictor', 'tmhmm');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0]).run`) === 'openTopologyPanel()', 'topology answer opens the paste panel');
 ctxRun(`setStepAnswer('topology', 'predictor', 'none');`);
 let topoAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'topology')[0])`);
-assert(topoAct.run.indexOf('window.open') === 0, 'no-predictor answer opens the predictor');
+assert(topoAct.run.indexOf('openExternal') === 0, 'no-predictor answer opens the predictor');
 assert(topoAct.accessory && topoAct.accessory.label === 'Copy sequence (FASTA)' && topoAct.accessory.run === 'copySequenceFasta()', 'with Copy sequence (FASTA) as an accessory beside it');
 ctxRun(`setStepAnswer('annotation', 'have', 'domains');`);
 assert(ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'annotation')[0]).run`) === 'runDomainScan()', 'annotation "domains only" resolves to the Pfam scan');
@@ -869,7 +869,7 @@ ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'hhpred');`);
 const hhAct = ctxRun(`resolveStepAction(WORKFLOW_STEPS.filter(s => s.id === 'homologs')[0])`);
 assert(hhAct.run === 'openInputDataModal()', 'the HHpred route leads with attaching the .hhr');
-assert(hhAct.accessory && hhAct.accessory.run.indexOf('window.open') === 0 && /HHpred/.test(hhAct.accessory.label), 'and offers the HHpred link beside it');
+assert(hhAct.accessory && hhAct.accessory.run.indexOf('openExternal') === 0 && /HHpred/.test(hhAct.accessory.label), 'and offers the HHpred link beside it');
 assert(/Copy sequence \(FASTA\) is below/.test(hhAct.hint), 'the short description points at the copy button');
 assert(hhAct.run.indexOf('copySequence') === -1 && hhAct.run.indexOf('clipboard') === -1, 'the attach button itself does not touch the clipboard');
 assert(/A3M\/CLUSTAL\/FASTA\/STOCKHOLM/.test(hhAct.hint) && /PDB_mmCIF70/.test(hhAct.hint), 'the hint names the accepted formats and the modelling databases');
@@ -1210,6 +1210,24 @@ assert(/^Conservation: highly conserved .*; Structure context: buried .*; Curate
 assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-agnostic');
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
+
+section('legacy saves (pre-0.23.0): tolerated, and explained');
+sandbox.__preLegacy = ctxRun(`JSON.stringify(gatherPersistableState())`);
+ctxRun(`
+    actionLog = [];
+    applyPersistedState({
+        parsedTracks: { AA: 'MKV', 'TP_Old': 'iii', 'DM_Old': '   ', 'UP_Old': '  \u25a0' },
+        currentProteinLabel: 'legacy', structureFiles: [], structureReferences: {},
+        homologHitsInfo: {}, validationHitsInfo: {}, experimentalTracksInfo: {}, keyedVariantsInfo: {},
+        graphHighlights: {}, topologySources: [], uniprotFeatures: null, uniprotFeatureTracks: {},
+        domainHitsInfo: {}, selection: {}, preferences: {}, graphMode: {},
+        analysisRules: [], guideProfile: {}, guideOverrides: {}, guideAnswers: {}
+    });
+`);
+assert(ctxRun(`typeof parsedTracks['TP_Old'] === 'string' && typeof parsedTracks['DM_Old'] === 'string'`), 'a legacy save still restores its rows');
+assert(ctxRun(`actionLog.some(e => e.kind === 'import' && /legacy session restored/.test(e.label) && /topology, domain, UniProt feature/.test(e.detail))`), 'and the app says which groups have no backing data (got ' + ctxRun(`JSON.stringify(actionLog.filter(e => e.kind === 'import'))`) + ')');
+assert(ctxRun(`(function () { try { removeTracks(['TP_Old']); return parsedTracks['TP_Old'] === undefined; } catch (e) { return 'threw: ' + e.message; } })()`) === true, 'removing a legacy row works (nothing to unpick) without throwing');
+ctxRun(`applyPersistedState(JSON.parse(window.__preLegacy)); actionLog = [];`);
 
 section('X2/X4: removal of restored rows is surgical; rules follow the data');
 ctxRun(`
@@ -1660,7 +1678,7 @@ const byRoute = ctxRun(`
     })()
 `);
 assert(byRoute.phmmer.run === 'runHomologSearch()', 'choosing phmmer offers the in-app search');
-assert(byRoute.hhpred.run === 'openInputDataModal()' && byRoute.hhpred.accessory === "window.open('https://toolkit.tuebingen.mpg.de/tools/hhpred','_blank')", 'choosing HHpred offers the attach action with the HHpred link as accessory');
+assert(byRoute.hhpred.run === 'openInputDataModal()' && byRoute.hhpred.accessory === "openExternal('https://toolkit.tuebingen.mpg.de/tools/hhpred')", 'choosing HHpred offers the attach action with the HHpred link as accessory');
 assert(byRoute.both.run === 'runHomologSearch()' && byRoute.both.custom === true, 'choosing both leads with the in-app search, with the .hhr attach as the secondary button');
 assert(byRoute.both.accessory === null, 'and no accessory repeats that secondary button (it used to show twice)');
 assert(byRoute.ready.run === byRoute.hhpred.run, 'legacy "ready" answers map onto the HHpred route');
@@ -1676,7 +1694,7 @@ assert(byRoute.hhpred.extras.indexOf('runHomologSearch()') !== -1, 'and the alte
 assert(byRoute.phmmer.extras.indexOf('runHomologSearch()') === -1, 'while a redundant phmmer extra is dropped when phmmer is the primary action');
 assert(!/No HHpred at hand/.test(hstep.desc + byRoute.hhpred.hint), 'the copy no longer says "No HHpred at hand" (neutral phrasing instead)');
 assert(/Alternatively, you can/.test(byRoute.hhpred.hint), 'the HHpred hint offers the alternative neutrally');
-assert(HTML.indexOf('Search homologs (phmmer) in-app, add an HHpred .hhr') !== -1, 'the guide read-out names phmmer when no homologs are loaded');
+assert(HTML.indexOf('Homologs cross-check the sequence predictions') !== -1, 'the guide read-out names phmmer when no homologs are loaded');
 
 section('phmmer homolog search: parser + apply (real EBI output fixture)');
 sandbox.__phmmerFixture = PHMMER_FIXTURE;
