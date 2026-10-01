@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-09-25
+
+### Added
+
+- **InterProScan (EBI) joins the app, for topology and for bacterial/viral domain families.** One
+  Job Dispatcher tool, two uses, both species-agnostic:
+  - **Predict topology in-app** (Input Data button, or the guide's topology step): TMHMM + Phobius +
+    SignalP run on the loaded sequence and each analysis is registered as a topology source, so the
+    majority-vote consensus, the `?` conflict flags and the TM cross-check light up without a manual
+    paste. Verified live on LacY (P02920): Phobius 12 TM with orientation, TMHMM 11 - a real
+    predictor disagreement the consensus now flags.
+  - **Domain scan provider**: InterProScan (PfamA + NCBIfam) is selectable next to hmmscan. NCBIfam
+    carries the bacterial and viral family models (TIGRFAM/PRK/NF), so bacterial/viral proteins get
+    family annotations where Pfam alone is thin. Verified live on LacY: Pfam PF01306 (LacY/RafB
+    permease family) plus NCBIfam TIGR00882 and NF007077.
+  - Both parsers read the **TSV** renderer: the JSON one does not say which analysis a match came
+    from (column 4 does), and a tab-separated first line distinguishes it from HMMER text
+    (`isIprscanTsv()`).
+  - `iprscanRegionState()` maps region names to the topology chars **name-first**: Phobius describes
+    `CYTOPLASMIC_DOMAIN` as "outside the membrane, in the cytoplasm", which the description-only
+    version read as outside (caught by the real fixture).
+  - `addTopologyStateSource()` registers a prebuilt state string and **replaces** a same-named
+    source, so re-running a prediction refreshes instead of stacking duplicates; `DM_` row labels
+    now use the recorded model (`Pfam:PF01306`, `NCBIfam:TIGR00882`).
+  - Also cleaned up: the harness had a duplicated async test block whose second copy could exit the
+    process before the first finished (it was masking the new end-to-end test).
+  - Tests: TSV parsing with the real LacY outputs as fixtures (analyses, ranges, significance),
+    region-name mapping incl. the Phobius trap, topology sources and the flagged disagreement,
+    domain models/descriptions, the runner end to end with the fixture (no network), provider
+    registry and markup.
+
 ## [0.57.0] - 2026-09-25
 
 ### Added

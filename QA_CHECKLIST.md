@@ -1237,6 +1237,20 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 324 | A non-human protein | Clear message that annotations exist for human proteins only |
 | 325 | A variant header with no token (e.g. `>var1`) | Falls back to the alignment difference |
 
+## 0.58.0 - InterProScan topology + domains (quick rows)
+
+| # | Try | Watch for |
+|---|---|---|
+| 332 | Load LacY (P02920) → Predict topology (TMHMM/Phobius/SignalP) | Phobius + TMHMM source rows appear; status names both TM counts |
+| 333 | Look at the Consensus row | TM 11-vs-12 disagreement shown as red `?` columns, N-terminus reported |
+| 334 | Re-run the prediction | Sources are replaced, not stacked (TMHMM/Phobius stay one each) |
+| 335 | Scan domains with the picker on InterProScan | DM_ rows labelled `Pfam:PF01306` and `NCBIfam:TIGR00882` etc. |
+| 336 | Scan domains with the picker on hmmscan | The original Pfam behaviour is unchanged |
+| 337 | Load GFP (soluble control) and predict topology | ~0 TM; no signal peptide; the consensus is mostly inside/outside |
+| 338 | Try a viral case (P0DTC2 spike) | Signal peptide + 1 TM in the sources |
+| 339 | Run the guide's topology step | Leads with "Predict topology (InterProScan)"; "Paste topology…" stays as an alternative |
+| 340 | Cross-check TM with a Quick2D TM row loaded | Uses the InterProScan consensus like a pasted source |
+
 ## 0.57.0 - variant effect providers (quick rows)
 
 | # | Try | Watch for |
@@ -1247,6 +1261,30 @@ EBI Search query for it was verified live: bare `GFP_AEQVI` → 1 hit (P42212) i
 | 329 | Block one service and rerun | That provider fails in the status; the others still report |
 | 330 | Nothing loaded → press the button | Clear message listing what each provider needs |
 | 331 | Add a new provider (dev) | One registry entry; tooltips/status/read-out pick it up |
+
+## Reference systems (verified expectations) — use these to test
+
+| System | Accession | Class | Verified expectation | Exercises |
+|---|---|---|---|---|
+| GFP (avGFP) | P42212 | soluble, non-membrane | ~0 TM helices, no signal peptide, Pfam PF01316 | the soluble control for every pipeline |
+| **LacY** lactose permease (*E. coli*) | P02920 | bacterial, 12-TM | curated 12 TM; Phobius 12, **TMHMM 11** - expect a flagged disagreement | topology prediction + `?` conflicts, InterProScan domains (Pfam PF01306 + NCBIfam TIGR00882/NF007077) |
+| KcsA (*S. lividans*) | P0A334 | bacterial, 2-TM channel | 2 TM | small membrane protein |
+| Bacteriorhodopsin (*H. salinarum*) | P02945 | archaeal, 7-TM | 7 TM | classic membrane control |
+| PhoE porin (*E. coli*) | P02932 | bacterial beta-barrel | 0 TM helices (barrel, not helical) | "membrane protein without TM helices" contrast |
+| FhuA (*E. coli*) | P06971 | bacterial beta-barrel | 22 TM-like strands | outer-membrane barrel stress test |
+| SARS-CoV-2 spike | P0DTC2 | viral, signal + 1 TM | signal peptide + TM 1214-1234 | viral membrane case |
+| Influenza HA | P03452 | viral, signal + 1 TM | signal peptide + TM 529-549 | viral membrane case |
+
+**How to run a membrane case:** load the sequence (UniProt or FASTA) → **Predict topology
+(TMHMM/Phobius/SignalP)** → expect the source rows plus a Consensus row; check the N-terminus and
+any `?` conflicts; then **Scan domains** with the picker on InterProScan to see Pfam + NCBIfam
+families; run **phmmer** for conservation; cross-check TM once a Quick2D TM row is loaded.
+
+**Bacteria / viruses: what already covers them.** UniProt (any taxon), phmmer/BLAST vs Swiss-Prot,
+hmmscan/Pfam, InterProScan with NCBIfam (TIGRFAM/PRK/NF: bacterial and viral family models),
+Foldseek (AFDB/PDB), ESMFold, the topology predictors and conservation. **Not integrated** (would
+need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial resistance), BV-BRC
+(bacterial/viral genomes), viral-specific databases. The capability/provider registry is the hook.
 
 ## Pending live checks (API calls + UI integration) — test later
 
@@ -1331,4 +1369,5 @@ needs a full card.
 6ah. 315–318 (per-provider menu + source-aware glyph wording - 0.55.1; check 317 first).
 6ai. 319–325 (AlphaMissense variant effects - new 0.56.0; card at the top, check 319 first).
 6aj. 326–331 (variant effect provider framework - new 0.57.0; card at the top, check 326 first).
+6ak. 332–340 + the reference-systems table (InterProScan topology/domains - new 0.58.0; check 332 first).
 7. 1–12 (design pass + HMMER) last, as they are the most self-contained.

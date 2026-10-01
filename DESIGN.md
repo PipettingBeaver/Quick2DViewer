@@ -74,6 +74,14 @@ field so HHpred / Foldseek / HMMER homologs coexist and are tagged.
   Clustal / MMseqs2 / PDBsum are redundant or superseded. (Checked 2026-09: the
   EBI Job Dispatcher has no hhblits/hhpred service, so HHblits stays a clipboard
   hand-off - the MPI toolkit has no CORS API.)
+- **InterProScan (EBI Job Dispatcher, `iprscan5`)** — done (v0.58.0) for two uses: topology
+  prediction (TMHMM + Phobius + SignalP -> topology sources for the consensus) and a domain-scan
+  provider (PfamA + NCBIfam). The TSV renderer is used because the JSON one does not name the
+  analysis. **Bacteria/viruses:** the app was already species-agnostic through UniProt (any taxon),
+  phmmer/BLAST vs Swiss-Prot, hmmscan/Pfam, Foldseek, ESMFold, the topology predictors and
+  conservation; NCBIfam now adds the bacterial/viral family models (TIGRFAM/PRK/NF). Dedicated
+  pathogen resources (VFDB virulence, CARD AMR, BV-BRC genomes) are **not** integrated - candidates
+  for the capability/provider registry once their CORS behaviour is verified.
 - **AlphaMissense** — variant effect predictions (done, v0.56.0): the AlphaFold DB
   entry's `amAnnotationsUrl` CSV is fetched on demand and only the loaded variants'
   substitutions are kept. Same accession requirement as the AlphaFold model fetch,

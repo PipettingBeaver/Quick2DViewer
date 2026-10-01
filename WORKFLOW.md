@@ -170,7 +170,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 ### 7. Membrane topology
 
-**Purpose.** Paste [TMHMM](https://services.healthtech.dtu.dk/services/TMHMM-2.0/), [Phobius](https://services.healthtech.dtu.dk/services/Phobius-1.01/) or [DeepTMHMM](https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/) output for a consensus topology bar.
+**Purpose.** Run <strong>TMHMM + Phobius + SignalP in-app</strong> (InterProScan, any species), or paste [TMHMM](https://services.healthtech.dtu.dk/services/TMHMM-2.0/), [Phobius](https://services.healthtech.dtu.dk/services/Phobius-1.01/) or [DeepTMHMM](https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/) output, for a consensus topology bar.
 
 **Why it matters.** Orientation decides which loops face the cytosol: it changes which residues are accessible to ligands, antibodies and variants.
 
@@ -178,7 +178,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 - Build a consensus across predictors; a segment that flips orientation between tools is not settled.
 - Compare the consensus with the Quick2D TM call to judge how robust the TM prediction is.
 
-**In-app action.** `Paste topology…` · `Cross-check TM`
+**In-app action.** `Predict topology (InterProScan)` · `Paste topology…` · `Cross-check TM`
 
 **Guided questions** (the answers choose the concrete action offered).
 

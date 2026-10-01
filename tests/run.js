@@ -13,6 +13,8 @@ const CHANGELOG = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf-8');
 const WORKFLOW_MD = fs.readFileSync(path.join(ROOT, 'WORKFLOW.md'), 'utf-8');
 const PHMMER_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/phmmer-gfp.out'), 'utf-8');
 const BLAST_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/blast-gfp.json'), 'utf-8');
+const IPR_TOPO_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-topology.tsv'), 'utf-8');
+const IPR_DOM_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-domains.tsv'), 'utf-8');
 
 // ---------- DOM stubs ----------
 function makeEl() {
@@ -1102,6 +1104,55 @@ const amActions = ctxRun(`
 assert(amActions.indexOf('fetchVariantEffectPredictions()') !== -1, 'with variants loaded the guide offers the AlphaMissense action');
 assert(HTML.indexOf('id="btnVariantEffects"') !== -1 && HTML.indexOf('id="variantEffectStatus"') !== -1, 'Input Data has the button and status line');
 ctxRun(`parsedTracks = {}; keyedVariantsInfo = {}; alphaMissenseScores = {}; alphaMissenseAccession = ''; activeRowKey = null;`);
+
+section('InterProScan: topology sources + bacterial/viral domain families');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers.map(p => p.id).join(',')`) === 'ebi_hmmer,ebi_iprscan5', 'the domain scan offers hmmscan then InterProScan (Pfam + NCBIfam)');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].params.appl`) === 'TMHMM,Phobius,SignalP', 'a topology_prediction capability runs TMHMM, Phobius and SignalP');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].resultExt`) === 'tsv', 'and reads the TSV renderer (the JSON one does not name the analysis)');
+sandbox.__iprTopo = IPR_TOPO_FIXTURE;
+sandbox.__iprDom = IPR_DOM_FIXTURE;
+const iprRows = ctxRun(`parseIprscanTsv(window.__iprTopo)`);
+assert(iprRows.length === 36 && iprRows.filter(r => r.analysis === 'TMHMM').length === 11 && iprRows.filter(r => r.analysis === 'Phobius').length === 25, 'the TSV parser keeps the analysis column (got ' + iprRows.length + ' rows)');
+assert(iprRows.every(r => r.start >= 1 && r.end >= r.start && r.significant), 'rows carry 1-based ranges and significance');
+assert(ctxRun(`isIprscanTsv(window.__iprTopo)`) === true && ctxRun(`isIprscanTsv('# hmmscan :: search sequence(s) against a profile database')`) === false, 'the domain-scan runner tells the two providers apart by the tab-separated first line');
+assert(ctxRun(`iprscanRegionState('TMhelix', '')`) === 'M' && ctxRun(`iprscanRegionState('NON_CYTOPLASMIC_DOMAIN', '')`) === 'o' && ctxRun(`iprscanRegionState('CYTOPLASMIC_DOMAIN', '')`) === 'i' && ctxRun(`iprscanRegionState('SIGNAL_PEPTIDE', '')`) === 'S', 'region names map onto the topology state chars');
+assert(ctxRun(`iprscanRegionState('CYTOPLASMIC_DOMAIN', 'Region of a membrane-bound protein predicted to be outside the membrane, in the cytoplasm.')`) === 'i', 'the signature name beats the description (Phobius calls the cytoplasmic side "outside the membrane")');
+assert(ctxRun(`iprscanRegionState('', 'Region of a membrane-bound protein predicted to be inside the membrane, in the cytoplasm.')`) === 'i', 'the description is the fallback when the name says nothing');
+const topoSources = ctxRun(`parseIprscanTopology(window.__iprTopo, 417)`);
+assert(topoSources.length === 2 && topoSources.map(s => s.name).sort().join(',') === 'Phobius,TMHMM', 'one topology source per analysis (got ' + topoSources.map(s => s.name).join(',') + ')');
+const phob = topoSources.filter(s => s.name === 'Phobius')[0];
+const tmh = topoSources.filter(s => s.name === 'TMHMM')[0];
+assert((phob.state.match(/M+/g) || []).length === 12, 'Phobius reports the curated 12 TM segments for LacY (got ' + (phob.state.match(/M+/g) || []).length + ' segments)');
+assert((tmh.state.match(/M+/g) || []).length === 11, 'TMHMM reports 11 - a real predictor disagreement (got ' + (tmh.state.match(/M+/g) || []).length + ' segments)');
+assert(/i/.test(phob.state) && /o/.test(phob.state), 'Phobius orientation fills inside and outside');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(417) };
+    topologySources = [];
+    parseIprscanTopology(window.__iprTopo, 417).forEach(s => addTopologyStateSource(s.state, s.name));
+    applyTopologySources();
+`);
+const lacYCons = ctxRun(`topologyConsensusSummary()`);
+assert(lacYCons && lacYCons.sources === 2 && lacYCons.tmSegments >= 11, 'the consensus runs over both analyses (got ' + (lacYCons && lacYCons.tmSegments) + ' TM)');
+assert(lacYCons.counts['?'] > 0, 'and the 11-vs-12 disagreement is flagged with ? rather than guessed (got ' + lacYCons.counts['?'] + ')');
+assert(ctxRun(`topologyConsensusSummary().nterm`) === 'o' || ctxRun(`topologyConsensusSummary().nterm`) === 'i', 'the N-terminus side is reported');
+const iprDomains = ctxRun(`parseIprscanDomains(window.__iprDom)`);
+assert(iprDomains.length === 3, 'the domain TSV yields one entry per family hit (got ' + iprDomains.length + ')');
+assert(iprDomains.map(d => d.model).join(',') === 'Pfam:PF01306,NCBIfam:TIGR00882,NCBIfam:NF007077', 'models keep the analysis, so bacterial/viral families are identifiable (got ' + iprDomains.map(d => d.model).join(',') + ')');
+assert(iprDomains[0].description === 'LacY/RafB permease family', 'the InterPro description wins when present');
+assert(iprDomains[0].aliFrom === 2 && iprDomains[0].aliTo === 412, 'and the alignment range is kept');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(417) };
+    domainHitsInfo = {};
+    const n = applyDomainTracks(parseIprscanDomains(window.__iprDom), 'InterProScan');
+`);
+assert(ctxRun(`Object.keys(parsedTracks).filter(k => k.startsWith('DM_')).length`) === 3, 'each family becomes a DM_ row');
+assert(ctxRun(`domainHitsInfo[Object.keys(parsedTracks).filter(k => k.startsWith('DM_'))[0]].database`) === 'InterProScan', 'registered with the InterProScan source');
+assert(ctxRun(`formatTrackLabel(Object.keys(parsedTracks).filter(k => k.startsWith('DM_'))[0])`).indexOf('Pfam:PF01306') !== -1, 'and the row label names the model with its analysis');
+assert(HTML.indexOf('id="btnTopologyPredict"') !== -1 && HTML.indexOf('id="topologyPredictStatus"') !== -1, 'Input Data has the topology prediction button and status');
+assert(HTML.indexOf('id="domainScanProvider"') !== -1 && HTML.indexOf('value="ebi_iprscan5"') !== -1, 'and a domain-scan provider picker including InterProScan');
+assert(ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'topology').action.run`) === 'runTopologyPrediction()', 'the guide topology step leads with the in-app prediction');
+assert(ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'topology').extraActions.some(a => a.run === 'openTopologyPanel()')`), 'and keeps the paste route as an alternative');
+ctxRun(`parsedTracks = {}; topologySources = []; domainHitsInfo = {};`);
 
 section('variant effect providers: modular registry + local sources');
 const provIds = ctxRun(`Object.keys(VARIANT_EFFECT_PROVIDERS)`);
@@ -2714,6 +2765,26 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     const result = await ctxRun(`runCapability('__test', {})`);
     assert(result === 'second-provider-result', 'runCapability falls through a failing provider to the next');
 
+    // runTopologyPrediction end to end with the real InterProScan TSV (the
+    // capability is stubbed, everything else is the app's own path).
+    sandbox.__iprTsv = IPR_TOPO_FIXTURE;
+    ctxRun(`
+        externalServicesEnabled = true;
+        parsedTracks = { AA: 'M'.repeat(417) };
+        topologySources = [];
+        SERVICE_ADAPTERS.__ipr_ok = async () => window.__iprTsv;
+        SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].adapter = '__ipr_ok';
+    `);
+    await ctxRun(`runTopologyPrediction()`);
+    assert(ctxRun(`topologySources.length`) === 2, 'the topology runner registers one source per analysis (got ' + ctxRun(`topologySources.length`) + ')');
+    assert((ctxRun(`topologySources[0].state`) || '').match(/M+/g) !== null, 'with TM segments filled in');
+    assert(ctxRun(`topologyConsensusSummary().counts['?']`) > 0, 'and the consensus flags the real TMHMM/Phobius disagreement');
+    assert(/InterProScan/.test(ctxRun(`document.getElementById('topologyPredictStatus').textContent`)), 'the status line summarises the run');
+    ctxRun(`
+        parsedTracks = {}; topologySources = [];
+        SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].adapter = 'ebiJob';
+    `);
+
     // opts.prefer (the homolog-search provider picker): preferred provider first,
     // the others stay as fallbacks.
     ctxRun(`
@@ -2732,75 +2803,3 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     process.exit(failed ? 1 : 0);
 })();
 
-// ---------- async tests ----------
-(async () => {
-    let err = null;
-    try { await ctxRun(`runCapability('fold', { sequence: 'X'.repeat(500) })`); }
-    catch (e) { err = e; }
-    assert(err && /too long/.test(err.message), 'fold rejects >400 aa before any network call');
-
-    err = null;
-    try { await ctxRun(`runCapability('no_such_capability', {})`); }
-    catch (e) { err = e; }
-    assert(err && /Unknown capability/.test(err.message), 'unknown capability rejects');
-
-    // Provider fallback: a capability whose first provider throws, second succeeds.
-    ctxRun(`
-        SERVICE_ADAPTERS.__ok = async () => 'second-provider-result';
-        SERVICE_REGISTRY.capabilities.__test = { label: 'Test', providers: [
-            { id: 'a', label: 'A', adapter: 'nope' },
-            { id: 'b', label: 'B', adapter: '__ok' }
-        ] };
-    `);
-    const result = await ctxRun(`runCapability('__test', {})`);
-    assert(result === 'second-provider-result', 'runCapability falls through a failing provider to the next');
-
-    console.log(`\n${passed} passed, ${failed} failed`);
-    process.exit(failed ? 1 : 0);
-})();
-
-// ---------- TEMP geometry diagnostic ----------
-section('TEMP graph geometry');
-ctxRun(`
-    parsedTracks = { AA: 'M'.repeat(60),
-        'm_pLDDT': Array.from({length: 60}, (_, i) => ({ val: 90, type: 'plddt' })),
-        'EV_RMSF': Array.from({length: 60}, (_, i) => ({ val: 1.5, type: 'rmsf' })) };
-    graphHighlights = {}; gridCellW = 11.5;
-`);
-const geom = ctxRun(`
-    (function () {
-        function collect(section) {
-            var out = { svg: null, circles: [] };
-            function walk(el, depth) {
-                if (!el || depth > 10) return;
-                if (el.attrs && el.attrs.width && el.attrs.height && el.attrs.class === 'graph-svg') { out.svg = el; }
-                if (el.attrs && el.attrs.class && String(el.attrs.class).indexOf('col-') === 0) out.circles.push(el.attrs.cx);
-                (el.children || []).forEach(function (c) { walk(c, depth + 1); });
-            }
-            walk(section, 0);
-            return { width: out.svg ? out.svg.attrs.width : null, first: out.circles[0], last: out.circles[out.circles.length - 1], n: out.circles.length };
-        }
-        return {
-            plddt: collect(createOverlayGraphSection('pLDDT', ['m_pLDDT'], 60, 'pLDDT')),
-            ev: collect(createOverlayGraphSection('RMSF', ['EV_RMSF'], 60, 'EV'))
-        };
-    })()
-`);
-console.log('  [geom] pLDDT:', JSON.stringify(geom.plddt));
-console.log('  [geom] EV   :', JSON.stringify(geom.ev));
-const sig = ctxRun(`
-    (function () {
-        function describe(el, depth) {
-            if (!el || depth > 4) return '';
-            var cls = (el.attrs && el.attrs.class) ? el.attrs.class : (el.className || '');
-            var id = el.id ? '#' + el.id : '';
-            var kids = (el.children || []).map(function (c) { return describe(c, depth + 1); }).filter(Boolean);
-            return el.tagName ? (el.tagName + id + (cls ? '.' + String(cls).split(' ').join('.') : '') + (kids.length ? '(' + kids.join(',') + ')' : '')) : '';
-        }
-        function sigOf(section) { return describe(section, 0); }
-        return { plddt: sigOf(createOverlayGraphSection('pLDDT', ['m_pLDDT'], 60, 'pLDDT')), ev: sigOf(createOverlayGraphSection('RMSF', ['EV_RMSF'], 60, 'EV')) };
-    })()
-`);
-console.log('  [sig] pLDDT:', sig.plddt.slice(0, 300));
-console.log('  [sig] EV   :', sig.ev.slice(0, 300));
-console.log('  [sig] same shape:', sig.plddt.replace(/pLDDT|m_pLDDT/g, 'X') === sig.ev.replace(/RMSF|EV_RMSF|Ensemble variance/g, 'X'));

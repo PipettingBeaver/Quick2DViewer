@@ -2068,8 +2068,14 @@
                             style="font-size:0.72rem; padding:3px 8px;" title="Look up the UniProt accession from the current sequence / protein ID">Find UniProt accession</button>
                         <button type="button" id="btnEsmfold" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Predict a 3D structure for the current sequence with ESMFold (≤400 aa) and attach it">Predict structure (ESMFold)</button>
+                        <select id="domainScanProvider" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Which service scans the sequence for domain families">
+                            <option value="ebi_hmmer">hmmscan (Pfam)</option>
+                            <option value="ebi_iprscan5">InterProScan (Pfam + NCBIfam)</option>
+                        </select>
                         <button type="button" id="btnDomainScan" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="runDomainScan()"
-                            style="font-size:0.72rem; padding:3px 8px;" title="Scan the sequence against Pfam with HMMER hmmscan (EBI) and add one track per domain family">Scan domains (HMMER/Pfam)</button>
+                            style="font-size:0.72rem; padding:3px 8px;" title="Scan the sequence for domain families (hmmscan/Pfam by default, InterProScan with Pfam + NCBIfam optionally) and add one track per family">Scan domains</button>
+                        <button type="button" id="btnTopologyPredict" data-task-step="topology" class="tb-btn tb-btn-secondary" onclick="runTopologyPrediction()"
+                            style="font-size:0.72rem; padding:3px 8px;" title="Predict membrane topology with InterProScan (TMHMM, Phobius, SignalP) and add each analysis as a topology source; works for any species">Predict topology (TMHMM/Phobius/SignalP)</button>
                         <select id="homologProvider" class="q2dv-select" style="font-size:0.72rem; padding:2px 4px;" title="Which service searches Swiss-Prot for homologs">
                             <option value="ebi_phmmer">phmmer (HMMER)</option>
                             <option value="ebi_blast">BLAST (NCBI)</option>
@@ -2094,6 +2100,7 @@
                 <div id="domainScanStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="homologSearchStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
                 <div id="variantEffectStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+                <div id="topologyPredictStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
             </div>
 
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
@@ -3230,6 +3237,28 @@ const SERVICE_REGISTRY = {
                   url: 'https://www.ebi.ac.uk/Tools/services/rest/hmmer3_hmmscan/',
                   params: { database: 'pfam', nhits: '25' },
                   resultExt: 'out', enabled: true },
+                // InterProScan runs several member databases at once; PfamA for
+                // the usual families plus NCBIfam, which carries the bacterial
+                // and viral family models (TIGRFAM/PRK/NF). Verified 2026-09:
+                // the JSON renderer does not say which analysis a match came
+                // from, so the TSV renderer is used (column 4 is the analysis).
+                { id: 'ebi_iprscan5', label: 'EBI InterProScan (Pfam + NCBIfam)', adapter: 'ebiJob',
+                  url: 'https://www.ebi.ac.uk/Tools/services/rest/iprscan5/',
+                  params: { stype: 'p', appl: 'PfamA,NCBIfam', goterms: 'false', pathways: 'false' },
+                  resultExt: 'tsv', enabled: true },
+            ],
+        },
+        topology_prediction: {
+            label: 'Topology prediction (TMHMM / Phobius / SignalP)',
+            providers: [
+                // Verified 2026-09 on LacY (P02920): Phobius reports 12 TM with
+                // orientation (cytoplasmic / non-cytoplasmic domains), TMHMM 11
+                // TM, SignalP the signal peptide when there is one - i.e. a real
+                // predictor disagreement for the consensus to flag.
+                { id: 'ebi_iprscan5_topo', label: 'EBI InterProScan (TMHMM, Phobius, SignalP)', adapter: 'ebiJob',
+                  url: 'https://www.ebi.ac.uk/Tools/services/rest/iprscan5/',
+                  params: { stype: 'p', appl: 'TMHMM,Phobius,SignalP', goterms: 'false', pathways: 'false' },
+                  resultExt: 'tsv', enabled: true },
             ],
         },
         homolog_search: {
@@ -3704,6 +3733,130 @@ async function runFoldseekSearch() {
 // `>> model  description` block per Pfam family, then a domain table whose rows
 // end with the alignment coordinates and per-domain E-values.
 const HMMER_DOMAIN_LINE = /^\s*(\d+)\s+([!?])\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+([\d.]+)\s*$/;
+// --- InterProScan (EBI) -----------------------------------------------------
+// One Job Dispatcher tool, several member databases at once, species-agnostic:
+// NCBIfam carries the bacterial/viral family models, TMHMM/Phobius/SignalP give
+// topology. Both parsers read the TSV renderer because the JSON one does not say
+// which analysis a match came from (column 4 does).
+// The domain scan gets HMMER text from hmmscan and TSV from InterProScan; a
+// tab-separated first line is the discriminator (HMMER's header never has tabs).
+function isIprscanTsv(text) {
+    return String(text || '').split('\n')[0].indexOf('\t') !== -1;
+}
+function parseIprscanTsv(text) {
+    const rows = [];
+    String(text || '').split(/\r?\n/).forEach(line => {
+        if (!line || line[0] === '#') return;
+        const f = line.split('\t');
+        if (f.length < 8) return;
+        const start = parseInt(f[6], 10), end = parseInt(f[7], 10);
+        if (isNaN(start) || isNaN(end)) return;
+        rows.push({
+            analysis: (f[3] || '').trim(),
+            acc: (f[4] || '').trim(),
+            desc: (f[5] || '').trim(),
+            start, end,
+            score: (f[8] && f[8] !== '-') ? parseFloat(f[8]) : null,
+            significant: (f[9] || 'T').trim() !== '?',
+            iprAcc: (f[11] || '').trim(),
+            iprDesc: (f[12] || '').trim()
+        });
+    });
+    return rows;
+}
+// "TMhelix"/"TRANSMEMBRANE"/"inside"/"NON_CYTOPLASMIC_DOMAIN"/"SIGNAL_PEPTIDE"
+// -> the topology state chars the consensus and TM cross-check already use.
+function iprscanRegionState(acc, desc) {
+    // The signature name is authoritative. Phobius' CYTOPLASMIC_DOMAIN carries
+    // the description "predicted to be outside the membrane, in the cytoplasm",
+    // which would read as outside if the description were consulted first.
+    const a = String(acc || '').toLowerCase();
+    const d = String(desc || '').toLowerCase();
+    if (/signal/.test(a)) return 'S';
+    if (/transmembrane|tmhelix|tm_helix/.test(a)) return 'M';
+    if (/non.?cytoplasmic/.test(a)) return 'o';
+    if (/cytoplasmic|inside/.test(a)) return 'i';
+    if (/outside|extracellular|lumenal/.test(a)) return 'o';
+    // Fall back to the description only when the name says nothing useful.
+    if (/signal/.test(d)) return 'S';
+    if (/transmembrane|tmhelix|tm_helix/.test(d)) return 'M';
+    if (/inside|cytoplasmic/.test(d)) return 'i';
+    if (/outside|extracellular|lumenal/.test(d)) return 'o';
+    return null;
+}
+// One topology source per analysis (TMHMM, Phobius, SignalP, ...) - the same
+// shape pasted predictor output produces, so the consensus, the conflict flags
+// and the TM cross-check all work unchanged.
+function parseIprscanTopology(text, totalLength) {
+    const byAnalysis = {};
+    parseIprscanTsv(text).forEach(r => {
+        const state = iprscanRegionState(r.acc, r.desc);
+        if (!state) return;
+        if (!byAnalysis[r.analysis]) byAnalysis[r.analysis] = [];
+        byAnalysis[r.analysis].push({ state, start: r.start, end: r.end });
+    });
+    const out = [];
+    Object.keys(byAnalysis).forEach(name => {
+        const segs = byAnalysis[name];
+        const arr = new Array(totalLength).fill(' ');
+        // Signal first, then domains, then TM: an overlap resolves to the
+        // stronger call (Phobius domains never overlap its own TM segments).
+        ['S', 'i', 'o', 'M'].forEach(st => segs.filter(s => s.state === st).forEach(s => {
+            for (let i = Math.max(1, s.start); i <= Math.min(s.end, totalLength); i++) arr[i - 1] = st;
+        }));
+        out.push({ name, state: arr.join('') });
+    });
+    return out;
+}
+// PfamA/NCBIfam/... rows -> the same domain shape applyDomainTracks consumes.
+// The analysis goes into the model name (e.g. "NCBIfam:TIGR00882") so the row
+// label and tooltip keep the provenance.
+function parseIprscanDomains(text) {
+    const seen = {};
+    return parseIprscanTsv(text).filter(r => r.significant && r.acc).filter(r => {
+        const key = r.acc + ':' + r.start + '-' + r.end;
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+    }).map(r => ({
+        model: (r.analysis ? r.analysis + ':' : '') + r.acc,
+        description: r.iprDesc || r.desc,
+        significant: true,
+        score: r.score == null ? 0 : r.score,
+        cEvalue: r.score,
+        iEvalue: r.score == null ? 1 : r.score,
+        aliFrom: r.start,
+        aliTo: r.end,
+        acc: null
+    }));
+}
+// Runs TMHMM + Phobius + SignalP via InterProScan and registers each analysis as
+// a topology source, so the consensus/conflict bar lights up without a manual
+// paste. Works for any species (bacteria, viruses, plants, ...).
+async function runTopologyPrediction() {
+    const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (!seq) { showToast('Load a protein sequence first: the topology prediction runs on the loaded sequence.', 'error'); return; }
+    if (!beginGuideTask('topology', 'Topology prediction (TMHMM/Phobius/SignalP) running')) return;
+    const statusEl = document.getElementById('topologyPredictStatus');
+    const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
+    try {
+        if (!(await ensureExternalServices())) { endGuideTask('topology'); return; }
+        setStatus('Submitting InterProScan job (TMHMM, Phobius, SignalP). Usually a minute or two\u2026');
+        const text = await runCapability('topology_prediction', { sequence: seq }, (m) => setStatus(m));
+        const sources = parseIprscanTopology(text, seq.length);
+        if (!sources.length) { setStatus('No topology regions were returned.'); endGuideTask('topology', 'Topology prediction returned nothing', 'info'); return; }
+        sources.forEach(s => addTopologyStateSource(s.state, s.name));
+        const summary = sources.map(s => s.name + ' ' + (s.state.match(/M/g) || []).length + ' TM').join(' \u00b7 ');
+        const sum = topologyConsensusSummary();
+        setStatus('Topology (InterProScan): ' + summary + (sum ? ' \u00b7 consensus ' + sum.tmSegments + ' TM, ' + sum.counts['?'] + ' disagreement column(s)' : '') + '.');
+        endGuideTask('topology', 'Added ' + sources.length + ' topology source(s) from InterProScan (' + summary + ')', 'success');
+    } catch (err) {
+        const m = err && err.message ? err.message : String(err);
+        setStatus('Topology prediction failed: ' + m);
+        endGuideTask('topology', 'Topology prediction failed: ' + m, 'error');
+    }
+}
+
 function parseHmmerDomains(text) {
     const out = [];
     let model = null, description = '';
@@ -3970,10 +4123,15 @@ async function runDomainScan() {
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
     try {
         if (!(await ensureExternalServices())) { endGuideTask('annotation'); return; }
-        setStatus('Submitting hmmscan job (Pfam). This usually takes a minute or two\u2026');
-        const text = await runCapability('domain_scan', { sequence: seq }, (m) => setStatus(m));
-        const domains = parseHmmerDomains(text);
-        const added = applyDomainTracks(domains, 'Pfam');
+        const picker = document.getElementById('domainScanProvider');
+        const prefer = (picker && picker.value) ? picker.value : 'ebi_hmmer';
+        const providerName = prefer === 'ebi_iprscan5' ? 'InterProScan (Pfam + NCBIfam)' : 'hmmscan (Pfam)';
+        setStatus('Submitting ' + providerName + ' job. This usually takes a minute or two\u2026');
+        const text = await runCapability('domain_scan', { sequence: seq }, (m) => setStatus(m), { prefer });
+        // The two providers answer differently: HMMER text, InterProScan TSV.
+        const isIprscan = isIprscanTsv(text);
+        const domains = isIprscan ? parseIprscanDomains(text) : parseHmmerDomains(text);
+        const added = applyDomainTracks(domains, isIprscan ? 'InterProScan' : 'Pfam');
         renderViewer(parsedTracks);
         populateCrossRefDropdown();
         refreshInputDataModalIfVisible();
@@ -3981,8 +4139,8 @@ async function runDomainScan() {
         schedulePersist();
         const nSig = domains.filter(d => d.significant).length;
         setStatus(added
-            ? ('Pfam: ' + added + ' domain famil' + (added === 1 ? 'y' : 'ies') + ', ' + nSig + ' significant domain(s).')
-            : 'No significant Pfam domains found.');
+            ? (providerName + ': ' + added + ' domain famil' + (added === 1 ? 'y' : 'ies') + ', ' + nSig + ' significant domain(s).')
+            : 'No significant domains found.');
         endGuideTask('annotation',
             added ? ('Added ' + added + ' Pfam domain track(s) from hmmscan') : 'hmmscan found no significant domains',
             added ? 'success' : 'info');
@@ -4496,8 +4654,19 @@ function topologyConsensusSummary() {
 function addTopologySource(text, name) {
     const aaLen = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     const parsed = parseTopologyText(text, aaLen);
-    if (!parsed) { showToast('Could not parse topology text (expected TMHMM/Phobius segments or a DeepTMHMM JSON).', 'error'); return false; }
-    topologySources.push({ name: name || ('Topology ' + (topologySources.length + 1)), state: parsed.state });
+    if (!parsed) { showToast('Could not parse topology text (expected TMHMM/Phobius segments, a TOPCONS run line or a DeepTMHMM JSON).', 'error'); return false; }
+    return addTopologyStateSource(parsed.state, name);
+}
+// Registers an already-built per-residue state string (the paste parser builds
+// one; the InterProScan prediction gets them straight from the TSV). Re-adding a
+// source with the same name replaces it, so re-running a prediction refreshes
+// the source instead of stacking duplicates.
+function addTopologyStateSource(state, name) {
+    if (!state) return false;
+    const label = name || ('Topology ' + (topologySources.length + 1));
+    const existing = topologySources.findIndex(s => s.name === label);
+    if (existing !== -1) topologySources.splice(existing, 1, { name: label, state });
+    else topologySources.push({ name: label, state });
     applyTopologySources();
     renderTopologySourceList();
     return true;
@@ -5778,6 +5947,7 @@ function syncTaskButtons() {
 // Which Guide steps own a long-running action (used to mark their buttons).
 const STEP_TASK_RUNS = {
     annotation: 'runDomainScan()',
+    topology: 'runTopologyPrediction()',
     foldseek: 'runFoldseekSearch()',
     structure: 'predictStructureESMFold()'
 };
@@ -6036,10 +6206,10 @@ const WORKFLOW_STEPS = [
     },
     {
         id: 'topology', title: 'Membrane topology',
-        desc: 'Paste <a href="https://services.healthtech.dtu.dk/services/TMHMM-2.0/" target="_blank" rel="noopener">TMHMM</a>, <a href="https://services.healthtech.dtu.dk/services/Phobius-1.01/" target="_blank" rel="noopener">Phobius</a> or <a href="https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/" target="_blank" rel="noopener">DeepTMHMM</a> output for a consensus topology bar.',
+        desc: 'Run <strong>TMHMM + Phobius + SignalP in-app</strong> (InterProScan, any species), or paste <a href="https://services.healthtech.dtu.dk/services/TMHMM-2.0/" target="_blank" rel="noopener">TMHMM</a>, <a href="https://services.healthtech.dtu.dk/services/Phobius-1.01/" target="_blank" rel="noopener">Phobius</a> or <a href="https://services.healthtech.dtu.dk/services/DeepTMHMM-1.0/" target="_blank" rel="noopener">DeepTMHMM</a> output, for a consensus topology bar.',
         why: 'Orientation decides which loops face the cytosol: it changes which residues are accessible to ligands, antibodies and variants.',
-        action: { label: 'Paste topology…', run: 'openTopologyPanel()' },
-        extraActions: [{ label: 'Cross-check TM', run: 'runTmCrossCheck()' }],
+        action: { label: 'Predict topology (InterProScan)', run: 'runTopologyPrediction()' },
+        extraActions: [{ label: 'Paste topology…', run: 'openTopologyPanel()' }, { label: 'Cross-check TM', run: 'runTmCrossCheck()' }],
         how: ['Build a consensus across predictors; a segment that flips orientation between tools is not settled.',
               'Compare the consensus with the Quick2D TM call to judge how robust the TM prediction is.'],
         refs: [{ cite: 'Krogh et al., J Mol Biol 2001 (TMHMM)', doi: '10.1006/jmbi.2000.4315' }],
@@ -8180,7 +8350,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.57.0';
+const APP_VERSION = '0.58.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -9522,6 +9692,10 @@ function formatTrackLabel(fullKey) {
     if (fullKey === 'CONSERVATION' || fullKey.startsWith('CONS_')) return 'Conservation';
     if (fullKey.startsWith('VAR_')) return 'Variant ' + fullKey.slice(4);
     if (fullKey.startsWith('UP_')) return 'UniProt ' + fullKey.slice(3).replace(/_/g, ' ');
+    if (fullKey.startsWith('DM_')) {
+        const d = domainHitsInfo[fullKey];
+        return (d && d.model) ? d.model : fullKey.slice(3).replace(/_/g, ' ');
+    }
     if (fullKey.startsWith('TP_')) {
         const label = fullKey.slice(3).replace(/_/g, ' ');
         return /^topology\b/i.test(label) ? label : 'Topology ' + label;
