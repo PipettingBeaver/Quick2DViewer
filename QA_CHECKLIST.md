@@ -1,6 +1,6 @@
-# Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.2)
+# Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1080 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1188 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -26,6 +26,49 @@ up; no new features land while you are driving it.
 Then work down the *Suggested order* at the bottom for the full pass. Rows are grouped by
 the release that added them, so an old row still counts: nothing here has been retired.
 
+## Round 2 — features to debug (the new round, newest first)
+
+Ordered by how much unverified surface each has; the two 0.66.10 features have full cards
+below, the rest have quick rows at their release heading. For every failure: the feature,
+what you did, what you saw, and **Log → Copy as JSON**.
+
+1. **PROSITE motifs (0.66.10)** — the third domain-scan provider. Card below. Watch: run it on
+   LacY (P02920); expect the two LacY signature motifs (PS00896/PS00897) and the MFS profile
+   (PS50850) as extra DM rows, each named `ProSitePatterns:PS…` / `ProSiteProfiles:PS…` and
+   overlaying with rules/3D like any domain row.
+2. **ddG hand-off (0.66.10)** — Options → Stability predictions. Card below. Watch: the
+   mutation list copies one-letter tokens; a pasted `R175H -1.2` becomes a `_EXP` row with the
+   ddG kind; the offset applies to it like any experimental row.
+3. **Experimental per-residue data (0.65.0)** — quick rows at its heading. Watch: paste
+   `position value` lines, then a bare series of ≥5 values (sequential mode); the row's graph
+   and its correlation line vs conservation.
+4. **Methods report completeness (0.66.0)** — quick rows. Watch: with validation/experimental/
+   ddG/domains loaded, the report lists each under its own heading and never claims a section
+   that has no data.
+5. **Ensemble RMSD matrix + the formula fix (0.66.9)** — **start at row 432**: the panel's
+   "RMSD to first" column read 0.00 for every model before this release. Then rows 429–434.
+   Watch: identical models → 0.00, a perturbed copy → nonzero, symmetric matrix, diagonal 0.
+6. **3D colour by any track (0.66.8)** — quick rows. Watch: validation amber/grey, pLDDT ramp,
+   a removed track falls back to a base scheme instead of going blank.
+7. **Tracks tab vs quick controls (0.66.7)** — quick rows. Watch: the cross-links open the right
+   surface; the full-row tint follows the active rule; chevrons stay subtle.
+8. **Model score colour mode (0.66.6)** — quick rows. Watch: HSL legend gradient, raw stat in
+   the tooltip, unscored positions unshaded.
+9. **Numbering offset + partial-HSP realignment (0.66.5)** — quick rows. Watch: the offset
+   shifts topology/UniProt/experimental rows and their labels consistently; a partial HSP
+   shows the amber "(partial N%)" tag and realigns only its covered span.
+10. **PDB entry lookup (0.63.0/0.64.0)** — quick rows. Watch: name fallback finds 1GFL where the
+    exact sequence cannot; per-hit Fetch loads the entry; the validation hint points at the box.
+11. **Category Options (0.62.0)** — quick rows. Watch: all eleven categories (ddG is new) switch
+    correctly; the guide's "⚙ Data sources" links land on the right category.
+12. **PDBe validation (0.60.0)** — card at its heading. Watch: per-chain rows, alignment mapping,
+    removal, and that dimer totals say "2 chain rows".
+13. **InterProScan topology + domains (0.58.0)** — quick rows. Watch: TMHMM/Phobius/SignalP land
+    as topology sources; the TSV renderer path; consensus conflicts flag when sources disagree.
+14. **Variant effect providers + AlphaMissense (0.56.0/0.57.0)** — card above. Watch: the
+    human-only skip reason, per-provider failure isolation, the merged line's registry order.
+15. **Rows 27–38 — removal**, the most destructive class (still from Round 1).
+
 ## Feature test cards (newest first)
 
 **Convention, going forward: every new feature ships with a card here.** The per-version
@@ -39,6 +82,71 @@ for a feature that is *entirely* unverified, and it has three parts:
   most likely cause, so a failure points at a diagnosis rather than a mystery.
 
 Cards stay until the feature has been driven by hand at least once.
+
+---
+
+### PROSITE motifs via InterProScan — 0.66.10
+
+**Should do.** The domain-scan picker gains a third choice, "InterProScan + PROSITE motifs", which
+adds the PROSITE signature patterns and profiles (PS… motifs, e.g. glycosylation and
+family-signature sites) to the Pfam/NCBIfam scan. They arrive as ordinary domain rows, so every
+overlay (rules with `group:DM`, the 3D colour picker, tooltips, the methods report) treats them
+like any other domain.
+
+**Try (normal use).**
+1. Load LacY (P02920) or fetch it, open Options → Domains, pick **InterProScan + PROSITE motifs**,
+   press **Scan for domains**.
+   *Expect:* the log line names "EBI InterProScan (Pfam + NCBIfam + PROSITE motifs)"; the DM rows
+   include `ProSitePatterns:PS00896` / `PS00897` ("LacY/RafB permease family, conserved site",
+   residues 64–78 and 280–294) and `ProSiteProfiles:PS50850` ("Major facilitator superfamily
+   (MFS) profile", ~8–404), plus the usual Pfam/NCBIfam rows.
+2. Hover a motif row and its cells.
+   *Expect:* the tooltip names the signature and the InterPro description where the entry maps.
+3. Add a rule with source `group:DM` and a position span over PS00896.
+   *Expect:* the motif highlights through the rule, like any domain row.
+
+**Edge cases.**
+- *Motif rows missing entirely:* the provider list or `appl` string lost PrositePatterns /
+  PrositeProfiles (the live-verified analysis names are exactly `ProSitePatterns` /
+  `ProSiteProfiles`, capital S). Check the request line in the activity log.
+- *Rows named `PrositePatterns:…` (lowercase s):* the parser's model naming drifted; the rows
+  should keep the TSV's own spelling.
+- *Signature with no InterPro mapping:* the description falls back to the signature's own text;
+  it must not render an empty tooltip.
+- *PROSITE rows appear in an ordinary InterProScan run:* the third provider's `appl` leaked into
+  the default one; the default must stay Pfam + NCBIfam only.
+
+### ddG hand-off (stability predictions) — 0.66.10
+
+**Should do.** Options → Stability predictions links the four services that verified as alive
+(DynaMut2, DUET, mCSM, FoldX suite), copies the loaded substitutions as one-letter tokens, and
+imports a pasted `mutation value` table as an experimental row of the ddG kind. There is no API;
+this is deliberately a hand-off, and the import reuses the experimental-row machinery so the
+overlays all apply.
+
+**Try (normal use).**
+1. Load a variant FASTA with substitutions (e.g. GFP R175H), open Options → Stability predictions.
+   *Expect:* the panel explains the hand-off, shows the two copy buttons and the four service links.
+2. Press **Copy mutation list**, paste into a text editor.
+   *Expect:* `R175H` (one letter, one per line, deduplicated); a toast confirms the count.
+   (With no variants loaded: a clear message, not an empty clipboard.)
+3. On a service, run the prediction, then paste its results as `R175H -1.2` lines into the box,
+   name it, press **Add ddG row**.
+   *Expect:* a `<name>_EXP` row appears; hovering says "ddG (negative = destabilising)"; the graph
+   plots it; the status line reports the mapped/out-of-range counts; the correlation vs
+   conservation appears if a conservation track is loaded.
+4. Change the reference numbering offset.
+   *Expect:* the ddG row shifts with the other evidence rows (raw rows are kept for re-placement).
+
+**Edge cases.**
+- *`p.Arg175His -1.2` accepted, `G175A` (no value) skipped:* the parser takes the mutation token
+  plus a trailing number; lines without a value or a valid token are ignored, and if nothing
+  parses the status says so.
+- *ddG values plotted on the wrong positions:* the substitution token's position must be the
+  reference numbering; check `parseDdgTable` output in the console (Log) before blaming the offset.
+- *Import lands as kind "other":* the kind select value drifted; the tooltip wording is the tell.
+- *Links open dead services:* the four linked services were curl-verified 2026-10-01; if one
+  dies, remove it from the panel rather than leaving a 404 in the docs.
 
 ---
 
@@ -1365,6 +1473,19 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.10 - PROSITE motifs + ddG hand-off (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 435 | Domains → InterProScan + PROSITE motifs on LacY | PS00896/PS00897 patterns + PS50850 profile as DM rows, analysis names kept |
+| 436 | The same run on a protein with no PROSITE matches | Pfam/NCBIfam rows still arrive; no empty motif rows |
+| 437 | Rule over group:DM covering a motif | Motif highlights through the rule like any domain row |
+| 438 | Copy mutation list with variants loaded / without | Tokens once each / clear message, not an empty clipboard |
+| 439 | Paste `R175H -1.2` + `p.Arg175His -0.4`, add | One ddG row, kind ddG, values at 175, status counts |
+| 440 | Change the reference offset after the import | The ddG row shifts with the other evidence |
+| 441 | Report with a ddG row loaded | Report lists the ddG row under experimental data |
+| 442 | All four service links | They open the verified services (DynaMut2, DUET, mCSM, FoldX) |
 
 ## 0.66.9 - ensemble RMSD matrix + the RMSD formula fix (quick rows)
 

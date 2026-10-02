@@ -15,6 +15,7 @@ const PHMMER_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/phmmer-gf
 const BLAST_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/blast-gfp.json'), 'utf-8');
 const IPR_TOPO_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-topology.tsv'), 'utf-8');
 const IPR_DOM_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-domains.tsv'), 'utf-8');
+const IPR_PROSITE_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-prosite.tsv'), 'utf-8');
 const PDBE_OUTLIERS_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-outliers.json'), 'utf-8');
 const PDBE_QUALITY_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-quality.json'), 'utf-8');
 
@@ -1108,7 +1109,17 @@ assert(HTML.indexOf('id="btnVariantEffects"') !== -1 && HTML.indexOf('id="varian
 ctxRun(`parsedTracks = {}; keyedVariantsInfo = {}; alphaMissenseScores = {}; alphaMissenseAccession = ''; activeRowKey = null;`);
 
 section('InterProScan: topology sources + bacterial/viral domain families');
-assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers.map(p => p.id).join(',')`) === 'ebi_hmmer,ebi_iprscan5', 'the domain scan offers hmmscan then InterProScan (Pfam + NCBIfam)');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers.map(p => p.id).join(',')`) === 'ebi_hmmer,ebi_iprscan5,ebi_iprscan5_motifs', 'the domain scan offers hmmscan, InterProScan, and InterProScan with PROSITE motifs');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers.map(p => p.id).join(',')`) === 'ebi_hmmer,ebi_iprscan5,ebi_iprscan5_motifs', 'the domain scan offers hmmscan, InterProScan, and InterProScan with PROSITE motifs');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.domain_scan.providers[2].params.appl`).indexOf('PrositePatterns') !== -1, 'the motif provider asks for PrositePatterns and PrositeProfiles');
+assert(HTML.indexOf('value="ebi_iprscan5_motifs"') !== -1, 'and the picker lists it');
+sandbox.__iprProsite = IPR_PROSITE_FIXTURE;
+const prositeRows = ctxRun(`parseIprscanTsv(window.__iprProsite)`);
+assert(prositeRows.length === 3 && prositeRows.filter(r => r.analysis === 'ProSitePatterns').length === 2, 'the PROSITE TSV parses (got ' + prositeRows.length + ' rows)');
+const prositeDomains = ctxRun(`parseIprscanDomains(window.__iprProsite)`);
+assert(prositeDomains.map(d => d.model).join(',') === 'ProSitePatterns:PS00896,ProSitePatterns:PS00897,ProSiteProfiles:PS50850', 'motifs keep their analysis and signature id (got ' + prositeDomains.map(d => d.model).join(',') + ')');
+assert(prositeDomains[0].description === 'LacY/RafB permease family, conserved site', 'and their InterPro description when mapped');
+assert(prositeDomains[0].aliFrom === 64 && prositeDomains[0].aliTo === 78, 'with the motif range');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].params.appl`) === 'TMHMM,Phobius,SignalP', 'a topology_prediction capability runs TMHMM, Phobius and SignalP');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.topology_prediction.providers[0].resultExt`) === 'tsv', 'and reads the TSV renderer (the JSON one does not name the analysis)');
 sandbox.__iprTopo = IPR_TOPO_FIXTURE;
@@ -1210,6 +1221,35 @@ assert(/^Conservation: highly conserved .*; Structure context: buried .*; Curate
 assert(HTML.indexOf('Assess variant effects') !== -1, 'the button is provider-agnostic');
 assert(HTML.indexOf('VARIANT_EFFECT_PROVIDERS') !== -1 && HTML.indexOf('species-specific API later') !== -1 && HTML.indexOf('Ensembl VEP') !== -1, 'the framework documents its extension point in place (with the species-API candidates named)');
 ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; variantEffectResults = {}; variantEffectRan = {};`);
+
+section('#3c: ddG hand-off - links, mutation-list copy, result import');
+assert(HTML.indexOf('id="optCat-ddg"') !== -1 && HTML.indexOf('id="ddgPasteInput"') !== -1, 'the ddG category has its own panel and paste box');
+assert(HTML.indexOf('Open DynaMut2') !== -1 && HTML.indexOf('Open DUET') !== -1 && HTML.indexOf('Open mCSM') !== -1 && HTML.indexOf('Open FoldX suite') !== -1, 'and the four verified services are linked (dead ones omitted)');
+assert(HTML.indexOf('Copy mutation list') !== -1, 'with the mutation-list copy button');
+const ddgRows = ctxRun(`parseDdgTable(['# comment', 'R175H -1.2', 'p.Arg175His -0.4', 'G175A', 'nonsense'].join(String.fromCharCode(10)))`);
+assert(ddgRows.length === 2 && ddgRows[0].pos === 175 && ddgRows[0].val === -1.2 && ddgRows[0].mutation === 'R175H', 'ddG lines parse into position/value/mutation (got ' + JSON.stringify(ddgRows) + ')');
+assert(ddgRows[1].mutation === 'R175H', 'three-letter tokens normalise to one-letter');
+assert(ctxRun(`EXPERIMENTAL_KINDS.ddg.label`).indexOf('destabilising') !== -1, 'ddG is a known experimental kind with its interpretation');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(200) };
+    experimentalTracksInfo = {};
+    keyedVariantsInfo = { v1: { aligned: 'M'.repeat(200), raw: 'M'.repeat(200), desc: 'R175H' } };
+`);
+assert(ctxRun(`variantMutationListText()`) === 'R175H', 'the mutation list copies one-letter tokens (got "' + ctxRun(`variantMutationListText()`) + '")');
+ctxRun(`
+    document.getElementById('ddgNameInput').value = 'DynaMut2 ddG';
+    document.getElementById('ddgPasteInput').value = 'R175H -1.2';
+    addDdgTrack();
+`);
+assert(ctxRun(`Array.isArray(parsedTracks['DynaMut2_ddG_EXP'])`) === true, 'the ddG import lands as an experimental row (got ' + ctxRun(`Object.keys(parsedTracks).filter(k => k.endsWith('_EXP')).join(',')`) + ')');
+assert(ctxRun(`experimentalTracksInfo['DynaMut2_ddG_EXP'].kind`) === 'ddg', 'registered with the ddG kind (tooltip/3D/report follow)');
+assert(ctxRun(`parsedTracks['DynaMut2_ddG_EXP'][174].val`) === -1.2, 'at the substitution position');
+assert(/1 value\(s\)/.test(ctxRun(`document.getElementById('ddgStatus').textContent`)), 'and the status confirms it');
+ctxRun(`keyedVariantsInfo = { v1: { aligned: 'M', raw: 'M', desc: 'R175H' } }; setStepAnswer('homologs', 'hhpred', 'phmmer');`);
+const homologActs = ctxRun(`resolveStepAction(WORKFLOW_STEPS.find(s => s.id === 'homologs')).extraActions.map(a => a.run)`);
+assert(homologActs.some(r => r.indexOf('ddg') !== -1), 'the guide homologs step links to the ddG hand-off when variants are loaded (got ' + JSON.stringify(homologActs) + ')');
+ctxRun(`clearStepAnswers('homologs');`);
+ctxRun(`parsedTracks = {}; experimentalTracksInfo = {}; keyedVariantsInfo = {};`);
 
 section('#4b: model-vs-model RMSD matrix in the ensemble panel');
 ctxRun(`
@@ -1607,7 +1647,7 @@ ctxRun(`pdbLookupEntries = []; renderPdbLookupResults();`);
 section('Options: data-source categories + guide deep links');
 assert(HTML.indexOf('id="optDataCategory"') !== -1 && HTML.indexOf('id="optDataCategoryHint"') !== -1, 'Options -> Data Sources has a category dropdown and a hint line');
 const catPanels = ctxRun(`Object.keys(DATA_CATEGORY_HINTS)`);
-assert(catPanels.join(',') === 'uniprot,conservation,topology,domains,homologs,structure,experimental,foldseek,variants,services', 'ten categories are declared (got ' + catPanels.join(',') + ')');
+assert(catPanels.join(',') === 'uniprot,conservation,topology,domains,homologs,structure,experimental,ddg,foldseek,variants,services', 'eleven categories are declared (got ' + catPanels.join(',') + ')');
 assert(catPanels.every(n => HTML.indexOf('id="optCat-' + n + '"') !== -1), 'and every category has a panel in the markup');
 const switchProbe = ctxRun(`
     (function () {

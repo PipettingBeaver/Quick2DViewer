@@ -608,3 +608,35 @@ rendering branch. `isTrackGroupConsColored()` is now a thin wrapper over the mod
 call sites and saved sessions keep working, and the old toggle/checkbox were **removed** rather
 than duplicated. The colour mode is also independent of the view: choosing Bar no longer
 discards it (Bar simply paints over the colours).
+
+## 18. Macro recording — plan (v0.66.10, planning only)
+
+Goal: record a session's actions (fetch UniProt, scan domains, run phmmer, realign, add a rule)
+as a named, replayable macro, so a repeated analysis is one click. **Not implemented yet**; this
+section records the constraints so the pieces get built in the right order.
+
+Why the activity log is the base: every user-triggered action already funnels through
+`logAction()` with a kind and a summary, and the API lifecycle lands in the activity log too. A
+recorder taps that funnel instead of building a parallel event system.
+
+What a macro step should be: a *capability call or a pure UI action*, never a DOM event.
+- capability runs (`runCapability(id, opts)`) with the resolved provider id,
+- imports (FASTA, variant FASTA, PDB id, experimental / ddG paste, offset),
+- view actions (add rule, colour mode) - cheap and idempotent,
+- never raw clicks, scroll positions, or text selections.
+
+Replay semantics:
+- **Dry run first**: replay resolves each step and lists what it would fetch (provider, sequence
+  hash); the user confirms before anything runs.
+- **Idempotence**: imports replace by track key; a capability run skips when a same-provider
+  result for the same sequence is already loaded (with a per-step override).
+- **Stale-sequence guard**: the macro records the reference sequence hash; replaying against a
+  different sequence warns and offers per-step rebind.
+- **No silent network**: every replayed fetch lands in the activity log exactly like a manual one.
+- Storage: one JSON (`{name, seqHash, steps:[{capability, provider, params, trackKey}]}`) with the
+  same shape as the activity-log export, so "Copy as JSON" doubles as macro export.
+
+Sequencing: (1) activity-log entries gain stable capability/param fields (0.59.0 gave kind +
+summary; params still need a pass), (2) a recorder capturing them, (3) the replay engine with the
+dry-run sheet, (4) save/load alongside sessions. Only step 1 has partially landed; the rest is
+deferred until after 1.0.0 unless asked.

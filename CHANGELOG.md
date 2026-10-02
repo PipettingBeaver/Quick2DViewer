@@ -12,6 +12,29 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.10] - 2026-10-01
+
+### Added
+- **PROSITE motifs via InterProScan.** The domain-scan picker gains a third provider, "InterProScan
+  + PROSITE motifs" (`PrositePatterns,PrositeProfiles` on top of Pfam/NCBIfam, live-verified
+  analysis names). Signature patterns and profiles arrive as ordinary domain rows
+  (`ProSitePatterns:PS00896` etc.), so rules (`group:DM`), tooltips, the 3D colour picker and the
+  methods report treat them like any other domain evidence. The run line now names the provider
+  from the registry instead of a hardcoded pair.
+- **ddG hand-off (stability predictions).** New Options category linking the four services that
+  verified as alive (DynaMut2, DUET, mCSM, FoldX suite; ThermoNet/INPS/PoPMuSiC/CUPSAT did not
+  respond and are omitted), a **Copy mutation list** helper (one-letter substitution tokens, the
+  format those tools expect), and a **ddG import**: pasted `mutation value` lines become an
+  experimental row of the new `ddg` kind ("negative = destabilising"), so numbering offsets,
+  graphs, tooltips, 3D colouring and the methods report all apply. The experimental importer was
+  factored into a shared `addExperimentalRows` used by both paths; the guide's homologs step links
+  to the panel when variants are loaded.
+- DESIGN §18 records the macro-recording plan (activity log as the base, capability-level steps,
+  dry-run replay, stale-sequence guard, JSON storage) - planning only, not implemented.
+
+### Fixed
+- Nothing this release.
+
 ## [Unreleased]
 
 ## [0.66.9] - 2026-10-01
