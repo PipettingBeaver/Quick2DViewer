@@ -91,6 +91,17 @@
         .tm-group-name { font-size: 0.78rem; font-weight: 700; color: #334155; }
         .tm-track { display: flex; align-items: center; gap: 6px; padding: 2px 2px 2px 18px; }
         .tm-track-name { font-size: 0.74rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tm-subgroup-head { display: flex; align-items: center; gap: 6px; padding: 3px 2px 2px 12px; }
+        .tm-subgroup-name { font-size: 0.72rem; font-weight: 600; color: #475569; }
+        .tm-src-badge {
+            flex-shrink: 0; font-size: 0.62rem; font-weight: 700; letter-spacing: .2px;
+            padding: 0 5px; border-radius: 999px; background: #e2e8f0; color: #475569;
+            white-space: nowrap;
+        }
+        .tm-src-blast { background: #dbeafe; color: #1d4ed8; }
+        .tm-src-phmmer { background: #dcfce7; color: #15803d; }
+        .tm-src-foldseek { background: #fef3c7; color: #b45309; }
+        .tm-src-hhpred { background: #f3e8ff; color: #7e22ce; }
         .tm-eye {
             width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
             font-size: 0.62rem; line-height: 1; padding: 0; background: #fff; color: #2563eb;
@@ -1655,6 +1666,13 @@
             font-weight: 700;
             color: #64748b;
         }
+        .tctl-filter-sources { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px 0; }
+        .tctl-src-chip {
+            font-size: 0.66rem; padding: 2px 7px; border-radius: 999px; border: 1px solid #cbd5e1;
+            background: #fff; color: #334155; cursor: pointer;
+        }
+        .tctl-src-chip:hover { background: #eff6ff; }
+        .tctl-src-chip.tctl-on { background: #e2e8f0; color: #94a3b8; text-decoration: line-through; }
         .tctl-filter-list {
             display: flex;
             flex-direction: column;
@@ -8811,6 +8829,36 @@ function switchSidebarTab(name) {
 // trackControlState the Track Control popover uses, so they stay in sync.
 let trackManagerExpanded = {}; // group -> bool (session-only accordion state)
 
+// Homolog rows grouped by source (BLAST, phmmer, Foldseek, HHpred...), in the
+// order the group's keys are listed; feeds the Track Control sub-headers and
+// the quick controls' source-filter chips.
+function homologKeysBySource(keys) {
+    const order = [];
+    const map = {};
+    (keys || []).forEach(k => {
+        const src = (homologHitsInfo[k] && homologHitsInfo[k].source) || 'Homolog';
+        if (!map[src]) { map[src] = []; order.push(src); }
+        map[src].push(k);
+    });
+    return order.map(src => ({ source: src, keys: map[src] }));
+}
+// One row in the full manager. Homolog rows carry a colour-coded source badge;
+// other rows keep the plain [source] tag.
+function trackManagerRowHtml(k) {
+    const vis = !isTrackFiltered(k);
+    const src = getTrackSource(k);
+    const badge = k.startsWith('HL_')
+        ? ' <span class="tm-src-badge tm-src-' + structureEscapeHtml(src.toLowerCase().replace(/[^a-z0-9]+/g, '-')) + '">' + structureEscapeHtml(src) + '</span>'
+        : ' <span style="color:#94a3b8;">[' + structureEscapeHtml(src) + ']</span>';
+    return '<div class="tm-track">' +
+        '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
+        '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) +
+        (isTrackEmpty(k) ? ' <em style="color:#94a3b8;" title="Nothing annotated: the import found nothing for this protein">(Empty)</em>' : '') +
+        (!vis ? ' <em style="color:#b45309;" title="Filtered out in the quick controls popover; the track is loaded but not drawn">(filtered)</em>' : '') +
+        badge + '</span>' +
+        '<button type="button" class="tm-remove" data-k="' + structureEscapeHtml(k) + '" onclick="confirmRemoveTrack(this.dataset.k)" title="Remove this track and its data">×</button>' +
+        '</div>';
+}
 function renderTrackManager() {
     const wrap = document.getElementById('trackManagerList');
     if (!wrap) return;
@@ -8832,17 +8880,21 @@ function renderTrackManager() {
             '<button type="button" class="tm-remove" data-g="' + gEsc + '" onclick="confirmRemoveGroup(this.dataset.g)" title="Remove all ' + structureEscapeHtml(trackGroupLabel(g)) + ' tracks and their data">×</button>' +
             '</div>';
         if (expanded) {
-            keys.forEach(k => {
-                const vis = !isTrackFiltered(k);
-                html += '<div class="tm-track">' +
-                    '<button type="button" class="tm-eye" data-k="' + structureEscapeHtml(k) + '" onclick="toggleTrackManagerTrack(this.dataset.k)" title="Show/hide this track">' + (vis ? '●' : '○') + '</button>' +
-                    '<span class="tm-track-name">' + structureEscapeHtml(formatTrackLabel(k)) +
-                    (isTrackEmpty(k) ? ' <em style="color:#94a3b8;" title="Nothing annotated: the import found nothing for this protein">(Empty)</em>' : '') +
-                    (!vis ? ' <em style="color:#b45309;" title="Filtered out in the quick controls popover; the track is loaded but not drawn">(filtered)</em>' : '') +
-                    ' <span style="color:#94a3b8;">[' + structureEscapeHtml(getTrackSource(k)) + ']</span></span>' +
-                    '<button type="button" class="tm-remove" data-k="' + structureEscapeHtml(k) + '" onclick="confirmRemoveTrack(this.dataset.k)" title="Remove this track and its data">×</button>' +
-                    '</div>';
-            });
+            if (g === 'HL') {
+                // Sub-headers per source with a count and a show/hide eye, so a
+                // dozen mixed hits read as BLAST vs phmmer vs Foldseek vs HHpred.
+                homologKeysBySource(keys).forEach(grp => {
+                    const allFiltered = grp.keys.every(isTrackFiltered);
+                    const srcEsc = structureEscapeHtml(grp.source);
+                    html += '<div class="tm-subgroup-head">' +
+                        '<button type="button" class="tm-eye" data-src="' + srcEsc + '" data-g="' + gEsc + '" onclick="toggleTrackManagerSource(this.dataset.g, this.dataset.src)" title="' + (allFiltered ? 'Show' : 'Hide') + ' all ' + srcEsc + ' hits">' + (allFiltered ? '○' : '●') + '</button>' +
+                        '<span class="tm-subgroup-name">' + srcEsc + ' <span style="color:#94a3b8;">(' + grp.keys.length + ')</span></span>' +
+                        '</div>';
+                    grp.keys.forEach(k => { html += trackManagerRowHtml(k); });
+                });
+            } else {
+                keys.forEach(k => { html += trackManagerRowHtml(k); });
+            }
         }
         html += '</div>';
     });
@@ -8859,6 +8911,14 @@ function trackManagerExpandAll(open) {
 function toggleTrackManagerGroup(g) {
     if (isTrackGroupHidden(g)) delete trackControlState.hidden[g];
     else trackControlState.hidden[g] = true;
+    tctlAfterChange();
+    renderTrackManager();
+}
+function toggleTrackManagerSource(g, src) {
+    const grp = homologKeysBySource(getGroupTrackKeys(g)).find(x => x.source === src);
+    if (!grp) return;
+    const allFiltered = grp.keys.every(isTrackFiltered);
+    grp.keys.forEach(k => { if (allFiltered) delete trackControlState.filtered[k]; else trackControlState.filtered[k] = true; });
     tctlAfterChange();
     renderTrackManager();
 }
@@ -9557,7 +9617,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.15';
+const APP_VERSION = '0.66.16';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -10466,6 +10526,23 @@ function buildTctlFilterSection(g) {
     });
     header.appendChild(topBtn);
     wrap.appendChild(header);
+
+    if (g === 'HL') {
+        // Source chips: one click hides (or restores) a whole import source.
+        const chips = mkEl('div', 'tctl-filter-sources');
+        homologKeysBySource(keys).forEach(grp => {
+            const allFiltered = grp.keys.every(isTrackFiltered);
+            const chip = mkEl('button', 'tctl-src-chip' + (allFiltered ? ' tctl-on' : ''), grp.source + ' (' + grp.keys.length + ')');
+            chip.title = (allFiltered ? 'Show all ' : 'Hide all ') + grp.source + ' hits';
+            chip.addEventListener('click', () => {
+                const all = grp.keys.every(isTrackFiltered);
+                grp.keys.forEach(k => { if (all) delete trackControlState.filtered[k]; else trackControlState.filtered[k] = true; });
+                tctlAfterChange();
+            });
+            chips.appendChild(chip);
+        });
+        wrap.appendChild(chips);
+    }
 
     const list = mkEl('div', 'tctl-filter-list');
     keys.forEach(key => {

@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.16] - 2026-10-01
+
+### Added
+- **Homolog source tracking.** With BLAST, phmmer, Foldseek and HHpred hits in one session it
+  was hard to tell the sources apart. Track Control's Homologs group now renders per-source
+  sub-headers with counts (BLAST (13), phmmer (4), ...), each with an eye that hides or shows
+  that whole source; homolog rows carry colour-coded source badges. The quick-controls Filter
+  section for Homologs gains matching source chips that filter a whole source in one click.
+  Rows with no recorded source fall back to a "Homolog" sub-header.
+
 ## [0.66.15] - 2026-10-01
 
 ### Fixed

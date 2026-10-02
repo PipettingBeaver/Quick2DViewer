@@ -1444,6 +1444,52 @@ assert(clampProbe.b.left === '694px' && clampProbe.b.top === '6px', 'and the far
 assert((HTML.match(/clampP3DViewerPosition\(/g) || []).length >= 4, 'the clamp runs on define, place, drag and resize');
 assert(HTML.indexOf("window.addEventListener('resize'") !== -1, 'a browser resize re-clamps the floating viewer');
 
+section('homolog source tracking: sub-groups, badges, source filter');
+ctxRun(`
+    parsedTracks = {
+        AA: 'MKVW',
+        'HL_01_a': 'MM  ',
+        'HL_02_b': ' MMW',
+        'HL_03_c': 'MMM ',
+        'HL_04_d': '  MW'
+    };
+    homologHitsInfo = {
+        HL_01_a: { rank: 1, hitId: 'sp|A', source: 'BLAST' },
+        HL_02_b: { rank: 2, hitId: 'sp|B', source: 'BLAST' },
+        HL_03_c: { rank: 3, hitId: 'sp|C', source: 'phmmer' },
+        HL_04_d: { rank: 4, hitId: 'sp|D', source: 'HHpred' }
+    };
+    trackControlState.filtered = {};
+    trackManagerExpanded.HL = true;
+`);
+const srcGroups = ctxRun(`homologKeysBySource(['HL_01_a', 'HL_02_b', 'HL_03_c', 'HL_04_d'])`);
+assert(srcGroups.map(x => x.source + ':' + x.keys.length).join(',') === 'BLAST:2,phmmer:1,HHpred:1', 'homologs group by source with counts (got ' + JSON.stringify(srcGroups) + ')');
+ctxRun(`renderTrackManager();`);
+const srcTmHtml = ctxRun(`document.getElementById('trackManagerList').innerHTML`);
+assert(/tm-subgroup-name">BLAST <span[^>]*>\(2\)/.test(srcTmHtml), 'Track Control renders a BLAST sub-header with its count');
+assert(srcTmHtml.indexOf('tm-src-badge tm-src-blast') !== -1 && srcTmHtml.indexOf('tm-src-badge tm-src-phmmer') !== -1 && srcTmHtml.indexOf('tm-src-badge tm-src-hhpred') !== -1, 'homolog rows carry colour-coded source badges');
+ctxRun(`toggleTrackManagerSource('HL', 'BLAST');`);
+const srcAfterHide = ctxRun(`['HL_01_a', 'HL_02_b', 'HL_03_c', 'HL_04_d'].map(k => isTrackFiltered(k)).join(',')`);
+assert(srcAfterHide === 'true,true,false,false', 'the sub-header eye hides the whole source (got ' + srcAfterHide + ')');
+ctxRun(`toggleTrackManagerSource('HL', 'BLAST');`);
+assert(ctxRun(`['HL_01_a', 'HL_02_b'].map(k => isTrackFiltered(k)).join(',')`) === 'false,false', 'and shows it again');
+const srcChips = ctxRun(`
+    (function () {
+        const wrap = buildTctlFilterSection('HL');
+        function find(el, out) {
+            (el.children || []).forEach(c => {
+                if ((c.className || '').indexOf('tctl-src-chip') !== -1) out.push(c.textContent || '');
+                find(c, out);
+            });
+            return out;
+        }
+        return find(wrap, []);
+    })()
+`);
+assert(srcChips.join('|') === 'BLAST (2)|phmmer (1)|HHpred (1)', 'the quick-controls filter offers one chip per source (got ' + JSON.stringify(srcChips) + ')');
+assert(HTML.indexOf('.tm-src-blast') !== -1 && HTML.indexOf('.tctl-src-chip') !== -1, 'the badge and chip styles ship with it');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {}; trackControlState.filtered = {}; trackManagerExpanded.HL = false;`);
+
 section('#2c/#2d: Tracks tab vs quick controls - roles, links, row polish');
 assert(HTML.indexOf('Track Visibility (full manager)') !== -1, 'the tab names itself the full manager');
 assert(HTML.indexOf('Every track, grouped by type') !== -1, 'with a one-line role description');
