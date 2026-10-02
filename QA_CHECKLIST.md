@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1206 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1215 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -1493,6 +1493,15 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.15 - 3D modal polish (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 456 | Toggle Flat / Per-residue | The toolbar does not shift (button width reserved) |
+| 457 | Fetch a PDB entry, then open 3D | Model info shows "PDB on RCSB" linking to the entry page |
+| 458 | Attach a local .pdb, then open 3D | A "Local model" chip, not clickable |
+| 459 | Drag to a corner, toggle +, shrink the window | The panel stays inside with a margin; both sizes stay on screen |
 
 ## 0.66.14 - homolog selection colours per glyph (quick rows)
 

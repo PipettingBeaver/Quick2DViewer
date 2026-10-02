@@ -12,6 +12,22 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.15] - 2026-10-01
+
+### Fixed
+- **The 3D toolbar no longer reflows** when the Flat/Per-residue button changes label: it
+  reserves the wider ("Per-residue") width.
+- **The 3D viewer can no longer leave the viewport.** The panel's small/large sizes cap to the
+  viewport (never wider or taller than the page), and its position is clamped to a 6 px margin
+  on open, after every size toggle, during drags and on browser resize.
+
+### Added
+- **Model provenance in the 3D modal.** The model-info line now shows **PDB on RCSB** or
+  **PDB on AlphaFold** as a link when the structure was downloaded this session, and a
+  non-clickable **Local model** chip for attached files and local predictions. Provenance is
+  recorded at fetch time rather than guessed from the file name (the old name-pattern external
+  link is gone).
+
 ## [0.66.14] - 2026-10-01
 
 ### Fixed

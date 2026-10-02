@@ -1402,6 +1402,48 @@ assert(lockProbe.lockedStyles >= 2, 'a locked viewer still recolours when the se
 assert(lockProbe.status.indexOf('(model locked)') !== -1, 'and the status says the model, not the colouring, is locked (got "' + lockProbe.status + '")');
 ctxRun(`parsedTracks = {}; homologHitsInfo = {}; trackMeta = {}; analysisRules = []; p3dTrackScheme = null; p3dBaseSchemeIdx = 0;`);
 
+section('3D modal: stable toggle width, model source button, viewport bounds');
+assert(HTML.indexOf('.p3d-toolbar #p3dFlatBtn { min-width: 84px') !== -1, 'the Flat/Per-residue button reserves the wider label width (no toolbar reflow)');
+assert(HTML.indexOf('min(360px, calc(100vw - 12px))') !== -1 && HTML.indexOf('min(68vw, calc(100vw - 12px))') !== -1, 'the viewer sizes cap to the viewport');
+const srcProbe = ctxRun(`
+    (function () {
+        Object.keys(p3dModelSources).forEach(k => delete p3dModelSources[k]);
+        cachedStructureTexts = { 'remote1.pdb': 'x', 'local1.pdb': 'x' };
+        p3dModelSources['remote1.pdb'] = { site: 'RCSB', href: 'https://www.rcsb.org/structure/1ABC' };
+        function scan(el) {
+            return (el.children || []).map(c => ({ cls: c.className || '', text: c.textContent || '', href: c.href || '' }));
+        }
+        loadP3DModel({ kind: 'pdb', fileName: 'remote1.pdb' });
+        const remote = scan(document.getElementById('p3dModelInfo'));
+        loadP3DModel({ kind: 'pdb', fileName: 'local1.pdb' });
+        const local = scan(document.getElementById('p3dModelInfo'));
+        p3dModel = null; cachedStructureTexts = {};
+        return { remote, local };
+    })()
+`);
+assert(srcProbe.remote.some(c => c.text === 'PDB on RCSB' && c.href === 'https://www.rcsb.org/structure/1ABC'), 'a downloaded model shows a clickable PDB on RCSB button (got ' + JSON.stringify(srcProbe.remote) + ')');
+assert(srcProbe.local.some(c => c.text === 'Local model' && !c.href), 'an attached model shows Local model with no click action (got ' + JSON.stringify(srcProbe.local) + ')');
+assert(HTML.indexOf('p3dExternalRef') === -1, 'the old name-guessed external link is gone (provenance is recorded at fetch time)');
+const clampProbe = ctxRun(`
+    (function () {
+        window.innerWidth = 1000; window.innerHeight = 800;
+        const el = document.getElementById('p3dViewer');
+        el.hidden = false; el.offsetWidth = 300; el.offsetHeight = 200;
+        el.style.left = '-50px'; el.style.top = '900px';
+        clampP3DViewerPosition(el);
+        const a = { left: el.style.left, top: el.style.top };
+        el.style.left = '5000px'; el.style.top = '0px';
+        clampP3DViewerPosition(el);
+        const b = { left: el.style.left, top: el.style.top };
+        el.hidden = true;
+        return { a, b };
+    })()
+`);
+assert(clampProbe.a.left === '6px' && clampProbe.a.top === '594px', 'a viewer past an edge is pulled back to the margin (got ' + JSON.stringify(clampProbe.a) + ')');
+assert(clampProbe.b.left === '694px' && clampProbe.b.top === '6px', 'and the far corner clamps to viewport minus size (got ' + JSON.stringify(clampProbe.b) + ')');
+assert((HTML.match(/clampP3DViewerPosition\(/g) || []).length >= 4, 'the clamp runs on define, place, drag and resize');
+assert(HTML.indexOf("window.addEventListener('resize'") !== -1, 'a browser resize re-clamps the floating viewer');
+
 section('#2c/#2d: Tracks tab vs quick controls - roles, links, row polish');
 assert(HTML.indexOf('Track Visibility (full manager)') !== -1, 'the tab names itself the full manager');
 assert(HTML.indexOf('Every track, grouped by type') !== -1, 'with a one-line role description');
