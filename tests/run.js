@@ -1300,7 +1300,7 @@ ctxRun(`
 `);
 const numMap = ctxRun(`(function () { const m = p3dColorsForTrack('m_pLDDT'); return { size: m.size, min: m.get(0), max: m.get(2), mid: m.get(3) }; })()`);
 assert(numMap.size === 3, 'a numeric track colours its non-null positions only (got ' + numMap.size + ')');
-assert(numMap.min === 'rgb(254,226,226)' && numMap.max === 'rgb(15,118,110)', 'the lowest value gets the ramp start and the highest its end (got ' + numMap.min + ' / ' + numMap.max + ')');
+assert(numMap.min === '0xfee2e2' && numMap.max === '0x0f766e', 'the lowest value gets the ramp start and the highest its end, converted to 3Dmol hex (got ' + numMap.min + ' / ' + numMap.max + ')');
 assert(numMap.mid !== numMap.min && numMap.mid !== numMap.max, 'and values in between interpolate');
 const valMap = ctxRun(`(function () { const m = p3dColorsForTrack('VAL_1ABC_A'); return { size: m.size, flagged: m.get(2), clean: m.get(0) }; })()`);
 assert(valMap.size === 4 && valMap.flagged === '#f59e0b' && valMap.clean === '#e2e8f0', 'a character track paints flagged residues in its colour and the rest grey (got ' + JSON.stringify(valMap) + ')');
@@ -1322,7 +1322,22 @@ assert(ctxRun(`(function () { const before = p3dTrackScheme; delete parsedTracks
 ctxRun(`updateP3DColorOptions();`);
 const selHtml = ctxRun(`document.getElementById('p3dColorSelect').innerHTML`);
 assert(selHtml.indexOf('Base: white') !== -1 && selHtml.indexOf('TP_Consensus') !== -1, 'the picker lists the base schemes and the available tracks (got "' + selHtml.slice(0, 90) + '")');
-ctxRun(`parsedTracks = {}; trackMeta = {}; analysisRules = []; p3dTrackScheme = null; p3dBaseSchemeIdx = 0;`);
+assert(selHtml.indexOf('<optgroup label="Flat colour"') !== -1 && selHtml.indexOf('<optgroup label="Per-residue"') !== -1, 'grouped into flat vs per-residue colouring');
+// Conservation as a track: the same per-residue gradient as its base scheme.
+ctxRun(`parsedTracks.CONSERVATION = { type: 'conservation', metric: 'shannon', values: [0, 0.5, 1, 0.9] };`);
+const consMap = ctxRun(`(function () { const m = p3dColorsForTrack('CONSERVATION'); return { size: m.size, low: m.get(0), high: m.get(2) }; })()`);
+assert(consMap.size === 4 && consMap.low === '0xffc6a0' && consMap.high === '0xa9d2ff', 'conservation colours per residue through the ConSurf gradient (got ' + JSON.stringify(consMap) + ')');
+ctxRun(`updateP3DColorOptions();`);
+assert(ctxRun(`document.getElementById('p3dColorSelect').innerHTML`).indexOf('Conservation') !== -1, 'and the picker offers it explicitly');
+// A homolog row is flat, but shaded by its model score (rows of different strength read differently).
+ctxRun(`
+    parsedTracks['HL_01_x'] = 'MM  ';
+    homologHitsInfo = { HL_01_x: { rank: 1, hitId: 'sp|X|Y', source: 'phmmer', aaTrack: 'MM  ', stats: { Probab: '90' } } };
+`);
+const hlMap = ctxRun(`(function () { const m = p3dColorsForTrack('HL_01_x'); return { covered: m.get(0), gap: m.get(2) }; })()`);
+assert(hlMap.covered === ctxRun(`p3dHexColor(modelScoreColor(90))`) && hlMap.covered !== ctxRun(`p3dHexColor(modelScoreColor(20))`), 'a homolog row paints its hit in its model-score colour (strength visible; got ' + hlMap.covered + ')');
+assert(hlMap.gap === '#e2e8f0', 'uncovered positions stay grey');
+ctxRun(`parsedTracks = {}; homologHitsInfo = {}; trackMeta = {}; analysisRules = []; p3dTrackScheme = null; p3dBaseSchemeIdx = 0;`);
 
 section('#2c/#2d: Tracks tab vs quick controls - roles, links, row polish');
 assert(HTML.indexOf('Track Visibility (full manager)') !== -1, 'the tab names itself the full manager');
@@ -1412,23 +1427,25 @@ assert(!/Coverage:/.test(ctxRun(`buildHomologPredictorInfo('HL_01_full').useCase
 const insPartial = ctxRun(`computeGuideInsights().map(x => x.text).join(' ')`);
 assert(/homolog row\(s\) cover only part of the sequence/.test(insPartial), 'the read-out counts partial rows (got "' + insPartial.slice(0, 80) + '")');
 assert(/lowest 25%/.test(insPartial), 'and names the lowest coverage');
-// The row tag is rendered by buildTrackRow (walk the stub DOM).
+// Partial coverage lives in the row tooltip now, not the visible label.
 const tagProbe = ctxRun(`
     (function () {
-        function findTags(el, out) {
+        function findLabels(el, out) {
             (el.children || []).forEach(c => {
-                if (c && c.className === 'track-partial-tag') out.push(c.textContent || c._text || '');
-                findTags(c, out);
+                if (c && c.className === 'track-label-text') out.push(c.title || '');
+                findLabels(c, out);
             });
             return out;
         }
         const full = buildTrackRow('HL_01_full', parsedTracks, 4, false);
         const part = buildTrackRow('HL_02_part', parsedTracks, 4, false);
-        return { full: findTags(full, []), part: findTags(part, []) };
+        return { full: findLabels(full, []), part: findLabels(part, []) };
     })()
 `);
-assert(tagProbe.part.length === 1 && tagProbe.part[0].indexOf('partial 50%') !== -1, 'a partial row carries the amber (partial N%) tag (got ' + JSON.stringify(tagProbe.part) + ')');
-assert(tagProbe.full.length === 0, 'a full row does not');
+assert(tagProbe.part.length === 1 && tagProbe.part[0].indexOf('covers residues 2-3 of 4 (50%)') !== -1, 'a partial row carries the coverage in its label tooltip (got ' + JSON.stringify(tagProbe.part) + ')');
+assert(tagProbe.part[0].indexOf('(partial') === -1, 'and not in the visible name field any more');
+assert(tagProbe.full.length === 1 && tagProbe.full[0].indexOf('covers residues') === -1, 'a full row gets no coverage note');
+assert(HTML.indexOf('track-partial-tag') === -1, 'the amber tag style is gone entirely');
 ctxRun(`parsedTracks = {}; homologHitsInfo = {};`);
 
 section('reference numbering offset: global + per-track, re-applied from raw data');

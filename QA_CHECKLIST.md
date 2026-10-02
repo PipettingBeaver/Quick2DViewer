@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1188 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1195 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -36,35 +36,47 @@ what you did, what you saw, and **Log → Copy as JSON**.
    LacY (P02920); expect the two LacY signature motifs (PS00896/PS00897) and the MFS profile
    (PS50850) as extra DM rows, each named `ProSitePatterns:PS…` / `ProSiteProfiles:PS…` and
    overlaying with rules/3D like any domain row.
-2. **ddG hand-off (0.66.10)** — Options → Stability predictions. Card below. Watch: the
-   mutation list copies one-letter tokens; a pasted `R175H -1.2` becomes a `_EXP` row with the
-   ddG kind; the offset applies to it like any experimental row.
-3. **Experimental per-residue data (0.65.0)** — quick rows at its heading. Watch: paste
-   `position value` lines, then a bare series of ≥5 values (sequential mode); the row's graph
-   and its correlation line vs conservation.
+2. **ddG hand-off (0.66.10)** — Options → Data Sources → Stability predictions. Card below.
+   Watch: the mutation list copies one-letter tokens; a pasted `R175H -1.2` becomes a `_EXP`
+   row with the ddG kind; the offset applies to it like any experimental row. (The services
+   need an account, so the on-site flow is untested; links verified 2026-10-01.)
+3. **Experimental per-residue data (0.65.0)** — quick rows at its heading. Example paste for
+   any protein (DMS-style tolerance, higher = better tolerated), one `position value` per line:
+   `1 0.85`, `2 0.40`, `3 0.72`, `4 0.15`, `5 0.60`. A bare series of ≥5 values maps to
+   sequential positions. Watch: the row's graph and its correlation line vs conservation.
 4. **Methods report completeness (0.66.0)** — quick rows. Watch: with validation/experimental/
    ddG/domains loaded, the report lists each under its own heading and never claims a section
    that has no data.
 5. **Ensemble RMSD matrix + the formula fix (0.66.9)** — **start at row 432**: the panel's
    "RMSD to first" column read 0.00 for every model before this release. Then rows 429–434.
    Watch: identical models → 0.00, a perturbed copy → nonzero, symmetric matrix, diagonal 0.
-6. **3D colour by any track (0.66.8)** — quick rows. Watch: validation amber/grey, pLDDT ramp,
-   a removed track falls back to a base scheme instead of going blank.
-7. **Tracks tab vs quick controls (0.66.7)** — quick rows. Watch: the cross-links open the right
-   surface; the full-row tint follows the active rule; chevrons stay subtle.
+6. **3D colour by any track (0.66.8, refined 0.66.11)** — quick rows. The picker is grouped
+   **Flat colour** (rules, validation, interfaces, topology, homolog hits shaded by model score)
+   vs **Per-residue** (pLDDT, RSA, experimental, conservation). Watch: conservation colours
+   through the ConSurf gradient as a track; a removed track falls back to a base scheme.
+7. **Tracks tab vs quick controls (0.66.7)** — quick rows. Where the cross-links are: sidebar →
+   **Tracks** tab → *Track Visibility (full manager)* → the **"Quick controls (View as / Color) ↗"**
+   button opens the popover; inside that popover the header carries **"Full manager ↗"** back.
+   Watch: the full-row tint follows the active rule; chevrons stay subtle.
 8. **Model score colour mode (0.66.6)** — quick rows. Watch: HSL legend gradient, raw stat in
    the tooltip, unscored positions unshaded.
-9. **Numbering offset + partial-HSP realignment (0.66.5)** — quick rows. Watch: the offset
-   shifts topology/UniProt/experimental rows and their labels consistently; a partial HSP
-   shows the amber "(partial N%)" tag and realigns only its covered span.
-10. **PDB entry lookup (0.63.0/0.64.0)** — quick rows. Watch: name fallback finds 1GFL where the
-    exact sequence cannot; per-hit Fetch loads the entry; the validation hint points at the box.
+9. **Numbering offset + partial-HSP realignment (0.66.5)** — quick rows. Test case: load a
+   topology source or an experimental row, then sidebar → Input Data → **Loaded Data** → set
+   **Numbering offset** (e.g. `2`) → Apply; the row's positions shift by 2 and the summary
+   updates. Partial HSPs: run BLAST on GFP and hover a hit's name - the tooltip names the
+   covered range (the old amber "(partial N%)" label tag moved into the tooltip in 0.66.11).
+10. **PDB entry lookup (0.63.0/0.64.0)** — quick rows. Test case: load UniProt **P42212** (GFP),
+    then Structure → **Find PDB entries**: the exact-sequence search finds little (1GFL carries
+    mutations), but the name fallback finds **1GFL**; press its Fetch. Also type `1GFL` directly
+    in Input Data's PDB ID box.
 11. **Category Options (0.62.0)** — quick rows. Watch: all eleven categories (ddG is new) switch
     correctly; the guide's "⚙ Data sources" links land on the right category.
 12. **PDBe validation (0.60.0)** — card at its heading. Watch: per-chain rows, alignment mapping,
     removal, and that dimer totals say "2 chain rows".
-13. **InterProScan topology + domains (0.58.0)** — quick rows. Watch: TMHMM/Phobius/SignalP land
-    as topology sources; the TSV renderer path; consensus conflicts flag when sources disagree.
+13. **InterProScan topology + domains (0.58.0)** — quick rows. Membrane test case: **LacY
+    (P02920)** - TMHMM and Phobius should agree on ~12 TM helices (SignalP: none, it is not
+    secreted); for a SignalP-positive control use a secreted protein such as insulin precursor
+    **P01308**. Watch: the TSV renderer path; consensus conflicts flag when sources disagree.
 14. **Variant effect providers + AlphaMissense (0.56.0/0.57.0)** — card above. Watch: the
     human-only skip reason, per-provider failure isolation, the merged line's registry order.
 15. **Rows 27–38 — removal**, the most destructive class (still from Round 1).
@@ -94,7 +106,8 @@ overlay (rules with `group:DM`, the 3D colour picker, tooltips, the methods repo
 like any other domain.
 
 **Try (normal use).**
-1. Load LacY (P02920) or fetch it, open Options → Domains, pick **InterProScan + PROSITE motifs**,
+1. Load LacY (P02920) or fetch it, open Options → Data Sources → Domains, pick
+   **InterProScan + PROSITE motifs**,
    press **Scan for domains**.
    *Expect:* the log line names "EBI InterProScan (Pfam + NCBIfam + PROSITE motifs)"; the DM rows
    include `ProSitePatterns:PS00896` / `PS00897` ("LacY/RafB permease family, conserved site",
@@ -118,14 +131,19 @@ like any other domain.
 
 ### ddG hand-off (stability predictions) — 0.66.10
 
-**Should do.** Options → Stability predictions links the four services that verified as alive
+**Status: the on-service flow is untested** (the sites need an account/login); the four links
+were reachability-verified 2026-10-01, and the copy/import side is covered by tests and manual
+checks. Treat everything past "Open …" as unverified until someone runs a prediction.
+
+**Should do.** Options → Data Sources → Stability predictions links the four services that verified as alive
 (DynaMut2, DUET, mCSM, FoldX suite), copies the loaded substitutions as one-letter tokens, and
 imports a pasted `mutation value` table as an experimental row of the ddG kind. There is no API;
 this is deliberately a hand-off, and the import reuses the experimental-row machinery so the
 overlays all apply.
 
 **Try (normal use).**
-1. Load a variant FASTA with substitutions (e.g. GFP R175H), open Options → Stability predictions.
+1. Load a variant FASTA with substitutions (e.g. GFP R175H), open Options → Data Sources →
+   Stability predictions.
    *Expect:* the panel explains the hand-off, shows the two copy buttons and the four service links.
 2. Press **Copy mutation list**, paste into a text editor.
    *Expect:* `R175H` (one letter, one per line, deduplicated); a toast confirms the count.
@@ -1473,6 +1491,16 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.11 - 3D picker refinement + partial-coverage tooltip (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 443 | 3D picker with conservation data | "Per-residue" group lists Conservation; picking it shows the ConSurf gradient on the model |
+| 444 | 3D picker with homolog rows | "Flat colour" group lists them; a stronger hit is darker/greener than a weaker one |
+| 445 | Remove the conservation row while its track scheme is active | Scheme falls back to a base scheme, status stays honest |
+| 446 | Hover a partial homolog row name in the sidebar | Coverage range in the tooltip; no "(partial N%)" in the visible name |
+| 447 | pLDDT/RSA/experimental 3D colouring | Colours render as before (hex conversion) - no uncoloured model |
 
 ## 0.66.10 - PROSITE motifs + ddG hand-off (quick rows)
 

@@ -12,6 +12,27 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.11] - 2026-10-01
+
+### Fixed
+- **Partial-coverage tag moved out of the track name.** Homolog rows showed "(partial N%)" in the
+  sidebar label, crowding out the hit name; the covered range now lives only in the row tooltip
+  (the info icon already carried it).
+- **3D colour conversion.** Numeric track colours (pLDDT / RSA / experimental) were handed to
+  3Dmol as CSS `rgb(...)` strings; they are now converted to the `0xrrggbb` form the renderer
+  expects, matching the selection and conservation paths.
+
+### Changed
+- **3D colour picker grouped and extended.** Options are grouped **Flat colour** (rules,
+  validation, interfaces, topology consensus, homolog hits) versus **Per-residue** (pLDDT, RSA,
+  experimental, conservation). Conservation is now an explicit track using the ConSurf gradient,
+  and a homolog row is painted flat in its model-score colour, so hits of different strength
+  read differently on the structure. The picker's bases sit in their own group.
+
+### Docs
+- Data Sources paths corrected (Options → Data Sources → Domains / Stability predictions); the
+  ddG service flow is marked untested because the sites require an account (links verified).
+
 ## [0.66.10] - 2026-10-01
 
 ### Added

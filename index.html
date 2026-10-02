@@ -1320,7 +1320,6 @@
         .coachmark-on .rp-suggested { box-shadow:0 0 0 2px #ddd6fe; }
         .track-row.track-empty { opacity:0.55; }
         .track-empty-tag { margin-left: 6px; font-size: 0.68rem; color: #94a3b8; font-style: italic; }
-        .track-partial-tag { margin-left: 6px; font-size: 0.68rem; color: #b45309; font-style: italic; }
         .task-running { opacity:0.85; cursor:progress; }
         .task-running::after {
             content:''; display:inline-block; width:9px; height:9px; margin-left:6px;
@@ -9532,7 +9531,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.10';
+const APP_VERSION = '0.66.11';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -13407,16 +13406,14 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
         emptyTag.title = 'No residue in this track is annotated: the prediction or import found nothing for this protein.';
         labelEl.appendChild(emptyTag);
     }
+    // Partial coverage used to ride in the visible label, where it crowded out
+    // the hit name; it is tooltip-only now (the info icon carries the range too).
     if (key.startsWith('HL_')) {
         const cov = homologCoverageRange(key);
         if (cov && cov.pct < 95) {
-            const partialTag = document.createElement('span');
-            partialTag.className = 'track-partial-tag';
-            partialTag.textContent = '(partial ' + Math.round(cov.pct) + '%)';
-            partialTag.title = 'This hit covers residues ' + cov.from + '-' + cov.to + ' of ' + cov.total +
+            labelText.title += '\nThis hit covers residues ' + cov.from + '-' + cov.to + ' of ' + cov.total +
                 ' (' + Math.round(cov.pct) + '%). BLAST HSPs are local, so a partial row is expected there; a ' +
                 'phmmer or HHpred hit this short is worth a look.';
-            labelEl.appendChild(partialTag);
         }
     }
 
@@ -16033,18 +16030,30 @@ function p3dColorSelectValue() {
     if (p3dTrackScheme && parsedTracks[p3dTrackScheme]) return 'track:' + p3dTrackScheme;
     return 'base:' + p3dBaseSchemeIdx;
 }
+// The 3D colour picker: base schemes plus evidence tracks, grouped by how the
+// track colours - a flat colour for every residue it flags (rules, validation,
+// interfaces, topology, a single homolog hit shaded by its model score), or a
+// per-residue ramp/gradient (pLDDT, RSA, experimental, conservation).
 function updateP3DColorOptions() {
     const sel = document.getElementById('p3dColorSelect');
     if (!sel) return;
-    const opts = P3D_BASE_SCHEMES.map((name, i) => ({ value: 'base:' + i, label: 'Base: ' + name }));
-    Object.keys(parsedTracks || {})
-        .filter(k => k === 'TP_Consensus' || k.startsWith('VAL_') || k.startsWith('RULE_') || k.startsWith('IF_') ||
-                     k.endsWith('_EXP') || k.endsWith('_pLDDT') || k.endsWith('_RSA'))
-        .forEach(k => opts.push({ value: 'track:' + k, label: formatTrackLabel(k) }));
-    sel.innerHTML = opts.map(o => '<option value="' + structureEscapeHtml(o.value) + '">' +
-        structureEscapeHtml(o.label) + '</option>').join('');
+    const flat = [];
+    const perRes = [];
+    Object.keys(parsedTracks || {}).forEach(k => {
+        if (k === 'CONSERVATION') { perRes.push(k); return; }
+        if (k.startsWith('HL_')) { flat.push(k); return; }
+        if (k === 'TP_Consensus' || k.startsWith('VAL_') || k.startsWith('RULE_') || k.startsWith('IF_')) { flat.push(k); return; }
+        if (k.endsWith('_EXP') || k.endsWith('_pLDDT') || k.endsWith('_RSA')) perRes.push(k);
+    });
+    const group = (label, keys) => keys.length
+        ? '<optgroup label="' + label + '">' + keys.map(k => '<option value="track:' + structureEscapeHtml(k) + '">' +
+            structureEscapeHtml(formatTrackLabel(k)) + '</option>').join('') + '</optgroup>'
+        : '';
+    const baseHtml = '<optgroup label="Base schemes">' + P3D_BASE_SCHEMES.map((name, i) =>
+        '<option value="base:' + i + '">Base: ' + structureEscapeHtml(name) + '</option>').join('') + '</optgroup>';
+    sel.innerHTML = baseHtml + group('Flat colour', flat) + group('Per-residue', perRes);
     sel.value = p3dColorSelectValue();
-    if (sel.selectedIndex === -1 && opts.length) sel.value = 'base:' + p3dBaseSchemeIdx;
+    if (sel.selectedIndex === -1 && sel.options.length) sel.value = 'base:' + p3dBaseSchemeIdx;
 }
 function onP3DColorSelectChange(value) {
     if (String(value).indexOf('track:') === 0) {
@@ -16062,12 +16071,29 @@ function onP3DColorSelectChange(value) {
 // the same low-to-high ramp as the Model score colour mode; character tracks
 // paint their flagged residues in the track colour against grey; the topology
 // consensus uses its state colours.
+// 3Dmol takes hex colours ("0xrrggbb"); modelScoreColor returns CSS rgb(...).
+function p3dHexColor(css) {
+    const rgb = String(css || '').match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+    if (rgb) return '0x' + [1, 2, 3].map(i => ('0' + parseInt(rgb[i], 10).toString(16)).slice(-2)).join('');
+    const hex = String(css || '').match(/^#([0-9a-fA-F]{6})$/);
+    if (hex) return '0x' + hex[1].toLowerCase();
+    return css;
+}
 function p3dColorsForTrack(key) {
     const map = new Map();
     const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     const t = key ? parsedTracks[key] : null;
     if (!t || !total) return map;
     const paint = (i, hex) => { if (i >= 0 && i < total) map.set(i, hex); };
+    // Conservation is per-residue by nature: the same ConSurf-style gradient the
+    // dedicated base scheme uses, exposed as a track so it sits beside the rest.
+    if (key === 'CONSERVATION') {
+        if (t && Array.isArray(t.values)) t.values.forEach((v, i) => {
+            const css = getConservationGradientColor(v);
+            if (css) paint(i, p3dHexColor(css));
+        });
+        return map;
+    }
     if (Array.isArray(t)) {
         const vals = t.filter(x => x && x.val != null).map(x => x.val);
         if (!vals.length) return map;
@@ -16075,7 +16101,7 @@ function p3dColorsForTrack(key) {
         const span = (Math.max.apply(null, vals) - min) || 1;
         t.forEach((x, i) => {
             if (!x || x.val == null) return;
-            paint(i, modelScoreColor(Math.round(((x.val - min) / span) * 100)));
+            paint(i, p3dHexColor(modelScoreColor(Math.round(((x.val - min) / span) * 100))));
         });
         return map;
     }
@@ -16084,7 +16110,14 @@ function p3dColorsForTrack(key) {
         return map;
     }
     const meta = getTrackMeta(key);
-    const hex = (meta && meta.color) || (key.startsWith('VAL_') ? VALIDATION_COLOR : '#0891b2');
+    // A homolog row is one hit with one strength: a flat colour, but taken from
+    // the model-score ramp so rows of different strength read differently. The
+    // per-residue view of the same evidence is the conservation scheme.
+    let hex = (meta && meta.color) || (key.startsWith('VAL_') ? VALIDATION_COLOR : '#0891b2');
+    if (key.startsWith('HL_')) {
+        const sc = homologScoreFor(key);
+        if (sc) hex = p3dHexColor(modelScoreColor(sc.conf));
+    }
     for (let i = 0; i < total; i++) paint(i, (t[i] && t[i] !== ' ') ? hex : '#e2e8f0');
     return map;
 }
