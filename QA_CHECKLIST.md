@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1203 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1206 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -50,11 +50,12 @@ what you did, what you saw, and **Log → Copy as JSON**.
 5. **Ensemble RMSD matrix + the formula fix (0.66.9)** — **start at row 432**: the panel's
    "RMSD to first" column read 0.00 for every model before this release. Then rows 429–434.
    Watch: identical models → 0.00, a perturbed copy → nonzero, symmetric matrix, diagonal 0.
-6. **3D colour by any track (0.66.8, refined through 0.66.13)** — quick rows. The colour
-   dropdown is a flat list: base schemes + evidence tracks. The **Flat / Per-residue** button
-   beside it owns homolog/conservation colouring: Flat = each hit's residues in its model-score
-   colour (stronger hits greener), Per-residue = the conservation gradient. Watch: the toggle
-   changes nothing for rule/validation/pLDDT schemes; a removed track falls back to a base scheme.
+6. **3D colour by any track (0.66.8, refined through 0.66.14)** — quick rows. The colour
+   dropdown is a flat list: base schemes + evidence tracks (no "Flat colour" group). The
+   **Flat / Per-residue** button beside it owns homolog/conservation colouring: highlighting a
+   homolog in per-residue mode colours each residue by its match-quality glyph (`|` `=` `+` `:`
+   `.`); Flat keeps one blue. On the conservation scheme, per-residue = gradient, flat = per-hit
+   strength. Watch: the toggle changes nothing for rule/validation/pLDDT schemes.
 7. **Tracks tab vs quick controls (0.66.7)** — quick rows. Where the cross-links are: sidebar →
    **Tracks** tab → *Track Visibility (full manager)* → the **"Quick controls (View as / Color) ↗"**
    button opens the popover; inside that popover the header carries **"Full manager ↗"** back.
@@ -1492,6 +1493,13 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.14 - homolog selection colours per glyph (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 453 | Highlight a homolog row in per-residue mode | Residues coloured by their glyph: `|` `=` `+` `:` `.` each a different colour |
+| 454 | Toggle Flat with the homolog highlighted | Every covered residue back to one blue |
 
 ## 0.66.13 - 3D colour cleanup + Lock scope (quick rows)
 

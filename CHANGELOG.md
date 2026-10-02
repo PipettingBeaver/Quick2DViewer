@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.14] - 2026-10-01
+
+### Fixed
+- **Highlighting a homolog now colours the 3D model per residue.** Every covered residue used to
+  be painted the same blue. In per-residue mode (the default) each residue now takes the colour
+  of its match-quality glyph from the 2D row (`|` `=` `+` `:` `.`), so a hit's strength varies
+  along the model instead of reading as one flat block. The Flat side of the toggle keeps the
+  single blue; the conservation scheme still switches between its gradient (per-residue) and
+  per-hit strength (flat).
+
 ## [0.66.13] - 2026-10-01
 
 ### Changed

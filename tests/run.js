@@ -1363,6 +1363,25 @@ const flatApplied = ctxRun(`
 assert(flatApplied.indexOf('homolog strength (flat)') !== -1, 'flat mode paints by homolog strength (got "' + flatApplied + '")');
 ctxRun(`toggleP3DHomologFlat();`);
 assert(ctxRun(`p3dHomologFlat`) === false && /^Per-residue$/.test(ctxRun(`document.getElementById('p3dFlatBtn').textContent`)), 'and flips back to Per-residue');
+// Highlighting a homolog row colours per match-quality glyph, not one blue.
+const selGlyph = ctxRun(`
+    (function () {
+        parsedTracks = { AA: 'MKVWX', 'HL_01_x': '|=+:.' };
+        homologHitsInfo = { HL_01_x: { rank: 1, hitId: 'sp|X|Y', source: 'BLAST', aaTrack: 'MKVWX', stats: {} } };
+        activeRowKey = 'HL_01_x'; selectionMode = 'row';
+        const m = selectionResidueColors([[1, 5]]);
+        const out = { bar: m.get(1), eq: m.get(2), plus: m.get(3), colon: m.get(4), dot: m.get(5) };
+        p3dHomologFlat = true;
+        const flat = selectionResidueColors([[1, 5]]).get(1);
+        p3dHomologFlat = false;
+        activeRowKey = null; selectionMode = 'point';
+        return { out, flat };
+    })()
+`);
+const glyphHex = (ch) => ctxRun(`p3dHexColor(HH_QUALITY_COLORS['${ch}'][0])`);
+assert(selGlyph.out.bar === glyphHex('|') && selGlyph.out.eq === glyphHex('=') && selGlyph.out.plus === glyphHex('+') && selGlyph.out.colon === glyphHex(':') && selGlyph.out.dot === glyphHex('.'), 'a highlighted homolog colours each residue by its glyph (got ' + JSON.stringify(selGlyph.out) + ')');
+assert(new Set(Object.values(selGlyph.out)).size === 5, 'and the five glyph colours are all distinct');
+assert(selGlyph.flat === ctxRun(`P3D_COLOR_HEX.blue`), 'flat mode keeps the single blue (got ' + selGlyph.flat + ')');
 // Lock freezes the model choice, not the colouring.
 const lockProbe = ctxRun(`
     (function () {

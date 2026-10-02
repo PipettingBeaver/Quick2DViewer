@@ -9534,7 +9534,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.13';
+const APP_VERSION = '0.66.14';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -15955,8 +15955,8 @@ function updateP3DToolbar() {
         flatEl.textContent = p3dHomologFlat ? 'Flat' : 'Per-residue';
         flatEl.classList.toggle('tb-btn-active', p3dHomologFlat);
         flatEl.title = p3dHomologFlat
-            ? 'Homolog / conservation colouring: flat colour per homolog hit, shaded by its model score (click for the per-residue conservation gradient)'
-            : 'Homolog / conservation colouring: per-residue conservation gradient (click for flat per-hit strength)';
+            ? 'Homolog / conservation colouring: flat (homolog residues in one colour; conservation by per-hit strength). Click for per-residue colours.'
+            : 'Homolog / conservation colouring: per residue (homolog match-quality glyphs | = + : . and the conservation gradient). Click for flat.';
     }
     const sizeEl = document.getElementById('p3dSizeBtn');
     if (sizeEl) {
@@ -16583,7 +16583,14 @@ function selectionResidueColors(selRanges) {
         colorFor = (r) => {
             const ch = trackStr[r - 1];
             if (isCofactor) return (ch && ch !== ' ') ? P3D_COLOR_HEX.yellow : P3D_COLOR_HEX.red;
-            if (isHomolog) return P3D_COLOR_HEX.blue;
+            if (isHomolog) {
+                // Per-residue (default): the same match-quality colours the 2D
+                // row shows, so | = + : . each read as their own strength along
+                // the model. Flat: the old single blue for every covered residue.
+                if (p3dHomologFlat) return P3D_COLOR_HEX.blue;
+                const qc = HH_QUALITY_COLORS[ch];
+                return qc ? p3dHexColor(qc[0]) : P3D_COLOR_HEX.blue;
+            }
             return P3D_COLOR_HEX[TYPE_CX_COLOR[ch]] || P3D_COLOR_HEX.red;
         };
     }
