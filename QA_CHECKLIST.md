@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1222 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1243 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -96,6 +96,36 @@ for a feature that is *entirely* unverified, and it has three parts:
   most likely cause, so a failure points at a diagnosis rather than a mystery.
 
 Cards stay until the feature has been driven by hand at least once.
+
+---
+
+### Species-specific variant effects (Ensembl VEP/SIFT) — 0.66.17
+
+**Should do.** Options -> Variants detects the species (header OS= tag, else the UniProt entry's
+organism), lets the user override it from a shortlist or by typing, and the "Assess variant
+effects" run adds an Ensembl VEP (SIFT) provider that scores each substitution species-aware.
+The hand-off section links PROVEAN, PolyPhen-2 and MutationTaster with the mutation-list copy.
+
+**Try (normal use).**
+1. Load TP53 (**P04637**) and a variant FASTA carrying `R175H`; open Options -> Variants.
+   *Expect:* Species shows `Homo sapiens (homo_sapiens) - detected`; the panel explains VEP.
+2. Press **Assess variant effects**.
+   *Expect:* the status/log line includes `Ensembl VEP (SIFT): 1 of 1 substitution(s) scored by
+   SIFT (0 deleterious, 1 tolerated)`; hovering the substitution's variant row shows
+   `SIFT tolerated` with score 0.08 alongside AlphaMissense/conservation/structure.
+3. Type a different species (e.g. `Mus musculus`) and press **Set**, then **Detect**.
+   *Expect:* the status flips to manual, then back to detected.
+4. Press **Copy mutation list** and one of the three hand-off links.
+   *Expect:* one-letter tokens on the clipboard; the tools open.
+
+**Edge cases.**
+- *No species / no accession:* VEP is skipped with its `needs` reason in the run line; the other
+  providers still report.
+- *UniProt and Ensembl numbering differ (some species):* positions map through the aligner; if a
+  substitution's reference residue does not match the Ensembl protein it is counted as unmapped
+  in the summary rather than scored wrongly.
+- *VEP down or rate-limited:* the provider fails alone with an HTTP reason; nothing else stalls.
+- *A species outside Ensembl:* the run reports the VEP HTTP error; the hand-off links still work.
 
 ---
 
@@ -1522,6 +1552,16 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.17 - species-specific variant effects (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 464 | TP53 (P04637) + R175H variant, Options -> Variants | Species detects Homo sapiens; Assess runs "Ensembl VEP (SIFT)" |
+| 465 | Read the merged line/tooltip | "SIFT tolerated" 0.08 from the live call; other providers still merge |
+| 466 | Override species by hand, then Detect | Manual sticks; Detect re-reads header/entry |
+| 467 | No accession or no species | VEP skipped with its needs reason; others still run |
+| 468 | Hand-off links + Copy mutation list | PROVEAN/PolyPhen-2/MutationTaster open; list copies |
 
 ## 0.66.16 - homolog source tracking (quick rows)
 

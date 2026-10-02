@@ -12,6 +12,24 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.17] - 2026-10-01
+
+### Added
+- **Species-specific variant effects via Ensembl VEP (SIFT).** Options -> Variants gains a
+  **Species** field (auto-detected from the header's OS= tag or the UniProt entry's organism,
+  overridable, shortlist of model organisms plus free-text search) and a new variant-effect
+  provider: it resolves the accession's canonical Ensembl transcript, maps each substitution
+  onto the Ensembl protein through the same aligner the variant grid uses (UniProt and Ensembl
+  sequences differ by small offsets in some species, so positions cannot be taken on trust),
+  builds protein HGVS and batches every substitution to VEP in one POST. The SIFT calls merge
+  into the existing tooltip/panel/status/report line. Needs a UniProt accession and a species;
+  per-provider failures stay isolated. Verified live: VEP REST, protein HGVS, the batch key
+  `hgvs_notations`, and the SIFT response shape (PolyPhen is not returned by this REST).
+- **Species-specific hand-off links.** The panel links PROVEAN, PolyPhen-2 and MutationTaster
+  (all reachability-verified; SIFT 4G's site is down, SIFT itself is the in-app call) and shares
+  the existing "Copy mutation list" helper.
+- The session save carries the species; Reset clears it.
+
 ## [0.66.16] - 2026-10-01
 
 ### Added

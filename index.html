@@ -2886,14 +2886,37 @@
         <div id="optCat-variants" class="opt-cat" hidden>
             <h4 style="margin: 18px 0 4px; color: #0f172a; font-size: 0.95rem;">Variant effects</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
-                Assess every loaded variant substitution with all applicable sources: AlphaMissense (human, needs a UniProt accession), conservation, structure context and curated UniProt features. Attach a variant FASTA first.
+                Assess every loaded variant substitution with all applicable sources: AlphaMissense (human, needs a UniProt accession), Ensembl VEP/SIFT (species-specific, needs a species), conservation, structure context and curated UniProt features. Attach a variant FASTA first.
             </p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
+                <label for="speciesInput" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Ensembl species used by species-specific predictors (Ensembl VEP/SIFT). Detected from the loaded header or UniProt entry; type to override.">Species</label>
+                <input type="text" id="speciesInput" list="speciesShortlist" placeholder="Detect from the loaded protein" autocomplete="off"
+                    style="width:230px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
+                <datalist id="speciesShortlist"></datalist>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="applySpeciesInput()" style="font-size:0.78rem; padding:4px 10px;" title="Use the typed species (or Ensembl species token) for species-specific predictors">Set</button>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="detectSessionSpecies(true)" style="font-size:0.78rem; padding:4px 10px;" title="Detect the species again from the loaded header or UniProt entry">Detect</button>
+            </div>
+            <div id="speciesStatus" style="font-size:0.72rem; color:#64748b; margin-bottom:8px;"></div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <button type="button" id="btnVariantEffects" data-task-step="annotation" class="tb-btn tb-btn-secondary" onclick="fetchVariantEffectPredictions()"
                     style="font-size:0.78rem; padding:4px 10px;" title="Assess the loaded variant substitutions with every applicable source">Assess variant effects</button>
                 <a class="copy-btn" style="text-decoration:none;" href="https://alphafold.ebi.ac.uk/" target="_blank" rel="noopener">AlphaMissense coverage ↗</a>
             </div>
             <div id="variantEffectStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px solid #e2e8f0;">
+                <h5 style="margin:0 0 4px; color:#0f172a; font-size:0.85rem;">Species-specific predictors (hand-off)</h5>
+                <p style="font-size:0.78rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                    Ensembl VEP runs in-app above (SIFT, species from the field). These tools take the same protein
+                    substitutions but have no usable API: copy the list and paste it into one of them. (SIFT 4G's site
+                    is currently down; SIFT itself is the in-app call.)
+                </p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <button type="button" class="copy-btn" onclick="copyVariantMutationList()" title="Copy the loaded variant substitutions as one-letter tokens (e.g. R175H), one per line - the format these tools expect">Copy mutation list</button>
+                    <a class="copy-btn" style="text-decoration:none;" href="http://provean.jcvi.org/index.php" target="_blank" rel="noopener">Open PROVEAN ↗</a>
+                    <a class="copy-btn" style="text-decoration:none;" href="http://genetics.bwh.harvard.edu/pph2/" target="_blank" rel="noopener">Open PolyPhen-2 ↗</a>
+                    <a class="copy-btn" style="text-decoration:none;" href="https://www.mutationtaster.org/" target="_blank" rel="noopener">Open MutationTaster ↗</a>
+                </div>
+            </div>
         </div>
 
         <div id="optCat-services" class="opt-cat" hidden>
@@ -3347,6 +3370,12 @@ let currentProteinLabel = null;
 // feature tracks are rebuilt in-session (they're refetchable on demand).
 let uniprotAnnotationMode = 'accession'; // 'accession' | 'sequence'
 let uniprotAccession = '';               // last-used accession (persisted)
+// Species for species-specific predictors (Ensembl VEP/SIFT). Auto-detected
+// from the loaded header's OS= tag or the UniProt entry's organism, and
+// overridable by hand in Options -> Variants.
+let sessionSpeciesToken = '';
+let sessionSpeciesLabel = '';
+let sessionSpeciesManual = false;
 let uniprotFeatures = null;              // { accession, features: [{type,start,end,description}], fetchedAt }
 let uniprotFeatureTracks = {};           // { 'UP_<cat>': [{start,end,type,description}] } (1-based)
 let uniprotLogEntries = [];              // timestamped debug log for the fetch/BLAST pipeline
@@ -7934,6 +7963,7 @@ function switchDataCategory(name) {
     if (sel && sel.value !== name) sel.value = name;
     const hint = document.getElementById('optDataCategoryHint');
     if (hint) hint.textContent = DATA_CATEGORY_HINTS[name] || '';
+    if (name === 'variants') { updateSpeciesUI(); detectSessionSpecies(); }
     const state = document.getElementById('optExternalState');
     if (state) state.textContent = 'External services are currently ' + (externalServicesEnabled ? 'ON' : 'OFF') + '.';
     renderTopologySourceList();
@@ -9617,7 +9647,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.16';
+const APP_VERSION = '0.66.17';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -12379,6 +12409,204 @@ function alphaMissenseFor(sub) {
 //   available(ctx) -> does this provider apply?
 //   run(ctx) -> { results: { 'R175H': { label, detail, level } }, summary }
 //   level: 'high' | 'medium' | 'low' (drives tallies/emphasis)
+// Ensembl species shortlist: the model organisms most likely to be loaded.
+// The field also accepts free text, sanitised into an Ensembl species token.
+const SPECIES_SHORTLIST = [
+    { label: 'Homo sapiens', token: 'homo_sapiens' },
+    { label: 'Mus musculus', token: 'mus_musculus' },
+    { label: 'Rattus norvegicus', token: 'rattus_norvegicus' },
+    { label: 'Danio rerio', token: 'danio_rerio' },
+    { label: 'Drosophila melanogaster', token: 'drosophila_melanogaster' },
+    { label: 'Caenorhabditis elegans', token: 'caenorhabditis_elegans' },
+    { label: 'Saccharomyces cerevisiae', token: 'saccharomyces_cerevisiae' },
+    { label: 'Schizosaccharomyces pombe', token: 'schizosaccharomyces_pombe' },
+    { label: 'Arabidopsis thaliana', token: 'arabidopsis_thaliana' },
+    { label: 'Gallus gallus', token: 'gallus_gallus' },
+    { label: 'Sus scrofa', token: 'sus_scrofa' },
+    { label: 'Bos taurus', token: 'bos_taurus' },
+    { label: 'Canis lupus familiaris', token: 'canis_lupus_familiaris' },
+    { label: 'Xenopus tropicalis', token: 'xenopus_tropicalis' },
+    { label: 'Macaca mulatta', token: 'macaca_mulatta' }
+];
+const AMINO_1TO3 = Object.keys(RESIDUE_3TO1).reduce((m, k) => { const v = RESIDUE_3TO1[k]; if (!m[v]) m[v] = k.charAt(0) + k.slice(1).toLowerCase(); return m; }, {});
+function speciesTokenFromName(name) {
+    const s = String(name || '').trim();
+    if (!s) return '';
+    const hit = SPECIES_SHORTLIST.find(x => x.label.toLowerCase() === s.toLowerCase() || x.token === s.toLowerCase());
+    if (hit) return hit.token;
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+function speciesLabelForToken(token) {
+    const hit = SPECIES_SHORTLIST.find(x => x.token === token);
+    if (hit) return hit.label;
+    return String(token || '').split('_').map(w => w ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(' ');
+}
+function setSessionSpecies(value, opts) {
+    opts = opts || {};
+    const token = speciesTokenFromName(value);
+    if (!token) return false;
+    sessionSpeciesToken = token;
+    sessionSpeciesLabel = speciesLabelForToken(token);
+    sessionSpeciesManual = !!opts.manual;
+    updateSpeciesUI();
+    schedulePersist();
+    return true;
+}
+function detectedSpeciesFromHeader() {
+    try {
+        const parsed = parseProteinHeaderLine(currentProteinLabel);
+        return (parsed && parsed.organism) ? parsed.organism : '';
+    } catch (e) { return ''; }
+}
+// Auto-detection: the header's OS= tag first, then the UniProt entry's
+// organism for accession-only sessions. A manual override always wins unless
+// force is set (the Detect button).
+async function detectSessionSpecies(force) {
+    if (sessionSpeciesManual && !force) return false;
+    const headerName = detectedSpeciesFromHeader();
+    if (headerName) { setSessionSpecies(headerName, { manual: false }); return true; }
+    const acc = uniprotAccession || '';
+    if (acc) {
+        try {
+            const resp = await fetchWithTimeout('https://rest.uniprot.org/uniprotkb/' + encodeURIComponent(acc) + '.json?fields=organism_name', {}, 20000);
+            if (resp.ok) {
+                const data = await resp.json();
+                const name = data && data.organism && data.organism.scientificName;
+                if (name) { setSessionSpecies(name, { manual: false }); return true; }
+            }
+        } catch (e) { /* best-effort; the field can be set by hand */ }
+    }
+    updateSpeciesUI();
+    return false;
+}
+function populateSpeciesDatalist() {
+    const list = document.getElementById('speciesShortlist');
+    if (!list || list.children.length) return;
+    SPECIES_SHORTLIST.forEach(x => {
+        const op = document.createElement('option');
+        op.value = x.label;
+        op.textContent = x.token;
+        list.appendChild(op);
+    });
+}
+function updateSpeciesUI() {
+    populateSpeciesDatalist();
+    const input = document.getElementById('speciesInput');
+    if (input && document.activeElement !== input) input.value = sessionSpeciesLabel || '';
+    const status = document.getElementById('speciesStatus');
+    if (status) {
+        status.textContent = sessionSpeciesToken
+            ? ('Species: ' + sessionSpeciesLabel + ' (' + sessionSpeciesToken + ')' + (sessionSpeciesManual ? ' - manual' : ' - detected'))
+            : 'Species not set: species-specific predictors need it. Load a UniProt entry, or type one above.';
+    }
+}
+function applySpeciesInput() {
+    const input = document.getElementById('speciesInput');
+    const ok = setSessionSpecies(input ? input.value : '', { manual: true });
+    if (!ok) showToast('Type a species name (e.g. Homo sapiens) or an Ensembl species token (e.g. homo_sapiens).', 'error');
+    else showToast('Species set to ' + sessionSpeciesLabel + ' (' + sessionSpeciesToken + ').', 'success');
+}
+// The first Ensembl transcript cross-reference of a UniProt entry (UniProt
+// lists the canonical first), cached per accession for the session.
+const ensemblTranscriptCache = {};
+function pickEnsemblXref(data) {
+    const xrefs = (data && data.uniProtKBCrossReferences) || [];
+    for (const x of xrefs) {
+        if (x.database !== 'Ensembl') continue;
+        const props = {};
+        (x.properties || []).forEach(p => { props[p.key] = p.value; });
+        if (!props.ProteinId) continue;
+        const parts = String(x.id || '').split('.');
+        if (!parts[0]) continue;
+        return { transcript: parts[0], version: parts[1] || '', protein: props.ProteinId };
+    }
+    return null;
+}
+async function resolveEnsemblTranscript(accession) {
+    if (ensemblTranscriptCache[accession]) return ensemblTranscriptCache[accession];
+    const resp = await fetchWithTimeout('https://rest.uniprot.org/uniprotkb/' + encodeURIComponent(accession) + '.json?fields=xref_ensembl', {}, 30000);
+    if (!resp.ok) throw new Error('UniProt xref lookup HTTP ' + resp.status);
+    const out = pickEnsemblXref(await resp.json());
+    if (out) ensemblTranscriptCache[accession] = out;
+    return out;
+}
+// NW alignment of the query onto the reference that also returns, for every
+// reference index, the query index aligned to it (-1 for a query gap). The
+// variant-grid aligner drops query insertions, which is fine for drawing but
+// loses the query coordinates this mapping needs.
+function alignQueryToReferenceMapped(query) {
+    const ref = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const N = ref.length, M = query.length;
+    const map = new Array(N).fill(-1);
+    if (!N || !M) return { aligned: '-'.repeat(N), map };
+    if (query === ref) { for (let i = 0; i < N; i++) map[i] = i; return { aligned: query, map }; }
+    const gapOpen = -11, gapExtend = -1, NEG = -1e9;
+    const Mtx = Array.from({ length: N + 1 }, () => new Array(M + 1).fill(0));
+    const Ix = Array.from({ length: N + 1 }, () => new Array(M + 1).fill(NEG));
+    const Iy = Array.from({ length: N + 1 }, () => new Array(M + 1).fill(NEG));
+    const trace = Array.from({ length: N + 1 }, () => new Array(M + 1).fill('M'));
+    for (let i = 1; i <= N; i++) { Ix[i][0] = gapOpen + (i - 1) * gapExtend; Mtx[i][0] = Ix[i][0]; trace[i][0] = 'U'; }
+    for (let j = 1; j <= M; j++) { Iy[0][j] = gapOpen + (j - 1) * gapExtend; Mtx[0][j] = Iy[0][j]; trace[0][j] = 'L'; }
+    for (let i = 1; i <= N; i++) {
+        for (let j = 1; j <= M; j++) {
+            const sc = typeof blosum62Score === 'function' ? blosum62Score(ref[i - 1], query[j - 1]) : (ref[i - 1] === query[j - 1] ? 4 : -1);
+            const diag = Mtx[i - 1][j - 1] + sc;
+            const up = Math.max(Mtx[i - 1][j] + gapOpen, Ix[i - 1][j] + gapExtend);
+            const left = Math.max(Mtx[i][j - 1] + gapOpen, Iy[i][j - 1] + gapExtend);
+            const best = Math.max(diag, up, left);
+            Mtx[i][j] = best;
+            Ix[i][j] = up; Iy[i][j] = left;
+            trace[i][j] = best === diag ? 'D' : (best === up ? 'U' : 'L');
+        }
+    }
+    let aligned = '', i = N, j = M;
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && trace[i][j] === 'D') { map[i - 1] = j - 1; aligned = query[j - 1] + aligned; i--; j--; }
+        else if (i > 0 && (j === 0 || trace[i][j] === 'U')) { aligned = '-' + aligned; i--; }
+        else { j--; } // query insertion vs the reference: dropped, no column
+    }
+    return { aligned, map };
+}
+// Maps substitutions onto the Ensembl protein: a substitution maps when its
+// reference column holds the same residue in the Ensembl protein, and the
+// HGVS position is that residue's 1-based position in the Ensembl sequence.
+function ensemblHgvsForSubstitutions(ensProtein, transcript, version, substitutions) {
+    const { aligned, map } = alignQueryToReferenceMapped(ensProtein);
+    const items = [];
+    let failed = 0;
+    (substitutions || []).forEach(({ key, sub }) => {
+        const idx = sub.pos - 1;
+        if (!aligned[idx] || aligned[idx] === '-' || aligned[idx] !== sub.ref || map[idx] < 0) { failed++; return; }
+        const ref3 = AMINO_1TO3[sub.ref], alt3 = AMINO_1TO3[sub.alt];
+        if (!ref3 || !alt3) { failed++; return; }
+        items.push({ key, hgvs: transcript + (version ? '.' + version : '') + ':p.' + ref3 + (map[idx] + 1) + alt3 });
+    });
+    return { items, failed };
+}
+// VEP returns one entry per submitted HGVS; pull the SIFT call from the
+// matching transcript consequence.
+function parseVepSiftResults(data, items) {
+    const byHgvs = {};
+    (items || []).forEach(x => { byHgvs[x.hgvs] = x.key; });
+    const results = {};
+    let deleterious = 0, tolerated = 0;
+    (Array.isArray(data) ? data : []).forEach(entry => {
+        const key = byHgvs[entry && entry.input];
+        if (!key) return;
+        const tc = (entry.transcript_consequences || []).filter(t => t.sift_prediction)[0];
+        if (!tc) return;
+        const pred = String(tc.sift_prediction || '');
+        const score = (tc.sift_score != null) ? Number(tc.sift_score) : null;
+        const bad = /deleterious/i.test(pred);
+        results[key] = {
+            label: 'SIFT ' + pred.replace(/_/g, ' '),
+            detail: (score != null && isFinite(score)) ? score.toFixed(2) : '',
+            level: bad ? 'high' : 'low'
+        };
+        if (bad) deleterious++; else tolerated++;
+    });
+    return { results, count: Object.keys(results).length, deleterious, tolerated };
+}
 let variantEffectResults = {}; // { 'R175H': { providerId: { label, detail, level } } }
 let variantEffectRan = {};     // providerId -> { ok, count, message }
 const VARIANT_EFFECT_PROVIDERS = {
@@ -12412,6 +12640,39 @@ const VARIANT_EFFECT_PROVIDERS = {
             const n = { high: 0, medium: 0, low: 0 };
             Object.keys(results).forEach(k => { n[results[k].level]++; });
             return { results, summary: Object.keys(results).length + ' of ' + ctx.substitutions.length + ' substitution(s) matched (' + n.high + ' pathogenic, ' + n.medium + ' ambiguous, ' + n.low + ' benign)' };
+        }
+    },
+    // Ensembl VEP with SIFT: species-specific. Needs the accession's Ensembl
+    // transcript and the session species. UniProt and Ensembl sequences can
+    // differ by small offsets, so substitution positions are mapped through
+    // the same aligner the variant grid uses; the protein-HGVS route then
+    // lets VEP translate the transcript itself.
+    ensembl_vep: {
+        label: 'Ensembl VEP (SIFT)',
+        coverage: 'Species-specific (any Ensembl species)',
+        kind: 'remote',
+        needs: 'a UniProt accession and a species',
+        available: (ctx) => !!(ctx.accession && ctx.species),
+        run: async (ctx) => {
+            const map = await resolveEnsemblTranscript(ctx.accession);
+            if (!map) throw new Error('no Ensembl transcript cross-reference for ' + ctx.accession);
+            const protResp = await fetchWithTimeout('https://rest.ensembl.org/sequence/id/' + encodeURIComponent(map.protein) + '?content-type=text/x-fasta', {}, 30000);
+            if (!protResp.ok) throw new Error('Ensembl protein lookup HTTP ' + protResp.status);
+            const ensProtein = String(await protResp.text()).split('\n').filter(l => l && l.charAt(0) !== '>').join('').trim();
+            if (!ensProtein) throw new Error('empty Ensembl protein for ' + map.protein);
+            const mapped = ensemblHgvsForSubstitutions(ensProtein, map.transcript, map.version, ctx.substitutions);
+            if (!mapped.items.length) throw new Error('none of the substitutions map onto the Ensembl protein (' + map.protein + ')');
+            const resp = await fetchWithTimeout('https://rest.ensembl.org/vep/' + encodeURIComponent(ctx.species) + '/hgvs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({ hgvs_notations: mapped.items.map(x => x.hgvs) })
+            }, 90000);
+            if (!resp.ok) throw new Error('VEP HTTP ' + resp.status);
+            const out = parseVepSiftResults(await resp.json(), mapped.items);
+            const summary = out.count + ' of ' + ctx.substitutions.length + ' substitution(s) scored by SIFT' +
+                (out.count ? ' (' + out.deleterious + ' deleterious, ' + out.tolerated + ' tolerated)' : '') +
+                (mapped.failed ? '; ' + mapped.failed + ' could not be mapped onto the Ensembl protein' : '');
+            return { results: out.results, summary };
         }
     },
     conservation: {
@@ -12529,12 +12790,13 @@ async function fetchVariantEffectPredictions() {
     }));
     if (!substitutions.length) { showToast('No substitution could be read from the variant headers or the alignment, so there is nothing to look up.', 'error'); return; }
     const derived = deriveLookupDefaults();
-    const ctx = { accession: uniprotAccession || (derived && derived.accession) || '', substitutions };
+    if (!sessionSpeciesToken) { try { await detectSessionSpecies(); } catch (e) {} }
+    const ctx = { accession: uniprotAccession || (derived && derived.accession) || '', species: sessionSpeciesToken || '', substitutions };
     const applicable = Object.keys(VARIANT_EFFECT_PROVIDERS).filter(id => {
         try { return VARIANT_EFFECT_PROVIDERS[id].available(ctx); } catch (e) { return false; }
     });
     if (!applicable.length) {
-        showToast('No variant-effect source applies to this session yet: AlphaMissense needs a UniProt accession, conservation needs the Conservation row, structure needs an attached model, and curated evidence needs a fetched UniProt entry.', 'error');
+        showToast('No variant-effect source applies to this session yet: AlphaMissense needs a UniProt accession, Ensembl VEP needs an accession and a species (set it in Options -> Variants), conservation needs the Conservation row, structure needs an attached model, and curated evidence needs a fetched UniProt entry.', 'error');
         return;
     }
     if (!beginGuideTask('annotation', 'Variant effect assessment')) return;
@@ -17423,6 +17685,7 @@ function gatherPersistableState() {
         referenceOffset: referenceOffset,
         trackOffsets: trackOffsets,
         keyedVariantsInfo: keyedVariantsInfo,
+        sessionSpecies: { token: sessionSpeciesToken, label: sessionSpeciesLabel, manual: sessionSpeciesManual },
         graphHighlights: graphHighlights,
         // These back derived tracks (TP_/UP_/DM_), so without them a restored
         // session would disagree with its own tracks: the guide would read the
@@ -17840,6 +18103,10 @@ function applyPersistedState(state) {
     applyConservationSettings(prefs);
     uniprotAnnotationMode = (prefs.uniprotAnnotationMode === 'sequence' || prefs.uniprotAnnotationMode === 'search') ? prefs.uniprotAnnotationMode : 'accession';
     uniprotAccession = (typeof prefs.uniprotAccession === 'string') ? prefs.uniprotAccession : '';
+    sessionSpeciesToken = (prefs.sessionSpecies && typeof prefs.sessionSpecies.token === 'string') ? prefs.sessionSpecies.token : '';
+    sessionSpeciesLabel = (prefs.sessionSpecies && typeof prefs.sessionSpecies.label === 'string') ? prefs.sessionSpecies.label : '';
+    sessionSpeciesManual = !!(prefs.sessionSpecies && prefs.sessionSpecies.manual);
+    updateSpeciesUI();
     // Per-type graph view (legacy saves carried a global currentViewMode).
     if (prefs.graphMode && typeof prefs.graphMode === 'object') {
         graphMode.pLDDT = !!prefs.graphMode.pLDDT;
@@ -18546,6 +18813,9 @@ async function resetAllData() {
     fastaAlignmentMode = 'auto';
     uniprotAnnotationMode = 'accession';
     uniprotAccession = '';
+    sessionSpeciesToken = '';
+    sessionSpeciesLabel = '';
+    sessionSpeciesManual = false;
     uniprotFeatures = null;
     uniprotFeatureTracks = {};
     uniprotLogEntries = [];

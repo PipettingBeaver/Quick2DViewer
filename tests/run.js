@@ -1169,7 +1169,7 @@ ctxRun(`parsedTracks = {}; topologySources = []; domainHitsInfo = {};`);
 
 section('variant effect providers: modular registry + local sources');
 const provIds = ctxRun(`Object.keys(VARIANT_EFFECT_PROVIDERS)`);
-assert(provIds.join(',') === 'alphamissense,conservation,structure,curated', 'the registry carries the remote provider plus three species-general local ones (got ' + provIds.join(',') + ')');
+assert(provIds.join(',') === 'alphamissense,ensembl_vep,conservation,structure,curated', 'the registry carries two remote providers plus three species-general local ones (got ' + provIds.join(',') + ')');
 assert(ctxRun(`VARIANT_EFFECT_PROVIDERS.conservation.coverage`).indexOf('Any species') !== -1, 'coverage notes say which sources speak for any species');
 const avail = ctxRun(`
     (function () {
@@ -1178,6 +1178,7 @@ const avail = ctxRun(`
         uniprotFeatureTracks = {};
         const before = Object.keys(VARIANT_EFFECT_PROVIDERS).filter(id => VARIANT_EFFECT_PROVIDERS[id].available(ctx));
         ctx.accession = 'P04637';
+        ctx.species = 'homo_sapiens';
         parsedTracks.CONSERVATION = { metric: 'shannon', values: new Array(10).fill(0.9) };
         parsedTracks['m_pLDDT'] = Array.from({ length: 10 }, () => ({ val: 90, type: 'plddt' }));
         uniprotFeatureTracks = { UP_Sites: { type: 'Site', features: [{ type: 'Active site', start: 5, end: 5, description: 'proton acceptor' }] } };
@@ -1186,7 +1187,7 @@ const avail = ctxRun(`
     })()
 `);
 assert(avail.before === '', 'with nothing loaded no provider applies (no misleading runs)');
-assert(avail.after === 'alphamissense,conservation,structure,curated', 'each source becomes applicable when its input arrives (got ' + avail.after + ')');
+assert(avail.after === 'alphamissense,ensembl_vep,conservation,structure,curated', 'each source becomes applicable when its input (accession, species, tracks) arrives (got ' + avail.after + ')');
 const localRuns = ctxRun(`
     (function () {
         parsedTracks = { AA: 'M'.repeat(10), CONSERVATION: { metric: 'shannon', values: [0.9, 0.9, 0.9, 0.9, 0.9, 0.4, 0.4, 0.4, 0.4, 0.4] },
@@ -1964,6 +1965,49 @@ assert(ctxRun(`homologGlyphBasis('HL_d')`) === 'HHpred match probability', 'and 
 ctxRun(`homologHitsInfo = {};`);
 assert(HTML.indexOf('HHpred match quality') === -1, 'no cell tooltip hardcodes "HHpred match quality" any more');
 assert(HTML.indexOf('Homologs: match quality') !== -1 && HTML.indexOf('HMMER posterior probability') !== -1, 'the legend explains the shared glyph scale and the per-source basis');
+
+section('#3b: species-specific variant APIs (Ensembl VEP/SIFT + hand-off)');
+const VEP_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/vep-tp53-batch.json'), 'utf-8');
+const UP_XREF_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/uniprot-tp53-xrefs.json'), 'utf-8');
+assert(ctxRun(`speciesTokenFromName('Homo sapiens')`) === 'homo_sapiens' && ctxRun(`speciesTokenFromName('danio rerio')`) === 'danio_rerio', 'species names map to Ensembl tokens (shortlist + free text)');
+assert(ctxRun(`speciesTokenFromName('Drosophila melanogaster')`) === 'drosophila_melanogaster' && ctxRun(`speciesLabelForToken('mus_musculus')`) === 'Mus musculus', 'and back to labels for the shortlist');
+assert(ctxRun(`speciesLabelForToken('some_odd_species')`) === 'Some Odd Species', 'an unlisted token is prettified for display');
+ctxRun(`currentProteinLabel = 'sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria GN=GFP';`);
+assert(ctxRun(`detectedSpeciesFromHeader()`) === 'Aequorea victoria', 'the header OS= tag is detected');
+ctxRun(`setSessionSpecies(detectedSpeciesFromHeader(), {});`);
+assert(ctxRun(`sessionSpeciesToken`) === 'aequorea_victoria' && ctxRun(`sessionSpeciesManual`) === false, 'detection sets the species as automatic');
+ctxRun(`setSessionSpecies('Homo sapiens', { manual: true });`);
+assert(ctxRun(`sessionSpeciesToken`) === 'homo_sapiens' && ctxRun(`sessionSpeciesManual`) === true, 'a manual override is flagged');
+assert(/Homo sapiens \(homo_sapiens\) - manual/.test(ctxRun(`document.getElementById('speciesStatus').textContent`)), 'and the status says so');
+sandbox.__vepFixture = VEP_FIXTURE;
+sandbox.__upXrefs = UP_XREF_FIXTURE;
+const pickedXref = ctxRun(`pickEnsemblXref(JSON.parse(window.__upXrefs))`);
+assert(pickedXref.transcript === 'ENST00000269305' && pickedXref.version === '9' && pickedXref.protein === 'ENSP00000269305.4', 'the first Ensembl xref (canonical) is picked (got ' + JSON.stringify(pickedXref) + ')');
+ctxRun(`parsedTracks = { AA: 'MKVW' };`);
+const mappedEq = ctxRun(`ensemblHgvsForSubstitutions('MKVW', 'ENST1', '3', [{ key: 'K2H', sub: { ref: 'K', pos: 2, alt: 'H' } }])`);
+assert(mappedEq.items.length === 1 && mappedEq.items[0].hgvs === 'ENST1.3:p.Lys2His', 'a substitution maps to protein HGVS on the Ensembl transcript (got ' + JSON.stringify(mappedEq) + ')');
+const mappedOff = ctxRun(`ensemblHgvsForSubstitutions('MKSVW', 'ENST1', '3', [{ key: 'V3A', sub: { ref: 'V', pos: 3, alt: 'A' } }])`);
+assert(mappedOff.items.length === 1 && mappedOff.items[0].hgvs === 'ENST1.3:p.Val4Ala', 'an N-terminal insertion in the Ensembl protein shifts the mapped position (got ' + JSON.stringify(mappedOff) + ')');
+const mappedMiss = ctxRun(`ensemblHgvsForSubstitutions('MKVW', 'ENST1', '3', [{ key: 'K2H', sub: { ref: 'R', pos: 2, alt: 'H' } }])`);
+assert(mappedMiss.items.length === 0 && mappedMiss.failed === 1, 'a reference mismatch is counted as unmapped, not scored');
+const parsedVep = ctxRun(`
+    parseVepSiftResults(JSON.parse(window.__vepFixture), [
+        { key: 'R175H', hgvs: 'ENST00000269305.9:p.Arg175His' },
+        { key: 'R273H', hgvs: 'ENST00000269305.9:p.Arg273His' }
+    ])
+`);
+assert(parsedVep.count === 2 && parsedVep.tolerated === 2 && parsedVep.deleterious === 0, 'the live VEP batch response parses (got ' + JSON.stringify({ c: parsedVep.count, d: parsedVep.deleterious, t: parsedVep.tolerated }) + ')');
+assert(parsedVep.results.R175H.label === 'SIFT tolerated' && parsedVep.results.R175H.detail === '0.08' && parsedVep.results.R175H.level === 'low', 'SIFT prediction + score become the merged-line result (got ' + JSON.stringify(parsedVep.results.R175H) + ')');
+assert(ctxRun(`VARIANT_EFFECT_PROVIDERS.ensembl_vep.available({ accession: 'P04637', species: 'homo_sapiens' })`) === true, 'VEP applies with an accession and a species');
+assert(ctxRun(`VARIANT_EFFECT_PROVIDERS.ensembl_vep.available({ accession: 'P04637', species: '' })`) === false, 'and not without a species');
+assert(ctxRun(`VARIANT_EFFECT_PROVIDERS.ensembl_vep.needs`).indexOf('species') !== -1, 'the needs line names the species requirement');
+assert(HTML.indexOf('id="speciesInput"') !== -1 && HTML.indexOf('id="speciesShortlist"') !== -1 && HTML.indexOf('id="speciesStatus"') !== -1, 'Options -> Variants has the species field, shortlist and status');
+assert(HTML.indexOf('Open PROVEAN') !== -1 && HTML.indexOf('Open PolyPhen-2') !== -1 && HTML.indexOf('Open MutationTaster') !== -1, 'the verified hand-off links are in the panel');
+assert(HTML.indexOf('Copy mutation list') !== -1, 'with the mutation-list copy shared with the ddG panel');
+ctxRun(`populateSpeciesDatalist();`);
+assert(ctxRun(`document.getElementById('speciesShortlist').children.length`) >= 15, 'the datalist fills from the shortlist');
+assert(ctxRun(`gatherPersistableState().sessionSpecies.token`) === 'homo_sapiens', 'the species travels in the session save');
+ctxRun(`currentProteinLabel = null; parsedTracks = {}; sessionSpeciesToken = ''; sessionSpeciesLabel = ''; sessionSpeciesManual = false; updateSpeciesUI();`);
 
 section('template table: identity, confidence, coverage, structure, exports');
 assert(ctxRun(`parseIdentityPercent('237/238 (100%)')`) === 100, 'identity parses the percentage out of "x/y (z%)" (was parseFloat -> 237)');
