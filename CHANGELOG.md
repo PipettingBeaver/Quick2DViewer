@@ -12,6 +12,17 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.13] - 2026-10-01
+
+### Changed
+- **3D colour toolbar cleanup.** The colour dropdown is a flat list again: base schemes plus the
+  evidence tracks (rules, validation, interfaces, topology, pLDDT, RSA, experimental). The
+  flat/per-residue groups and the per-homolog-row entries are gone. A **Flat / Per-residue**
+  button now sits beside the picker and owns homolog/conservation colouring: Flat paints each
+  residue with the strongest covering hit's model-score colour (hits of different strength read
+  differently), Per-residue uses the conservation gradient. The toggle is always visible and
+  changes nothing for the other colour schemes.
+
 ## [0.66.12] - 2026-10-01
 
 ### Fixed

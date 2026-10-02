@@ -3103,7 +3103,9 @@
         <button type="button" id="p3dLockBtn" class="tb-btn tb-btn-secondary" onclick="toggleP3DLock()"
             title="Lock/unlock: when locked, selection changes stop updating the 3D coloring">Lock Model</button>
         <select id="p3dColorSelect" class="q2dv-select" onchange="onP3DColorSelectChange(this.value)"
-            title="Colour the model by a base scheme, or by any evidence track (validation, experimental data, rules, interfaces, pLDDT, RSA, topology consensus)"></select>
+            title="Colour the model by a base scheme, or by an evidence track (validation, experimental data, rules, interfaces, pLDDT, RSA, topology consensus)"></select>
+        <button type="button" id="p3dFlatBtn" class="tb-btn tb-btn-secondary" onclick="toggleP3DHomologFlat()"
+            title="Homolog / conservation colouring: per-residue conservation gradient (click for flat per-hit strength)">Per-residue</button>
     </div>
     <div class="p3d-stage">
         <div id="p3dContainer"></div>
@@ -3151,6 +3153,7 @@ let homologCopyText = null;
 // --- Floating 3D viewer state (Py3Dmol) -----------------------------------
 let p3dViewerOpen = false;   // is the floating viewer showing
 let p3dLocked = false;       // Lock Model: keep the current structure loaded (colouring still follows the selection)
+let p3dHomologFlat = false;  // Flat / Per-residue toggle: flat = per-hit model-score colour, else conservation gradient
 let p3dLarge = false;        // false = small (default) | true = large
 let p3dLoaded = false;       // $3Dmol engine ready
 let p3dView = null;          // GLViewer instance
@@ -9531,7 +9534,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.12';
+const APP_VERSION = '0.66.13';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -15947,6 +15950,14 @@ function updateP3DToolbar() {
             ? 'Unlock: let the model follow the selection again (the colours already update live)'
             : 'Lock the model: keep this structure loaded while the selection moves; colours keep updating';
     }
+    const flatEl = document.getElementById('p3dFlatBtn');
+    if (flatEl) {
+        flatEl.textContent = p3dHomologFlat ? 'Flat' : 'Per-residue';
+        flatEl.classList.toggle('tb-btn-active', p3dHomologFlat);
+        flatEl.title = p3dHomologFlat
+            ? 'Homolog / conservation colouring: flat colour per homolog hit, shaded by its model score (click for the per-residue conservation gradient)'
+            : 'Homolog / conservation colouring: per-residue conservation gradient (click for flat per-hit strength)';
+    }
     const sizeEl = document.getElementById('p3dSizeBtn');
     if (sizeEl) {
         sizeEl.textContent = p3dLarge ? '-' : '+';
@@ -16009,6 +16020,11 @@ function toggleP3DLock() {
     updateP3DToolbar();
     if (!p3dLocked) updateP3DColoring();
 }
+function toggleP3DHomologFlat() {
+    p3dHomologFlat = !p3dHomologFlat;
+    updateP3DToolbar();
+    updateP3DColoring();
+}
 function toggleP3DSize() {
     p3dLarge = !p3dLarge;
     const el = document.getElementById('p3dViewer');
@@ -16030,30 +16046,26 @@ function p3dColorSelectValue() {
     if (p3dTrackScheme && parsedTracks[p3dTrackScheme]) return 'track:' + p3dTrackScheme;
     return 'base:' + p3dBaseSchemeIdx;
 }
-// The 3D colour picker: base schemes plus evidence tracks, grouped by how the
-// track colours - a flat colour for every residue it flags (rules, validation,
-// interfaces, topology, a single homolog hit shaded by its model score), or a
-// per-residue ramp/gradient (pLDDT, RSA, experimental, conservation).
+// The 3D colour picker: the base schemes plus the evidence tracks that colour
+// from a row (rules, validation, interfaces, topology, pLDDT, RSA,
+// experimental). Homolog and conservation colouring is not a list of rows here:
+// it is the "conservation" base scheme, whose two views (flat per-hit strength
+// vs per-residue gradient) are the Flat / Per-residue toggle beside the picker.
 function updateP3DColorOptions() {
     const sel = document.getElementById('p3dColorSelect');
     if (!sel) return;
-    const flat = [];
-    const perRes = [];
+    const tracks = [];
     Object.keys(parsedTracks || {}).forEach(k => {
-        if (k === 'CONSERVATION') { perRes.push(k); return; }
-        if (k.startsWith('HL_')) { flat.push(k); return; }
-        if (k === 'TP_Consensus' || k.startsWith('VAL_') || k.startsWith('RULE_') || k.startsWith('IF_')) { flat.push(k); return; }
-        if (k.endsWith('_EXP') || k.endsWith('_pLDDT') || k.endsWith('_RSA')) perRes.push(k);
+        if (k === 'CONSERVATION' || k.startsWith('HL_')) return;
+        if (k === 'TP_Consensus' || k.startsWith('VAL_') || k.startsWith('RULE_') || k.startsWith('IF_') ||
+            k.endsWith('_EXP') || k.endsWith('_pLDDT') || k.endsWith('_RSA')) tracks.push(k);
     });
-    const group = (label, keys) => keys.length
-        ? '<optgroup label="' + label + '">' + keys.map(k => '<option value="track:' + structureEscapeHtml(k) + '">' +
-            structureEscapeHtml(formatTrackLabel(k)) + '</option>').join('') + '</optgroup>'
-        : '';
-    const baseHtml = '<optgroup label="Base schemes">' + P3D_BASE_SCHEMES.map((name, i) =>
-        '<option value="base:' + i + '">Base: ' + structureEscapeHtml(name) + '</option>').join('') + '</optgroup>';
-    sel.innerHTML = baseHtml + group('Flat colour', flat) + group('Per-residue', perRes);
+    const opts = P3D_BASE_SCHEMES.map((name, i) => ({ value: 'base:' + i, label: 'Base: ' + name }))
+        .concat(tracks.map(k => ({ value: 'track:' + k, label: formatTrackLabel(k) })));
+    sel.innerHTML = opts.map(o => '<option value="' + structureEscapeHtml(o.value) + '">' +
+        structureEscapeHtml(o.label) + '</option>').join('');
     sel.value = p3dColorSelectValue();
-    if (sel.selectedIndex === -1 && sel.options.length) sel.value = 'base:' + p3dBaseSchemeIdx;
+    if (sel.selectedIndex === -1 && opts.length) sel.value = 'base:' + p3dBaseSchemeIdx;
 }
 function onP3DColorSelectChange(value) {
     if (String(value).indexOf('track:') === 0) {
@@ -16701,9 +16713,18 @@ function p3dConservationResidueColors() {
 
 // Colors the whole 3D model by conservation when there is data; otherwise
 // falls back to the plain base style with a "no conservation data" note.
+// The Flat / Per-residue toggle picks the view: flat paints each residue with
+// the strongest covering homolog hit's model-score colour, per-residue uses the
+// ConSurf-style conservation gradient.
 function applyP3DConservationColoring() {
     if (!p3dView) return;
-    const resiColors = p3dConservationResidueColors();
+    let resiColors = p3dConservationResidueColors();
+    let label = 'conservation-colored';
+    if (p3dHomologFlat) {
+        const flat = p3dHomologFlatResidueColors();
+        if (flat.size) { resiColors = flat; label = 'homolog strength (flat)'; }
+        else { label = 'conservation (no homologs for flat mode)'; }
+    }
     if (!resiColors.size) {
         p3dView.setStyle({}, baseP3DStyle());
         setP3DStatus(p3dModelDisplayName() + ': no conservation data');
@@ -16711,7 +16732,29 @@ function applyP3DConservationColoring() {
         p3dSafeRender();
         return;
     }
-    applyP3DColoring(resiColors, 'conservation-colored');
+    applyP3DColoring(resiColors, label);
+}
+// Flat view of the homolog evidence: every covered residue takes the colour of
+// the strongest hit covering it (model-score ramp), so hits of different
+// strength read differently. Overlaps resolve in favour of the stronger hit;
+// unscored hits keep their row colour.
+function p3dHomologFlatResidueColors() {
+    const map = new Map();
+    const best = new Map();
+    Object.keys(homologHitsInfo || {}).forEach(key => {
+        const t = parsedTracks[key];
+        if (typeof t !== 'string') return;
+        const sc = homologScoreFor(key);
+        const conf = sc ? sc.conf : -1;
+        const meta = getTrackMeta(key);
+        const hex = sc ? p3dHexColor(modelScoreColor(sc.conf)) : ((meta && meta.color) || '#0891b2');
+        for (let i = 0; i < t.length; i++) {
+            if (!t[i] || t[i] === ' ') continue;
+            const prev = best.has(i) ? best.get(i) : -2;
+            if (conf >= prev) { best.set(i, conf); map.set(i, hex); }
+        }
+    });
+    return map;
 }
 
 // Sets conservation as the default 3D base scheme once conservation data

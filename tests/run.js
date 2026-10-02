@@ -1322,21 +1322,47 @@ assert(ctxRun(`(function () { const before = p3dTrackScheme; delete parsedTracks
 ctxRun(`updateP3DColorOptions();`);
 const selHtml = ctxRun(`document.getElementById('p3dColorSelect').innerHTML`);
 assert(selHtml.indexOf('Base: white') !== -1 && selHtml.indexOf('TP_Consensus') !== -1, 'the picker lists the base schemes and the available tracks (got "' + selHtml.slice(0, 90) + '")');
-assert(selHtml.indexOf('<optgroup label="Flat colour"') !== -1 && selHtml.indexOf('<optgroup label="Per-residue"') !== -1, 'grouped into flat vs per-residue colouring');
-// Conservation as a track: the same per-residue gradient as its base scheme.
+assert(selHtml.indexOf('<optgroup') === -1, 'the picker is a flat list, no groups (got "' + selHtml.slice(0, 90) + '")');
+assert(selHtml.indexOf('Base: conservation') !== -1, 'conservation stays one of the base schemes');
+// Conservation as a track path still exists (robustness), but the picker does
+// not list it: homolog/conservation colouring is the toggle's job.
 ctxRun(`parsedTracks.CONSERVATION = { type: 'conservation', metric: 'shannon', values: [0, 0.5, 1, 0.9] };`);
 const consMap = ctxRun(`(function () { const m = p3dColorsForTrack('CONSERVATION'); return { size: m.size, low: m.get(0), high: m.get(2) }; })()`);
-assert(consMap.size === 4 && consMap.low === '0xffc6a0' && consMap.high === '0xa9d2ff', 'conservation colours per residue through the ConSurf gradient (got ' + JSON.stringify(consMap) + ')');
-ctxRun(`updateP3DColorOptions();`);
-assert(ctxRun(`document.getElementById('p3dColorSelect').innerHTML`).indexOf('Conservation') !== -1, 'and the picker offers it explicitly');
-// A homolog row is flat, but shaded by its model score (rows of different strength read differently).
+assert(consMap.size === 4 && consMap.low === '0xffc6a0' && consMap.high === '0xa9d2ff', 'the conservation track path still paints the ConSurf gradient (got ' + JSON.stringify(consMap) + ')');
+// Individual homolog rows are not picker entries any more.
 ctxRun(`
     parsedTracks['HL_01_x'] = 'MM  ';
     homologHitsInfo = { HL_01_x: { rank: 1, hitId: 'sp|X|Y', source: 'phmmer', aaTrack: 'MM  ', stats: { Probab: '90' } } };
 `);
-const hlMap = ctxRun(`(function () { const m = p3dColorsForTrack('HL_01_x'); return { covered: m.get(0), gap: m.get(2) }; })()`);
-assert(hlMap.covered === ctxRun(`p3dHexColor(modelScoreColor(90))`) && hlMap.covered !== ctxRun(`p3dHexColor(modelScoreColor(20))`), 'a homolog row paints its hit in its model-score colour (strength visible; got ' + hlMap.covered + ')');
-assert(hlMap.gap === '#e2e8f0', 'uncovered positions stay grey');
+ctxRun(`updateP3DColorOptions();`);
+const selHtml2 = ctxRun(`document.getElementById('p3dColorSelect').innerHTML`);
+assert(selHtml2.indexOf('Homolog #') === -1 && selHtml2.indexOf('track:CONSERVATION') === -1, 'neither individual homolog rows nor conservation-as-track are listed (the toggle owns those)');
+// Flat / Per-residue toggle: flat paints each residue with the strongest hit's model-score colour.
+const flatMap = ctxRun(`(function () { const m = p3dHomologFlatResidueColors(); return { size: m.size, r0: m.get(0), r2: m.get(2), r3: m.get(3) }; })()`);
+assert(flatMap.size === 2 && flatMap.r0 === ctxRun(`p3dHexColor(modelScoreColor(90))`), 'a flat-mode residue takes its hit\'s model-score colour (got ' + JSON.stringify(flatMap) + ')');
+assert(ctxRun(`p3dHomologFlat`) === false, 'the toggle starts per-residue');
+ctxRun(`
+    parsedTracks['HL_02_y'] = ' MMW';
+    homologHitsInfo['HL_02_y'] = { rank: 2, hitId: 'sp|Z|W', source: 'phmmer', aaTrack: ' MMW', stats: { Probab: '40' } };
+`);
+const flatMap2 = ctxRun(`(function () { const m = p3dHomologFlatResidueColors(); return { size: m.size, r1: m.get(1), r2: m.get(2), r3: m.get(3) }; })()`);
+assert(flatMap2.size === 4 && flatMap2.r3 === ctxRun(`p3dHexColor(modelScoreColor(40))`), 'a weaker hit still colours its own residues (got ' + JSON.stringify(flatMap2) + ')');
+assert(flatMap2.r1 === ctxRun(`p3dHexColor(modelScoreColor(90))`) && flatMap2.r2 === ctxRun(`p3dHexColor(modelScoreColor(40))`), 'the shared residue takes the stronger hit and the weaker one keeps the rest');
+ctxRun(`toggleP3DHomologFlat();`);
+assert(ctxRun(`p3dHomologFlat`) === true && /^Flat$/.test(ctxRun(`document.getElementById('p3dFlatBtn').textContent`)), 'the toggle flips and the button says Flat');
+const flatApplied = ctxRun(`
+    (function () {
+        p3dView = { setStyle: function () {}, zoomTo: function () {}, render: function () {}, resize: function () {} };
+        p3dViewerOpen = true; p3dLoaded = true; p3dModel = { kind: 'pdb', fileName: 'x.pdb' };
+        applyP3DConservationColoring();
+        const status = document.getElementById('p3dStatus').textContent || '';
+        p3dViewerOpen = false; p3dLoaded = false; p3dModel = null; p3dView = null;
+        return status;
+    })()
+`);
+assert(flatApplied.indexOf('homolog strength (flat)') !== -1, 'flat mode paints by homolog strength (got "' + flatApplied + '")');
+ctxRun(`toggleP3DHomologFlat();`);
+assert(ctxRun(`p3dHomologFlat`) === false && /^Per-residue$/.test(ctxRun(`document.getElementById('p3dFlatBtn').textContent`)), 'and flips back to Per-residue');
 // Lock freezes the model choice, not the colouring.
 const lockProbe = ctxRun(`
     (function () {
