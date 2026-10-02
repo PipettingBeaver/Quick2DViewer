@@ -1337,6 +1337,24 @@ ctxRun(`
 const hlMap = ctxRun(`(function () { const m = p3dColorsForTrack('HL_01_x'); return { covered: m.get(0), gap: m.get(2) }; })()`);
 assert(hlMap.covered === ctxRun(`p3dHexColor(modelScoreColor(90))`) && hlMap.covered !== ctxRun(`p3dHexColor(modelScoreColor(20))`), 'a homolog row paints its hit in its model-score colour (strength visible; got ' + hlMap.covered + ')');
 assert(hlMap.gap === '#e2e8f0', 'uncovered positions stay grey');
+// Lock freezes the model choice, not the colouring.
+const lockProbe = ctxRun(`
+    (function () {
+        let styles = 0;
+        parsedTracks = { AA: 'MK' };
+        p3dViewerOpen = true; p3dLocked = true; p3dLoaded = true;
+        p3dModel = { kind: 'pdb', fileName: 'x.pdb' };
+        p3dView = { setStyle: function () { styles++; }, zoomTo: function () {}, render: function () {}, resize: function () {} };
+        lastRanges = [[1, 2]];
+        updateP3DColoring();
+        const lockedStyles = styles;
+        const status = document.getElementById('p3dStatus').textContent || '';
+        p3dViewerOpen = false; p3dLocked = false; p3dLoaded = false; p3dModel = null; p3dView = null; lastRanges = null;
+        return { lockedStyles, status };
+    })()
+`);
+assert(lockProbe.lockedStyles >= 2, 'a locked viewer still recolours when the selection changes (got ' + lockProbe.lockedStyles + ' style calls)');
+assert(lockProbe.status.indexOf('(model locked)') !== -1, 'and the status says the model, not the colouring, is locked (got "' + lockProbe.status + '")');
 ctxRun(`parsedTracks = {}; homologHitsInfo = {}; trackMeta = {}; analysisRules = []; p3dTrackScheme = null; p3dBaseSchemeIdx = 0;`);
 
 section('#2c/#2d: Tracks tab vs quick controls - roles, links, row polish');

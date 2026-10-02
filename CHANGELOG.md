@@ -12,6 +12,14 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.12] - 2026-10-01
+
+### Fixed
+- **Lock Model no longer freezes the colouring.** Locking now keeps the current structure
+  loaded (the model no longer auto-switches when the selection moves to another homolog),
+  while highlighting a new line still recolours the model. The status line says
+  "(model locked)" so the scope is clear.
+
 ## [0.66.11] - 2026-10-01
 
 ### Fixed
