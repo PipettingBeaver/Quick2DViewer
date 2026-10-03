@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1254 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1272 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -96,6 +96,40 @@ for a feature that is *entirely* unverified, and it has three parts:
   most likely cause, so a failure points at a diagnosis rather than a mystery.
 
 Cards stay until the feature has been driven by hand at least once.
+
+---
+
+### Macros: record, export, replay — 0.66.19
+
+**Should do.** The Macro button records the replayable API/import actions of a session with their
+resolved provider and parameters, exports/imports them as JSON, and replays them through the
+same code paths as the buttons, with a step banner and activity-log entries.
+
+**Try (normal use).**
+1. Menu bar -> **Macro**, press **Record**, load UniProt **P42212**, run a BLAST homolog search
+   (Analyze menu), then press **Stop recording**.
+   *Expect:* two steps listed ("Load UniProt entry $ACCESSION", "Search homologs with NCBI
+   BLAST ..."); the status line counts them.
+2. Press **Dry run**.
+   *Expect:* a toast lists the plan; nothing runs.
+3. Press **Export JSON**, then **Clear steps**, paste the JSON into the import box and press
+   **Load macro**.
+   *Expect:* the same steps return with the macro name.
+4. Type an accession into **Accession override** (e.g. a TerC entry), press **Replay**.
+   *Expect:* the banner steps "Running macro: step 1/2 ..."; the UniProt fetch uses the override
+   where `$ACCESSION` was recorded; the activity log gets one entry per step plus the finish line.
+5. Turn off the network and replay a macro with several steps.
+   *Expect:* the failing step is logged and named in the final toast, later steps still attempt,
+   and the banner hides at the end.
+
+**Edge cases.**
+- *Replay while still recording:* steps must not duplicate; replay never re-records itself.
+- *A step throws:* the run continues, the final toast warns, and the log shows "macro step N
+  failed".
+- *No steps:* Dry run and Replay say so instead of running anything.
+- *Import with malformed JSON:* a clear error toast; existing steps stay untouched.
+- *Macros are session-only:* closing the tab loses them unless exported (session-save integration
+  comes later).
 
 ---
 
@@ -1552,6 +1586,17 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.19 - macro v1 (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 471 | Macro -> Record, load P42212, run BLAST, stop | Steps listed with the resolved providers; $ACCESSION recorded |
+| 472 | Dry run | Plan in a toast; nothing runs |
+| 473 | Export, Clear, paste back, Load | Same steps and name return |
+| 474 | Accession override + Replay | Banner steps; $ACCESSION uses the override |
+| 475 | Activity log during replay | macro/step entries, per-step failures named |
+| 476 | Offline replay of a multi-step macro | Failures isolated, later steps still run, final toast warns |
 
 ## 0.66.18 - UniProt feature tooltips (quick rows)
 

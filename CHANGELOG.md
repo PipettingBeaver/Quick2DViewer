@@ -12,6 +12,19 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.19] - 2026-10-01
+
+### Added
+- **Macro v1, slice 1: record, export, replay.** A menu-bar **Macro** button opens a modal that
+  records the replayable actions of a session (UniProt load, domain scan, topology prediction,
+  homolog search, PDB fetch, PDBe validation, variant effects) with their resolved provider and
+  parameters. Macros export and import as versioned JSON; `$ACCESSION` stands for the session
+  accession, so an override retargets a whole macro to another protein. Replay calls the same
+  runners as the buttons (it cannot drift from the real path), shows a "Running macro: step N/M"
+  banner, logs every step and failure to the activity log, isolates per-step failures, and
+  offers a dry-run plan. Recording hooks live inside the runners and replay never re-records
+  itself.
+
 ## [0.66.18] - 2026-10-01
 
 ### Fixed

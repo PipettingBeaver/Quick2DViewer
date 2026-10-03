@@ -3684,6 +3684,55 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     assert((await ctxRun(`runCapability('__test2', {})`)) === 'first-provider-result', 'without a preference the declared order stands');
     assert((await ctxRun(`runCapability('__test2', {}, null, { prefer: 'nope' })`)) === 'first-provider-result', 'an unknown preference is ignored');
 
+    section('macro v1: record, parameterise, JSON, dry run, replay');
+    assert(HTML.indexOf('id="macroModal"') !== -1 && HTML.indexOf('id="macroBanner"') !== -1, 'the macro modal and replay banner exist');
+    assert(HTML.indexOf('onclick="openMacroModal()"') !== -1 && HTML.indexOf('>Macro</button>') !== -1, 'and the menu bar has the Macro button');
+    assert(HTML.indexOf('id="macroRecordBtn"') !== -1 && HTML.indexOf('id="macroAccessionOverride"') !== -1 && HTML.indexOf('id="macroImportText"') !== -1, 'record, override and import controls are present');
+    ctxRun(`uniprotAccession = 'P42212'; macroAccessionOverride = ''; macroRecording = true; macroSteps = []; macroReplaying = false;`);
+    ctxRun(`macroCaptureStep({ type: 'uniprot', accession: macroParam('P42212') });`);
+    assert(ctxRun(`macroSteps[0].accession`) === '$ACCESSION', 'the session accession is recorded as the $ACCESSION parameter (got ' + ctxRun(`macroSteps[0].accession`) + ')');
+    ctxRun(`macroCaptureStep({ type: 'pdb', pdbId: '1GFL' });`);
+    assert(ctxRun(`macroSteps.length`) === 2, 'steps accumulate while recording');
+    assert(ctxRun(`macroStepDescription({ type: 'homolog', provider: 'ebi_blast' })`).indexOf('BLAST') !== -1, 'step descriptions name the resolved provider');
+    assert(ctxRun(`macroStepDescription({ type: 'domainScan', provider: 'ebi_iprscan5_motifs' })`).indexOf('PROSITE') !== -1, 'the domain provider label comes from the registry');
+    const macroJsonText = ctxRun(`macroToJson()`);
+    sandbox.__macroJsonText = macroJsonText;
+    const macroParsed = JSON.parse(macroJsonText);
+    assert(macroParsed.v === 1 && macroParsed.steps.length === 2, 'macroToJson exports a versioned steps array');
+    ctxRun(`macroSteps = []; macroName = '';`);
+    ctxRun(`macroFromJson(window.__macroJsonText);`);
+    assert(ctxRun(`macroSteps.length`) === 2 && ctxRun(`macroName`) === 'Untitled macro', 'macroFromJson restores the steps and name');
+    assert(ctxRun(`macroPlan().length`) === 2 && ctxRun(`macroPlan()[0]`).indexOf('Load UniProt entry') !== -1, 'the dry-run plan lists the steps');
+    macroAccessionOverrideSet = ctxRun(`(function () { macroAccessionOverride = 'Q9XYZ1'; const r = macroResolveValue('$ACCESSION'); macroAccessionOverride = ''; return r; })()`);
+    assert(macroAccessionOverrideSet === 'Q9XYZ1', 'the accession override retargets $ACCESSION (got ' + macroAccessionOverrideSet + ')');
+    ctxRun(`
+        macroRecording = false;
+        window.__macroCalls = [];
+        window.__macroOrigPdb = fetchPdbEntry;
+        fetchPdbEntry = async (id) => { window.__macroCalls.push('pdb:' + id); return true; };
+        macroSteps = [{ type: 'pdb', pdbId: '$ACCESSION' }];
+        macroName = 'test macro';
+        actionLog = [];
+    `);
+    const macroReplayOk = await ctxRun(`macroReplay(false)`);
+    assert(macroReplayOk === true, 'a clean replay reports success');
+    assert(ctxRun(`window.__macroCalls.join(',')`) === 'pdb:P42212', 'replay resolves $ACCESSION and calls the real runner (got ' + ctxRun(`window.__macroCalls.join(',')`) + ')');
+    assert(ctxRun(`document.getElementById('macroBanner').hidden`) === true, 'the banner hides when replay finishes');
+    assert(ctxRun(`actionLog.some(e => e.kind === 'macro' && /step 1 done/.test(e.label))`), 'each replayed step lands in the activity log');
+    ctxRun(`macroRecording = true; window.__macroCalls = [];`);
+    await ctxRun(`macroReplay(false)`);
+    assert(ctxRun(`macroSteps.length`) === 1, 'replay never re-records its own steps');
+    ctxRun(`macroRecording = false;`);
+    ctxRun(`fetchPdbEntry = async () => { throw new Error('boom'); };`);
+    const macroReplayFail = await ctxRun(`macroReplay(false)`);
+    assert(macroReplayFail === false, 'a failing step makes replay report failure');
+    assert(ctxRun(`actionLog.some(e => e.kind === 'error' && /macro step 1 failed/.test(e.label))`), 'and the failure is logged with the step number');
+    ctxRun(`
+        fetchPdbEntry = window.__macroOrigPdb;
+        macroSteps = []; macroName = 'Untitled macro'; macroAccessionOverride = ''; macroRecording = false;
+        uniprotAccession = ''; actionLog = [];
+    `);
+
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
 })();

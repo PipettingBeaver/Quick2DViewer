@@ -465,6 +465,17 @@
             background: transparent; border: none; border-radius: 4px; padding: 5px 8px; cursor: pointer;
         }
         .menubar-menu button:hover { background: #dbeafe; }
+        /* Macro replay overlay + step list */
+        .macro-banner {
+            position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+            z-index: 1200; background: #0f172a; color: #fff; padding: 8px 16px;
+            border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35); max-width: 90vw;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .macro-banner[hidden] { display: none; }
+        .macro-step { display: flex; gap: 8px; padding: 2px 0; }
+        .macro-step-num { color: #94a3b8; min-width: 16px; text-align: right; flex-shrink: 0; }
         .app-header-tools .tb-btn { font-size: 0.72rem; padding: 4px 9px; }
         .app-version {
             display: inline-block;
@@ -2053,6 +2064,7 @@
                 </div>
             </div>
             <div class="menubar-item">
+                <button type="button" class="menubar-btn" onclick="openMacroModal()" title="Record, export and replay a workflow as a macro: the API/import steps with their providers and parameters">Macro</button>
                 <button type="button" class="menubar-btn" onclick="openActionLog()" title="Everything this session: clicks, menu choices, API jobs and what came back - newest first">Log</button>
                 <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('export', this)">Export ▾</button>
                 <div class="menubar-menu" id="menubar-export" hidden>
@@ -2071,6 +2083,7 @@
     </div>
 
     <div id="toastContainer" aria-live="polite"></div>
+    <div id="macroBanner" class="macro-banner" role="status" hidden></div>
 
     <input type="file" id="structureUpload" accept=".pdb,.cif,.json,.hhr,.fasta,.fa,.faa,.fas" multiple style="display: none;">
 
@@ -3077,6 +3090,42 @@
             <button type="button" class="copy-btn" onclick="clearActionLog()">Clear</button>
         </div>
         <pre id="actionLogBody" class="data-box" style="font-size:0.7rem; max-height:50vh; overflow:auto; white-space:pre-wrap; margin:0; color:#334155;">(no actions recorded yet this session)</pre>
+    </div>
+</div>
+
+<div class="modal-overlay" id="macroModal" role="dialog" aria-modal="true" aria-labelledby="macroTitle">
+    <div class="modal-content" style="width: 720px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="macroTitle" style="margin: 0; color: #0f172a;">Macros</h3>
+            <button onclick="closeMacroModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <p style="font-size:0.78rem; color:#64748b; margin: 12px 0 8px; line-height:1.4;">
+            Record the API and import steps of a workflow and replay them, so the same analysis can be
+            repeated or moved to another protein. Each step stores the action, its resolved provider and its
+            parameters; <code>$ACCESSION</code> stands for the session accession, so the override below
+            retargets the whole run. Replay calls the same code paths as the buttons, and every step lands
+            in the activity log.
+        </p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+            <button type="button" id="macroRecordBtn" class="tb-btn tb-btn-secondary" onclick="toggleMacroRecording()">&#9679; Record</button>
+            <button type="button" class="copy-btn" onclick="macroReplay(true)">Dry run</button>
+            <button type="button" class="copy-btn" onclick="macroReplay(false)">Replay</button>
+            <button type="button" class="copy-btn" onclick="exportMacroJson()">Export JSON</button>
+            <button type="button" class="copy-btn" onclick="clearMacroSteps()">Clear steps</button>
+        </div>
+        <div id="macroStatus" style="font-size:0.72rem; color:#64748b; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+            <label for="macroNameInput" style="font-size:0.78rem; font-weight:600; color:#475569;">Name</label>
+            <input type="text" id="macroNameInput" oninput="macroName = this.value;" style="width:200px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
+            <label for="macroAccessionOverride" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Used for $ACCESSION steps: leave empty to keep the session accession">Accession override</label>
+            <input type="text" id="macroAccessionOverride" oninput="macroAccessionOverride = this.value;" placeholder="e.g. Q12345" style="width:130px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
+        </div>
+        <div id="macroStepList" class="data-box" style="max-height:32vh; overflow:auto; font-size:0.76rem; line-height:1.5;"></div>
+        <div style="margin-top:10px;">
+            <label for="macroImportText" style="font-size:0.78rem; font-weight:600; color:#475569;">Paste a macro JSON to load</label>
+            <textarea id="macroImportText" rows="3" style="width:100%; font-size:0.72rem; font-family:monospace; padding:6px; border:1px solid #cbd5e1; border-radius:4px; margin-top:4px;" placeholder='{"v":1,"name":"GFP demo","steps":[{"type":"uniprot","accession":"P42212"}]}'></textarea>
+            <button type="button" class="copy-btn" style="margin-top:6px;" onclick="importMacroFromTextarea()">Load macro</button>
+        </div>
     </div>
 </div>
 
@@ -4289,6 +4338,7 @@ function parseIprscanDomains(text) {
 async function runTopologyPrediction() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     if (!seq) { showToast('Nothing to predict yet: the topology prediction runs on the loaded sequence.', 'error'); return; }
+    macroCaptureStep({ type: 'topology' });
     if (!beginGuideTask('topology', 'Topology prediction (TMHMM/Phobius/SignalP) running')) return;
     const statusEl = document.getElementById('topologyPredictStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
@@ -4592,6 +4642,7 @@ async function runDomainScan() {
         if (!(await ensureExternalServices())) { endGuideTask('annotation'); return; }
         const picker = document.getElementById('domainScanProvider');
         const prefer = (picker && picker.value) ? picker.value : 'ebi_hmmer';
+        macroCaptureStep({ type: 'domainScan', provider: prefer });
         const chosen = (SERVICE_REGISTRY.capabilities.domain_scan.providers || []).find(p => p.id === prefer);
         const providerName = (chosen && chosen.label) || 'hmmscan (Pfam)';
         setStatus('Submitting ' + providerName + ' job. This usually takes a minute or two\u2026');
@@ -4638,6 +4689,7 @@ async function runHomologSearch() {
     if (!seq) { showToast('Nothing to search yet: the homolog search runs against the loaded sequence.', 'error'); return; }
     const sel = document.getElementById('homologProvider');
     const prefer = (sel && sel.value) ? sel.value : 'ebi_phmmer';
+    macroCaptureStep({ type: 'homolog', provider: prefer });
     const providerName = prefer === 'ebi_blast' ? 'NCBI-BLAST' : 'phmmer';
     if (!beginGuideTask('annotation', providerName + ' homolog search running')) return;
     const statusEl = document.getElementById('homologSearchStatus');
@@ -4921,6 +4973,7 @@ async function useUniProtAccession(acc) {
     const features = await fetchUniProtFeaturesByAccession(acc);
     if (!features) return;
     uniprotAccession = acc;
+    macroCaptureStep({ type: 'uniprot', accession: macroParam(acc) });
     uniprotFeatures = { accession: acc, features, fetchedAt: Date.now() };
     applyUniProtFeatures();
     schedulePersist();
@@ -6778,6 +6831,7 @@ function focusPdbFetch() {
 async function fetchPdbEntry(rawId) {
     const id = String(rawId || '').trim().toUpperCase();
     if (!/^[0-9][A-Z0-9]{3}$/.test(id)) { showToast('A four-character PDB id is needed (e.g. 1GFL) - or use Find PDB entries in Options -> Structure to look one up from the sequence.', 'error'); return false; }
+    macroCaptureStep({ type: 'pdb', pdbId: id });
     if (!beginGuideTask('structure', 'RCSB fetch for ' + id)) return false;
     const statusEl = document.getElementById('structureFetchStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
@@ -6820,6 +6874,7 @@ async function runStructureValidation() {
         showToast('Validation needs an experimental PDB entry: use Fetch PDB entry (e.g. 1GFL), or attach a file named after the entry.', 'error');
         return;
     }
+    macroCaptureStep({ type: 'validation' });
     if (!beginGuideTask('structure', 'PDBe validation for ' + cand.pdbId)) return;
     const statusEl = document.getElementById('validationStatus');
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
@@ -7101,6 +7156,192 @@ function copyActionLog(asJson) {
     }
 }
 function clearActionLog() { actionLog = []; renderActionLog(); showToast('Action log cleared.', 'success'); }
+// --- Macro recording + replay (DESIGN 18, slice 1) --------------------------
+// A macro is a JSON list of the session's replayable actions: capability runs
+// and imports with their resolved provider and parameters. The recording hooks
+// sit inside the action runners themselves and replay calls the same runners
+// after setting the same controls, so a macro can never drift from the real
+// path. Slice 1 covers the UniProt load, domain scan, topology, homolog
+// search, PDB fetch, PDBe validation and variant effects; view actions and
+// pastes come later. '$ACCESSION' stands for the session's UniProt accession,
+// so one macro can be retargeted to another protein.
+let macroRecording = false;
+let macroReplaying = false;
+let macroSteps = [];
+let macroName = 'Untitled macro';
+let macroAccessionOverride = '';
+function macroParam(value) {
+    const v = String(value == null ? '' : value).trim();
+    if (!v) return '';
+    const acc = String(uniprotAccession || '').trim();
+    return (acc && v.toUpperCase() === acc.toUpperCase()) ? '$ACCESSION' : v;
+}
+function macroResolveValue(value) {
+    const v = String(value == null ? '' : value);
+    if (v === '$ACCESSION') return String(macroAccessionOverride || uniprotAccession || '').trim();
+    return v;
+}
+function macroCaptureStep(step) {
+    if (!macroRecording || macroReplaying) return;
+    macroSteps.push(step);
+    renderMacroModalIfVisible();
+}
+function macroProviderLabel(capability, id) {
+    const cap = SERVICE_REGISTRY.capabilities[capability];
+    const p = cap && (cap.providers || []).find(x => x.id === id);
+    return p ? p.label : (id || 'the default provider');
+}
+function macroStepDescription(step) {
+    if (!step || !step.type) return '(unknown step)';
+    switch (step.type) {
+        case 'uniprot': return 'Load UniProt entry ' + (step.accession || '(accession)');
+        case 'domainScan': return 'Scan domains via ' + macroProviderLabel('domain_scan', step.provider);
+        case 'topology': return 'Predict topology (TMHMM + Phobius + SignalP via InterProScan)';
+        case 'homolog': return 'Search homologs with ' + macroProviderLabel('homolog_search', step.provider);
+        case 'pdb': return 'Fetch PDB entry ' + (step.pdbId || '(id)');
+        case 'validation': return 'Fetch PDBe validation for the attached entry';
+        case 'variantEffects': return 'Assess variant effects with every applicable source';
+        default: return step.type;
+    }
+}
+function macroToJson() {
+    return JSON.stringify({ v: 1, name: macroName, steps: macroSteps }, null, 2);
+}
+function macroFromJson(text) {
+    try {
+        const data = JSON.parse(String(text || ''));
+        if (!data || !Array.isArray(data.steps)) throw new Error('no steps array');
+        macroName = (typeof data.name === 'string' && data.name) ? data.name : 'Imported macro';
+        macroSteps = data.steps.filter(st => st && typeof st.type === 'string');
+        renderMacroModalIfVisible();
+        return true;
+    } catch (err) {
+        showToast('Could not read the macro JSON (' + ((err && err.message) || err) + ').', 'error');
+        return false;
+    }
+}
+function macroPlan() {
+    return macroSteps.map((st, i) => (i + 1) + '. ' + macroStepDescription(st));
+}
+function macroSetBanner(text) {
+    const el = document.getElementById('macroBanner');
+    if (!el) return;
+    if (text) { el.textContent = text; el.hidden = false; }
+    else { el.hidden = true; el.textContent = ''; }
+}
+async function macroRunStep(step) {
+    switch (step.type) {
+        case 'uniprot': {
+            const acc = macroResolveValue(step.accession);
+            if (!acc) throw new Error('no accession (set the session accession or the override)');
+            uniprotAnnotationMode = 'accession';
+            await useUniProtAccession(acc);
+            return;
+        }
+        case 'domainScan': {
+            const sel = document.getElementById('domainScanProvider');
+            if (sel && step.provider) sel.value = step.provider;
+            await runDomainScan();
+            return;
+        }
+        case 'topology': await runTopologyPrediction(); return;
+        case 'homolog': {
+            const sel = document.getElementById('homologProvider');
+            if (sel && step.provider) sel.value = step.provider;
+            await runHomologSearch();
+            return;
+        }
+        case 'pdb': {
+            const id = macroResolveValue(step.pdbId);
+            const ok = await fetchPdbEntry(id);
+            if (ok === false) throw new Error('PDB fetch failed for ' + id);
+            return;
+        }
+        case 'validation': await runStructureValidation(); return;
+        case 'variantEffects': await fetchVariantEffectPredictions(); return;
+        default: throw new Error('unknown step type "' + step.type + '"');
+    }
+}
+async function macroReplay(dryRun) {
+    if (macroReplaying) return false;
+    if (!macroSteps.length) { showToast('Record or import a macro first.', 'error'); return false; }
+    if (dryRun) {
+        logAction('macro', 'dry run', macroSteps.length + ' step(s)');
+        showToast('Dry run, ' + macroSteps.length + ' step(s): ' + macroPlan().join(' '), 'info');
+        return true;
+    }
+    macroReplaying = true;
+    logAction('macro', 'replay started', macroSteps.length + ' step(s)');
+    let ok = 0, failed = 0;
+    for (let i = 0; i < macroSteps.length; i++) {
+        const step = macroSteps[i];
+        macroSetBanner('Running macro: step ' + (i + 1) + '/' + macroSteps.length + ' \u00b7 ' + macroStepDescription(step));
+        try {
+            await macroRunStep(step);
+            ok++;
+            logAction('macro', 'step ' + (i + 1) + ' done', macroStepDescription(step));
+        } catch (err) {
+            failed++;
+            logAction('error', 'macro step ' + (i + 1) + ' failed', ((err && err.message) || String(err)));
+        }
+        renderMacroModalIfVisible();
+    }
+    macroReplaying = false;
+    macroSetBanner('');
+    const msg = 'Macro "' + macroName + '": ' + ok + ' step(s) done' + (failed ? ', ' + failed + ' failed' : '') + '.';
+    showToast(msg, failed ? 'warn' : 'success');
+    logAction('macro', 'replay finished', msg);
+    renderMacroModalIfVisible();
+    return failed === 0;
+}
+function toggleMacroRecording() {
+    macroRecording = !macroRecording;
+    logAction('macro', macroRecording ? 'recording started' : 'recording stopped', macroSteps.length + ' step(s)');
+    renderMacroModalIfVisible();
+    updateMacroControls();
+}
+function clearMacroSteps() {
+    macroSteps = [];
+    renderMacroModalIfVisible();
+    updateMacroControls();
+}
+function exportMacroJson() {
+    downloadTextFile('q2dv-macro-' + (macroName || 'macro').replace(/[^A-Za-z0-9]+/g, '_').slice(0, 30) + '.json', macroToJson(), 'application/json');
+}
+function importMacroFromTextarea() {
+    const el = document.getElementById('macroImportText');
+    if (el && macroFromJson(el.value)) { el.value = ''; showToast('Macro loaded (' + macroSteps.length + ' step(s)).', 'success'); }
+}
+function openMacroModal() { renderMacroModal(); openModalAsDialog('macroModal'); }
+function closeMacroModal() { closeModalAsDialog('macroModal'); }
+function renderMacroModalIfVisible() {
+    const modal = document.getElementById('macroModal');
+    if (modal && modal.style.display === 'flex') renderMacroModal();
+}
+function updateMacroControls() {
+    const btn = document.getElementById('macroRecordBtn');
+    if (btn) {
+        btn.textContent = macroRecording ? '\u25a0 Stop recording' : '\u25cf Record';
+        btn.classList.toggle('tb-btn-active', macroRecording);
+    }
+    const status = document.getElementById('macroStatus');
+    if (status) status.textContent = macroRecording
+        ? ('Recording: ' + macroSteps.length + ' step(s) captured. Run the actions you want, then stop.')
+        : (macroSteps.length ? (macroSteps.length + ' step(s) ready to replay.') : 'Not recording. Press Record, run the actions, then stop.');
+}
+function renderMacroModal() {
+    const nameEl = document.getElementById('macroNameInput');
+    if (nameEl && document.activeElement !== nameEl) nameEl.value = macroName;
+    const overrideEl = document.getElementById('macroAccessionOverride');
+    if (overrideEl && document.activeElement !== overrideEl) overrideEl.value = macroAccessionOverride;
+    const list = document.getElementById('macroStepList');
+    if (list) {
+        list.innerHTML = macroSteps.length
+            ? macroSteps.map((st, i) => '<div class="macro-step"><span class="macro-step-num">' + (i + 1) + '</span>' + structureEscapeHtml(macroStepDescription(st)) + '</div>').join('')
+            : '<p style="color:#94a3b8; font-size:0.78rem; margin:0;">No steps yet. Press Record, then run the actions you want to replay.</p>';
+    }
+    updateMacroControls();
+}
 function openActionLog() { renderActionLog(); openModalAsDialog('actionLogModal'); }
 function closeActionLog() { closeModalAsDialog('actionLogModal'); }
 // Console access for debugging/macros: q2dvActions() returns the log as JSON.
@@ -9727,7 +9968,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.18';
+const APP_VERSION = '0.66.19';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -12869,6 +13110,7 @@ async function fetchVariantEffectPredictions() {
         if (!substitutions.some(x => x.key === key)) substitutions.push({ key, sub, variant: n });
     }));
     if (!substitutions.length) { showToast('No substitution could be read from the variant headers or the alignment, so there is nothing to look up.', 'error'); return; }
+    macroCaptureStep({ type: 'variantEffects' });
     const derived = deriveLookupDefaults();
     if (!sessionSpeciesToken) { try { await detectSessionSpecies(); } catch (e) {} }
     const ctx = { accession: uniprotAccession || (derived && derived.accession) || '', species: sessionSpeciesToken || '', substitutions };
