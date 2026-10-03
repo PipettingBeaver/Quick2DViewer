@@ -12,6 +12,28 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.24] - 2026-10-01
+
+### Changed
+- **The macro run button is now "Play macro", prominent and validated.** It is green and
+  disabled unless the macro is structurally runnable: a new pre-parse checks for unknown step
+  types and missing required parameters (errors, which block Play) and reports environment gaps
+  as warnings ("needs a loaded sequence", expected skips) on a validation line under the
+  controls. Replay itself refuses an invalid macro even when called directly, and the dry run
+  lists the warnings.
+
+## [0.66.23] - 2026-10-01
+
+### Added
+- **Real one-click GFP and TerC presets.** The Saved Macros dropdown gains "GFP, API-Only
+  (Preset)" (pins P42212: UniProt, domains, BLAST, 1GFL fetch, validation) and "TerC, API-Only
+  (Preset)" (pins Q52356, Serratia marcescens TerC: UniProt, topology, domains, phmmer). Loading
+  a preset fills the accession override and handles the species the same way as the accession
+  presets (clears a stale species for non-Ensembl organisms, never touches a manual one). The
+  two generic workflow templates remain underneath. Live lookup note: E. coli K12's TerC-family
+  homologs are now named by function (MgpA P0AEC0, Alx P42601, MntP P76264), all without PDB
+  cross-references.
+
 ## [0.66.22] - 2026-10-01
 
 ### Added

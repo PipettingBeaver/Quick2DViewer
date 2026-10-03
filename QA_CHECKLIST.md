@@ -1599,6 +1599,15 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
 
+## 0.66.23 - GFP/TerC one-click presets (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 491 | Saved Macros | Four presets: GFP, TerC, then the two generic templates |
+| 492 | Load "GFP, API-Only (Preset)" | Override pinned to P42212; 5 live steps; species cleared |
+| 493 | Load "TerC, API-Only (Preset)" | Override pinned to Q52356; topology first; no PDB step |
+| 494 | Play either with a manual species set | The manual species survives |
+
 ## 0.66.24 - Play macro button + validation (quick rows)
 
 | # | Try this | Watch for |
