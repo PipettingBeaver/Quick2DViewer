@@ -3398,6 +3398,58 @@ const UNIPROT_TYPE_CATEGORIES = {
     'Alternative sequence': 'variant', 'Splicing variant': 'variant'
 };
 const UNIPROT_CATEGORY_COLORS = { domain: '#c7d2fe', topology: '#a5f3fc', site: '#fecaca', ptm: '#fde68a', variant: '#bbf7d0' };
+const UNIPROT_CATEGORY_LABELS = { domain: 'domain or family', topology: 'topology or processing', site: 'functional site', ptm: 'post-translational modification', variant: 'sequence variation' };
+// What each UniProt feature type means and how to read it next to the rest of
+// the evidence. Kept one entry per type in UNIPROT_TYPE_CATEGORIES (a test
+// enforces that no type ships without one).
+const UNIPROT_FEATURE_DESCRIPTIONS = {
+    // domains / regions
+    'Domain': 'A structurally or functionally distinct region of the chain. Domains often fold and work independently, and are the natural unit for homology and function transfer.',
+    'Family': 'A region shared by a protein family: its presence suggests the chain belongs to that family, with the caveats that come with family-level annotation.',
+    'Repeat': 'A unit that occurs more than once in the chain (armadillo, leucine-rich, ankyrin repeats and so on). The repeat count is often the functional variable.',
+    'Region': 'A region with a shared property or role that is not a formal domain: a binding surface, an interaction region, a maturation segment.',
+    'Motif': 'A short, functionally important sequence pattern, usually a recognition or targeting signal.',
+    'Zinc finger': 'A small zinc-coordinating fold, most often DNA/RNA-binding, but also used in protein-protein recognition.',
+    'Coiled coil': 'Two or more alpha helices wound together; frequently the dimerisation or oligomerisation module of the protein.',
+    'Compositional bias': 'A stretch dominated by one or a few residue types. Low-complexity and biased regions are common in linkers and disordered regions, and can produce spurious matches in searches.',
+    // topology / processing
+    'Transmembrane': 'A membrane-spanning segment, almost always alpha-helical in UniProt annotation. Count them to sanity-check topology predictions (TMHMM/Phobius/TOPCONS).',
+    'Intramembrane': 'A segment that sits within the membrane plane without crossing it (re-entrant loops, some pore helices).',
+    'Topological domain': 'The luminal/extracellular or cytoplasmic side between membrane segments; useful for placing active sites and partners on the correct side of the membrane.',
+    'Signal': 'A signal peptide or signal sequence that targets the protein for secretion or to an organelle; cleaved during or after translocation.',
+    'Signal peptide': 'An N-terminal signal peptide that routes the chain into the secretory pathway; cleaved during or after translocation.',
+    'Transit peptide': 'An N-terminal peptide that targets the protein to an organelle (mitochondrion, chloroplast, peroxisome); cleaved after import.',
+    'Propeptide': 'A propeptide removed during maturation; its presence marks a zymogen or precursor rather than the mature form.',
+    // functional sites
+    'Active site': 'A residue directly involved in the catalytic mechanism. Mutating one is a strong functional hypothesis and often a disease mechanism.',
+    'Binding site': 'A residue that contacts a ligand, substrate, ion or partner. Binding sites cluster on a surface and are prime targets for mutation analysis.',
+    'Site': 'A single residue of special interest that does not fit a more specific category.',
+    'Metal binding': 'A residue coordinating a metal ion; metal sites often hold a fold together or position a catalytic group.',
+    'DNA binding': 'A residue contacting DNA; DNA-binding modules are usually basic and surface-exposed.',
+    'Calcium binding': 'A residue coordinating calcium, often in EF-hand or similar motifs used for switching and stability.',
+    'Zinc binding': 'A residue coordinating zinc, typically in zinc fingers or catalytic sites.',
+    'Nucleotide binding': 'A residue contacting ATP/GTP or another nucleotide, frequently in a P-loop or kinase-like fold.',
+    // post-translational modifications
+    'Modified residue': 'A residue carrying a post-translational modification (phospho, acetyl, methyl, hydroxy and so on); the exact chemistry is in the feature description. PTMs switch function, localisation and stability.',
+    'Glycosylation': 'A sugar attachment site (N- or O-linked). Glycosylation affects folding, stability, trafficking and immune recognition.',
+    'Disulfide bond': 'A covalent S-S bond between two cysteines that staples a fold, usually in secreted or extracellular proteins. Loss or gain changes stability and can trap folding intermediates.',
+    'Cross-link': 'Two residues joined by a non-standard covalent bond beyond a disulfide (for example a heme- or copper-mediated lysine-tyrosine link). The partner and chemistry are named in the feature description.',
+    'Lipidation': 'A lipid attachment (myristoyl, palmitoyl, prenyl and so on) that anchors the protein to a membrane.',
+    'Phosphorylation': 'A phosphate added to Ser/Thr/Tyr; the canonical reversible switch in signalling. Predicted phosphosites are common, curated ones are more reliable.',
+    'Acetylation': 'An acetyl group on a lysine (or the N-terminus); a switch in chromatin, metabolism and protein stability.',
+    'Methylation': 'A methyl group on Lys/Arg (or other residues); a common switch in chromatin and signalling.',
+    'Hydroxylation': 'A hydroxyl group added to proline or lysine (collagen, HIF and related systems); often oxygen-sensitive.',
+    'Palmitoylation': 'A reversible palmitate attachment that targets the protein to membranes and membrane microdomains.',
+    'Nitrosylation': 'A nitric-oxide-derived modification, usually on cysteine; a redox-linked signalling switch.',
+    'Chromophore': 'A residue that forms part of a light-absorbing chromophore (for example in fluorescent proteins and photoreceptors).',
+    'Sulfation': 'A sulfate group added to tyrosine; common on secreted proteins and involved in recognition and clearance.',
+    // variation
+    'Natural variant': 'A sequence difference observed in a natural population or a patient. Curated variants can carry clinical significance in the description; read the description as the evidence, not the mere presence of the row.',
+    'Mutagenesis': 'A variant introduced experimentally, with the effect described in the feature. Useful as a sanity check on predictions, not as clinical evidence.',
+    'Sequence conflict': 'A disagreement between the canonical sequence and other reports; usually a sequencing or strain artifact, but worth checking if a mutation sits on it.',
+    'Alternative sequence': 'A sequence produced by alternative splicing, initiation or a polymorphism; the description names the isoform.',
+    'Splicing variant': 'A sequence change caused by alternative splicing; use it to see which regions an isoform keeps or loses.'
+};
 const UNIPROT_MARKER = '■';
 
 // One track per feature type: 'UP_Transmembrane', 'UP_Signal', 'UP_Disulfide_bond', …
@@ -9356,6 +9408,7 @@ function getPredictorInfo(trackKey) {
     if (trackKey.startsWith('DM_')) return buildDomainPredictorInfo(trackKey);
     if (trackKey.startsWith('TP_')) return buildTopologyPredictorInfo(trackKey);
     if (trackKey.startsWith('VAL_')) return buildValidationPredictorInfo(trackKey);
+    if (trackKey.startsWith('UP_')) return buildUniProtPredictorInfo(trackKey);
     if (trackKey.endsWith('_EXP')) {
         const info = experimentalTracksInfo[trackKey] || {};
         const kind = EXPERIMENTAL_KINDS[info.kind] || EXPERIMENTAL_KINDS.other;
@@ -9386,6 +9439,33 @@ function getPredictorInfo(trackKey) {
     // Fallback: synthesise a minimal entry so the info icon still appears.
     const name = trackKey.replace(/^[A-Z]+_/, '').replace(/_/g, ' ');
     return { name, category: getPredictorCategoryFromPrefix(trackKey), description: '', useCase: '', citation: '' };
+}
+
+// UniProt rows are curated annotations, not predictions: build their ℹ
+// tooltip from the feature type (what it means), the fetched features (how
+// many, where, what their descriptions say) and the source. Without this they
+// fell through to the synthesised "Structural Prediction" placeholder with no
+// details.
+function buildUniProtPredictorInfo(trackKey) {
+    const meta = uniprotMetaForKey(trackKey) || {};
+    const type = meta.type || trackKey.replace(/^UP_/, '').replace(/_/g, ' ');
+    const features = meta.features || [];
+    const covered = features.reduce((n, f) => n + Math.max(0, (f.end - f.start + 1)), 0);
+    const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const notes = [];
+    features.forEach(f => { if (f.description && notes.indexOf(f.description) === -1) notes.push(f.description); });
+    const bits = [features.length + ' annotated ' + (features.length === 1 ? 'region' : 'regions') +
+        ' covering ' + covered + ' residue(s)' + (total ? ' (' + Math.round(covered / total * 100) + '% of the sequence)' : '')];
+    if (notes.length) bits.push('Annotations: ' + notes.slice(0, 3).join('; ') + (notes.length > 3 ? '; …' : ''));
+    const catLabel = UNIPROT_CATEGORY_LABELS[meta.category];
+    return {
+        name: formatTrackLabel(trackKey),
+        category: 'UniProt feature' + (catLabel ? ' (' + catLabel + ')' : ''),
+        description: UNIPROT_FEATURE_DESCRIPTIONS[type] || 'Curated UniProtKB annotation of this type.',
+        bands: [],
+        useCase: bits.join('. ') + '.',
+        citation: 'UniProtKB curated feature annotation (' + type + '), imported from the UniProt REST API.'
+    };
 }
 
 // Domain rows come from HMMER hmmscan over Pfam, not from a structure
@@ -9647,7 +9727,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.17';
+const APP_VERSION = '0.66.18';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

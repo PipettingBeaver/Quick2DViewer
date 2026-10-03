@@ -640,3 +640,42 @@ Sequencing: (1) activity-log entries gain stable capability/param fields (0.59.0
 summary; params still need a pass), (2) a recorder capturing them, (3) the replay engine with the
 dry-run sheet, (4) save/load alongside sessions. Only step 1 has partially landed; the rest is
 deferred until after 1.0.0 unless asked.
+
+## 19. Feature search: show where, do not act (v0.66.18 plan)
+
+Goal: a top-right **Search** that answers "where is the thing that does X?" for a
+JalView-class tool with many surfaces, without becoming a command runner. The
+user decision (2026-10-01) is explicit: results navigate and highlight, they do
+not execute.
+
+Why navigation-only: Q2DV's actions have context (loaded data, species, selection)
+and a search result cannot know it. A result that silently runs `remove track`
+or a fetch would be the most dangerous surface in the app. Showing the location
+teaches the UI at the same time, which is what a documentation search does.
+
+Index (built locally, no network):
+- guide steps, their labels and question text (the workflow spine),
+- Options -> Data Sources categories, their names and hint lines,
+- menu-bar items (File / View / Data / Export / Help),
+- sidebar tabs and panel titles (Track Visibility, Rules, Variant effects, ...),
+- curated aliases: "ddG", "offset", "PROSITE", "Ensembl", "pLDDT", "remove track".
+
+Result shape: title, breadcrumb path (`Options -> Data Sources -> Variants`),
+one-line description, and a **highlight target** (element id plus an optional
+surface opener, e.g. switch category or tab first). Selecting a result opens the
+surface, scrolls the target into view and pulses it briefly; it never clicks it.
+
+Ranking: exact title match, then prefix, then substring, then alias/fuzzy.
+Guide steps and Options categories get a small boost because they are the
+documented paths.
+
+UI: a Search button in the menu bar plus Ctrl/Cmd+K; a modal with the input and
+a keyboard-navigable list (up/down/enter, Esc closes). No results state suggests
+two or three likely aliases.
+
+Testability: the index builder is pure and unit-tested. A test asserts every
+guide step and every Options category appears, and that every highlight target
+resolves to an element id in the markup, so the index cannot drift silently.
+
+Non-goals for v1: running actions, searching remote docs, indexing user data
+(track names, hit ids) - the last one can be a follow-up once navigation works.

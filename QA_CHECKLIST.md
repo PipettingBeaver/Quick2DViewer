@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1243 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1254 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -1552,6 +1552,13 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.18 - UniProt feature tooltips (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 469 | Fetch a UniProt entry with cross-links/PTMs, hover a UP_ row's ℹ | Type + biological class, a real description, region count/coverage, actual annotations, source |
+| 470 | Check a topology UP_ row (Transmembrane) | "UniProt feature (topology or processing)", no "Structural Prediction" placeholder anywhere |
 
 ## 0.66.17 - species-specific variant effects (quick rows)
 

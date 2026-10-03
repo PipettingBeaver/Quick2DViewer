@@ -12,6 +12,25 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.18] - 2026-10-01
+
+### Fixed
+- **UniProt feature rows have real tooltips.** Every `UP_` row used to fall through to the
+  synthesised "Structural Prediction" placeholder with no details. The info icon now names the
+  feature type and its biological class (domain/family, topology/processing, functional site,
+  post-translational modification, sequence variation), explains what the type means and how to
+  read it, counts the annotated regions and their coverage, lists the actual feature
+  descriptions from the fetched entry, and cites the source. Descriptions exist for all 33
+  types, enforced by a test.
+
+### Docs
+- `EVALUATION.md`: a reusable 12-dimension rubric (1-5 with evidence anchors) for UI,
+  information flow and feature set, benchmarked against a modern JalView, with a first
+  assessment (~3.6/5; top levers: accessibility, search, performance) and a derived weakness
+  backlog.
+- DESIGN 19: the feature-search plan (navigation and highlight only, never actions; local
+  index; drift-proof tests).
+
 ## [0.66.17] - 2026-10-01
 
 ### Added

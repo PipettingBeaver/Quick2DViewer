@@ -1966,6 +1966,30 @@ ctxRun(`homologHitsInfo = {};`);
 assert(HTML.indexOf('HHpred match quality') === -1, 'no cell tooltip hardcodes "HHpred match quality" any more');
 assert(HTML.indexOf('Homologs: match quality') !== -1 && HTML.indexOf('HMMER posterior probability') !== -1, 'the legend explains the shared glyph scale and the per-source basis');
 
+section('UniProt feature tooltips: substantial descriptions, counts, annotations');
+const missingUpDesc = ctxRun(`Object.keys(UNIPROT_TYPE_CATEGORIES).filter(t => !UNIPROT_FEATURE_DESCRIPTIONS[t])`);
+assert(missingUpDesc.length === 0, 'every UniProt feature type has a description (missing: ' + missingUpDesc.join(',') + ')');
+assert(ctxRun(`UNIPROT_FEATURE_DESCRIPTIONS['Cross-link']`).indexOf('non-standard covalent bond') !== -1, 'the cross-link description explains what it is');
+assert(ctxRun(`UNIPROT_FEATURE_DESCRIPTIONS['Transmembrane']`).indexOf('sanity-check') !== -1, 'and the topology ones say how to use them');
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(100) };
+    uniprotFeatureTracks = { UP_Cross_link: { type: 'Cross-link', category: 'ptm', color: '#fde68a',
+        features: [{ start: 10, end: 10, type: 'Cross-link', description: 'Lysine-tyrosine cross-link' },
+                   { start: 40, end: 41, type: 'Cross-link', description: 'Lysine-tyrosine cross-link' }] },
+        UP_Transmembrane: { type: 'Transmembrane', category: 'topology', color: '#a5f3fc',
+        features: [{ start: 5, end: 25, type: 'Transmembrane', description: 'Helical' }] } };
+`);
+const upInfo = ctxRun(`buildUniProtPredictorInfo('UP_Cross_link')`);
+assert(upInfo.category === 'UniProt feature (post-translational modification)', 'the category says UniProt feature + the biological class (got "' + upInfo.category + '")');
+assert(upInfo.category.indexOf('Structural Prediction') === -1, 'and no longer claims to be a structural prediction');
+assert(upInfo.description.indexOf('non-standard covalent bond') !== -1, 'the description explains the type');
+assert(/2 annotated regions covering 3 residue\(s\) \(3% of the sequence\)/.test(upInfo.useCase), 'the use case counts features, residues and coverage (got "' + upInfo.useCase + '")');
+assert(upInfo.useCase.indexOf('Lysine-tyrosine cross-link') !== -1, 'and surfaces the actual feature descriptions');
+assert(upInfo.citation.indexOf('UniProtKB') !== -1, 'the citation names the source');
+assert(ctxRun(`getPredictorInfo('UP_Cross_link').description`).indexOf('non-standard') !== -1, 'getPredictorInfo routes UniProt rows to the builder');
+assert(ctxRun(`getPredictorInfo('UP_Transmembrane').category`).indexOf('topology or processing') !== -1, 'each type gets its own class label');
+ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {};`);
+
 section('#3b: species-specific variant APIs (Ensembl VEP/SIFT + hand-off)');
 const VEP_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/vep-tp53-batch.json'), 'utf-8');
 const UP_XREF_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/uniprot-tp53-xrefs.json'), 'utf-8');
