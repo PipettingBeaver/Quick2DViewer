@@ -3829,6 +3829,34 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     assert(ctxRun(`document.getElementById('macroSavedSelect').value`) === '', 'resetting clears the dropdown selection');
     ctxRun(`macroSteps = []; macroName = 'Untitled macro'; parsedTracks = {};`);
 
+    section('macro accession hint + preset accessions');
+    ctxRun(`macroAccessionPresetsPopulated = false; populateMacroAccessionPresets();`);
+    assert(ctxRun(`document.getElementById('macroAccessionPreset').children.length`) === 8, 'the preset list has the placeholder and seven proteins');
+    const accPresetLabels = ctxRun(`
+        (function () {
+            return (document.getElementById('macroAccessionPreset').children || []).slice(1).map(o => o.textContent || '');
+        })()
+    `);
+    assert(accPresetLabels.length === 7 && accPresetLabels.every(l => /\(P[0-9A-Z]{5}, /.test(l)), 'each option names the protein, accession and organism');
+    assert(accPresetLabels.some(l => l.indexOf('P0CG48') !== -1) && !accPresetLabels.some(l => l.indexOf('P62988') !== -1), 'the obsolete ubiquitin entry was replaced by P0CG48');
+    assert(accPresetLabels.some(l => l.indexOf('Physeter macrocephalus') !== -1) && !accPresetLabels.some(l => l.indexOf('catodon') !== -1), 'and the whale uses the current spelling');
+    ctxRun(`uniprotAccession = ''; macroAccessionOverride = ''; updateMacroAccessionHint();`);
+    assert(ctxRun(`document.getElementById('macroAccessionHint').textContent`).indexOf('Current: none') !== -1, 'without an accession the hint says so');
+    ctxRun(`uniprotAccession = 'P42212'; updateMacroAccessionHint();`);
+    assert(ctxRun(`document.getElementById('macroAccessionHint').textContent`) === 'Current: P42212 (session)', 'the hint shows the session accession (got ' + ctxRun(`document.getElementById('macroAccessionHint').textContent`) + ')');
+    ctxRun(`sessionSpeciesToken = ''; sessionSpeciesLabel = ''; sessionSpeciesManual = false;`);
+    assert(ctxRun(`onMacroAccessionPreset('P02699')`) === true, 'picking Rhodopsin fills the override');
+    assert(ctxRun(`macroAccessionOverride`) === 'P02699' && ctxRun(`document.getElementById('macroAccessionOverride').value`) === 'P02699', 'in the field too');
+    assert(ctxRun(`sessionSpeciesToken`) === 'bos_taurus', 'and sets the species for an Ensembl organism');
+    assert(ctxRun(`document.getElementById('macroAccessionHint').textContent`).indexOf('Current: P02699 (override)') === 0, 'the hint reflects the override');
+    ctxRun(`sessionSpeciesManual = true; sessionSpeciesToken = 'gallus_gallus'; sessionSpeciesLabel = 'Gallus gallus';`);
+    ctxRun(`onMacroAccessionPreset('P42212');`);
+    assert(ctxRun(`sessionSpeciesToken`) === 'gallus_gallus', 'a manual species is never overwritten by a preset');
+    ctxRun(`sessionSpeciesManual = false; onMacroAccessionPreset('P42212');`);
+    assert(ctxRun(`sessionSpeciesToken`) === '', 'a non-Ensembl organism clears the species so species-specific steps skip honestly');
+    assert(ctxRun(`onMacroAccessionPreset('NOPE1')`) === false, 'an unknown accession changes nothing');
+    ctxRun(`uniprotAccession = ''; macroAccessionOverride = ''; sessionSpeciesToken = ''; sessionSpeciesLabel = ''; sessionSpeciesManual = false; updateMacroAccessionHint();`);
+
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
 })();

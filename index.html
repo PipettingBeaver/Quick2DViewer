@@ -3142,9 +3142,14 @@
             <label for="macroNameInput" style="font-size:0.78rem; font-weight:600; color:#475569;">Name</label>
             <input type="text" id="macroNameInput" oninput="macroName = this.value;" style="width:200px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
             <label for="macroAccessionOverride" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Used for $ACCESSION steps: leave empty to keep the session accession">Accession override</label>
-            <input type="text" id="macroAccessionOverride" oninput="macroAccessionOverride = this.value;" placeholder="e.g. Q12345" style="width:130px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
+            <input type="text" id="macroAccessionOverride" oninput="macroAccessionOverride = this.value; updateMacroAccessionHint();" placeholder="e.g. Q12345" style="width:130px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
+            <span id="macroAccessionHint" style="font-size:0.72rem; color:#64748b;"></span>
             <label for="macroPdbOverride" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Replaces the PDB id in every PDB step, so a macro can point at another entry">PDB override</label>
             <input type="text" id="macroPdbOverride" oninput="macroPdbOverride = this.value;" placeholder="e.g. 1GFL" style="width:90px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px; text-transform:uppercase;">
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+            <label for="macroAccessionPreset" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Known proteins to retarget the macro to: fills the accession override, and sets the species when the organism is an Ensembl species">Preset Accessions</label>
+            <select id="macroAccessionPreset" class="q2dv-select" onchange="onMacroAccessionPreset(this.value)" style="font-size:0.78rem; padding:4px 6px; min-width:320px;"></select>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
             <label for="macroFailurePolicy" style="font-size:0.78rem; font-weight:600; color:#475569;" title="What happens when an API step fails after the preflight">On step failure</label>
@@ -7212,6 +7217,72 @@ let macroFailurePolicy = 'retry3'; // 'retry3' | 'proceed' | 'pause' | 'stop'
 let macroCheckinResolver = null;
 let macroLastRun = null;
 let macroSavedPopulated = false;
+let macroAccessionPresetsPopulated = false;
+// Known proteins for the Preset Accessions list. Verified live 2026-10-01:
+// P62988 (the old ubiquitin entry) is inactive and has been replaced by
+// P0CG48 (polyubiquitin-C); UniProt now spells the whale Physeter
+// macrocephalus. 'species' is the Ensembl token when the organism is an
+// Ensembl species; the rest leave the species field alone so species-specific
+// preflights can tag their steps as skips.
+const MACRO_ACCESSION_PRESETS = [
+    { name: 'Rhodopsin', accession: 'P02699', organism: 'Bos taurus', species: 'bos_taurus' },
+    { name: 'Outer membrane porin F (OmpF)', accession: 'P02931', organism: 'Escherichia coli K12', species: '' },
+    { name: 'Green fluorescent protein (GFP)', accession: 'P42212', organism: 'Aequorea victoria', species: '' },
+    { name: 'Lysozyme C', accession: 'P00698', organism: 'Gallus gallus', species: 'gallus_gallus' },
+    { name: 'Myoglobin', accession: 'P02185', organism: 'Physeter macrocephalus', species: '' },
+    { name: 'Polyubiquitin-C (ubiquitin)', accession: 'P0CG48', organism: 'Homo sapiens', species: 'homo_sapiens' },
+    { name: 'Alpha-synuclein', accession: 'P37840', organism: 'Homo sapiens', species: 'homo_sapiens' }
+];
+function populateMacroAccessionPresets() {
+    const sel = document.getElementById('macroAccessionPreset');
+    if (!sel || macroAccessionPresetsPopulated) return;
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Choose a known protein\u2026';
+    sel.appendChild(placeholder);
+    MACRO_ACCESSION_PRESETS.forEach(p => {
+        const op = document.createElement('option');
+        op.value = p.accession;
+        op.textContent = p.name + ' (' + p.accession + ', ' + p.organism + ')';
+        sel.appendChild(op);
+    });
+    macroAccessionPresetsPopulated = true;
+}
+function updateMacroAccessionHint() {
+    const el = document.getElementById('macroAccessionHint');
+    if (!el) return;
+    const sessionAcc = String(uniprotAccession || '').trim();
+    const override = String(macroAccessionOverride || '').trim();
+    if (override) el.textContent = 'Current: ' + override + ' (override)' + (sessionAcc ? ' \u00b7 session: ' + sessionAcc : '');
+    else if (sessionAcc) el.textContent = 'Current: ' + sessionAcc + ' (session)';
+    else el.textContent = 'Current: none \u00b7 load a UniProt entry or pick a preset';
+}
+function onMacroAccessionPreset(accession) {
+    if (!accession) return false;
+    const preset = MACRO_ACCESSION_PRESETS.find(p => p.accession === accession);
+    if (!preset) return false;
+    macroAccessionOverride = preset.accession;
+    const el = document.getElementById('macroAccessionOverride');
+    if (el) el.value = preset.accession;
+    let speciesNote = '';
+    if (preset.species && !sessionSpeciesManual) {
+        setSessionSpecies(preset.species, { manual: false });
+        speciesNote = ' Species set to ' + sessionSpeciesLabel + '.';
+    } else if (!preset.species && !sessionSpeciesManual && sessionSpeciesToken) {
+        // Non-Ensembl organism (bacteria, jellyfish, whale): clear a stale
+        // species so species-specific steps preflight as skips instead of
+        // running against the wrong organism.
+        sessionSpeciesToken = '';
+        sessionSpeciesLabel = '';
+        updateSpeciesUI();
+        schedulePersist();
+        speciesNote = ' Species cleared (not an Ensembl organism).';
+    }
+    updateMacroAccessionHint();
+    logAction('macro', 'accession preset', preset.name + ' (' + preset.accession + ')');
+    showToast('Override set to ' + preset.accession + ' (' + preset.name + ', ' + preset.organism + ').' + speciesNote, 'success');
+    return true;
+}
 // Built-in workflow presets shown in the Saved Macros dropdown. They are
 // ordinary macro JSON: the accession is parameterised, providers are resolved
 // ids, and the PDB override can retarget the literal entry.
@@ -7597,6 +7668,8 @@ function renderMacroReport() {
 }
 function renderMacroModal() {
     populateMacroSavedSelect();
+    populateMacroAccessionPresets();
+    updateMacroAccessionHint();
     const nameEl = document.getElementById('macroNameInput');
     if (nameEl && document.activeElement !== nameEl) nameEl.value = macroName;
     const overrideEl = document.getElementById('macroAccessionOverride');
@@ -10246,7 +10319,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.21';
+const APP_VERSION = '0.66.22';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

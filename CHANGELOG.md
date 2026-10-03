@@ -12,6 +12,20 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.22] - 2026-10-01
+
+### Added
+- **Accession hint and Preset Accessions in the Macro screen.** The accession override now shows
+  what replay will actually use ("Current: P42212 (session)", "(override)" with the session value
+  beside it, or "none"). A Preset Accessions dropdown lists seven known proteins with their
+  accession and organism (Rhodopsin, OmpF, GFP, Lysozyme C, Myoglobin, Polyubiquitin-C,
+  Alpha-synuclein). Picking one fills the override and sets the species when the organism is an
+  Ensembl species (Rhodopsin, Lysozyme C, the human entries); a non-Ensembl organism (E. coli,
+  Aequorea victoria, whale) clears a stale species so species-specific steps preflight as skips.
+  Manual species overrides always win. Live verification corrected the list: P62988 (ubiquitin)
+  is inactive and replaced by P0CG48 (polyubiquitin-C), and UniProt now spells the whale
+  Physeter macrocephalus.
+
 ## [0.66.21] - 2026-10-01
 
 ### Added
