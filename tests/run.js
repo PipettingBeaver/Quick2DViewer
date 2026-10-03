@@ -3733,6 +3733,73 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
         uniprotAccession = ''; actionLog = [];
     `);
 
+    section('macro v2: preflight, failure policy, run report');
+    assert(HTML.indexOf('id="macroFailurePolicy"') !== -1 && HTML.indexOf('id="macroCheckin"') !== -1 && HTML.indexOf('id="macroReport"') !== -1 && HTML.indexOf('id="macroPdbOverride"') !== -1, 'the macro screen has the policy select, check-in, report and PDB override');
+    assert(HTML.indexOf('Auto-retry 3 times, then proceed') !== -1 && HTML.indexOf('Pause and check in') !== -1 && HTML.indexOf('Stop the macro') !== -1, 'the failure policy offers all four modes');
+    ctxRun(`parsedTracks = {}; keyedVariantsInfo = {}; cachedStructureTexts = {};`);
+    assert(ctxRun(`macroStepPreflight({ type: 'domainScan' }).ok`) === false, 'a sequence step reports the missing sequence');
+    ctxRun(`parsedTracks = { AA: 'MKVW' };`);
+    assert(ctxRun(`macroStepPreflight({ type: 'topology' }).ok`) === true, 'and is ready once a sequence is loaded');
+    assert(ctxRun(`macroStepPreflight({ type: 'validation' }).skip`) === true, 'validation is a skip (not a failure) without a structure');
+    assert(ctxRun(`macroStepPreflight({ type: 'variantEffects' }).skip`) === true, 'variant effects are a skip without variants');
+    ctxRun(`parsedTracks = {}; macroSteps = [{ type: 'domainScan', provider: 'ebi_hmmer' }];`);
+    assert(ctxRun(`macroPreflightPlan()[0]`).indexOf('[needs a loaded sequence]') !== -1, 'the preflight plan tags missing requirements');
+    ctxRun(`
+        parsedTracks = { AA: 'MKVW' };
+        macroFailurePolicy = 'retry3';
+        window.__macroOrigTopo = runTopologyPrediction;
+        window.__macroAttempts = 0;
+        runTopologyPrediction = async () => { window.__macroAttempts++; if (window.__macroAttempts < 3) throw new Error('HTTP 503'); };
+        macroSteps = [{ type: 'topology' }];
+        macroName = 'retry test';
+        actionLog = [];
+    `);
+    const macroRetryOk = await ctxRun(`macroReplay(false)`);
+    assert(macroRetryOk === true, 'a step that succeeds on the third attempt passes');
+    assert(ctxRun(`window.__macroAttempts`) === 3, 'auto-retry used three attempts (got ' + ctxRun(`window.__macroAttempts`) + ')');
+    assert(ctxRun(`macroLastRun.outcomes[0].retries`) === 2, 'the report records the retry count');
+    ctxRun(`runTopologyPrediction = async () => { throw new Error('HTTP 500'); }; macroSteps = [{ type: 'topology' }];`);
+    await ctxRun(`macroReplay(false)`);
+    const macroFailReport = ctxRun(`macroRunReportText()`);
+    assert(macroFailReport.indexOf('Unexpected: API call for "Predict topology (TMHMM + Phobius + SignalP via InterProScan)" failed (HTTP 500).') !== -1, 'the report names the unexpected API failure');
+    assert(macroFailReport.indexOf('failures can affect downstream actions') !== -1 && macroFailReport.indexOf('the topology rows') !== -1, 'and names the downstream impact of that failure');
+    ctxRun(`macroFailurePolicy = 'pause'; macroSteps = [{ type: 'topology' }];`);
+    const macroPaused = ctxRun(`macroReplay(false)`);
+    await new Promise(r => setTimeout(r, 50));
+    assert(ctxRun(`document.getElementById('macroCheckin').hidden`) === false, 'pause shows the check-in panel');
+    ctxRun(`macroCheckinDecision('skip')`);
+    const macroPausedResult = await macroPaused;
+    assert(macroPausedResult === true, 'a user skip resolves the pause and completes the run');
+    assert(ctxRun(`macroLastRun.outcomes[0].status`) === 'skipped', 'and the report marks the step skipped by the user');
+    ctxRun(`
+        macroFailurePolicy = 'stop';
+        window.__macroSecondRan = false;
+        window.__macroOrigDomain = runDomainScan;
+        runDomainScan = async () => { window.__macroSecondRan = true; };
+        macroSteps = [{ type: 'topology' }, { type: 'domainScan', provider: 'ebi_hmmer' }];
+    `);
+    const macroStopResult = await ctxRun(`macroReplay(false)`);
+    assert(macroStopResult === false, 'the stop policy reports failure');
+    assert(ctxRun(`window.__macroSecondRan`) === false, 'and never runs later steps');
+    assert(ctxRun(`macroLastRun.stopped`) === true, 'the report marks the run stopped');
+    ctxRun(`
+        macroFailurePolicy = 'proceed';
+        macroPdbOverride = '2XYZ';
+        window.__macroPdbCalls = [];
+        window.__macroOrigPdb2 = fetchPdbEntry;
+        fetchPdbEntry = async (id) => { window.__macroPdbCalls.push(id); return true; };
+        macroSteps = [{ type: 'pdb', pdbId: '1GFL' }];
+    `);
+    await ctxRun(`macroReplay(false)`);
+    assert(ctxRun(`window.__macroPdbCalls.join(',')`) === '2XYZ', 'the PDB override replaces the recorded id (got ' + ctxRun(`window.__macroPdbCalls.join(',')`) + ')');
+    ctxRun(`
+        runTopologyPrediction = window.__macroOrigTopo;
+        runDomainScan = window.__macroOrigDomain;
+        fetchPdbEntry = window.__macroOrigPdb2;
+        macroSteps = []; macroFailurePolicy = 'retry3'; macroPdbOverride = ''; macroLastRun = null;
+        parsedTracks = {}; keyedVariantsInfo = {}; actionLog = [];
+    `);
+
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
 })();

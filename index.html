@@ -476,6 +476,16 @@
         .macro-banner[hidden] { display: none; }
         .macro-step { display: flex; gap: 8px; padding: 2px 0; }
         .macro-step-num { color: #94a3b8; min-width: 16px; text-align: right; flex-shrink: 0; }
+        .macro-step-tag { font-size: 0.68rem; padding: 0 5px; border-radius: 999px; margin-left: 4px; }
+        .macro-tag-needs { background: #fee2e2; color: #b91c1c; }
+        .macro-tag-skip { background: #fef3c7; color: #b45309; }
+        .macro-checkin {
+            position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+            z-index: 1200; background: #fff; color: #334155; padding: 10px 14px;
+            border: 1px solid #f59e0b; border-radius: 10px; font-size: 0.78rem;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25); max-width: 90vw;
+        }
+        .macro-checkin[hidden] { display: none; }
         .app-header-tools .tb-btn { font-size: 0.72rem; padding: 4px 9px; }
         .app-version {
             display: inline-block;
@@ -2084,6 +2094,15 @@
 
     <div id="toastContainer" aria-live="polite"></div>
     <div id="macroBanner" class="macro-banner" role="status" hidden></div>
+    <div id="macroCheckin" class="macro-checkin" role="alertdialog" aria-labelledby="macroCheckinText" hidden>
+        <div id="macroCheckinText" style="margin-bottom:6px;"></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="copy-btn" onclick="macroCheckinDecision('retry')">Retry step</button>
+            <button type="button" class="copy-btn" onclick="macroCheckinDecision('skip')">Skip step</button>
+            <button type="button" class="copy-btn" onclick="macroCheckinDecision('proceed')">Proceed anyway</button>
+            <button type="button" class="copy-btn" onclick="macroCheckinDecision('stop')">Stop macro</button>
+        </div>
+    </div>
 
     <input type="file" id="structureUpload" accept=".pdb,.cif,.json,.hhr,.fasta,.fa,.faa,.fas" multiple style="display: none;">
 
@@ -3119,8 +3138,21 @@
             <input type="text" id="macroNameInput" oninput="macroName = this.value;" style="width:200px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
             <label for="macroAccessionOverride" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Used for $ACCESSION steps: leave empty to keep the session accession">Accession override</label>
             <input type="text" id="macroAccessionOverride" oninput="macroAccessionOverride = this.value;" placeholder="e.g. Q12345" style="width:130px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
+            <label for="macroPdbOverride" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Replaces the PDB id in every PDB step, so a macro can point at another entry">PDB override</label>
+            <input type="text" id="macroPdbOverride" oninput="macroPdbOverride = this.value;" placeholder="e.g. 1GFL" style="width:90px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px; text-transform:uppercase;">
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+            <label for="macroFailurePolicy" style="font-size:0.78rem; font-weight:600; color:#475569;" title="What happens when an API step fails after the preflight">On step failure</label>
+            <select id="macroFailurePolicy" onchange="macroFailurePolicy = this.value;" class="q2dv-select" style="font-size:0.78rem; padding:4px 6px;">
+                <option value="retry3">Auto-retry 3 times, then proceed</option>
+                <option value="proceed">Proceed immediately</option>
+                <option value="pause">Pause and check in</option>
+                <option value="stop">Stop the macro</option>
+            </select>
         </div>
         <div id="macroStepList" class="data-box" style="max-height:32vh; overflow:auto; font-size:0.76rem; line-height:1.5;"></div>
+        <div id="macroReport" class="data-box" style="max-height:22vh; overflow:auto; margin-top:8px; font-size:0.76rem;"></div>
+        <button type="button" class="copy-btn" style="margin-top:6px;" onclick="copyMacroReport()" title="Copy the last run's outcome report, including any unexpected API failures and what they can affect downstream">Copy run report</button>
         <div style="margin-top:10px;">
             <label for="macroImportText" style="font-size:0.78rem; font-weight:600; color:#475569;">Paste a macro JSON to load</label>
             <textarea id="macroImportText" rows="3" style="width:100%; font-size:0.72rem; font-family:monospace; padding:6px; border:1px solid #cbd5e1; border-radius:4px; margin-top:4px;" placeholder='{"v":1,"name":"GFP demo","steps":[{"type":"uniprot","accession":"P42212"}]}'></textarea>
@@ -7170,6 +7202,10 @@ let macroReplaying = false;
 let macroSteps = [];
 let macroName = 'Untitled macro';
 let macroAccessionOverride = '';
+let macroPdbOverride = '';
+let macroFailurePolicy = 'retry3'; // 'retry3' | 'proceed' | 'pause' | 'stop'
+let macroCheckinResolver = null;
+let macroLastRun = null;
 function macroParam(value) {
     const v = String(value == null ? '' : value).trim();
     if (!v) return '';
@@ -7229,70 +7265,204 @@ function macroSetBanner(text) {
     if (text) { el.textContent = text; el.hidden = false; }
     else { el.hidden = true; el.textContent = ''; }
 }
-async function macroRunStep(step) {
-    switch (step.type) {
+// What a step needs from the live session. The macro knows requirements, not
+// the recorded values: a missing required item makes the step fail, a missing
+// optional one makes it skip as "not applicable" instead of nagging.
+function macroStepPreflight(step) {
+    switch (step && step.type) {
         case 'uniprot': {
             const acc = macroResolveValue(step.accession);
-            if (!acc) throw new Error('no accession (set the session accession or the override)');
+            return acc ? { ok: true } : { ok: false, reason: 'an accession (set it in the session or the override)' };
+        }
+        case 'domainScan':
+        case 'topology':
+        case 'homolog': {
+            const hasSeq = !!(parsedTracks && typeof parsedTracks.AA === 'string' && parsedTracks.AA.length);
+            return hasSeq ? { ok: true } : { ok: false, reason: 'a loaded sequence' };
+        }
+        case 'pdb': {
+            const id = String(macroPdbOverride || '').trim() || macroResolveValue(step.pdbId);
+            return id ? { ok: true } : { ok: false, reason: 'a PDB id (recorded value is empty)' };
+        }
+        case 'validation': {
+            let has = false;
+            try { has = !!validationCandidateStructure(); } catch (e) { has = false; }
+            return has ? { ok: true } : { ok: true, skip: true, reason: 'no experimental structure attached' };
+        }
+        case 'variantEffects': {
+            const has = Object.keys(keyedVariantsInfo || {}).length > 0;
+            return has ? { ok: true } : { ok: true, skip: true, reason: 'no variant FASTA loaded' };
+        }
+        default: return { ok: true };
+    }
+}
+function macroPreflightPlan() {
+    return macroSteps.map((st, i) => {
+        const pre = macroStepPreflight(st);
+        const tag = pre.skip ? ' [skip: ' + pre.reason + ']' : (!pre.ok ? ' [needs ' + pre.reason + ']' : '');
+        return (i + 1) + '. ' + macroStepDescription(st) + tag;
+    });
+}
+async function macroRunStep(step) {
+    const pre = macroStepPreflight(step);
+    if (pre.skip) return { status: 'skipped', reason: pre.reason };
+    if (!pre.ok) throw new Error('needs ' + pre.reason);
+    switch (step.type) {
+        case 'uniprot': {
             uniprotAnnotationMode = 'accession';
-            await useUniProtAccession(acc);
-            return;
+            await useUniProtAccession(macroResolveValue(step.accession));
+            return { status: 'done' };
         }
         case 'domainScan': {
             const sel = document.getElementById('domainScanProvider');
             if (sel && step.provider) sel.value = step.provider;
             await runDomainScan();
-            return;
+            return { status: 'done' };
         }
-        case 'topology': await runTopologyPrediction(); return;
+        case 'topology': await runTopologyPrediction(); return { status: 'done' };
         case 'homolog': {
             const sel = document.getElementById('homologProvider');
             if (sel && step.provider) sel.value = step.provider;
             await runHomologSearch();
-            return;
+            return { status: 'done' };
         }
         case 'pdb': {
-            const id = macroResolveValue(step.pdbId);
+            const id = String(macroPdbOverride || '').trim().toUpperCase() || macroResolveValue(step.pdbId);
             const ok = await fetchPdbEntry(id);
             if (ok === false) throw new Error('PDB fetch failed for ' + id);
-            return;
+            return { status: 'done' };
         }
-        case 'validation': await runStructureValidation(); return;
-        case 'variantEffects': await fetchVariantEffectPredictions(); return;
+        case 'validation': await runStructureValidation(); return { status: 'done' };
+        case 'variantEffects': await fetchVariantEffectPredictions(); return { status: 'done' };
         default: throw new Error('unknown step type "' + step.type + '"');
     }
+}
+// The check-in screen for "pause and ask": the replay loop awaits the decision.
+function macroPauseForDecision(index, step, message) {
+    return new Promise(resolve => {
+        macroCheckinResolver = resolve;
+        const el = document.getElementById('macroCheckin');
+        const text = document.getElementById('macroCheckinText');
+        if (text) text.textContent = 'Step ' + (index + 1) + ' failed: ' + macroStepDescription(step) + ' (' + message + '). Retry the step, skip it, proceed anyway, or stop the macro.';
+        if (el) el.hidden = false;
+    });
+}
+function macroCheckinDecision(decision) {
+    const el = document.getElementById('macroCheckin');
+    if (el) el.hidden = true;
+    const r = macroCheckinResolver;
+    macroCheckinResolver = null;
+    if (r) r(decision);
+}
+// One step under the failure policy: auto-retry (3), proceed, pause and ask,
+// or stop. Returns an outcome for the run report.
+async function macroExecuteStepWithPolicy(step, index, total) {
+    const retryLimit = macroFailurePolicy === 'retry3' ? 3 : 0;
+    let attempt = 0;
+    while (true) {
+        macroSetBanner('Running macro: step ' + (index + 1) + '/' + total + ' \u00b7 ' + macroStepDescription(step) + (attempt ? ' \u00b7 retry ' + attempt + '/' + retryLimit : ''));
+        try {
+            const out = await macroRunStep(step);
+            return { status: (out && out.status) || 'done', retries: attempt, message: (out && out.reason) || '' };
+        } catch (err) {
+            const message = (err && err.message) || String(err);
+            if (attempt < retryLimit) {
+                attempt++;
+                logAction('macro', 'step ' + (index + 1) + ' retry ' + attempt, message);
+                continue;
+            }
+            if (macroFailurePolicy === 'proceed' || macroFailurePolicy === 'retry3') {
+                return { status: 'failed', retries: attempt, message: message };
+            }
+            if (macroFailurePolicy === 'stop') {
+                return { status: 'failed', retries: attempt, message: message, stop: true };
+            }
+            const decision = await macroPauseForDecision(index, step, message);
+            if (decision === 'retry') { attempt++; continue; }
+            if (decision === 'skip') return { status: 'skipped', retries: attempt, message: message + ' (skipped by user)' };
+            if (decision === 'proceed') return { status: 'failed', retries: attempt, message: message };
+            return { status: 'failed', retries: attempt, message: message, stop: true };
+        }
+    }
+}
+// What a failed step starves downstream, so "proceed anyway" is an informed
+// choice and the run report can say what is missing from the analysis.
+const MACRO_DOWNSTREAM_HINTS = {
+    uniprot: 'curated feature rows and curated variant evidence will be missing',
+    domainScan: 'the domain rows and any rule that reads them will be missing',
+    topology: 'the topology rows, their consensus and their rules will be missing',
+    homolog: 'conservation, the homolog/template table and any rule that reads homolog rows will be missing or thinner',
+    pdb: 'the 3D model, validation and structure-derived tracks will be missing',
+    validation: 'the validation rows and their rules will be missing',
+    variantEffects: 'the merged variant-effect line will be incomplete'
+};
+function macroRunReportText() {
+    if (!macroLastRun) return '';
+    const run = macroLastRun;
+    const counts = { done: 0, skipped: 0, failed: 0 };
+    run.outcomes.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
+    const lines = [];
+    lines.push('Macro run report');
+    lines.push('Macro: ' + run.name);
+    lines.push('When: ' + run.at);
+    lines.push('Steps: ' + counts.done + ' done, ' + counts.skipped + ' skipped, ' + counts.failed + ' failed');
+    lines.push('');
+    run.outcomes.forEach((o, i) => {
+        let line = (i + 1) + '. ' + o.description + ': ' + o.status.toUpperCase();
+        if (o.retries) line += ' after ' + o.retries + ' retr' + (o.retries === 1 ? 'y' : 'ies');
+        if (o.message) line += ' (' + o.message + ')';
+        lines.push(line);
+    });
+    const failed = run.outcomes.filter(o => o.status === 'failed');
+    if (failed.length) {
+        lines.push('');
+        failed.forEach(o => lines.push('Unexpected: API call for "' + o.description + '" failed' + (o.message ? ' (' + o.message + ')' : '') + '.'));
+        lines.push('Note: failures can affect downstream actions. If a step fails, later steps that read its output run on less data.');
+        failed.forEach(o => {
+            const hint = MACRO_DOWNSTREAM_HINTS[o.type];
+            if (hint) lines.push('For example, the failed "' + o.description + '" step means ' + hint + '.');
+        });
+    }
+    return lines.join('\n');
+}
+function copyMacroReport() {
+    const text = macroRunReportText();
+    if (!text) { showToast('No macro run to report yet.', 'error'); return; }
+    const ok = legacyCopyText(text);
+    showToast(ok ? 'Macro run report copied.' : 'Could not copy the report.', ok ? 'success' : 'error');
 }
 async function macroReplay(dryRun) {
     if (macroReplaying) return false;
     if (!macroSteps.length) { showToast('Record or import a macro first.', 'error'); return false; }
     if (dryRun) {
         logAction('macro', 'dry run', macroSteps.length + ' step(s)');
-        showToast('Dry run, ' + macroSteps.length + ' step(s): ' + macroPlan().join(' '), 'info');
+        showToast('Dry run, ' + macroSteps.length + ' step(s): ' + macroPreflightPlan().join(' '), 'info');
         return true;
     }
     macroReplaying = true;
-    logAction('macro', 'replay started', macroSteps.length + ' step(s)');
-    let ok = 0, failed = 0;
+    logAction('macro', 'replay started', macroSteps.length + ' step(s), policy ' + macroFailurePolicy);
+    const outcomes = [];
+    let stopped = false;
     for (let i = 0; i < macroSteps.length; i++) {
         const step = macroSteps[i];
-        macroSetBanner('Running macro: step ' + (i + 1) + '/' + macroSteps.length + ' \u00b7 ' + macroStepDescription(step));
-        try {
-            await macroRunStep(step);
-            ok++;
-            logAction('macro', 'step ' + (i + 1) + ' done', macroStepDescription(step));
-        } catch (err) {
-            failed++;
-            logAction('error', 'macro step ' + (i + 1) + ' failed', ((err && err.message) || String(err)));
-        }
+        const out = await macroExecuteStepWithPolicy(step, i, macroSteps.length);
+        outcomes.push({ type: step.type, description: macroStepDescription(step), status: out.status, retries: out.retries, message: out.message });
+        if (out.status === 'failed') logAction('error', 'macro step ' + (i + 1) + ' failed', out.message);
+        else logAction('macro', 'step ' + (i + 1) + ' ' + out.status, out.message || '');
         renderMacroModalIfVisible();
+        if (out.stop) { stopped = true; break; }
     }
     macroReplaying = false;
     macroSetBanner('');
-    const msg = 'Macro "' + macroName + '": ' + ok + ' step(s) done' + (failed ? ', ' + failed + ' failed' : '') + '.';
-    showToast(msg, failed ? 'warn' : 'success');
+    if (macroCheckinResolver) macroCheckinDecision('stop');
+    const counts = { done: 0, skipped: 0, failed: 0 };
+    outcomes.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
+    macroLastRun = { name: macroName, at: new Date().toISOString(), outcomes, stopped };
+    const msg = 'Macro "' + macroName + '": ' + counts.done + ' done' + (counts.skipped ? ', ' + counts.skipped + ' skipped' : '') + (counts.failed ? ', ' + counts.failed + ' failed' : '') + (stopped ? ' (stopped)' : '') + '.';
+    showToast(msg, counts.failed ? 'warn' : 'success');
     logAction('macro', 'replay finished', msg);
     renderMacroModalIfVisible();
-    return failed === 0;
+    return counts.failed === 0 && !stopped;
 }
 function toggleMacroRecording() {
     macroRecording = !macroRecording;
@@ -7329,17 +7499,51 @@ function updateMacroControls() {
         ? ('Recording: ' + macroSteps.length + ' step(s) captured. Run the actions you want, then stop.')
         : (macroSteps.length ? (macroSteps.length + ' step(s) ready to replay.') : 'Not recording. Press Record, run the actions, then stop.');
 }
+function renderMacroReport() {
+    const el = document.getElementById('macroReport');
+    if (!el) return;
+    if (!macroLastRun) { el.innerHTML = ''; return; }
+    const counts = { done: 0, skipped: 0, failed: 0 };
+    macroLastRun.outcomes.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
+    let html = '<div style="font-size:0.76rem; color:#334155; margin-bottom:4px;"><strong>Last run:</strong> ' +
+        structureEscapeHtml(macroLastRun.name) + ' \u00b7 ' + counts.done + ' done, ' + counts.skipped + ' skipped, ' + counts.failed + ' failed' +
+        (macroLastRun.stopped ? ' (stopped)' : '') + '</div>';
+    macroLastRun.outcomes.forEach((o, i) => {
+        const color = o.status === 'failed' ? '#b91c1c' : (o.status === 'skipped' ? '#b45309' : '#15803d');
+        html += '<div class="macro-step"><span class="macro-step-num">' + (i + 1) + '</span><span style="color:' + color + ';">' +
+            structureEscapeHtml(o.description) + ': ' + o.status + (o.retries ? ' (retries ' + o.retries + ')' : '') +
+            (o.message ? ' - ' + structureEscapeHtml(o.message) : '') + '</span></div>';
+    });
+    const failed = macroLastRun.outcomes.filter(o => o.status === 'failed');
+    if (failed.length) {
+        html += '<div style="font-size:0.74rem; color:#b91c1c; margin-top:6px;">Unexpected: ' +
+            failed.map(o => structureEscapeHtml('API call for "' + o.description + '" failed')).join('; ') + '.</div>';
+        html += '<div style="font-size:0.74rem; color:#64748b; margin-top:2px;">Failures can affect downstream actions: later steps that read the failed output run on less data.</div>';
+    }
+    el.innerHTML = html;
+}
 function renderMacroModal() {
     const nameEl = document.getElementById('macroNameInput');
     if (nameEl && document.activeElement !== nameEl) nameEl.value = macroName;
     const overrideEl = document.getElementById('macroAccessionOverride');
     if (overrideEl && document.activeElement !== overrideEl) overrideEl.value = macroAccessionOverride;
+    const pdbEl = document.getElementById('macroPdbOverride');
+    if (pdbEl && document.activeElement !== pdbEl) pdbEl.value = macroPdbOverride;
+    const policyEl = document.getElementById('macroFailurePolicy');
+    if (policyEl && document.activeElement !== policyEl) policyEl.value = macroFailurePolicy;
     const list = document.getElementById('macroStepList');
     if (list) {
         list.innerHTML = macroSteps.length
-            ? macroSteps.map((st, i) => '<div class="macro-step"><span class="macro-step-num">' + (i + 1) + '</span>' + structureEscapeHtml(macroStepDescription(st)) + '</div>').join('')
+            ? macroSteps.map((st, i) => {
+                const pre = macroStepPreflight(st);
+                const tag = pre.skip
+                    ? ' <span class="macro-step-tag macro-tag-skip">skip: ' + structureEscapeHtml(pre.reason) + '</span>'
+                    : (!pre.ok ? ' <span class="macro-step-tag macro-tag-needs">needs ' + structureEscapeHtml(pre.reason) + '</span>' : '');
+                return '<div class="macro-step"><span class="macro-step-num">' + (i + 1) + '</span><span>' + structureEscapeHtml(macroStepDescription(st)) + tag + '</span></div>';
+            }).join('')
             : '<p style="color:#94a3b8; font-size:0.78rem; margin:0;">No steps yet. Press Record, then run the actions you want to replay.</p>';
     }
+    renderMacroReport();
     updateMacroControls();
 }
 function openActionLog() { renderActionLog(); openModalAsDialog('actionLogModal'); }
@@ -9968,7 +10172,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.19';
+const APP_VERSION = '0.66.20';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

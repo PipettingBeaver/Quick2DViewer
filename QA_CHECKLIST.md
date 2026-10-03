@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1272 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1291 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -99,7 +99,7 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
-### Macros: record, export, replay — 0.66.19
+### Macros: record, export, replay — 0.66.19, policy + report — 0.66.20
 
 **Should do.** The Macro button records the replayable API/import actions of a session with their
 resolved provider and parameters, exports/imports them as JSON, and replays them through the
@@ -121,6 +121,12 @@ same code paths as the buttons, with a step banner and activity-log entries.
 5. Turn off the network and replay a macro with several steps.
    *Expect:* the failing step is logged and named in the final toast, later steps still attempt,
    and the banner hides at the end.
+6. Set **On step failure** to **Pause and check in**, replay offline.
+   *Expect:* the check-in panel appears naming the step and error; **Skip step** resumes and the
+   run report marks it skipped; **Stop macro** ends the run there.
+7. Load no sequence, then look at the step list.
+   *Expect:* sequence steps are tagged "needs a loaded sequence" before anything runs; with a
+   structure absent, the validation step is tagged "skip: no experimental structure attached".
 
 **Edge cases.**
 - *Replay while still recording:* steps must not duplicate; replay never re-records itself.
@@ -130,6 +136,12 @@ same code paths as the buttons, with a step banner and activity-log entries.
 - *Import with malformed JSON:* a clear error toast; existing steps stay untouched.
 - *Macros are session-only:* closing the tab loses them unless exported (session-save integration
   comes later).
+- *Expected skips do not nag:* a validation step with no structure, or variant effects with no
+  variants, skip as "not applicable" under every policy.
+- *PDB override:* it replaces the id in every PDB step, so a GFP macro can point at another
+  entry without editing steps.
+- *Run report:* the copyable report names unexpected API failures and what each one can affect
+  downstream (for example, a failed homolog search thins conservation and the template table).
 
 ---
 
@@ -1586,6 +1598,17 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.20 - macro failure policy + run report (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 477 | Macro screen | Failure policy select (4 modes) and PDB override present |
+| 478 | Record steps with no sequence loaded | Steps tagged "needs a loaded sequence" before running |
+| 479 | Validation without a structure / variant effects without variants | Tagged "skip: ..." and skipped, not failed |
+| 480 | Replay a broken API under Auto-retry 3 times | Retries logged, step failed, later steps still run |
+| 481 | The same under Pause and check in | Panel appears; Retry/Skip/Proceed/Stop each behave |
+| 482 | Copy run report | "Unexpected: API call for ... failed" plus the downstream-impact note |
 
 ## 0.66.19 - macro v1 (quick rows)
 

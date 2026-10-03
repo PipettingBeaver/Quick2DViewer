@@ -12,6 +12,22 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.20] - 2026-10-01
+
+### Added
+- **Macro failure policy, preflight and run report (slice 2).** The Macro screen gains an
+  **On step failure** select (Auto-retry 3 times then proceed, Proceed immediately, Pause and
+  check in, Stop the macro) and a **PDB override** that retargets every PDB step. Each step
+  declares what it needs from the live session (sequence, accession, structure, variants), and
+  the step list tags missing requirements or expected skips before a run. A "pause and check in"
+  failure shows a Retry / Skip / Proceed / Stop panel and the replay loop waits for the
+  decision. Every run produces a report in the modal (done/skipped/failed per step, retry
+  counts, error messages) that names unexpected API failures and lists what each failure can
+  affect downstream; the report is copyable.
+
+### Changed
+- The dry-run toast now shows the preflight plan, missing requirements and skips included.
+
 ## [0.66.19] - 2026-10-01
 
 ### Added
