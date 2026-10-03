@@ -3890,6 +3890,46 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     assert(macroInvalidReplay === false, 'replay refuses an invalid macro even when called directly');
     ctxRun(`macroSteps = []; uniprotAccession = ''; parsedTracks = {}; updateMacroControls();`);
 
+    section('hypothesis read-out: candidate ranking, suggestions, TSV, report');
+    assert(HTML.indexOf('id="hypothesisModal"') !== -1 && HTML.indexOf('>Hypotheses</button>') !== -1 && HTML.indexOf('id="hypothesisTable"') !== -1, 'the Hypotheses modal and menu button exist');
+    ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {};`);
+    assert(ctxRun(`buildHypothesisCandidates().length`) === 0, 'with no evidence there are no candidates');
+    ctxRun(`
+        parsedTracks = {
+            AA: 'MKVLDEKRST',
+            CONSERVATION: { metric: 'shannon', values: [0.9, 0.9, 0.2, 0.9, 0.9, 0.9, 0.9, 0.9, 0.3, 0.3] },
+            TP_Consensus: 'MMMMMiiiii',
+            'm_pLDDT': Array.from({ length: 10 }, (_, i) => ({ val: i === 4 ? 40 : 90, type: 'plddt' })),
+            'm_RSA': Array.from({ length: 10 }, (_, i) => ({ val: i === 1 ? 0.05 : 0.5, type: 'rsa' })),
+            'HL_01_a': 'MM    K   '
+        };
+        uniprotFeatureTracks = { UP_Active_site: { type: 'Active site', category: 'site', features: [{ start: 7, end: 7, type: 'Active site', description: 'proton acceptor' }] } };
+        keyedVariantsInfo = {};
+    `);
+    const hypRows = ctxRun(`buildHypothesisCandidates()`);
+    assert(hypRows.length === 6, 'six positions carry enough signal for a suggestion (got ' + hypRows.length + ')');
+    assert(hypRows[0].pos === 7 && hypRows[0].suggestion === 'A' && /Annotated functional site/.test(hypRows[0].rationale), 'the annotated active site ranks first (got ' + JSON.stringify(hypRows[0]) + ')');
+    assert(hypRows[0].confidence === 'high' && hypRows[0].features.indexOf('Active site') !== -1, 'with high confidence and the feature named');
+    assert(!hypRows.some(r => r.pos === 5), 'the low-pLDDT position is excluded from candidates');
+    const hypChargeSwap = hypRows.find(r => r.pos === 6);
+    assert(hypChargeSwap && hypChargeSwap.suggestion === 'K' && /electrostatics/.test(hypChargeSwap.rationale), 'a conserved surface charge gets a charge-swap suggestion (got ' + JSON.stringify(hypChargeSwap) + ')');
+    assert(hypRows.find(r => r.pos === 2).suggestion === 'A', 'a conserved buried residue gets an alanine suggestion');
+    assert(hypRows.every(r => r.topology === 'M' || r.topology === 'i'), 'the topology state is carried into the rows');
+    ctxRun(`parsedTracks['VAR_x'] = 'MH        ';`);
+    const hypKnown = ctxRun(`buildHypothesisCandidates().find(r => r.pos === 2)`);
+    assert(hypKnown.known.join(',') === 'K2H' && hypKnown.suggestion === 'H' && /compare predicted effects/.test(hypKnown.rationale), 'a known variant is marked and the suggestion switches to comparison');
+    ctxRun(`delete parsedTracks['VAR_x'];`);
+    const hypTsv = ctxRun(`hypothesisTSV()`);
+    const hypTsvLines = hypTsv.split('\n');
+    assert(hypTsvLines.length === 7 && hypTsvLines[0].indexOf('SuggestedMutation') !== -1, 'the TSV has a header and one line per candidate');
+    assert(hypTsvLines[1].split('\t').length === 13, 'with thirteen columns');
+    const hypReport = ctxRun(`buildMethodsReport()`);
+    assert(hypReport.indexOf('## Candidate residues (hypothesis read-out)') !== -1 && hypReport.indexOf('suggest **A**') !== -1, 'the methods report carries the candidate section');
+    assert(hypReport.indexOf('suggestions to evaluate, not conclusions') !== -1, 'and states that they are suggestions');
+    ctxRun(`renderHypothesisModal();`);
+    assert(ctxRun(`document.getElementById('hypothesisTable').innerHTML`).indexOf('Annotated functional site') !== -1, 'the modal renders the table with each rationale on the row');
+    ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; keyedVariantsInfo = {};`);
+
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
 })();

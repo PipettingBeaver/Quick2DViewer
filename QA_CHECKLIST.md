@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1338 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1353 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -96,6 +96,31 @@ for a feature that is *entirely* unverified, and it has three parts:
   most likely cause, so a failure points at a diagnosis rather than a mystery.
 
 Cards stay until the feature has been driven by hand at least once.
+
+---
+
+### Hypothesis read-out (candidate residues) — 0.66.25
+
+**Should do.** The Hypotheses button ranks positions from the loaded evidence (conservation, RSA,
+pLDDT, curated UniProt sites, homolog coverage) and suggests a test per position, with the
+evidence and a confidence on every row. It is explicitly a suggestion list, not a conclusion.
+
+**Try (normal use).**
+1. Load a protein with homologs (conservation), an AlphaFold model (pLDDT/RSA) and UniProt
+   features, then open **Hypotheses**.
+   *Expect:* a ranked table; hover a row to see why it was suggested; the top row usually has a
+   curated site or is highly conserved and buried.
+2. Add a variant FASTA with a substitution, rebuild.
+   *Expect:* that position is marked with the known variant and the suggestion switches to
+   "compare predicted effects".
+3. Press **Copy TSV** or **Export TSV**, and generate the methods report.
+   *Expect:* a 13-column table; a "Candidate residues" section with the top ten.
+
+**Edge cases.**
+- *No evidence loaded:* a clear message naming what the read-out needs.
+- *Low-pLDDT region:* positions below pLDDT 50 are excluded rather than suggested.
+- *Charged conserved surface residue:* the suggestion is a charge swap, not alanine.
+- *Nothing conserved:* no candidates rather than a padded list.
 
 ---
 
@@ -1607,6 +1632,16 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 492 | Load "GFP, API-Only (Preset)" | Override pinned to P42212; 5 live steps; species cleared |
 | 493 | Load "TerC, API-Only (Preset)" | Override pinned to Q52356; topology first; no PDB step |
 | 494 | Play either with a manual species set | The manual species survives |
+
+## 0.66.25 - hypothesis read-out (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 499 | Homologs + AlphaFold + UniProt features, open Hypotheses | Ranked table with evidence, confidence and a suggestion per row |
+| 500 | Hover a row | The rationale (why it was suggested) |
+| 501 | A position with a known variant | Marked; suggestion switches to comparison |
+| 502 | A low-pLDDT region | Excluded from the candidates |
+| 503 | Copy/Export TSV and the methods report | 13-column table; "Candidate residues" section with the top ten |
 
 ## 0.66.24 - Play macro button + validation (quick rows)
 

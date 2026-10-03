@@ -12,6 +12,18 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.25] - 2026-10-01
+
+### Added
+- **Hypothesis read-out.** A new Hypotheses button opens a ranked candidate table built from the
+  loaded evidence: conservation, burial (RSA), model confidence (pLDDT), curated UniProt sites and
+  homolog coverage. Each row carries its evidence, a score and confidence, and a suggested test
+  (alanine scan for conserved/buried or annotated sites, charge swap for conserved surface
+  charges, comparison for positions with known variants). Low-confidence regions (pLDDT below 50)
+  are excluded, and the panel states plainly that these are suggestions to evaluate, not
+  conclusions. The table copies or exports as TSV (13 columns), and the methods report gains a
+  "Candidate residues" section with the top ten.
+
 ## [0.66.24] - 2026-10-01
 
 ### Changed
