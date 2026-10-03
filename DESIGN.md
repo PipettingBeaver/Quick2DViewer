@@ -679,3 +679,32 @@ resolves to an element id in the markup, so the index cannot drift silently.
 
 Non-goals for v1: running actions, searching remote docs, indexing user data
 (track names, hit ids) - the last one can be a follow-up once navigation works.
+
+## 20. Feature placement rules (v0.66.26)
+
+A feature belongs on an existing surface; a new top-level entry point needs a
+reason. This rule exists because the protein picker first landed inside the
+Macro modal, where choosing a protein read as macro feature creep and a preset
+run from an empty session failed its sequence-based steps.
+
+Where things go:
+- **Choosing or loading data** (accessions, example proteins, FASTA, PDB ids,
+  structures) belongs in **Input Data**, the surface whose job is "what am I
+  looking at".
+- **Provider settings and paste boxes** (which service, databases, categories)
+  belong in **Options -> Data Sources**.
+- **Per-track behaviour** (visibility, colours, filters, per-row config)
+  belongs in **Tracks / the quick controls popover**.
+- **Workflow-level actions** (running a saved sequence of actions, retargeting
+  a macro) belong in **Macro**; a macro may reference the session's protein but
+  must not be the place where it is chosen.
+- **Cross-cutting read-outs** (log, hypotheses, methods report) live on the
+  menu bar or in the report.
+
+Checklist before UI work on a new feature:
+1. Name the existing surface it attaches to.
+2. If a new top-level entry is proposed, write the justification in the feature
+   card (why no existing surface fits).
+3. Make the feature read the session state rather than duplicate it (a macro
+   step must not become a second input system).
+4. Tests assert the placement (element ids on the right surface).

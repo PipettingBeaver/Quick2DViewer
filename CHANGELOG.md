@@ -12,6 +12,25 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.26] - 2026-10-01
+
+### Fixed
+- **Accession-only sessions now load the sequence.** The UniProt step fetched features but not
+  the FASTA, so a macro preset run from an empty session failed its sequence-based steps
+  ("needs a loaded sequence") after a successful-looking UniProt load. `useUniProtAccession`
+  now fetches the entry's FASTA when no sequence is loaded (a loaded sequence is never
+  overwritten), so presets work from empty and the accession flow is complete.
+
+### Changed
+- **The example-protein picker moved from Macro to Input Data** (DESIGN 20, feature placement):
+  choosing a protein belongs where data is loaded. It fetches the entry and its sequence, and
+  sets the species when the organism is an Ensembl species. The Macro screen keeps the accession
+  override and hint for retargeting, and the workflow presets keep their pinned accessions.
+- The offline sample button now reads "Load sample Quick2D data" and explains itself.
+- DESIGN 20 records the feature placement rules (Input Data for data, Options -> Data Sources
+  for providers, Tracks for per-track behaviour, Macro for workflows, menu bar for read-outs),
+  and the QA card convention now requires naming the surface and justifying new entry points.
+
 ## [0.66.25] - 2026-10-01
 
 ### Added

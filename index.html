@@ -2138,7 +2138,7 @@
                             Show raw text ▾
                         </button>
                     </span>
-                    <button type="button" class="tb-btn tb-btn-secondary" onclick="loadSampleData()">Load Sample Data</button>
+                    <button type="button" class="tb-btn tb-btn-secondary" onclick="loadSampleData()" title="Offline example: a verbatim Quick2D output for histone H2A, to try the viewer without any network">Load sample Quick2D data</button>
                 </div>
                 <div id="rawInputDrawer" class="raw-input-drawer" hidden style="margin-top: 8px;">
                     <textarea id="rawInput" placeholder="Paste Quick2D output, a FASTA header + sequence, or a plain protein sequence..." aria-label="Raw Quick2D or FASTA input"></textarea>
@@ -2158,6 +2158,11 @@
                             title="Four-character PDB entry id, e.g. 1GFL" aria-label="PDB entry id">
                         <button type="button" id="btnFetchPdb" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="fetchPdbEntryFromInput()"
                             style="font-size:0.72rem; padding:3px 8px;" title="Download an experimental entry from RCSB PDB by id and attach it; validation and the 3D viewer then work on it">Fetch PDB entry</button>
+                        <select id="inputAccessionPreset" class="q2dv-select" onchange="onInputAccessionPreset(this.value)"
+                            style="font-size:0.72rem; padding:2px 4px; max-width:190px;"
+                            title="Load an example protein: fetches its UniProt entry and, when no sequence is loaded, its FASTA sequence">
+                            <option value="">Example proteins&hellip;</option>
+                        </select>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="openDataSources('uniprot')"
                             style="font-size:0.72rem; padding:3px 8px;" title="UniProt lookup, domain families, homologs, structure models, validation and variant effects - all in Options -> Data Sources">Data sources&hellip;</button>
                     </span>
@@ -3154,10 +3159,6 @@
             <span id="macroAccessionHint" style="font-size:0.72rem; color:#64748b;"></span>
             <label for="macroPdbOverride" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Replaces the PDB id in every PDB step, so a macro can point at another entry">PDB override</label>
             <input type="text" id="macroPdbOverride" oninput="macroPdbOverride = this.value;" placeholder="e.g. 1GFL" style="width:90px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px; text-transform:uppercase;">
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
-            <label for="macroAccessionPreset" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Known proteins to retarget the macro to: fills the accession override, and sets the species when the organism is an Ensembl species">Preset Accessions</label>
-            <select id="macroAccessionPreset" class="q2dv-select" onchange="onMacroAccessionPreset(this.value)" style="font-size:0.78rem; padding:4px 6px; min-width:320px;"></select>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
             <label for="macroFailurePolicy" style="font-size:0.78rem; font-weight:600; color:#475569;" title="What happens when an API step fails after the preflight">On step failure</label>
@@ -5040,6 +5041,17 @@ async function resolveAccessionFromSequence(seq) {
 // Fetches features for a specific accession and applies them as tracks. Shared
 // by the Accession mode, the Sequence mode's resolved accession, and a picked
 // Search result.
+// The entry's FASTA sequence: an accession-only session has none, and every
+// sequence-based tool needs one.
+async function fetchUniProtFastaSequence(acc) {
+    const resp = await fetchWithTimeout('https://rest.uniprot.org/uniprotkb/' + encodeURIComponent(acc) + '.fasta', {}, 30000);
+    if (!resp.ok) throw new Error('FASTA HTTP ' + resp.status);
+    const text = await resp.text();
+    const lines = String(text).split(/\r?\n/);
+    const seq = lines.filter(l => l && l[0] !== '>').join('').replace(/[^A-Za-z]/g, '').toUpperCase();
+    if (seq.length < 3) throw new Error('empty FASTA');
+    return { seq: seq, header: (lines[0] || '').replace(/^>/, '').trim() };
+}
 async function useUniProtAccession(acc) {
     if (!(await ensureExternalServices())) return;
     uniprotLog('using accession ' + acc);
@@ -5049,6 +5061,24 @@ async function useUniProtAccession(acc) {
     macroCaptureStep({ type: 'uniprot', accession: macroParam(acc) });
     uniprotFeatures = { accession: acc, features, fetchedAt: Date.now() };
     applyUniProtFeatures();
+    // Fetch the paired FASTA only when nothing is loaded: retargeting a macro
+    // or loading annotations over your own FASTA must keep your sequence.
+    if (!(parsedTracks && typeof parsedTracks.AA === 'string' && parsedTracks.AA.length)) {
+        try {
+            const fasta = await fetchUniProtFastaSequence(acc);
+            parsedTracks.AA = fasta.seq;
+            if (fasta.header && !currentProteinLabel) currentProteinLabel = fasta.header;
+            logAction('api', 'UniProt sequence loaded', acc + ': ' + fasta.seq.length + ' aa');
+            renderViewer(parsedTracks);
+            populateCrossRefDropdown();
+            refreshInputDataModalIfVisible();
+            refreshTrackManagerIfVisible();
+        } catch (err) {
+            const m = (err && err.message) || String(err);
+            logAction('error', 'UniProt FASTA failed', acc + ': ' + m);
+            showToast('Loaded ' + acc + ' annotations, but its sequence could not be fetched (' + m + '). Load a FASTA to run sequence-based tools.', 'warn');
+        }
+    }
     schedulePersist();
 }
 
@@ -7248,14 +7278,14 @@ let macroFailurePolicy = 'retry3'; // 'retry3' | 'proceed' | 'pause' | 'stop'
 let macroCheckinResolver = null;
 let macroLastRun = null;
 let macroSavedPopulated = false;
-let macroAccessionPresetsPopulated = false;
+let inputAccessionPresetsPopulated = false;
 // Known proteins for the Preset Accessions list. Verified live 2026-10-01:
 // P62988 (the old ubiquitin entry) is inactive and has been replaced by
 // P0CG48 (polyubiquitin-C); UniProt now spells the whale Physeter
 // macrocephalus. 'species' is the Ensembl token when the organism is an
 // Ensembl species; the rest leave the species field alone so species-specific
 // preflights can tag their steps as skips.
-const MACRO_ACCESSION_PRESETS = [
+const ACCESSION_PRESETS = [
     { name: 'Rhodopsin', accession: 'P02699', organism: 'Bos taurus', species: 'bos_taurus' },
     { name: 'Outer membrane porin F (OmpF)', accession: 'P02931', organism: 'Escherichia coli K12', species: '' },
     { name: 'Green fluorescent protein (GFP)', accession: 'P42212', organism: 'Aequorea victoria', species: '' },
@@ -7264,20 +7294,16 @@ const MACRO_ACCESSION_PRESETS = [
     { name: 'Polyubiquitin-C (ubiquitin)', accession: 'P0CG48', organism: 'Homo sapiens', species: 'homo_sapiens' },
     { name: 'Alpha-synuclein', accession: 'P37840', organism: 'Homo sapiens', species: 'homo_sapiens' }
 ];
-function populateMacroAccessionPresets() {
-    const sel = document.getElementById('macroAccessionPreset');
-    if (!sel || macroAccessionPresetsPopulated) return;
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Choose a known protein\u2026';
-    sel.appendChild(placeholder);
-    MACRO_ACCESSION_PRESETS.forEach(p => {
+function populateInputAccessionPresets() {
+    const sel = document.getElementById('inputAccessionPreset');
+    if (!sel || inputAccessionPresetsPopulated) return;
+    ACCESSION_PRESETS.forEach(p => {
         const op = document.createElement('option');
         op.value = p.accession;
         op.textContent = p.name + ' (' + p.accession + ', ' + p.organism + ')';
         sel.appendChild(op);
     });
-    macroAccessionPresetsPopulated = true;
+    inputAccessionPresetsPopulated = true;
 }
 function updateMacroAccessionHint() {
     const el = document.getElementById('macroAccessionHint');
@@ -7288,35 +7314,42 @@ function updateMacroAccessionHint() {
     else if (sessionAcc) el.textContent = 'Current: ' + sessionAcc + ' (session)';
     else el.textContent = 'Current: none \u00b7 load a UniProt entry or pick a preset';
 }
-// Fills the accession override and handles the species the same way for both
-// preset kinds: set it when the organism is an Ensembl species, clear a stale
-// one otherwise, never touch a manual override.
+// Set or clear the session species from an organism, never touching a manual
+// override. Returns a note for the toast.
+function applySpeciesForOrganism(speciesToken) {
+    if (speciesToken && !sessionSpeciesManual) {
+        setSessionSpecies(speciesToken, { manual: false });
+        return ' Species set to ' + sessionSpeciesLabel + '.';
+    }
+    if (!speciesToken && !sessionSpeciesManual && sessionSpeciesToken) {
+        sessionSpeciesToken = '';
+        sessionSpeciesLabel = '';
+        updateSpeciesUI();
+        schedulePersist();
+        return ' Species cleared (not an Ensembl organism).';
+    }
+    return '';
+}
 function macroApplyAccession(accession, speciesToken) {
     if (!accession) return '';
     macroAccessionOverride = accession;
     const el = document.getElementById('macroAccessionOverride');
     if (el) el.value = accession;
-    let speciesNote = '';
-    if (speciesToken && !sessionSpeciesManual) {
-        setSessionSpecies(speciesToken, { manual: false });
-        speciesNote = ' Species set to ' + sessionSpeciesLabel + '.';
-    } else if (!speciesToken && !sessionSpeciesManual && sessionSpeciesToken) {
-        sessionSpeciesToken = '';
-        sessionSpeciesLabel = '';
-        updateSpeciesUI();
-        schedulePersist();
-        speciesNote = ' Species cleared (not an Ensembl organism).';
-    }
+    const speciesNote = applySpeciesForOrganism(speciesToken);
     updateMacroAccessionHint();
     return speciesNote;
 }
-function onMacroAccessionPreset(accession) {
+// Input Data's example proteins: fetch the entry (features) and, when the
+// session has no sequence, its FASTA too, so every sequence-based tool works.
+async function onInputAccessionPreset(accession) {
     if (!accession) return false;
-    const preset = MACRO_ACCESSION_PRESETS.find(p => p.accession === accession);
+    const preset = ACCESSION_PRESETS.find(p => p.accession === accession);
     if (!preset) return false;
-    const speciesNote = macroApplyAccession(preset.accession, preset.species);
-    logAction('macro', 'accession preset', preset.name + ' (' + preset.accession + ')');
-    showToast('Override set to ' + preset.accession + ' (' + preset.name + ', ' + preset.organism + ').' + speciesNote, 'success');
+    const speciesNote = applySpeciesForOrganism(preset.species);
+    logAction('session', 'example protein', preset.name + ' (' + preset.accession + ')');
+    showToast('Loading ' + preset.name + ' (' + preset.accession + ', ' + preset.organism + ')\u2026' + speciesNote, 'info');
+    await useUniProtAccession(preset.accession);
+    refreshInputDataModalIfVisible();
     return true;
 }
 // Built-in workflow presets shown in the Saved Macros dropdown. They are
@@ -7783,7 +7816,6 @@ function renderMacroReport() {
 }
 function renderMacroModal() {
     populateMacroSavedSelect();
-    populateMacroAccessionPresets();
     updateMacroAccessionHint();
     const nameEl = document.getElementById('macroNameInput');
     if (nameEl && document.activeElement !== nameEl) nameEl.value = macroName;
@@ -9581,6 +9613,7 @@ function renderWorkflowGuide() {
 }
 
 function renderInputDataModal() {
+    populateInputAccessionPresets();
     syncReferenceNumberingControls();
     const dmBtn = document.getElementById('btnDomainScan');
     if (dmBtn) {
@@ -10621,7 +10654,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.25';
+const APP_VERSION = '0.66.26';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

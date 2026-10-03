@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1353 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1357 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -85,7 +85,9 @@ what you did, what you saw, and **Log → Copy as JSON**.
 
 ## Feature test cards (newest first)
 
-**Convention, going forward: every new feature ships with a card here.** The per-version
+**Convention, going forward: every new feature ships with a card here.** Cards must also name
+the existing surface the feature attaches to (Input Data, Options -> Data Sources, Tracks, Macro,
+menu bar); a new top-level entry point needs its justification in the card (DESIGN 20). The per-version
 tables further down are quick "try this, watch for that" rows; a card is the fuller form
 for a feature that is *entirely* unverified, and it has three parts:
 
@@ -1632,6 +1634,15 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 492 | Load "GFP, API-Only (Preset)" | Override pinned to P42212; 5 live steps; species cleared |
 | 493 | Load "TerC, API-Only (Preset)" | Override pinned to Q52356; topology first; no PDB step |
 | 494 | Play either with a manual species set | The manual species survives |
+
+## 0.66.26 - accession FASTA + placement fix (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 504 | From empty, Input Data -> Example proteins -> GFP | Sequence and UniProt features load; sequence-based tools work |
+| 505 | Load your own FASTA, then load an accession | Your sequence is kept, never overwritten |
+| 506 | Macro modal | No protein picker; the override and its hint remain |
+| 507 | Play a macro preset from an empty session | The UniProt step loads the sequence; no "needs a loaded sequence" failures |
 
 ## 0.66.25 - hypothesis read-out (quick rows)
 
