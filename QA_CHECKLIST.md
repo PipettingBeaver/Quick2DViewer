@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1318 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1338 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -115,7 +115,7 @@ same code paths as the buttons, with a step banner and activity-log entries.
 3. Press **Export JSON**, then **Clear steps**, paste the JSON into the import box and press
    **Load macro**.
    *Expect:* the same steps return with the macro name.
-4. Type an accession into **Accession override** (e.g. a TerC entry), press **Replay**.
+4. Type an accession into **Accession override** (e.g. a TerC entry), press **▶ Play macro**.
    *Expect:* the banner steps "Running macro: step 1/2 ..."; the UniProt fetch uses the override
    where `$ACCESSION` was recorded; the activity log gets one entry per step plus the finish line.
 5. Turn off the network and replay a macro with several steps.
@@ -1598,6 +1598,15 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.24 - Play macro button + validation (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 495 | Macro with no steps | Green "Play macro" is disabled; "Nothing to play yet" |
+| 496 | Import a JSON with a bad step type | Play disabled; the line names the step and type |
+| 497 | Load a valid preset | Play enabled (green); "Ready to play." |
+| 498 | Valid macro but no sequence loaded | Play enabled with an amber warning naming the missing sequence |
 
 ## 0.66.22 - accession hint + preset accessions (quick rows)
 

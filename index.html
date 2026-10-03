@@ -479,6 +479,12 @@
         .macro-step-tag { font-size: 0.68rem; padding: 0 5px; border-radius: 999px; margin-left: 4px; }
         .macro-tag-needs { background: #fee2e2; color: #b91c1c; }
         .macro-tag-skip { background: #fef3c7; color: #b45309; }
+        .copy-btn.macro-play-btn {
+            background: #16a34a; color: #fff; font-weight: 700; font-size: 0.8rem;
+            padding: 6px 14px; border: 1px solid #15803d;
+        }
+        .copy-btn.macro-play-btn:hover { background: #15803d; }
+        .copy-btn.macro-play-btn:disabled { background: #e2e8f0; color: #94a3b8; border-color: #cbd5e1; cursor: not-allowed; }
         .macro-checkin {
             position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
             z-index: 1200; background: #fff; color: #334155; padding: 10px 14px;
@@ -3133,10 +3139,11 @@
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
             <button type="button" id="macroRecordBtn" class="tb-btn tb-btn-secondary" onclick="toggleMacroRecording()">&#9679; Record</button>
             <button type="button" class="copy-btn" onclick="macroReplay(true)">Dry run</button>
-            <button type="button" class="copy-btn" onclick="macroReplay(false)">Replay</button>
+            <button type="button" id="macroPlayBtn" class="copy-btn macro-play-btn" onclick="macroReplay(false)" title="Run every step in order, live">&#9654; Play macro</button>
             <button type="button" class="copy-btn" onclick="exportMacroJson()">Export JSON</button>
             <button type="button" class="copy-btn" onclick="clearMacroSteps()">Clear steps</button>
         </div>
+        <div id="macroValidation" style="font-size:0.74rem; margin-bottom:6px;"></div>
         <div id="macroStatus" style="font-size:0.72rem; color:#64748b; margin-bottom:8px;"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
             <label for="macroNameInput" style="font-size:0.78rem; font-weight:600; color:#475569;">Name</label>
@@ -7257,21 +7264,19 @@ function updateMacroAccessionHint() {
     else if (sessionAcc) el.textContent = 'Current: ' + sessionAcc + ' (session)';
     else el.textContent = 'Current: none \u00b7 load a UniProt entry or pick a preset';
 }
-function onMacroAccessionPreset(accession) {
-    if (!accession) return false;
-    const preset = MACRO_ACCESSION_PRESETS.find(p => p.accession === accession);
-    if (!preset) return false;
-    macroAccessionOverride = preset.accession;
+// Fills the accession override and handles the species the same way for both
+// preset kinds: set it when the organism is an Ensembl species, clear a stale
+// one otherwise, never touch a manual override.
+function macroApplyAccession(accession, speciesToken) {
+    if (!accession) return '';
+    macroAccessionOverride = accession;
     const el = document.getElementById('macroAccessionOverride');
-    if (el) el.value = preset.accession;
+    if (el) el.value = accession;
     let speciesNote = '';
-    if (preset.species && !sessionSpeciesManual) {
-        setSessionSpecies(preset.species, { manual: false });
+    if (speciesToken && !sessionSpeciesManual) {
+        setSessionSpecies(speciesToken, { manual: false });
         speciesNote = ' Species set to ' + sessionSpeciesLabel + '.';
-    } else if (!preset.species && !sessionSpeciesManual && sessionSpeciesToken) {
-        // Non-Ensembl organism (bacteria, jellyfish, whale): clear a stale
-        // species so species-specific steps preflight as skips instead of
-        // running against the wrong organism.
+    } else if (!speciesToken && !sessionSpeciesManual && sessionSpeciesToken) {
         sessionSpeciesToken = '';
         sessionSpeciesLabel = '';
         updateSpeciesUI();
@@ -7279,6 +7284,13 @@ function onMacroAccessionPreset(accession) {
         speciesNote = ' Species cleared (not an Ensembl organism).';
     }
     updateMacroAccessionHint();
+    return speciesNote;
+}
+function onMacroAccessionPreset(accession) {
+    if (!accession) return false;
+    const preset = MACRO_ACCESSION_PRESETS.find(p => p.accession === accession);
+    if (!preset) return false;
+    const speciesNote = macroApplyAccession(preset.accession, preset.species);
     logAction('macro', 'accession preset', preset.name + ' (' + preset.accession + ')');
     showToast('Override set to ' + preset.accession + ' (' + preset.name + ', ' + preset.organism + ').' + speciesNote, 'success');
     return true;
@@ -7287,6 +7299,36 @@ function onMacroAccessionPreset(accession) {
 // ordinary macro JSON: the accession is parameterised, providers are resolved
 // ids, and the PDB override can retarget the literal entry.
 const MACRO_PRESETS = [
+    {
+        id: 'gfp-api-infobase',
+        label: 'GFP, API-Only (Preset)',
+        name: 'GFP API-Only Infobase',
+        accession: 'P42212',
+        species: '',
+        steps: [
+            { type: 'uniprot', accession: '$ACCESSION' },
+            { type: 'domainScan', provider: 'ebi_iprscan5' },
+            { type: 'homolog', provider: 'ebi_blast' },
+            { type: 'pdb', pdbId: '1GFL' },
+            { type: 'validation' }
+        ]
+    },
+    {
+        // Serratia marcescens TerC (reviewed, gene terC, 9 TM, no PDB xrefs);
+        // E. coli K12's TerC-family homologs are now named by function
+        // (MgpA P0AEC0, Alx P42601, MntP P76264), also without PDB entries.
+        id: 'terc-api-infobase',
+        label: 'TerC, API-Only (Preset)',
+        name: 'TerC API-Only Infobase',
+        accession: 'Q52356',
+        species: '',
+        steps: [
+            { type: 'uniprot', accession: '$ACCESSION' },
+            { type: 'topology' },
+            { type: 'domainScan', provider: 'ebi_iprscan5' },
+            { type: 'homolog', provider: 'ebi_phmmer' }
+        ]
+    },
     {
         id: 'char-nonmembrane-api',
         label: 'Characterized Non-Membrane Protein, API-Only (Preset)',
@@ -7334,9 +7376,11 @@ function loadMacroPreset(id) {
     if (!preset) return false;
     macroName = preset.name;
     macroSteps = preset.steps.map(st => Object.assign({}, st));
+    let speciesNote = '';
+    if (preset.accession) speciesNote = macroApplyAccession(preset.accession, preset.species || '');
     renderMacroModalIfVisible();
     logAction('macro', 'preset loaded', preset.label);
-    showToast('Loaded "' + preset.label + '" (' + macroSteps.length + ' step(s)). Set the accession or the override, then Replay.', 'success');
+    showToast('Loaded "' + preset.label + '" (' + macroSteps.length + ' step(s)).' + speciesNote + ' Replay when ready.', 'success');
     return true;
 }
 function onMacroSavedSelect(value) {
@@ -7398,6 +7442,35 @@ function macroFromJson(text) {
         return false;
     }
 }
+// Pre-parse validation: is this macro structurally runnable at all? Unknown
+// step types or missing required parameters are errors (Play stays disabled);
+// environment gaps (no sequence loaded, an expected skip) are warnings, since
+// the failure policy handles those at run time.
+const MACRO_STEP_TYPES = ['uniprot', 'domainScan', 'topology', 'homolog', 'pdb', 'validation', 'variantEffects'];
+function macroValidate() {
+    const errors = [];
+    const warnings = [];
+    if (!macroSteps.length) errors.push('the macro has no steps');
+    macroSteps.forEach((st, i) => {
+        const n = 'step ' + (i + 1);
+        if (!st || typeof st.type !== 'string' || MACRO_STEP_TYPES.indexOf(st.type) === -1) {
+            errors.push(n + ' has an unknown type' + (st && st.type ? ' "' + st.type + '"' : ''));
+            return;
+        }
+        if (st.type === 'uniprot' && !String(st.accession || '').trim()) errors.push(n + ' (UniProt load) has no accession');
+        if (st.type === 'pdb' && !String(macroPdbOverride || '').trim() && !String(st.pdbId || '').trim()) errors.push(n + ' (PDB fetch) has no PDB id and no override');
+        if ((st.type === 'domainScan' || st.type === 'homolog') && st.provider) {
+            const cap = SERVICE_REGISTRY.capabilities[st.type === 'domainScan' ? 'domain_scan' : 'homolog_search'];
+            const known = cap && (cap.providers || []).some(pp => pp.id === st.provider);
+            if (!known) warnings.push(n + ' names an unknown provider "' + st.provider + '"; the default will run');
+        }
+        const pre = macroStepPreflight(st);
+        if (!pre.ok) warnings.push(n + ' needs ' + pre.reason);
+        else if (pre.skip) warnings.push(n + ' will skip: ' + pre.reason);
+    });
+    return { ok: errors.length === 0 && macroSteps.length > 0, errors, warnings };
+}
+function macroIsPlayable() { return macroValidate().ok; }
 function macroPlan() {
     return macroSteps.map((st, i) => (i + 1) + '. ' + macroStepDescription(st));
 }
@@ -7576,9 +7649,12 @@ function copyMacroReport() {
 async function macroReplay(dryRun) {
     if (macroReplaying) return false;
     if (!macroSteps.length) { showToast('Record or import a macro first.', 'error'); return false; }
+    const validation = macroValidate();
+    if (!validation.ok) { showToast('Macro cannot run: ' + validation.errors.join('; ') + '.', 'error'); return false; }
     if (dryRun) {
         logAction('macro', 'dry run', macroSteps.length + ' step(s)');
-        showToast('Dry run, ' + macroSteps.length + ' step(s): ' + macroPreflightPlan().join(' '), 'info');
+        showToast('Dry run, ' + macroSteps.length + ' step(s): ' + macroPreflightPlan().join(' ') +
+            (validation.warnings.length ? ' \u00b7 ' + validation.warnings.length + ' warning(s): ' + validation.warnings.join('; ') : ''), 'info');
         return true;
     }
     macroReplaying = true;
@@ -7637,6 +7713,21 @@ function updateMacroControls() {
     if (btn) {
         btn.textContent = macroRecording ? '\u25a0 Stop recording' : '\u25cf Record';
         btn.classList.toggle('tb-btn-active', macroRecording);
+    }
+    const v = macroValidate();
+    const playBtn = document.getElementById('macroPlayBtn');
+    if (playBtn) {
+        playBtn.disabled = !v.ok;
+        playBtn.title = v.ok
+            ? ('Run every step in order, live' + (v.warnings.length ? ' (' + v.warnings.length + ' warning(s))' : ''))
+            : ('Cannot play: ' + v.errors.join('; '));
+    }
+    const valEl = document.getElementById('macroValidation');
+    if (valEl) {
+        if (!macroSteps.length) { valEl.textContent = 'Nothing to play yet.'; valEl.style.color = '#94a3b8'; }
+        else if (v.errors.length) { valEl.textContent = 'Cannot play: ' + v.errors.join('; ') + '.'; valEl.style.color = '#b91c1c'; }
+        else if (v.warnings.length) { valEl.textContent = 'Ready to play, with ' + v.warnings.length + ' warning(s): ' + v.warnings.join('; ') + '.'; valEl.style.color = '#b45309'; }
+        else { valEl.textContent = 'Ready to play.'; valEl.style.color = '#15803d'; }
     }
     const status = document.getElementById('macroStatus');
     if (status) status.textContent = macroRecording

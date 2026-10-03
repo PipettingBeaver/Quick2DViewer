@@ -3814,8 +3814,9 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
             return (group.children || []).map(o => o.textContent || '');
         })()
     `);
-    assert(presetLabels.length === 2 && presetLabels.every(l => /\(Preset\)$/.test(l)), 'both defaults carry the (Preset) suffix (got ' + JSON.stringify(presetLabels) + ')');
-    assert(presetLabels[0].indexOf('Non-Membrane') !== -1 && presetLabels[1].indexOf('Membrane') !== -1, 'one fits characterized non-membrane proteins (GFP) and one membrane proteins (TerC)');
+    assert(presetLabels.length === 4 && presetLabels.every(l => /\(Preset\)$/.test(l)), 'all four defaults carry the (Preset) suffix (got ' + JSON.stringify(presetLabels) + ')');
+    assert(presetLabels[0].indexOf('GFP') !== -1 && presetLabels[1].indexOf('TerC') !== -1, 'GFP and TerC are one-click presets first');
+    assert(presetLabels[2].indexOf('Non-Membrane') !== -1 && presetLabels[3].indexOf('Membrane') !== -1, 'then the two generic workflow templates');
     assert(ctxRun(`onMacroSavedSelect('char-nonmembrane-api')`) === true, 'the GFP preset loads');
     assert(ctxRun(`macroSteps.length`) === 5 && ctxRun(`macroSteps[0].accession`) === '$ACCESSION', 'with parameterised steps');
     assert(ctxRun(`macroSteps.map(s => s.type).join(',')`) === 'uniprot,domainScan,homolog,pdb,validation', 'in API-only order');
@@ -3824,6 +3825,15 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     const gfpPreflight = ctxRun(`macroPreflightPlan()`);
     assert(gfpPreflight[4].indexOf('[skip: no experimental structure attached]') !== -1, 'without a structure the validation step preflights as a skip (got "' + gfpPreflight[4] + '")');
     assert(ctxRun(`onMacroSavedSelect('unchar-membrane-api')`) === true && ctxRun(`macroSteps.map(s => s.type).join(',')`) === 'uniprot,topology,domainScan,homolog', 'the membrane preset runs topology before domains');
+    ctxRun(`sessionSpeciesToken = 'bos_taurus'; sessionSpeciesLabel = 'Bos taurus'; sessionSpeciesManual = false; uniprotAccession = ''; macroAccessionOverride = '';`);
+    assert(ctxRun(`onMacroSavedSelect('gfp-api-infobase')`) === true, 'the GFP preset loads');
+    assert(ctxRun(`macroAccessionOverride`) === 'P42212' && ctxRun(`macroSteps.length`) === 5, 'and pins the accession override with the full API chain (got ' + ctxRun(`macroAccessionOverride`) + ')');
+    assert(ctxRun(`sessionSpeciesToken`) === '', 'clearing a stale species for the jellyfish entry');
+    ctxRun(`sessionSpeciesManual = true; sessionSpeciesToken = 'homo_sapiens'; sessionSpeciesLabel = 'Homo sapiens';`);
+    assert(ctxRun(`onMacroSavedSelect('terc-api-infobase')`) === true && ctxRun(`macroAccessionOverride`) === 'Q52356', 'the TerC preset pins the Serratia entry');
+    assert(ctxRun(`macroSteps.map(s => s.type).join(',')`) === 'uniprot,topology,domainScan,homolog', 'with topology first and no PDB step');
+    assert(ctxRun(`sessionSpeciesToken`) === 'homo_sapiens', 'and a manual species survives preset loading');
+    ctxRun(`sessionSpeciesManual = false;`);
     assert(ctxRun(`onMacroSavedSelect('nope')`) === false, 'an unknown saved macro changes nothing');
     ctxRun(`resetMacroSavedSelect();`);
     assert(ctxRun(`document.getElementById('macroSavedSelect').value`) === '', 'resetting clears the dropdown selection');
@@ -3856,6 +3866,29 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     assert(ctxRun(`sessionSpeciesToken`) === '', 'a non-Ensembl organism clears the species so species-specific steps skip honestly');
     assert(ctxRun(`onMacroAccessionPreset('NOPE1')`) === false, 'an unknown accession changes nothing');
     ctxRun(`uniprotAccession = ''; macroAccessionOverride = ''; sessionSpeciesToken = ''; sessionSpeciesLabel = ''; sessionSpeciesManual = false; updateMacroAccessionHint();`);
+
+    section('macro play button + pre-parse validation');
+    assert(HTML.indexOf('id="macroPlayBtn"') !== -1 && HTML.indexOf('Play macro') !== -1, 'the run button is "Play macro"');
+    assert(HTML.indexOf('macro-play-btn') !== -1 && HTML.indexOf('id="macroValidation"') !== -1, 'it is styled prominently and has a validation line');
+    ctxRun(`macroSteps = []; updateMacroControls();`);
+    assert(ctxRun(`document.getElementById('macroPlayBtn').disabled`) === true, 'Play is disabled with no steps');
+    assert(ctxRun(`document.getElementById('macroValidation').textContent`).indexOf('Nothing to play') !== -1, 'and the line says so');
+    ctxRun(`macroSteps = [{ type: 'nonsense' }]; updateMacroControls();`);
+    assert(ctxRun(`document.getElementById('macroPlayBtn').disabled`) === true, 'an unknown step type disables Play');
+    assert(ctxRun(`document.getElementById('macroValidation').textContent`).indexOf('unknown type "nonsense"') !== -1, 'and names the bad step');
+    ctxRun(`macroSteps = [{ type: 'uniprot', accession: '' }]; updateMacroControls();`);
+    assert(ctxRun(`document.getElementById('macroPlayBtn').disabled`) === true, 'a missing required parameter disables Play');
+    assert(ctxRun(`document.getElementById('macroValidation').textContent`).indexOf('has no accession') !== -1, 'with a specific reason');
+    ctxRun(`macroSteps = [{ type: 'uniprot', accession: '$ACCESSION' }]; uniprotAccession = 'P42212'; macroAccessionOverride = ''; updateMacroControls();`);
+    assert(ctxRun(`document.getElementById('macroPlayBtn').disabled`) === false, 'a valid macro enables Play');
+    assert(ctxRun(`document.getElementById('macroValidation').textContent`) === 'Ready to play.', 'and the line confirms readiness');
+    ctxRun(`parsedTracks = {}; macroSteps = [{ type: 'topology' }]; updateMacroControls();`);
+    assert(ctxRun(`document.getElementById('macroPlayBtn').disabled`) === false, 'missing session data is a warning, not a block');
+    assert(ctxRun(`document.getElementById('macroValidation').textContent`).indexOf('warning(s)') !== -1 && ctxRun(`document.getElementById('macroValidation').textContent`).indexOf('needs a loaded sequence') !== -1, 'and the warning names what is missing');
+    ctxRun(`macroSteps = [{ type: 'nonsense' }];`);
+    const macroInvalidReplay = await ctxRun(`macroReplay(false)`);
+    assert(macroInvalidReplay === false, 'replay refuses an invalid macro even when called directly');
+    ctxRun(`macroSteps = []; uniprotAccession = ''; parsedTracks = {}; updateMacroControls();`);
 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
