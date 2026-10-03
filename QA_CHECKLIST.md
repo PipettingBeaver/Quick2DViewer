@@ -1,6 +1,6 @@
 # Q2DV — QA checklist for the current development session (v0.16.0 → 0.66.10)
 
-**Read this first.** Every item below has automated coverage in `npm test` (1291 checks),
+**Read this first.** Every item below has automated coverage in `npm test` (1305 checks),
 but that harness runs the app script against a **stubbed DOM**: it never renders a
 pixel, never lays anything out, never fires a real browser event, and it *replaces*
 `renderViewer` with a no-op for speed (one check restores the real renderer just to
@@ -1598,6 +1598,15 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 346 | Cycle the 3D colour schemes (incl. hydro/spectrum) | Colours actually change; no "Could not interpret colorscheme" |
 | 347 | Open/close/resize the 3D viewer | No OffscreenCanvas/framebuffer warnings in the console |
 | 348 | Copy as JSON | Valid JSON for macro work (macro recording itself is a future idea) |
+
+## 0.66.21 - Saved Macros presets (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 483 | Macro -> Saved Macros | Two presets, both ending "(Preset)" |
+| 484 | Load "Characterized Non-Membrane Protein, API-Only (Preset)" | 5 steps; accession $ACCESSION; PDB 1GFL |
+| 485 | Replay it on GFP (P42212) | UniProt, domains, BLAST, PDB, validation run in order |
+| 486 | Load the membrane preset and replay on a TerC entry | Topology before domains; no PDB step; validation absent |
 
 ## 0.66.20 - macro failure policy + run report (quick rows)
 

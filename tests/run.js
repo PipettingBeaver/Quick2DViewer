@@ -3800,6 +3800,35 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
         parsedTracks = {}; keyedVariantsInfo = {}; actionLog = [];
     `);
 
+    section('macro presets: Saved Macros dropdown');
+    assert(HTML.indexOf('Macros are pre-recorded action sequences') !== -1, 'the macro screen uses the rewritten description');
+    assert(HTML.indexOf('Auto-retry 3 times, then proceed (Recommended)') !== -1, 'the recommended failure policy is labelled');
+    assert(HTML.indexOf('id="macroSavedSelect"') !== -1 && HTML.indexOf('>Saved Macros</label>') !== -1, 'the Saved Macros dropdown exists');
+    ctxRun(`macroSavedPopulated = false;`);
+    ctxRun(`populateMacroSavedSelect();`);
+    assert(ctxRun(`document.getElementById('macroSavedSelect').children.length`) === 2, 'the dropdown holds the placeholder and the presets group');
+    const presetLabels = ctxRun(`
+        (function () {
+            const sel = document.getElementById('macroSavedSelect');
+            const group = sel.children[1];
+            return (group.children || []).map(o => o.textContent || '');
+        })()
+    `);
+    assert(presetLabels.length === 2 && presetLabels.every(l => /\(Preset\)$/.test(l)), 'both defaults carry the (Preset) suffix (got ' + JSON.stringify(presetLabels) + ')');
+    assert(presetLabels[0].indexOf('Non-Membrane') !== -1 && presetLabels[1].indexOf('Membrane') !== -1, 'one fits characterized non-membrane proteins (GFP) and one membrane proteins (TerC)');
+    assert(ctxRun(`onMacroSavedSelect('char-nonmembrane-api')`) === true, 'the GFP preset loads');
+    assert(ctxRun(`macroSteps.length`) === 5 && ctxRun(`macroSteps[0].accession`) === '$ACCESSION', 'with parameterised steps');
+    assert(ctxRun(`macroSteps.map(s => s.type).join(',')`) === 'uniprot,domainScan,homolog,pdb,validation', 'in API-only order');
+    assert(ctxRun(`macroName`).indexOf('Characterized Non-Membrane') !== -1, 'and names the workflow');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(238) }; keyedVariantsInfo = {}; cachedStructureTexts = {};`);
+    const gfpPreflight = ctxRun(`macroPreflightPlan()`);
+    assert(gfpPreflight[4].indexOf('[skip: no experimental structure attached]') !== -1, 'without a structure the validation step preflights as a skip (got "' + gfpPreflight[4] + '")');
+    assert(ctxRun(`onMacroSavedSelect('unchar-membrane-api')`) === true && ctxRun(`macroSteps.map(s => s.type).join(',')`) === 'uniprot,topology,domainScan,homolog', 'the membrane preset runs topology before domains');
+    assert(ctxRun(`onMacroSavedSelect('nope')`) === false, 'an unknown saved macro changes nothing');
+    ctxRun(`resetMacroSavedSelect();`);
+    assert(ctxRun(`document.getElementById('macroSavedSelect').value`) === '', 'resetting clears the dropdown selection');
+    ctxRun(`macroSteps = []; macroName = 'Untitled macro'; parsedTracks = {};`);
+
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
 })();

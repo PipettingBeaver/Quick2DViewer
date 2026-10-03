@@ -3119,12 +3119,17 @@
             <button onclick="closeMacroModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
         </div>
         <p style="font-size:0.78rem; color:#64748b; margin: 12px 0 8px; line-height:1.4;">
-            Record the API and import steps of a workflow and replay them, so the same analysis can be
-            repeated or moved to another protein. Each step stores the action, its resolved provider and its
-            parameters; <code>$ACCESSION</code> stands for the session accession, so the override below
-            retargets the whole run. Replay calls the same code paths as the buttons, and every step lands
-            in the activity log.
+            Macros are pre-recorded action sequences. Q2DV allows for saving or running macros to
+            sequentially run actions across different proteins. This can automate API calls and import steps
+            of a workflow and replay them, enabling analysis to be repeated or moved to another protein. Each
+            step stores the action, its resolved provider and its parameters; <code>$ACCESSION</code> stands
+            for the session accession, so the override below retargets the whole run. Replay calls the same
+            code paths as the buttons, and every step lands in the activity log.
         </p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+            <label for="macroSavedSelect" style="font-size:0.78rem; font-weight:600; color:#475569;" title="Load a built-in workflow preset (or a saved macro) into the step list, then set the accession or the override and Replay">Saved Macros</label>
+            <select id="macroSavedSelect" class="q2dv-select" onchange="onMacroSavedSelect(this.value)" style="font-size:0.78rem; padding:4px 6px; min-width:280px;"></select>
+        </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
             <button type="button" id="macroRecordBtn" class="tb-btn tb-btn-secondary" onclick="toggleMacroRecording()">&#9679; Record</button>
             <button type="button" class="copy-btn" onclick="macroReplay(true)">Dry run</button>
@@ -3144,7 +3149,7 @@
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
             <label for="macroFailurePolicy" style="font-size:0.78rem; font-weight:600; color:#475569;" title="What happens when an API step fails after the preflight">On step failure</label>
             <select id="macroFailurePolicy" onchange="macroFailurePolicy = this.value;" class="q2dv-select" style="font-size:0.78rem; padding:4px 6px;">
-                <option value="retry3">Auto-retry 3 times, then proceed</option>
+                <option value="retry3">Auto-retry 3 times, then proceed (Recommended)</option>
                 <option value="proceed">Proceed immediately</option>
                 <option value="pause">Pause and check in</option>
                 <option value="stop">Stop the macro</option>
@@ -7206,6 +7211,72 @@ let macroPdbOverride = '';
 let macroFailurePolicy = 'retry3'; // 'retry3' | 'proceed' | 'pause' | 'stop'
 let macroCheckinResolver = null;
 let macroLastRun = null;
+let macroSavedPopulated = false;
+// Built-in workflow presets shown in the Saved Macros dropdown. They are
+// ordinary macro JSON: the accession is parameterised, providers are resolved
+// ids, and the PDB override can retarget the literal entry.
+const MACRO_PRESETS = [
+    {
+        id: 'char-nonmembrane-api',
+        label: 'Characterized Non-Membrane Protein, API-Only (Preset)',
+        name: 'Characterized Non-Membrane Protein, API-Only',
+        steps: [
+            { type: 'uniprot', accession: '$ACCESSION' },
+            { type: 'domainScan', provider: 'ebi_iprscan5' },
+            { type: 'homolog', provider: 'ebi_blast' },
+            { type: 'pdb', pdbId: '1GFL' },
+            { type: 'validation' }
+        ]
+    },
+    {
+        id: 'unchar-membrane-api',
+        label: 'Uncharacterized Membrane Protein, API-Only (Preset)',
+        name: 'Uncharacterized Membrane Protein, API-Only',
+        steps: [
+            { type: 'uniprot', accession: '$ACCESSION' },
+            { type: 'topology' },
+            { type: 'domainScan', provider: 'ebi_iprscan5' },
+            { type: 'homolog', provider: 'ebi_phmmer' }
+        ]
+    }
+];
+function populateMacroSavedSelect() {
+    const sel = document.getElementById('macroSavedSelect');
+    if (!sel || macroSavedPopulated) return;
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Choose a saved macro\u2026';
+    sel.appendChild(placeholder);
+    const group = document.createElement('optgroup');
+    group.label = 'Presets';
+    MACRO_PRESETS.forEach(p => {
+        const op = document.createElement('option');
+        op.value = p.id;
+        op.textContent = p.label;
+        group.appendChild(op);
+    });
+    sel.appendChild(group);
+    macroSavedPopulated = true;
+}
+function loadMacroPreset(id) {
+    const preset = MACRO_PRESETS.find(p => p.id === id);
+    if (!preset) return false;
+    macroName = preset.name;
+    macroSteps = preset.steps.map(st => Object.assign({}, st));
+    renderMacroModalIfVisible();
+    logAction('macro', 'preset loaded', preset.label);
+    showToast('Loaded "' + preset.label + '" (' + macroSteps.length + ' step(s)). Set the accession or the override, then Replay.', 'success');
+    return true;
+}
+function onMacroSavedSelect(value) {
+    if (!value) return false;
+    if (!loadMacroPreset(value)) { showToast('That saved macro was not found.', 'error'); return false; }
+    return true;
+}
+function resetMacroSavedSelect() {
+    const sel = document.getElementById('macroSavedSelect');
+    if (sel) sel.value = '';
+}
 function macroParam(value) {
     const v = String(value == null ? '' : value).trim();
     if (!v) return '';
@@ -7466,12 +7537,14 @@ async function macroReplay(dryRun) {
 }
 function toggleMacroRecording() {
     macroRecording = !macroRecording;
+    if (macroRecording) resetMacroSavedSelect();
     logAction('macro', macroRecording ? 'recording started' : 'recording stopped', macroSteps.length + ' step(s)');
     renderMacroModalIfVisible();
     updateMacroControls();
 }
 function clearMacroSteps() {
     macroSteps = [];
+    resetMacroSavedSelect();
     renderMacroModalIfVisible();
     updateMacroControls();
 }
@@ -7523,6 +7596,7 @@ function renderMacroReport() {
     el.innerHTML = html;
 }
 function renderMacroModal() {
+    populateMacroSavedSelect();
     const nameEl = document.getElementById('macroNameInput');
     if (nameEl && document.activeElement !== nameEl) nameEl.value = macroName;
     const overrideEl = document.getElementById('macroAccessionOverride');
@@ -10172,7 +10246,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.20';
+const APP_VERSION = '0.66.21';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

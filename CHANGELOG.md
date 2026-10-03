@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.21] - 2026-10-01
+
+### Added
+- **Saved Macros dropdown with workflow presets.** The Macro screen now offers two built-in
+  presets, labelled with a (Preset) suffix: "Characterized Non-Membrane Protein, API-Only"
+  (UniProt load, domain scan, BLAST homologs, 1GFL fetch, validation: fits GFP) and
+  "Uncharacterized Membrane Protein, API-Only" (UniProt load, topology, domain scan, phmmer
+  homologs: fits TerC). Loading one fills the step list; the accession and PDB overrides
+  retarget it, and preflight still tags skips (for example validation without a structure).
+
+### Changed
+- The macro screen description now introduces macros as pre-recorded action sequences for
+  saving or running across proteins, and the default failure policy is labelled
+  "(Recommended)".
+
 ## [0.66.20] - 2026-10-01
 
 ### Added
