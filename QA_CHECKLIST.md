@@ -101,7 +101,60 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
-### Metal-site coordination analysis — 0.69.2 (core only, no surface yet)
+---
+
+### Metal-site coordination on the cofactor rows — 0.66.30
+
+**Surface.** No new surface: the coordination read-out hangs off the existing
+**`Cofactors` track** (a Structure-derived row). Row-label tooltip and per-residue
+hover, paired to the cofactor numbering 1-9 the row already shows.
+
+**Should do.** Hovering the cofactor row (or a residue in it) reports each metal's
+coordination number, geometry class and distortion, donor composition, axial
+ligands and both entropies.
+
+**Try (normal use).**
+1. Attach a structure with a heme (a cytochrome or peroxidase PDB) plus a
+   sequence, then find the **Cofactors** row.
+   *Expect:* digits 1..9 on residues near each cofactor.
+2. Hover the **row label**.
+   *Expect:* a block headed "Coordination (from the attached coordinates)", one line
+   per metal-bearing cofactor — e.g. `#1 HEM A201 - FE, CN 6, OCT - octahedral` —
+   then a detail line with donors, axial ligands and the two entropies.
+3. Hover a **residue** carrying the digit `1`.
+   *Expect:* `Cofactor #1 - HEM A201 / FE, CN 6, OCT - octahedral` plus its axial
+   ligand(s). This is the primary interaction.
+4. Read the codes: `OCT` octahedral, `SPY` square pyramidal, `SPL` square planar,
+   `TET` tetrahedral, `TBP` trigonal bipyramidal, `TPR` trigonal prismatic, `LIN`
+   linear, `TPL`/`TPY` trigonal planar/pyramidal.
+   *Expect:* the full name always follows the code, so the abbreviations are never
+   ambiguous.
+5. Attach two structures that both have metals.
+   *Expect:* each row reports its own file's metals; nothing bleeds across.
+6. Attach a structure with **no** metals (most soluble proteins).
+   *Expect:* the row tooltip is unchanged — no coordination block, no empty section.
+
+**Edge cases.**
+- *A heme reporting CN 0, or "NA" as the element.* That was the porphyrine-`NA`
+  read-as-sodium bug, now fixed. If it reappears the element column is being
+  mis-parsed and the site is worthless — report it.
+- *Every donor labelled axial.* "Axial" used to mean "closest"; it now means "off
+  the porphyrin plane". A bare metal should show **no** axial ligands — four on a Zn
+  means the plane logic has regressed.
+- *A five-coordinate heme called TBP instead of SPY.* The signature of the broken
+  permutation search. Sanity check: an exact ideal geometry must still score ~0 A.
+- *Metals in cofactors 10+.* Only nine are numbered, so those sites appear solely as
+  the "N further metal site(s)" count. Expected, not a bug.
+- *Fe-S / di-iron.* Two sites under one cofactor digit, each flagged `[cluster]`;
+  read the flag before the number, since single-site CN is not meaningful.
+- *CN above 6.* Geometry is left undetermined rather than guessed.
+- Headless coverage: pairing, both tooltips, the axial rule, cluster handling and
+  the NA fix are tested against a synthetic heme + zinc. Real-file behaviour
+  (missing B-factor columns, insertion codes, alternate conformers) needs a browser.
+
+---
+
+### Metal-site coordination analysis — 0.66.29 (core only, no surface yet)
 
 **Surface.** None yet, deliberately. The computation lives behind
 `analyzeMetalSites(parseAllAtoms(text, ext))` and is covered by the headless
@@ -139,7 +192,7 @@ parsed atoms.
 
 ---
 
-### Protein constants (mass, pI, A280, GRAVY) — 0.69.1
+### Protein constants (mass, pI, A280, GRAVY) — 0.66.28
 
 **Surface.** Selection tab → *Protein constants* block (`constantsDisplay`), beside FASTA
 Segment; also emitted in Export → Methods summary (.md). No new surface (DESIGN 20).
@@ -175,7 +228,7 @@ Segment; also emitted in Export → Methods summary (.md). No new surface (DESIG
 
 ---
 
-### Structure file export (PDB/CIF) — 0.69.0
+### Structure file export (PDB/CIF) — 0.66.27
 
 **Surface.** Export menu (menu bar) → *Structure file (PDB/CIF)*. No new top-level entry: it is a
 deliverable, and Export already owns "what leaves the app" (DESIGN 16/20, 26).
@@ -222,7 +275,7 @@ No selection = whole model, and the toast says which was exported.
 
 ---
 
-### Named multi-column tables in the experimental importer — 0.69.0
+### Named multi-column tables in the experimental importer — 0.66.27
 
 **Surface.** Options → Data Sources → *Experimental per-residue data* (`expNameInput`,
 `expKindSelect`, `expPasteInput`, `btnAddExp`). No new surface; same importer, one more input shape.

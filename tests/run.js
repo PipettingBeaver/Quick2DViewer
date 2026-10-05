@@ -3850,8 +3850,86 @@ assert(clusterSites.every(s => s.element === 'FE'), 'both are recognised as iron
 
 assert(ctxRun(`analyzeMetalSites(parseAllAtoms('END','pdb'))`).length === 0, 'a file with no metals yields no sites, not an error');
 assert(ctxRun(`atomElementOf({element:'', atomName:'ZN'})`) === 'ZN' && ctxRun(`atomElementOf({element:'', atomName:'CA'})`) === 'CA' && ctxRun(`atomElementOf({element:'', atomName:' O '})`) === 'O', 'element falls back to the atom name, two-letter metals first');
-assert(ctxRun(`atomElementOf({element:'Z', atomName:'ZN'})`) === 'ZN' && ctxRun(`atomElementOf({element:'N', atomName:'NE2'})`) === 'N', 'a truncated element column is recovered from the atom name');
 ctxRun(`cachedStructureTexts = {}; parsedTracks = {};`);
+
+section('cofactor/coordination pairing and tooltips');
+// A heme-like group (Fe + four porphyrine N + one axial His) plus a bare Zn, so
+// pairing to the existing 1-9 cofactor numbering is exercised for both a
+// macrocycle metal and a monatomic one.
+const hemePdb = [
+    // porphyrine nitrogens 2.0 A from the iron, four in a plane (z = 0)
+    metalPdbLine('HETATM', 'NA', 'HEM', 'A', 201, 200, 2.0, 0, 0, 'N'),
+    metalPdbLine('HETATM', 'NB', 'HEM', 'A', 201, 201, 0, 2.0, 0, 'N'),
+    metalPdbLine('HETATM', 'NC', 'HEM', 'A', 201, 202, -2.0, 0, 0, 'N'),
+    metalPdbLine('HETATM', 'ND', 'HEM', 'A', 201, 203, 0, -2.0, 0, 'N'),
+    metalPdbLine('HETATM', 'FE', 'HEM', 'A', 201, 204, 0, 0, 0, 'FE'),
+    // axial histidine below the plane -> square-pyramidal, CN 5
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 88, 205, 0, 0, -2.1, 'N'),
+    metalPdbLine('HETATM', 'ZN', 'ZN', 'A', 300, 206, 20, 20, 20, 'ZN'),
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 40, 207, 21.183, 21.183, 21.183, 'N'),
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 41, 208, 21.183, 18.817, 18.817, 'N'),
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 42, 209, 18.817, 21.183, 18.817, 'N'),
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 43, 210, 18.817, 18.817, 21.183, 'N'),
+    'END'
+].join(String.fromCharCode(10));
+sandbox.__hemePdb = hemePdb;
+
+// The bug this guards: a porphyrine nitrogen is named NA in every heme, and NA is
+// also sodium. Reading the name over the element column deleted the metal's own
+// donors and reported "NA, CN 0" instead of iron.
+assert(ctxRun(`atomElementOf({element:'N', atomName:'NA'})`) === 'N', 'a declared element wins over the atom name, so a porphyrine NA is nitrogen, not sodium');
+assert(ctxRun(`looksLikePorphyrinN({element:'', atomName:'NA'}, 'HEM')`) === true && ctxRun(`looksLikePorphyrinN({element:'', atomName:'NA'}, 'ZN')`) === false, 'a macrocycle NA is recognised as a porphyrine nitrogen, but not elsewhere');
+assert(ctxRun(`findMetalCenters(parseAllAtoms(window.__hemePdb, 'pdb')).length`) === 2, 'the heme contributes exactly one metal (iron) - its NA-ND nitrogens are never read as sodium');
+
+const hemeParsed = ctxRun(`parseAllAtoms(window.__hemePdb, 'pdb')`);
+const hemeCofactors = ctxRun(`extractCofactorNeighborhoods(window.__hemePdb, 'pdb').cofactors`);
+assert(hemeCofactors.length === 2, 'the heme and the zinc are two numbered cofactors (got ' + hemeCofactors.length + ')');
+const hemeCoord = ctxRun(`analyzeCofactorCoordination(window.__hemePdb, 'pdb', extractCofactorNeighborhoods(window.__hemePdb, 'pdb').cofactors)`);
+assert(hemeCoord.sites.length === 2, 'both cofactors get a coordination entry (got ' + hemeCoord.sites.length + ')');
+assert(hemeCoord.unpaired === 0, 'and no metal is left unpaired (got ' + hemeCoord.unpaired + ')');
+const hemeEntry = hemeCoord.sites[0], znEntry = hemeCoord.sites[1];
+assert(hemeEntry.sites[0].element === 'FE' && hemeEntry.sites[0].inMacrocycle === true, 'the macrocycle metal is iron and is flagged as such');
+assert(hemeEntry.sites[0].cn === 5, 'the heme reads CN 5 - four porphyrine N plus one axial His (got ' + hemeEntry.sites[0].cn + ')');
+assert(hemeEntry.sites[0].geometry === 'square pyramidal', 'so the geometry is square pyramidal (got ' + hemeEntry.sites[0].geometry + ')');
+assert(hemeEntry.sites[0].geometryLabel.indexOf('SPY') === 0, 'labelled SPY in the short code (got ' + hemeEntry.sites[0].geometryLabel + ')');
+assert(hemeEntry.sites[0].axial.length === 1 && /HIS/.test(hemeEntry.sites[0].axial[0]), 'the axial histidine is named (got ' + JSON.stringify(hemeEntry.sites[0].axial) + ')');
+assert(znEntry.sites[0].element === 'ZN' && znEntry.sites[0].cn === 4 && znEntry.sites[0].geometry === 'tetrahedral', 'the zinc reads CN 4 tetrahedral (got ' + znEntry.sites[0].cn + ' ' + znEntry.sites[0].geometry + ')');
+assert(hemeEntry.cofactorIndex === 1 && znEntry.cofactorIndex === 2, 'the entries carry the cofactor numbers the row already shows');
+
+// A polynuclear group: two irons in one FES must both appear under cofactor #1.
+const fesCoord = ctxRun(`(function () {
+    const p = window.__clusterPdb;
+    return analyzeCofactorCoordination(p, 'pdb', extractCofactorNeighborhoods(p, 'pdb').cofactors);
+})()`);
+assert(fesCoord.sites.length === 1 && fesCoord.sites[0].sites.length === 2, 'two metals in one FES group give two sites under a single cofactor (got ' + (fesCoord.sites[0] ? fesCoord.sites[0].sites.length : 0) + ')');
+assert(fesCoord.sites[0].sites.every(s => s.isCluster === true), 'both are flagged as clusters');
+assert(/not meaningful/.test(fesCoord.sites[0].sites[0].geometryLabel + '') === false, 'the label itself does not editorialize');
+
+ctxRun(`
+    structureCoordination = { 'zn': { sites: ${JSON.stringify(hemeCoord.sites)}, unpaired: 2 } };
+`);
+const cofTip = ctxRun(`cofactorCoordinationTooltip('zn')`);
+assert(/Coordination \(from the attached coordinates\)/.test(cofTip), 'the row-label tooltip opens with its heading');
+assert(/#1 HEM A201 - FE, CN 5, SPY - square pyramidal/.test(cofTip), 'and names cofactor #1 with its code and class (got: ' + cofTip.split('\n')[1] + ')');
+assert(/RMSD 0\.\d+ A/.test(cofTip), 'with the distortion');
+assert(/axial HIS A88:NE2/.test(cofTip), 'and the axial ligand');
+assert(/donors N5/.test(cofTip), 'and the donor composition');
+assert(/ambiguity .* bits/.test(cofTip) && /donor diversity .* bits/.test(cofTip), 'and both entropies');
+assert(/2 further metal site\(s\)/.test(cofTip), 'metals beyond the numbered nine are reported, not hidden');
+assert(/Geometry codes are Q2DV abbreviations/.test(cofTip), 'and the codes are flagged as ours');
+assert(ctxRun(`cofactorCoordinationTooltip('nothing-here')`) === '', 'a row with no metals gets no coordination block');
+
+const siteTip = ctxRun(`cofactorSiteTooltip('zn', 2)`);
+assert(/Cofactor #2 - ZN A300/.test(siteTip) && /ZN, CN 4, TET - tetrahedral/.test(siteTip), 'the per-residue hover names the cofactor and its site');
+assert(/axial ligand/.test(siteTip) === false, 'and stays short when there is nothing axial to add');
+assert(ctxRun(`cofactorSiteTooltip('zn', 5)`) === '', 'hovering a cofactor with no metal adds nothing');
+
+ctxRun(`
+    structureCoordination = {};
+    resetAllData();
+`);
+assert(ctxRun(`Object.keys(structureCoordination).length`) === 0, 'reset clears the coordination store');
+ctxRun(`parsedTracks = {}; cachedStructureTexts = {}; uploadedStructureFiles = [];`);
 
 // ---------- async tests ----------
 (async () => {
@@ -4288,6 +4366,20 @@ ctxRun(`cachedStructureTexts = {}; parsedTracks = {};`);
     assert(expDownloadedSel && expDownloadedSel.whole === false && expDownloadedSel.keptAtoms === 2, 'with a selection it exports only that residue, from both chains');
     assert(ctxRun(`actionLog.some(e => e.label === 'q2dv-model-selection.pdb')`) === true, 'and the filename says it was narrowed');
     ctxRun(`cachedStructureTexts = {}; parsedTracks = {}; selectStart = null; selectEnd = null;`);
+
+    // attachStructureText is async, so the attach-time coordination store has to
+    // be checked here rather than in the synchronous section above.
+    section('coordination is computed at attach time');
+    ctxRun(`
+        parsedTracks = { AA: 'M'.repeat(120) };
+        cachedStructureTexts = {}; uploadedStructureFiles = []; structureCoordination = {};
+    `);
+    await ctxRun(`attachStructureText('heme.pdb', window.__hemePdb, 'pdb', {})`);
+    assert(ctxRun(`Object.keys(structureCoordination).join(',')`) === 'heme', 'attaching a file computes and stores its coordination (got "' + ctxRun(`Object.keys(structureCoordination).join(',')`) + '")');
+    assert(ctxRun(`cofactorCoordinationForBase('heme').length`) === 2, 'keyed by the same base name the _Cofactors track uses');
+    assert(ctxRun(`parsedTracks['heme_Cofactors']`) !== undefined, 'and the per-residue cofactor row exists alongside it');
+    assert(/SPY/.test(ctxRun(`cofactorCoordinationTooltip('heme')`)), 'so the row-label tooltip resolves it straight away');
+    assert(/CN 4/.test(ctxRun(`cofactorSiteTooltip('heme', 2)`)), 'and so does the per-residue hover on the zinc cofactor');
 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);

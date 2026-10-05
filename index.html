@@ -10754,7 +10754,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.29';
+const APP_VERSION = '0.66.30';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -12307,6 +12307,19 @@ async function attachStructureText(fileName, text, ext, opts) {
         if (opts.source) setTrackMeta(cofactorKey, { source: opts.source });
     }
 
+    // Metal-site coordination for this file, paired to the cofactor numbering the
+    // "_Cofactors" row already uses, so the row's tooltip can carry the chemistry.
+    if (cofactorResult.cofactors.length) {
+        const coordination = analyzeCofactorCoordination(text, ext, cofactorResult.cofactors);
+        if (coordination.sites.length || coordination.unpaired) {
+            structureCoordination[baseName] = coordination;
+        } else {
+            delete structureCoordination[baseName];
+        }
+    } else {
+        delete structureCoordination[baseName];
+    }
+
     // Lightweight metadata only (name/ext/size) for the Cached Data listing -
     // raw text lives in the IndexedDB structure cache, never in localStorage.
     uploadedStructureFiles = uploadedStructureFiles.filter(f => f.name !== fileName);
@@ -12782,15 +12795,25 @@ function isWaterResidue(resName) { return WATER_RESNAMES.has(String(resName || '
 // not be read as zinc's first letter.
 function atomElementOf(atom) {
     const declared = String((atom && atom.element) || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (declared) return declared;
+    // Only when the file has no usable element column do we read the name. Two
+    // letters win there (ZN must not become Z), but deliberately *not* when a
+    // column exists: a porphyrine nitrogen is named NA in every heme, and
+    // promoting that to sodium would delete the metal's own donors.
     const name = String((atom && atom.atomName) || '').replace(/^[0-9]+/, '').replace(/[^A-Za-z]/g, '').toUpperCase();
-    let fromName = '';
-    if (name) fromName = TWO_LETTER_ELEMENTS.has(name.slice(0, 2)) ? name.slice(0, 2) : name.charAt(0);
-    // A declared single letter that is only the first half of the name's
-    // two-letter element ("Z" for an atom named ZN) is a truncated column rather
-    // than the element, and that is exactly where metals are; prefer the name.
-    // Otherwise the file's own column wins.
-    if (fromName.length === 2 && declared.length === 1 && declared === fromName.charAt(0)) return fromName;
-    return declared || fromName;
+    if (!name) return '';
+    if (TWO_LETTER_ELEMENTS.has(name.slice(0, 2))) return name.slice(0, 2);
+    return name.charAt(0);
+}
+// Atom names that look like a metal to the name fallback but are ligand atoms.
+// Inside a macrocycle these are the porphyrine nitrogens coordinating the metal.
+const PORPHYRIN_N_NAMES = new Set(['NA', 'NB', 'NC', 'ND', 'NE', 'N1', 'N2', 'N3', 'N4', 'N5', 'NEA', 'NEB', 'NEC', 'NED', 'CHA', 'CHB', 'CHC', 'CHD']);
+function looksLikePorphyrinN(atom, groupResName) {
+    if (!MACROCYCLE_RESNAMES.has(String(groupResName || '').toUpperCase())) return false;
+    const declared = String((atom && atom.element) || '').toUpperCase().replace(/[^A-Z]/g, '');
+    const name = String((atom && atom.atomName) || '').replace(/^[0-9]+/, '').replace(/[^A-Za-z]/g, '').toUpperCase();
+    if (declared && declared !== 'N') return false;   // a real column already told us
+    return PORPHYRIN_N_NAMES.has(name) || PORPHYRIN_N_NAMES.has(name.slice(0, 2));
 }
 // Every metal atom in the file becomes a candidate site, including the iron
 // *inside* a heme (there is no standalone FE record) and metals inside clusters.
@@ -12800,6 +12823,7 @@ function findMetalCenters(parsed) {
         (group.atoms || []).forEach((atom) => {
             const el = atomElementOf(atom);
             if (!METAL_ELEMENTS.has(el)) return;
+            if (looksLikePorphyrinN(atom, group.resName)) return; // ligand N named like a metal
             centers.push({
                 id: centers.length + 1, element: el,
                 groupResName: group.resName, chain: group.chain, resSeq: group.resSeq, key: key,
@@ -12836,8 +12860,7 @@ function metalFirstShell(center, parsed, opts) {
             x: atom.x, y: atom.y, z: atom.z,
             kind: kind, resName: meta.resName, chain: meta.chain, resSeq: meta.resSeq, iCode: meta.iCode,
             atomName: atom.atomName || '', element: el, distance: d,
-            water: kind === 'het' && isWaterResidue(meta.resName),
-            axial: d <= (o.axialCutoff || METAL_AXIAL_CUTOFF)
+            water: kind === 'het' && isWaterResidue(meta.resName)
         });
     };
     (parsed.proteinResidues || new Map()).forEach((res) => {
@@ -12866,13 +12889,18 @@ const IDEAL_GEOMETRIES = [
     { name: 'octahedral', cn: 6, points: [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] },
     { name: 'trigonal prismatic', cn: 6, points: [[1, 0, 0], [-0.5, 0.8660, 0], [-0.5, -0.8660, 0], [1, 0, 2 * 0.8165], [-0.5, 0.8660, 2 * 0.8165], [-0.5, -0.8660, 2 * 0.8165]] }
 ];
-function permutations(n) {
-    if (n === 0) return [[]];
-    if (n === 1) return [[0]];
+// All n! assignments of donors to template vertices. The remaining set has to be
+// carried explicitly: prefixing a loop index onto the permutations of a smaller
+// range silently yields repeated indices ([0,0,1,2,3]), which is not a valid
+// assignment - and because a degenerate point set makes the RMSD clamp to zero,
+// that bug hides itself as a *better* score rather than an error.
+const GEOMETRY_MAX_CN = 6; // the largest template is octahedral; 6! = 720 fits
+function permutations(items) {
+    if (items.length <= 1) return [items.slice()];
     const out = [];
-    for (let i = 0; i < n; i++) {
-        const rest = permutations(n - 1);
-        for (const p of rest) out.push([i].concat(p));
+    for (let i = 0; i < items.length; i++) {
+        const rest = items.slice(0, i).concat(items.slice(i + 1));
+        permutations(rest).forEach(p => out.push([items[i]].concat(p)));
     }
     return out;
 }
@@ -12913,7 +12941,7 @@ function matchGeometry(donorPts, geometry) {
         return { x: p[0] / len * target, y: p[1] / len * target, z: p[2] / len * target };
     });
     let best = Infinity;
-    permutations(n).forEach((perm) => {
+    permutations(donorPts.map((_, i) => i)).forEach((perm) => {
         const reordered = perm.map(i => template[i]);
         const fit = kabschSuperpose(shell, reordered);
         if (fit && isFinite(fit.rmsd) && fit.rmsd < best) best = fit.rmsd;
@@ -12926,6 +12954,9 @@ function matchGeometry(donorPts, geometry) {
 function classifyCoordinationGeometry(donorPts) {
     const cn = donorPts.length;
     if (cn < 2) return { cn: cn, geometry: null, rmsd: null, runnerUp: null, candidates: [] };
+    // Above the largest template there is nothing honest to compare against, so
+    // the class is left undetermined rather than guessed from six of the donors.
+    if (cn > GEOMETRY_MAX_CN) return { cn: cn, geometry: null, rmsd: null, runnerUp: null, candidates: [], aboveLibrary: true };
     const candidates = [];
     IDEAL_GEOMETRIES.forEach(g => {
         if (g.cn !== cn) return;
@@ -12973,6 +13004,27 @@ function donorDiversityEntropy(donors) {
 }
 // The full read-out for one metal site. Everything the surfaces need, computed
 // in one pass so a table row and a track agree by construction.
+// The plane of a macrocycle's own coordinating atoms, from three of them by
+// cross-product, with the sign settled by the rest of the ring. Dependency-free
+// and good enough for a near-planar porphyrin or chlorophyll.
+function macrocyclePlaneNormal(donors, center) {
+    const ring = donors.filter(d => d.kind === 'het' && String(d.resName) === String(center.groupResName));
+    if (ring.length < 3) return null;
+    const cx = ring.reduce((s, d) => s + d.x, 0) / ring.length;
+    const cy = ring.reduce((s, d) => s + d.y, 0) / ring.length;
+    const cz = ring.reduce((s, d) => s + d.z, 0) / ring.length;
+    const p0 = ring[0];
+    const u = { x: ring[1].x - p0.x, y: ring[1].y - p0.y, z: ring[1].z - p0.z };
+    const v = { x: ring[2].x - p0.x, y: ring[2].y - p0.y, z: ring[2].z - p0.z };
+    let nx = u.y * v.z - u.z * v.y, ny = u.z * v.x - u.x * v.z, nz = u.x * v.y - u.y * v.x;
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (!(len > 1e-6)) return null;
+    nx /= len; ny /= len; nz /= len;
+    let bias = 0;
+    ring.forEach(d => { bias += (d.x - cx) * nx + (d.y - cy) * ny + (d.z - cz) * nz; });
+    if (bias < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    return { x: nx, y: ny, z: nz };
+}
 function analyzeMetalSite(center, parsed, opts) {
     const donors = metalFirstShell(center, parsed, opts);
     // Geometry matching is scale- and origin-free, but the radial normalisation
@@ -12980,7 +13032,22 @@ function analyzeMetalSite(center, parsed, opts) {
     // first. Absolute coordinates would otherwise read as a huge bond length.
     const local = donors.map(d => ({ x: d.x - center.x, y: d.y - center.y, z: d.z - center.z }));
     const classification = classifyCoordinationGeometry(local);
-    const axial = donors.filter(d => d.axial);
+    // "Axial" is only meaningful against a macrocycle plane: the axial ligands are
+    // the ones standing off the porphyrin, not simply the closest ones. With no
+    // plane there is no axis, so nothing is labelled axial rather than everything.
+    const normal = center.inMacrocycle ? macrocyclePlaneNormal(donors, center) : null;
+    const axialDonors = [];
+    if (normal) {
+        donors.forEach(d => {
+            const isRingAtom = d.kind === 'het' && String(d.resName) === String(center.groupResName);
+            if (isRingAtom) return;
+            const vx = d.x - center.x, vy = d.y - center.y, vz = d.z - center.z;
+            const vl = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+            const cosT = Math.abs((vx * normal.x + vy * normal.y + vz * normal.z) / vl);
+            if (cosT >= 0.7) axialDonors.push(d);
+        });
+    }
+    const axial = axialDonors;
     return {
         center: center,
         element: center.element,
@@ -13002,6 +13069,120 @@ function analyzeMetalSite(center, parsed, opts) {
 }
 function analyzeMetalSites(parsed, opts) {
     return findMetalCenters(parsed).map(c => analyzeMetalSite(c, parsed, opts));
+}
+// Short codes for the geometry classes, so a tooltip can say "OCT" at a glance.
+// These are Q2DV's own abbreviations (SPL = square planar, SPY = square pyramidal),
+// not a published code list, and every tooltip that uses one also spells the class
+// out in full so the two can never be confused.
+const METAL_GEOMETRY_CODES = {
+    'linear': 'LIN', 'trigonal planar': 'TPL', 'trigonal pyramidal': 'TPY',
+    'tetrahedral': 'TET', 'square planar': 'SPL', 'trigonal bipyramidal': 'TBP',
+    'square pyramidal': 'SPY', 'octahedral': 'OCT', 'trigonal prismatic': 'TPR'
+};
+function metalGeometryLabel(geometry) {
+    if (!geometry) return 'geometry undetermined';
+    const code = METAL_GEOMETRY_CODES[geometry] || '?';
+    return code + ' - ' + geometry;
+}
+// One metal site, reduced to what a tooltip has room for. Numbers are rounded here
+// on purpose: the full-precision values belong in the analysis, not a hover.
+function metalSiteSummary(site) {
+    return {
+        element: site.element, cn: site.cn,
+        geometry: site.geometry, geometryLabel: metalGeometryLabel(site.geometry),
+        rmsd: site.geometryRmsd == null ? null : Math.round(site.geometryRmsd * 100) / 100,
+        geometryEntropy: site.geometryEntropy == null ? null : Math.round(site.geometryEntropy * 100) / 100,
+        donorEntropy: site.donorEntropy == null ? null : Math.round(site.donorEntropy * 100) / 100,
+        donorElements: site.donorElements, proteinDonors: site.proteinDonors.length,
+        waterDonors: site.waterDonors,
+        axial: site.axialLigands.map(a => (a.kind === 'protein' ? a.resName + ' ' + a.chain + a.resSeq + ':' + a.atomName : (a.resName + ':' + a.atomName))),
+        inMacrocycle: site.inMacrocycle, isCluster: site.isCluster
+    };
+}
+// Pairs every numbered cofactor (the existing 1-9 extraction) with the metal
+// sites inside it, so the coordination read-out can hang off the cofactor the
+// researcher already sees. Sites in a polynuclear group (two irons in one FES)
+// produce two entries under one cofactor; a metal in a cofactor beyond the
+// numbering cap is counted in `unpaired` rather than silently dropped.
+function analyzeCofactorCoordination(text, ext, cofactors) {
+    const out = [];
+    if (!cofactors || !cofactors.length) return out;
+    let parsed;
+    try { parsed = parseAllAtoms(text, ext); } catch (err) { return out; }
+    let centers;
+    try { centers = findMetalCenters(parsed); } catch (err) { return out; }
+    if (!centers.length) return out;
+    const used = new Set();
+    cofactors.forEach(cf => {
+        const sites = [];
+        centers.forEach(c => {
+            if (used.has(c)) return;
+            const sameResidue = String(c.groupResName) === String(cf.resName)
+                && String(c.chain) === String(cf.chain || '_')
+                && String(c.resSeq) === String(cf.resSeq);
+            if (!sameResidue) return;
+            used.add(c);
+            sites.push(metalSiteSummary(analyzeMetalSite(c, parsed)));
+        });
+        if (sites.length) {
+            out.push({
+                cofactorIndex: cf.index, resName: cf.resName, chain: cf.chain, resSeq: cf.resSeq,
+                insCode: cf.insCode, category: cf.category, sites: sites
+            });
+        }
+    });
+    return { sites: out, unpaired: Math.max(0, centers.length - used.size) };
+}
+// Per-file coordination results, keyed by the same base name the "_Cofactors"
+// track uses, so a track key resolves to its own model's metals.
+let structureCoordination = {}; // baseName -> { sites: [...], unpaired: n }
+function cofactorCoordinationForBase(baseName) {
+    const rec = structureCoordination[baseName];
+    return (rec && Array.isArray(rec.sites)) ? rec.sites : [];
+}
+// The row-label tooltip: one line per numbered cofactor that carries a metal.
+function cofactorCoordinationTooltip(baseName) {
+    const sites = cofactorCoordinationForBase(baseName);
+    if (!sites.length) return '';
+    const lines = ['Coordination (from the attached coordinates):'];
+    sites.forEach(entry => {
+        entry.sites.forEach((s, k) => {
+            const label = entry.sites.length > 1 ? ' site ' + (k + 1) + '/' + entry.sites.length : '';
+            lines.push('#' + entry.cofactorIndex + ' ' + entry.resName + ' ' + (entry.chain || '') + entry.resSeq + label
+                + ' - ' + s.element + ', CN ' + s.cn + ', ' + s.geometryLabel
+                + (s.rmsd != null ? ' (RMSD ' + s.rmsd.toFixed(2) + ' A)' : '')
+                + (s.isCluster ? ' [cluster: single-site CN not meaningful]' : '')
+                + (s.inMacrocycle ? ' [macrocycle]' : ''));
+            const parts = [];
+            if (Object.keys(s.donorElements || {}).length) {
+                parts.push('donors ' + Object.keys(s.donorElements).sort().map(e => e + s.donorElements[e]).join('+')
+                    + ' (' + s.proteinDonors + ' side-chain' + (s.proteinDonors === 1 ? '' : 's') + (s.waterDonors ? ', ' + s.waterDonors + ' water' + (s.waterDonors === 1 ? '' : 's') : '') + ')');
+            }
+            if (s.axial && s.axial.length) parts.push('axial ' + s.axial.join(', '));
+            if (s.geometryEntropy != null) parts.push('ambiguity ' + s.geometryEntropy.toFixed(2) + ' bits');
+            if (s.donorEntropy != null) parts.push('donor diversity ' + s.donorEntropy.toFixed(2) + ' bits');
+            if (parts.length) lines.push('    ' + parts.join('; '));
+        });
+    });
+    const rec = structureCoordination[baseName];
+    if (rec && rec.unpaired) lines.push('(' + rec.unpaired + ' further metal site(s) sit in cofactors beyond the 9 numbered here)');
+    lines.push('Geometry codes are Q2DV abbreviations; RMSD is the deviation from the ideal shape, not an error.');
+    return lines.join('\n');
+}
+// The per-residue hover: the same read-out, narrowed to the one cofactor the
+// residue is labelled with.
+function cofactorSiteTooltip(baseName, cofactorNum) {
+    const sites = cofactorCoordinationForBase(baseName);
+    const entry = sites.find(e => String(e.cofactorIndex) === String(cofactorNum));
+    if (!entry) return '';
+    const lines = ['Cofactor #' + entry.cofactorIndex + ' - ' + entry.resName + ' ' + (entry.chain || '') + entry.resSeq];
+    entry.sites.forEach((s, k) => {
+        lines.push((entry.sites.length > 1 ? 'site ' + (k + 1) + ': ' : '') + s.element + ', CN ' + s.cn + ', ' + s.geometryLabel
+            + (s.rmsd != null ? ' (RMSD ' + s.rmsd.toFixed(2) + ' A)' : '')
+            + (s.isCluster ? ' [cluster]' : ''));
+        if (s.axial && s.axial.length) lines.push('axial ligand(s): ' + s.axial.join(', '));
+    });
+    return lines.join('\n');
 }
 
 // --- HHpred .hhr import ("Homolog" annotation layers) ----------------------
@@ -15202,7 +15383,10 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     // FASTA header description for variant rows, shown via the row label
     // tooltip so the original sequence metadata stays accessible.
     const varDesc = key.startsWith('VAR_') ? getVariantDescription(key) : '';
-    labelText.title = key + (varDesc ? '\n' + varDesc : '');
+    // The cofactor row's label tooltip carries the metal coordination read-out for
+    // the same file, paired to the cofactor numbers the row already shows.
+    const cofDesc = key.endsWith('_Cofactors') ? cofactorCoordinationTooltip(key.replace(/_Cofactors$/, '')) : '';
+    labelText.title = key + (varDesc ? '\n' + varDesc : '') + (cofDesc ? '\n\n' + cofDesc : '');
     labelEl.appendChild(labelText);
     if (isTrackEmpty(key)) {
         const emptyTag = document.createElement('span');
@@ -15525,7 +15709,8 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 cellEl.style.backgroundColor = c;
                 const gSpan = showGlyphs ? cellEl.querySelector('.cell-glyph') : null;
                 if (gSpan) { gSpan.style.color = '#fff'; gSpan.style.fontWeight = 'bold'; }
-                cellEl.title = `Residue ${i + 1}: neighbor of cofactor #${char}`;
+                cellEl.title = `Residue ${i + 1}: neighbor of cofactor #${char}`
+                    + cofactorSiteTooltip(key.replace(/_Cofactors$/, ''), char);
             } else if (key.startsWith('HL_') && HH_QUALITY_COLORS[char]) {
                 const [bg, fg] = HH_QUALITY_COLORS[char];
                 // Conservation-colors mode: swap the per-column match-quality
@@ -20405,6 +20590,7 @@ async function resetAllData() {
     parsedTracks = {};
     currentProteinLabel = null;
     uploadedStructureFiles = [];
+    structureCoordination = {};
     cachedStructureTexts = {};
     p3dStructureMeta = {};
     // Reset-only the current session's mapping into the device structure cache

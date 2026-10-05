@@ -761,14 +761,16 @@ bond-valence parameters), and Q2DV already parses atom records and does Kabsch
 superposition. MetalHawk's CSV becomes the **benchmark** for the local
 implementation, never a dependency; no MetalHawk code or weights are used.
 
-**Status (2026-10-04).** Computation core **done (0.69.2)**: metal centres (including
-the iron inside a heme and metals inside clusters), first shell / CN / donors,
-axial ligands, geometry class + distortion from the template RMSD, and the two
-entropies. Still to do: the surfaces (`COORD_` tracks, the Metal sites table,
-rule sources, the 3D first-shell highlight), frame-aware ensemble coordination,
-and bond-valence / nVECSUM - the last held back until its R0 parameters are
-verified against the source tables, because a plausible-looking valence is worse
-than none.
+**Status (2026-10-04).** Computation core **done (0.66.29)**; surfaces **done
+(0.66.30)**: the read-out rides the existing `_Cofactors` row rather than adding a
+parallel surface - every metal site is paired to the cofactor number (1-9) that
+row already shows, and the chemistry appears on the row-label tooltip and on the
+per-residue hover (`#1 HEM A201 - FE, CN 5, SPY - square pyramidal (RMSD 0.04 A)
+[macrocycle]`). Axial ligands are measured against the macrocycle plane, so a bare
+metal reports none. Still open: a Metal sites table for the whole model, `COORD_`
+track rows, rule sources, frame-aware ensemble coordination, and bond-valence /
+nVECSUM - the last held back until its R0 parameters are verified against the
+source tables, because a plausible-looking valence is worse than none.
 
 **Data basis.** The same parser `extractCofactorNeighborhoods()` uses:
 ATOM/HETATM groups (`chain`/`resSeq`/`iCode`/`resName`, per-atom
@@ -845,7 +847,7 @@ NAR 2023, `10.1093/nar/gkac1000`.
 
 | Feature | What / where | Category (§16) | Notes |
 |---|---|---|---|
-| Wet-lab constants | pI, MW, A280 extinction, GRAVY; sequence panel, methods report, AI pack | Step extension | **Done (0.69.1)** - Selection tab block beside FASTA Segment; pure JS, offline; nothing of these existed before |
+| Wet-lab constants | pI, MW, A280 extinction, GRAVY; sequence panel, methods report, AI pack | Step extension | **Done (0.66.28)** - Selection tab block beside FASTA Segment; pure JS, offline; nothing of these existed before |
 | DNA construct export | codon back-translation with host codon tables, GC/forbidden-site flags; Construct designer | Deliverable | not primer design (still out of scope) |
 | MSA export | FASTA/Stockholm/Clustal from the stored alignment rows; optional NJ tree later | Deliverable | addresses EVALUATION dim. 12; no alignment export today |
 | Ensemble conformer clustering | cluster the existing pairwise RMSD matrix into states; label/colour models | Step extension | reuses 0.66.9 machinery |
@@ -928,13 +930,13 @@ DCD/XTC trajectories in-browser, or automate the CHARMM-GUI REST API (JWT,
 credentials, no-backend). Automation belongs in an external script.
 
 **Work items.**
-1. ~~PDB export (selection/model, original numbering).~~ **Done (0.69.0)** - Export menu
+1. ~~PDB export (selection/model, original numbering).~~ **Done (0.66.27)** - Export menu
    -> *Structure file (PDB/CIF)*; filters the cached original text, so numbering,
    chain IDs, record types and HETATM survive; mmCIF gets a `#` header; a
    cache-only file is re-read from IndexedDB before filtering.
 2. Simulation-prep report block.
 3. ~~Multi-column MD CSV import (extends the experimental importer).~~ **Done
-   (0.69.0)** - a header row makes each numeric column its own experimental
+   (0.66.27)** - a header row makes each numeric column its own experimental
    row; new `MD / trajectory metric` kind for the interpretation text.
 4. Predicted-vs-MD `XC_` cross-check (the existing TM cross-check pattern).
 5. Frame-aware §22 coordination.

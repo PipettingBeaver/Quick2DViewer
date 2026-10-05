@@ -12,6 +12,51 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.30] - 2026-10-04
+
+### Added
+- **Metal-site coordination, surfaced on the cofactor rows it belongs to.** The
+  coordination analysis now rides the existing `_Cofactors` track instead of
+  adding a parallel surface: every metal site is paired to the cofactor number
+  (1-9) the row already shows, and the chemistry appears on hover.
+  - Hovering the **row label** lists every numbered cofactor carrying a metal:
+    `#1 HEM A201 - FE, CN 5, SPY - square pyramidal (RMSD 0.04 A) [macrocycle]`,
+    with a detail line for donor composition, axial ligands and both entropies.
+  - Hovering a **residue in the row** narrows to that one cofactor:
+    `Cofactor #1 - HEM A201 / FE, CN 5, SPY - square pyramidal` plus its axial
+    ligand(s) - the "hover #1 and read the shape" behaviour.
+  - Geometry codes are Q2DV abbreviations (`SPL` = square planar,
+    `SPY` = square pyramidal) and every tooltip spells the class out in full so
+    the two cannot be confused.
+  - A metal in a cofactor beyond the numbered nine is reported as a count rather
+    than dropped; two metals in one group (Fe-S, di-iron) appear as two sites
+    under one cofactor, flagged as a cluster.
+  - Computed at attach time and keyed by the same base name as the track, so each
+    attached file reports its own metals.
+
+### Fixed
+- **A porphyrine nitrogen is named `NA` in every heme, and `NA` is also sodium.**
+  The element reader preferred the atom name over the file's element column, so a
+  heme's own nitrogens were read as sodium ions and the iron came back with *CN 0*
+  and no donors. A declared element column now always wins, the name is only a
+  fallback for files that have none, and porphyrine-style names inside a
+  macrocycle are never treated as metals.
+- **Axial ligands were "the closest donors", which made every donor in a heme
+  axial.** Axial is now measured against the macrocycle plane - the ligands that
+  stand off the porphyrin. With no plane (a bare Zn, say) nothing is labelled
+  axial, rather than everything.
+- **The donor-to-vertex assignment search never produced a valid assignment.** The
+  permutation generator prefixed a loop index onto permutations of a smaller
+  range, yielding repeated indices (`[0,0,1,2,3]`); because a degenerate point set
+  makes the RMSD clamp to zero, this corrupted the fit while *lowering* the score,
+  so it hid as an improvement rather than an error. Exact ideal geometries now
+  score ~0 A and a five-coordinate heme reads square pyramidal, not trigonal
+  bipyramidal.
+- Coordination numbers above six are left undetermined rather than guessed from
+  six of the donors, since the template library stops at octahedral.
+
+1478 checks.
+
 ## [0.66.29] - 2026-10-04
 
 ### Added
