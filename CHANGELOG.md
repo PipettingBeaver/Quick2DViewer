@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.28] - 2026-10-04
+
+### Added
+- **Protein constants.** A new *Protein constants* block in the Selection tab
+  (beside FASTA Segment, so it is a read-out of the loaded sequence rather than a
+  new menu entry) with molecular weight, isoelectric point, net charge at pH 7,
+  the 280 nm extinction coefficient and GRAVY - the numbers a bench conversation
+  about a new protein starts with. Pure sequence arithmetic, so it works offline
+  and can never disagree with what is loaded: average residue masses, the
+  ProtParam pKa walk for the pI, Gill & von Hippel for A280, Kyte & Doolittle for
+  hydropathy. Copyable, and also emitted in the methods summary so a report
+  carries them. The tooltip states the two assumptions that matter (free
+  N-/C-termini and unpaired cysteines; A280 does not count a mature
+  fluorescent-protein chromophore, which dominates its own extinction).
+
 ## [0.66.27] - 2026-10-04
 
 ### Added

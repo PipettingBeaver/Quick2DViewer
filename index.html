@@ -2387,6 +2387,25 @@
                 </div>
             </details>
 
+            <details class="workflow-section" id="constantsSection" style="margin-top: 10px;">
+                <summary>Protein constants <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                    <strong>Protein constants</strong><br>
+                    Computed from the loaded sequence, offline, with standard average residue masses
+                    (so they always match what is in the session): molecular weight, isoelectric point,
+                    net charge at pH 7, the 280 nm extinction coefficient and mean hydropathy (GRAVY).<br><br>
+                    <strong>Caveats.</strong> pI assumes free N- and C-termini and unpaired cysteines
+                    (pairing them raises it); A280 counts Trp, Tyr and cystine only, so a mature
+                    fluorescent-protein chromophore - which dominates its own extinction - is not
+                    counted here and the literature value should be used instead.<br><br>
+                    Useful before a construct decision: a very low pI or a high GRAVY predicts poor
+                    solubility and behaviour on ion exchange.
+                </span></span></summary>
+                <div class="data-box" id="constantsDisplay" style="margin-top: 6px; white-space: pre-wrap;">No sequence loaded.</div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button class="copy-btn" onclick="copyText('constantsDisplay')" title="Copy these constants as text">Copy</button>
+                </div>
+            </details>
+
             <details class="workflow-section" id="metricsSection" open style="margin-top: 10px;">
                 <summary>Quantitative Metrics</summary>
                 <div style="display:flex; align-items:center; gap:4px; margin:6px 0; flex-wrap:wrap;">
@@ -9272,6 +9291,21 @@ function buildMethodsReport() {
     });
     L.push('');
 
+    const constants = computeProteinConstants(len ? parsedTracks.AA : '');
+    if (constants) {
+        L.push('## Protein constants');
+        L.push('');
+        L.push('Computed from the loaded sequence (average residue masses; ProtParam pKa set for the pI).');
+        L.push('');
+        L.push('- Length: ' + constants.length + ' aa');
+        L.push('- Molecular weight: ' + constants.mwKd.toFixed(2) + ' kDa');
+        L.push('- Isoelectric point: ' + constants.pI.toFixed(2) + ' (free N- and C-termini, unpaired cysteines)');
+        L.push('- Net charge at pH 7: ' + (constants.chargeAt7 >= 0 ? '+' : '') + constants.chargeAt7.toFixed(1));
+        L.push('- A280 (Trp + Tyr + cystine): ' + Math.round(constants.eps280) + ' M-1cm-1');
+        L.push('- GRAVY (mean hydropathy): ' + constants.gravy.toFixed(2));
+        L.push('');
+    }
+
     L.push('## Workflow coverage');
     L.push('');
     L.push('| # | Step | Status | Answer(s) |');
@@ -10720,7 +10754,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.27';
+const APP_VERSION = '0.66.28';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -14652,12 +14686,96 @@ function getActiveRanges(track) {
     return ranges;
 }
 
+// --- Wet-lab constants (DESIGN 24) ------------------------------------------
+// The four numbers a bench conversation about a new protein starts with: mass,
+// isoelectric point, 280 nm extinction coefficient and mean hydropathy, plus the
+// net charge at pH 7. They are pure functions of the loaded sequence, computed
+// here rather than fetched, so they work offline and can never disagree with the
+// sequence actually in the session.
+// Molecular weights are the standard average residue masses; the pI walk uses
+// the Bjellqvist/ExPASy ProtParam pKa set (cysteine and tyrosine ionisable, so
+// a sequence with free thiols reports a different pI from the paired one); A280
+// follows Gill & von Hippel (1986).
+const RESIDUE_MASS = { A:71.0788,R:156.1875,N:114.1038,D:115.0886,C:103.1388,E:129.1155,Q:128.1307,G:57.0519,H:137.1411,I:113.1594,L:113.1594,K:128.1741,M:131.1926,F:147.1766,P:97.1167,S:87.0782,T:101.1051,W:186.2132,Y:163.1760,V:99.1326 };
+// Kyte & Doolittle (1982) hydropathy index.
+const KD_HYDROPATHY = { A:1.8,R:-4.5,N:-3.5,D:-3.5,C:2.5,Q:-3.5,E:-3.5,G:-0.4,H:-3.2,I:4.5,L:3.8,K:-3.9,M:1.9,F:2.8,P:-1.6,S:-0.8,T:-0.7,W:-0.9,Y:-1.3,V:4.2 };
+const WATER_MASS = 18.0153;
+const PKA_POSITIVE = { N_TERM: 7.5, K: 10.0, R: 12.0, H: 5.98 };
+const PKA_NEGATIVE = { C_TERM: 3.55, D: 4.05, E: 4.45, C: 9.0, Y: 10.0 };
+function countResidues(seq) {
+    const c = {};
+    for (let i = 0; i < seq.length; i++) c[seq[i]] = (c[seq[i]] || 0) + 1;
+    return c;
+}
+function computeProteinConstants(aa) {
+    const seq = String(aa || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (!seq.length) return null;
+    const counts = countResidues(seq);
+    let mass = WATER_MASS;
+    Object.keys(counts).forEach(r => { mass += (RESIDUE_MASS[r] || 0) * counts[r]; });
+    // Net charge as a function of pH: positive groups protonate below their pKa,
+    // negative groups deprotonate above theirs.
+    const netCharge = (ph) => {
+        let q = 1 / (1 + Math.pow(10, ph - PKA_POSITIVE.N_TERM));
+        q -= 1 / (1 + Math.pow(10, PKA_NEGATIVE.C_TERM - ph));
+        ['K', 'R', 'H'].forEach(r => {
+            const n = counts[r] || 0;
+            if (n) q += n / (1 + Math.pow(10, ph - PKA_POSITIVE[r]));
+        });
+        ['D', 'E', 'C', 'Y'].forEach(r => {
+            const n = counts[r] || 0;
+            if (n) q -= n / (1 + Math.pow(10, PKA_NEGATIVE[r] - ph));
+        });
+        return q;
+    };
+    // pI is where the charge crosses zero; walk down from acid to base and take
+    // the first crossing, interpolating inside the step.
+    let pI = null, prevPh = 0, prevQ = netCharge(0);
+    for (let ph = 0.01; ph <= 14.0001; ph += 0.01) {
+        const q = netCharge(ph);
+        if (prevQ > 0 && q <= 0) { pI = prevPh + 0.01 * (prevQ / (prevQ - q)); break; }
+        prevPh = ph; prevQ = q;
+    }
+    if (pI === null) { // no crossing in range: report the least-charged pH instead
+        let best = Infinity;
+        for (let ph = 0; ph <= 14; ph += 0.01) { const q = Math.abs(netCharge(ph)); if (q < best) { best = q; pI = ph; } }
+    }
+    let hyd = 0;
+    for (let i = 0; i < seq.length; i++) hyd += (KD_HYDROPATHY[seq[i]] !== undefined ? KD_HYDROPATHY[seq[i]] : 0);
+    const eps280 = 5500 * (counts.W || 0) + 1490 * (counts.Y || 0) + 125 * (counts.C || 0);
+    return {
+        length: seq.length, counts: counts,
+        mw: mass, mwKd: mass / 1000,
+        pI: pI, chargeAt7: netCharge(7),
+        eps280: eps280, gravy: hyd / seq.length
+    };
+}
+// The Selection tab is where the loaded sequence's read-outs already live (the
+// FASTA Segment block sits beside it), so the constants join it there rather
+// than becoming another menu entry (DESIGN 20).
+function renderProteinConstants() {
+    const el = document.getElementById('constantsDisplay');
+    if (!el) return;
+    const aa = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const c = computeProteinConstants(aa);
+    if (!c) { el.textContent = 'No sequence loaded.'; return; }
+    el.textContent = [
+        'Length    ' + c.length + ' aa',
+        'Mass      ' + c.mwKd.toFixed(2) + ' kDa',
+        'pI        ' + c.pI.toFixed(2),
+        'Charge    ' + (c.chargeAt7 >= 0 ? '+' : '') + c.chargeAt7.toFixed(1) + ' at pH 7',
+        'A280      ' + Math.round(c.eps280) + ' M-1cm-1',
+        'GRAVY     ' + c.gravy.toFixed(2)
+    ].join('\n');
+}
+
 function renderViewer(tracks) {
     const grid = document.getElementById('alignmentGrid');
     grid.innerHTML = ''; 
     applyGridZoom();
     refreshGuideIfVisible();
     reevaluateRulesIfNeeded(tracks);
+    renderProteinConstants();
     const totalLength = tracks.AA ? tracks.AA.length : 0;
     if (totalLength === 0) return;
 

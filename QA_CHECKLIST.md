@@ -101,6 +101,42 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Protein constants (mass, pI, A280, GRAVY) — 0.69.1
+
+**Surface.** Selection tab → *Protein constants* block (`constantsDisplay`), beside FASTA
+Segment; also emitted in Export → Methods summary (.md). No new surface (DESIGN 20).
+
+**Should do.** Show the loaded sequence's mass, isoelectric point, net charge at pH 7,
+280 nm extinction coefficient and mean hydropathy, computed locally and copyable.
+
+**Try (normal use).**
+1. Load any sequence; open the **Selection** tab.
+   *Expect:* six lines (Length / Mass / pI / Charge / A280 / GRAVY) with a Copy button.
+2. Paste a short sequence and check the mass by hand for one residue (e.g. a
+   single cysteine should read ~0.12 kDa).
+   *Expect:* average residue mass plus one water, i.e. 121.2 Da for Cys.
+3. Compare a very acidic sequence (many D/E) with a very basic one (many K/R).
+   *Expect:* the pI and the sign of the charge at pH 7 move together; the acidic one
+   reads below 5, the basic one above 10.
+4. Export the methods summary with the same sequence loaded.
+   *Expect:* a *Protein constants* section listing all six values, plus the stated basis
+   (average residue masses; ProtParam pKa; A280 basis).
+5. Reset all data, then look at the block again.
+   *Expect:* "No sequence loaded."
+
+**Edge cases.**
+- *A fluorescent protein.* The A280 here counts Trp + Tyr + cystine only, so it will
+  read far below the literature value for a mature FP - the chromophore dominates.
+  The tooltip says so; use the published number for a purified chromophore protein.
+- *Cysteines.* The pI assumes unpaired thiols; pairing them (or tagging) raises it.
+- *A construct with a non-standard residue.* Unknown residues (X, U, O, B, Z) carry no
+  mass and contribute 0 to GRAVY, so the mass reads low; check the sequence first.
+- Headless coverage: the arithmetic, the pI walk's sign behaviour, the panel block, the
+  methods-report section and the markup are tested. Numbers for a real protein should
+  still be spot-checked against a calculator before quoting them.
+
+---
+
 ### Structure file export (PDB/CIF) — 0.69.0
 
 **Surface.** Export menu (menu bar) → *Structure file (PDB/CIF)*. No new top-level entry: it is a

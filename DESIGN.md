@@ -836,7 +836,7 @@ NAR 2023, `10.1093/nar/gkac1000`.
 
 | Feature | What / where | Category (§16) | Notes |
 |---|---|---|---|
-| Wet-lab constants | pI, MW, A280 extinction, GRAVY; sequence panel, methods report, AI pack | Step extension | pure JS; none of these exist today |
+| Wet-lab constants | pI, MW, A280 extinction, GRAVY; sequence panel, methods report, AI pack | Step extension | **Done (0.69.1)** - Selection tab block beside FASTA Segment; pure JS, offline; nothing of these existed before |
 | DNA construct export | codon back-translation with host codon tables, GC/forbidden-site flags; Construct designer | Deliverable | not primer design (still out of scope) |
 | MSA export | FASTA/Stockholm/Clustal from the stored alignment rows; optional NJ tree later | Deliverable | addresses EVALUATION dim. 12; no alignment export today |
 | Ensemble conformer clustering | cluster the existing pairwise RMSD matrix into states; label/colour models | Step extension | reuses 0.66.9 machinery |

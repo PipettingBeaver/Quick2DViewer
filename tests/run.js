@@ -3710,6 +3710,34 @@ assert(ctxRun(`Array.isArray(parsedTracks['DMS_tolerance_EXP'])`) === true, 'the
 assert(/Added "DMS tolerance"/.test(ctxRun(`document.getElementById('expStatus').textContent`)), 'and keeps its own status wording');
 ctxRun(`parsedTracks = {}; experimentalTracksInfo = {}; cachedStructureTexts = {}; cachedStructureIndex = {}; uploadedStructureFiles = [];`);
 
+section('wet-lab constants (mass, pI, A280, GRAVY)');
+// Hand-checkable cases first: A+C+D average residue masses plus one water.
+const constACD = ctxRun(`computeProteinConstants('ACD')`);
+assert(Math.abs(constACD.mw - (71.0788 + 103.1388 + 115.0886 + 18.0153)) < 0.01, 'mass is the sum of average residue masses plus water (got ' + constACD.mw.toFixed(3) + ')');
+assert(constACD.length === 3 && Math.abs(constACD.mwKd - 0.3073) < 0.001, 'and is reported in kDa too');
+assert(ctxRun(`computeProteinConstants('KKKK').pI > 10 && computeProteinConstants('KKKK').pI < 11`) === true, 'a poly-lysine is basic (pI ' + ctxRun(`computeProteinConstants('KKKK').pI.toFixed(2)`) + ')');
+assert(ctxRun(`computeProteinConstants('DDDD').pI < 4.5`) === true, 'a poly-aspartate is acidic (pI ' + ctxRun(`computeProteinConstants('DDDD').pI.toFixed(2)`) + ')');
+assert(ctxRun(`computeProteinConstants('KKKK').chargeAt7 > 0 && computeProteinConstants('DDDD').chargeAt7 < 0`) === true, 'the sign of the charge at pH 7 follows the pI');
+assert(ctxRun(`computeProteinConstants('WW').eps280`) === 11000 && ctxRun(`computeProteinConstants('YY').eps280`) === 2980, 'A280 counts Trp and Tyr (Gill & von Hippel)');
+assert(ctxRun(`computeProteinConstants('WC').eps280`) === 5625, 'and cystine');
+assert(ctxRun(`computeProteinConstants('AAAA').gravy`) === 1.8 && Math.abs(ctxRun(`computeProteinConstants('AAAAKK').gravy`) - ((1.8 * 4) + (-3.9 * 2)) / 6) < 0.001, 'GRAVY is the Kyte-Doolittle mean');
+assert(ctxRun(`computeProteinConstants('')`) === null && ctxRun(`computeProteinConstants('   ')`) === null, 'no sequence means no constants, not a zero row');
+assert(ctxRun(`computeProteinConstants('acdW')`).length === 4, 'case and non-residue characters are handled');
+
+ctxRun(`parsedTracks = { AA: 'ACD' }; renderProteinConstants();`);
+const constText = ctxRun(`document.getElementById('constantsDisplay').textContent`);
+assert(constText.indexOf('3 aa') !== -1 && constText.indexOf('0.31 kDa') !== -1, 'the Selection panel block lists length and mass (got ' + JSON.stringify(constText) + ')');
+assert(/pI\s+3\.80/.test(constText) && /A280\s+125/.test(constText), 'and the pI and A280 lines');
+ctxRun(`parsedTracks = {}; renderProteinConstants();`);
+assert(ctxRun(`document.getElementById('constantsDisplay').textContent`) === 'No sequence loaded.', 'the block says so when there is no sequence');
+ctxRun(`parsedTracks = { AA: 'MKTAYIAKQRQISFVKSHFSRQLEERLGLI' };`);
+const constReport = ctxRun(`buildMethodsReport()`);
+assert(constReport.indexOf('## Protein constants') !== -1 && /Isoelectric point: 10\.43/.test(constReport), 'the methods report carries a Protein constants section (pI ' + ctxRun(`computeProteinConstants('MKTAYIAKQRQISFVKSHFSRQLEERLGLI').pI.toFixed(2)`) + ')');
+assert(constReport.indexOf('A280 (Trp + Tyr + cystine): 1490') !== -1, 'with the A280 line and its stated basis');
+assert(HTML.indexOf('id="constantsDisplay"') !== -1 && HTML.indexOf('GRAVY') !== -1, 'the Selection panel carries the block and explains GRAVY');
+assert(/const\s+TERMINAL/.test(HTML) || /free N- and C-termini/.test(HTML), 'and states the terminal/cysteine assumption it makes');
+ctxRun(`parsedTracks = {}; experimentalTracksInfo = {}; cachedStructureTexts = {};`);
+
 // ---------- async tests ----------
 (async () => {
     let err = null;
