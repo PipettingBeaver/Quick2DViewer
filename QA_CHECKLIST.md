@@ -1844,6 +1844,15 @@ need a live CORS check first): VFDB (virulence factors), CARD (antimicrobial res
 | 493 | Load "TerC, API-Only (Preset)" | Override pinned to Q52356; topology first; no PDB step |
 | 494 | Play either with a manual species set | The manual species survives |
 
+## 0.66.31 - homolog default view = AA (quick rows)
+
+| # | Try this | Watch for |
+|---|---|---|
+| 508 | With a saved session from before this release, load a Homolog (.hhr or phmmer) row | Letters read as the **AA sequence**, not match-quality glyphs, without clicking anything |
+| 509 | Track Control on the Homolog type -> letter-style cycle once (AA -> none -> symbols) | Each explicit choice sticks across a reload; the migration must not force it back to AA |
+| 510 | Clear cache / fresh profile, load homologs | Same AA default (this path already worked) |
+| 511 | Toggle a different type's letters (e.g. SS) | Unaffected - the default applies to Homolog only |
+
 ## 0.66.26 - accession FASTA + placement fix (quick rows)
 
 | # | Try this | Watch for |

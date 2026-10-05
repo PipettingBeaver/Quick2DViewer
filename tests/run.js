@@ -3931,6 +3931,31 @@ ctxRun(`
 assert(ctxRun(`Object.keys(structureCoordination).length`) === 0, 'reset clears the coordination store');
 ctxRun(`parsedTracks = {}; cachedStructureTexts = {}; uploadedStructureFiles = [];`);
 
+section('homolog letter-style default (AA)');
+// The documented default for Homolog rows is "AA" (getDefaultTrackControlState),
+// but saved sessions predating it stored an empty bag and kept match-quality
+// glyphs forever. The migration must apply the default *only* where the session
+// made no homolog letter choice at all.
+const baseState = sel => JSON.stringify({ parsedTracks: { AA: 'M'.repeat(10) }, structureFiles: [], preferences: { trackControl: sel } });
+ctxRun(`applyPersistedState(${baseState({ hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, consColor: {}, viewOverride: {} })});`);
+assert(ctxRun(`trackControlState.aaSeq.HL === true`) === true, 'a saved session with no homolog letter choice gets the AA default');
+assert(ctxRun(`isTrackGroupAASeq('HL')`) === true, 'and the renderer agrees');
+assert(ctxRun(`trackControlState.aaSeq.TM === undefined`) === true, 'without touching other types');
+
+ctxRun(`applyPersistedState(${baseState({ aaSeq: { HL: false }, hideSymbols: {}, fullBar: {}, filtered: {}, consColor: {}, viewOverride: {} })});`);
+assert(ctxRun(`trackControlState.aaSeq.HL === false`) === true, 'an explicit non-AA choice is preserved (not re-defaulted)');
+
+ctxRun(`applyPersistedState(${baseState({ aaSeq: {}, hideSymbols: { HL: true }, fullBar: {}, filtered: {}, consColor: {}, viewOverride: {} })});`);
+assert(ctxRun(`trackControlState.aaSeq.HL === undefined`) === true && ctxRun(`isTrackGroupSymbolsHidden('HL')`) === true, 'a session that chose "none" is left as none');
+
+ctxRun(`applyPersistedState(${baseState({ aaSeq: { HL: true }, hideSymbols: {}, fullBar: {}, filtered: {}, consColor: {}, viewOverride: {} })});`);
+assert(ctxRun(`trackControlState.aaSeq.HL === true`) === true, 'an explicit AA choice is kept');
+
+// Fresh installs already take the whole default object, so the documented
+// defaults have to stay in one place.
+assert(ctxRun(`getDefaultTrackControlState().aaSeq.HL`) === true && ctxRun(`getDefaultTrackControlState().fullBar.TM`) === true, 'the fresh-install defaults still carry HL=AA and TM=Bar');
+ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
+
 // ---------- async tests ----------
 (async () => {
     let err = null;

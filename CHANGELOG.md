@@ -12,6 +12,19 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.31] - 2026-10-05
+
+### Fixed
+- **Homolog tracks now default to the "AA" letter style in saved sessions too.**
+  The documented default (`getDefaultTrackControlState`) already applied on a
+  fresh install, but any session saved before it stored an empty `aaSeq` bag and
+  so kept match-quality glyphs permanently, with no way to tell "never chosen"
+  from "chosen". Loading a persisted session now applies the AA default when the
+  session carries no homolog letter-style choice at all, while an explicit
+  AA / symbols / none choice is always preserved. Other types are untouched.
+
+1485 checks.
+
 ## [0.66.30] - 2026-10-04
 
 ### Added
