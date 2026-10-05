@@ -101,6 +101,88 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Structure file export (PDB/CIF) — 0.69.0
+
+**Surface.** Export menu (menu bar) → *Structure file (PDB/CIF)*. No new top-level entry: it is a
+deliverable, and Export already owns "what leaves the app" (DESIGN 16/20, 26).
+
+**Should do.** Write the attached model — or only the selected residues — out as the *original*
+coordinate text, so a simulation builder, refinement job or colleague receives the real file:
+numbering, chain IDs, insertion codes, TER/ANISOU and every HETATM preserved, nothing renumbered.
+No selection = whole model, and the toast says which was exported.
+
+**Try (normal use).**
+1. Load a sequence, attach a PDB (or fetch the AlphaFold model), select no residues, then
+   **Export → Structure file (PDB/CIF)**.
+   *Expect:* a download named `q2dv-<model>.pdb`; a toast reading "whole model"; opening it shows
+   the same residues, numbering and HETATM lines as the input file, with `REMARK   1` provenance
+   lines at the top.
+2. Select residues 20-40 in the grid (drag on the AA row) and export again.
+   *Expect:* filename ends `-selection.pdb`; the toast says "selection" and gives the atom count;
+   only those residues are present, **with their original numbers** (not renumbered to 1-21).
+3. With a two-chain or experimental-assembly model attached, do the same.
+   *Expect:* the selection is applied in **every** chain that contains those residues, and the
+   toast lists the chains. Chain B numbered from 11 keeps its 11-based numbers.
+4. Attach an mmCIF file and export.
+   *Expect:* `q2dv-<model>.cif`, and the header lines start with `#`, never `REMARK` (a REMARK in
+   mmCIF would make the file unreadable to some tools).
+5. With nothing attached, use the menu item.
+   *Expect:* a toast explaining no structure is attached; no download, no empty file.
+6. Reload the page (session restored from the device cache) and export before opening the 3D view.
+   *Expect:* it either exports from the cache or explains that the file must be re-attached —
+   never a silent empty or full-length file. (This path crosses IndexedDB; drive it by hand.)
+
+**Edge cases.**
+- *Empty selection exports everything.* Symptom: a full-length file you thought was trimmed. Cause:
+  no selection is active. The toast states "whole model" precisely so this is visible.
+- *A model numbered from its own mature chain.* Symptom: the wrong residues exported. Cause: the
+  reference mapping falls back to raw numbering when a chain has too few usable residue letters;
+  the header always states the scope, so check it before trusting the file.
+- *Cofactors disappear from a selection export.* Symptom: no HETATM lines. Expected: a
+  non-selected cofactor/water is dropped, because it has no reference residue. Select the whole
+  model when the ligand matters.
+- *Downloaded file rejected downstream.* Symptom: a builder refuses the file. Check that the header
+  comment syntax matches the format (PDB `REMARK`, mmCIF `#`) and that TER/END survived.
+- The harness cannot verify the actual download or the 3D model's identity; steps 1-5 need a real
+  browser.
+
+---
+
+### Named multi-column tables in the experimental importer — 0.69.0
+
+**Surface.** Options → Data Sources → *Experimental per-residue data* (`expNameInput`,
+`expKindSelect`, `expPasteInput`, `btnAddExp`). No new surface; same importer, one more input shape.
+
+**Should do.** Paste a trajectory analysis with a header row (`resid,rmsf,rmsd,sasa`) and each
+numeric column becomes its own experimental row — graphable, ruleable as `EXP:<label>`, and
+cross-read against conservation — instead of flattening to one arbitrary column.
+
+**Try (normal use).**
+1. Options → Data Sources → Experimental; label it `MD`, kind **MD / trajectory metric**, paste:
+   `resid,rmsf,rmsd,sasa` then four rows of numbers.
+   *Expect:* three rows named `MD rmsf`, `MD rmsd`, `MD sasa`; the status names all three columns.
+2. Click one of the new rows → Track Control → View as → Graph.
+   *Expect:* it graphs like the ensemble-variance row, with the MD label in the tooltip.
+3. Add a rule using `EXP:MD rmsf` as a numeric source.
+   *Expect:* the rule matches on that column alone.
+4. Paste the old shape (`1  0.42` lines) instead.
+   *Expect:* unchanged behaviour — one row, the original status wording.
+5. Paste a table with a text column (`resid,note,rmsf` with non-numeric `note` values).
+   *Expect:* the note column is skipped and the status does not claim it.
+
+**Edge cases.**
+- *A column too short to be a series (<3 values).* Symptom: that metric silently missing. Cause: by
+  design; the status reports the count of added rows so a low count is explainable.
+- *Header with no residue column.* Symptom: nothing imported. Cause: positions must be integers in
+  the first column (or one named `resid`/`position`/etc.); the importer does not guess which column
+  is the position. Keep the usual `position value` shape instead.
+- *Positions out of range.* Symptom: "N out of range (1-L)" in the status. Cause: the numbering
+  offset; the values are stored raw and re-placed when the offset changes.
+- Headless coverage: the parser, per-column import, rule source and status are tested; the select
+  option and hint text are asserted as markup only.
+
+---
+
 ### Hypothesis read-out (candidate residues) — 0.66.25
 
 **Should do.** The Hypotheses button ranks positions from the loaded evidence (conservation, RSA,
@@ -965,7 +1047,7 @@ swatch, the track name and its provenance, and the residue detail.
 | 3 | Compare legend order with the track order in the viewer | Same order (AA, H, P, E, M, D, C, pLDDT, RSA) |
 | 4 | Collapse "FASTA Segment" and "Quantitative Metrics" in the Selection tab | Both collapse; the ⓘ info icons inside the summaries must **not** toggle the section |
 | 5 | Select exactly one residue | Reads "Residue 148" (no "Length: 1aa"); select 2+ → "Residues: 148 - 149 (Length: 2aa)"; do the same on a non-AA row (row readout) |
-| 6 | Open every menu | File has Options + both toggles; **Analyze** holds Data & Structures / Analysis Rules / Interfaces / Scan Domains / Cross-checks; Export has 6 items; no crossed handlers |
+| 6 | Open every menu | File has Options + both toggles; **Analyze** holds Data & Structures / Analysis Rules / Interfaces / Scan Domains / Cross-checks; Export has 7 items (JSON, TSV, CSV, SVG, PNG, Structure file, Methods summary); no crossed handlers |
 | 7 | Hover a type row (e.g. SS) | Type badges fade in; move away → fade out; click one to activate → stays visible |
 | 8 | Tab to the chevrons / ✕ buttons | Visible focus ring; with reduced-motion on, no transitions animate |
 

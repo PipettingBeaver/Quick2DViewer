@@ -2090,6 +2090,7 @@
                     <button type="button" onclick="menuBarAction('csv')">Data as CSV</button>
                     <button type="button" onclick="menuBarAction('svg')">Viewport as SVG</button>
                     <button type="button" onclick="menuBarAction('png')">Viewport as PNG</button>
+                    <button type="button" onclick="menuBarAction('structure')" title="The attached model (or just the selected residues) as the original PDB/CIF text - unrenumbered, for a simulation builder or a colleague">Structure file (PDB/CIF)</button>
                     <button type="button" onclick="menuBarAction('methods')">Methods summary (.md)</button>
                 </div>
             </div>
@@ -2862,7 +2863,7 @@
         <div id="optCat-experimental" class="opt-cat" hidden>
             <h4 style="margin: 18px 0 4px; color: #0f172a; font-size: 0.95rem;">Experimental per-residue data</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
-                The lab-measured layer: DMS mutation tolerance, HDX protection, NMR order parameters or any per-residue score. Paste <code>position value</code> lines (space, tab, comma, colon or semicolon), or one series of at least five values. The row plots like the ensemble-variance row (switch it to a graph in Track Control's View as) and is cross-read against conservation.
+                The lab-measured layer: DMS mutation tolerance, HDX protection, NMR order parameters, per-residue simulation output or any per-residue score. Paste <code>position value</code> lines (space, tab, comma, colon or semicolon), one series of at least five values, or a <strong>named table with a header row</strong> such as <code>resid,rmsf,rmsd,sasa</code> - every numeric column then becomes its own row, which is how a trajectory analysis drops in. The row plots like the ensemble-variance row (switch it to a graph in Track Control's View as) and is cross-read against conservation.
             </p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
                 <input type="text" id="expNameInput" placeholder="Label (e.g. DMS tolerance)" style="width:200px; font-size:0.78rem; padding:4px 6px; border:1px solid #cbd5e1; border-radius:4px;">
@@ -2870,6 +2871,7 @@
                     <option value="dms">DMS tolerance</option>
                     <option value="hdx">HDX protection</option>
                     <option value="nmr">NMR order (S2)</option>
+                    <option value="md">MD / trajectory metric</option>
                     <option value="other">Other score</option>
                 </select>
             </div>
@@ -6680,6 +6682,7 @@ const EXPERIMENTAL_KINDS = {
     dms: { label: 'DMS tolerance (higher = better tolerated)', hint: 'Deep mutational scanning: how well the protein tolerated changes at each position. High values usually line up with low conservation.' },
     hdx: { label: 'HDX protection (higher = more protected)', hint: 'Hydrogen-deuterium exchange: protection per residue or segment. High values mark buried, slowly exchanging structure.' },
     nmr: { label: 'NMR order (S2, 0-1)', hint: 'Backbone order parameters: 1 = rigid, 0 = flexible.' },
+    md: { label: 'MD / trajectory metric', hint: 'Per-residue dynamics from a simulation: RMSF (higher = more mobile), RMSD, SASA or contact frequency. Cross-read against the ensemble RMSF row and pLDDT: where they disagree, the prediction or the model is worth a look.' },
     ddg: { label: 'ddG (negative = destabilising)', hint: 'Predicted folding-stability change on mutation, from a web service. Negative values destabilise; a conserved, buried position with a strongly negative ddG is a red flag.' },
     other: { label: 'Other experimental score', hint: 'Any per-residue measurement, plotted as-is.' }
 };
@@ -6701,6 +6704,47 @@ function parseExperimentalTable(text) {
         if (pos >= 1 && isFinite(val)) out.push({ pos, val });
     });
     return out;
+}
+// A pasted table is either the original "position value" shape or a named,
+// multi-column export such as a trajectory analysis ("resid,rmsf,rmsd,sasa").
+// The header decides: a first line whose fields are not all numbers opens the
+// named path, and every numeric column after the residue column becomes its own
+// series. Anything less than three values in a column is not a series, so a
+// stray annotation column cannot become a row. Kept separate from
+// parseExperimentalTable so the two-column contract cannot drift.
+const EXPERIMENTAL_POSITION_HEADERS = /^(resi|resid|resno|resnum|residue|residues|position|pos|index|seq|seqnum|seqno|i)$/i;
+function parseExperimentalColumns(text) {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.trim())
+        .filter(l => l && l[0] !== '#' && l[0] !== ';');
+    const asSingle = () => ({ mode: 'single', series: [{ name: '', rows: parseExperimentalTable(text) }] });
+    if (!lines.length) return { mode: 'empty', series: [] };
+    const split = l => l.split(/[\s,;]+/).filter(Boolean);
+    const numeric = /^-?[\d.]+(?:[eE][-+]?\d+)?$/;
+    const head = split(lines[0]);
+    // No header: every field is a number, so this is the plain position/value or
+    // single-series shape and the original parser owns it.
+    if (head.length < 2 || head.every(v => numeric.test(v))) return asSingle();
+    let posCol = head.findIndex(h => EXPERIMENTAL_POSITION_HEADERS.test(String(h).replace(/[^A-Za-z0-9]/g, '')));
+    if (posCol < 0) posCol = 0;
+    const body = lines.slice(1);
+    const series = [];
+    let skipped = 0;
+    head.forEach((rawName, c) => {
+        if (c === posCol) return;
+        const name = String(rawName || '').trim();
+        if (!name) { skipped++; return; }
+        const rows = [];
+        body.forEach(l => {
+            const f = split(l);
+            if (f.length <= Math.max(posCol, c)) return;
+            const pos = parseInt(f[posCol], 10), val = parseFloat(f[c]);
+            if (isFinite(pos) && pos >= 1 && isFinite(val)) rows.push({ pos: pos, val: val });
+        });
+        if (rows.length >= 3) series.push({ name: name, rows: rows });
+        else skipped++;
+    });
+    if (!series.length) return asSingle();
+    return { mode: 'named', series: series, skipped: skipped };
 }
 // Pearson correlation, used for the conservation cross-read-out.
 function pearsonR(xs, ys) {
@@ -6787,8 +6831,29 @@ function addExperimentalTrack() {
     const setStatus = (m) => { if (statusEl) statusEl.textContent = m || ''; };
     const label = ((nameEl && nameEl.value) || '').trim() || 'Experimental data';
     const kind = (kindEl && kindEl.value) || 'other';
-    const rows = parseExperimentalTable(textEl ? textEl.value : '');
-    addExperimentalRows(label, kind, rows, setStatus);
+    const parsed = parseExperimentalColumns(textEl ? textEl.value : '');
+    if (parsed.mode !== 'named') { addExperimentalRows(label, kind, parsed.series[0].rows, setStatus); return; }
+    const total = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    if (!total) { showToast('Nothing to map yet: the table is mapped onto the reference residues.', 'error'); return; }
+    // One pasted table, several named metrics: each numeric column becomes its
+    // own row so a trajectory analysis can be compared, ruled on and graphed
+    // side by side instead of being flattened into one arbitrary column.
+    const before = Object.keys(experimentalTracksInfo);
+    const names = [];
+    parsed.series.forEach(s => {
+        addExperimentalRows(label + ' ' + s.name, kind, s.rows, function () {});
+        names.push(s.name);
+    });
+    const added = Object.keys(experimentalTracksInfo).filter(k => before.indexOf(k) === -1);
+    if (!added.length) {
+        setStatus('No numeric column carried at least three values.');
+        showToast('No numeric column in that table carried at least three values.', 'error');
+        return;
+    }
+    let mapped = 0, oor = 0;
+    added.forEach(k => { const i = experimentalTracksInfo[k] || {}; mapped += i.values || 0; oor += i.outOfRange || 0; });
+    setStatus('Added ' + added.length + ' row(s) from the named columns (' + names.join(', ') + '): ' +
+        mapped + ' value(s)' + (oor ? ', ' + oor + ' out of range (1-' + total + ')' : '') + '.');
 }
 // Shared by the experimental importer and the ddG hand-off: validate the rows,
 // register the track (raw rows kept so the numbering offset can re-place them),
@@ -9990,6 +10055,7 @@ function menuBarAction(action) {
         case 'csv': exportMetricsCSV(); break;
         case 'svg': exportViewportSVG(); break;
         case 'png': exportViewportPNG(); break;
+        case 'structure': exportStructureFile(); break;
         case 'help': openHelpModal(); break;
         default: break;
     }
@@ -10654,7 +10720,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.26';
+const APP_VERSION = '0.66.27';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -17256,6 +17322,181 @@ function downloadTextFile(filename, text, mime) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     return true;
+}
+
+// --- Structure export (PDB/CIF: selection or whole model) -------------------
+// The hand-off for building a simulation system (CHARMM-GUI and friends),
+// running a refinement job, or simply handing a colleague coordinates. It
+// filters the *cached original text* instead of re-serialising parsed atoms, so
+// residue numbering, chain IDs, insertion codes, record types, TER/ANISOU and
+// every HETATM line survive exactly as deposited or predicted. Nothing is
+// renumbered and no coordinate is rewritten - that is the whole point: a
+// builder should receive the real file, narrowed, not a lossy copy of it.
+function structureExportExt(fileName) {
+    const entry = cachedStructureIndex[fileName];
+    if (entry && entry.ext) return String(entry.ext).toLowerCase();
+    return structExt(fileName);
+}
+// Which files can be exported: the model the 3D viewer is showing first, then
+// anything else attached or cached. Cache-only files are included because the
+// text can be re-read from IndexedDB.
+function structureExportTargets() {
+    const seen = [];
+    const ref = p3dModelSourceRef(p3dModel);
+    if (ref && ref.fileName) seen.push(ref.fileName);
+    Object.keys(cachedStructureTexts).forEach(f => seen.push(f));
+    Object.keys(cachedStructureIndex).forEach(f => seen.push(f));
+    Object.keys(uploadedStructureFiles).forEach(f => seen.push(f.name));
+    const out = [];
+    seen.forEach(f => {
+        if (out.indexOf(f) !== -1) return;
+        const e = structExt(f);
+        if (e !== 'pdb' && e !== 'cif') return;
+        const cached = !!cachedStructureTexts[f];
+        const onDisk = !!(cachedStructureIndex[f] && cachedStructureIndex[f].hash);
+        if (cached || onDisk) out.push(f);
+    });
+    return out;
+}
+// Reference indices (0-based) the current selection covers. Empty means the
+// whole model, which is what an unselected session exports.
+function structureExportSelection() {
+    const set = new Set();
+    getSelectedIndices().forEach(i => { if (i >= 0) set.add(i); });
+    return set;
+}
+// Which of a chain's residues fall inside the selection, as "chainId:resSeq".
+// Reference indices come from the same aligner the validation, interface and
+// ensemble paths use, so a model numbered from its own mature chain still maps;
+// the raw-numbering fallback is inherited from mapChainToReference.
+function structureExportKeepSet(chains, refIdxSet, referenceAA) {
+    const keep = new Set();
+    if (!refIdxSet || !refIdxSet.size) return keep;
+    Object.keys(chains).forEach(chainId => {
+        const chain = chains[chainId] || [];
+        const mapping = mapChainToReference(chain, referenceAA);
+        chain.forEach((res, i) => {
+            const ref = mapping.has(i) ? mapping.get(i) : (res.resSeq - 1);
+            if (!refIdxSet.has(ref)) return;
+            keep.add(chainId + ':' + res.resSeq);
+        });
+    });
+    return keep;
+}
+// mmCIF has no fixed columns, so the _atom_site loop's own column order is
+// resolved once, the same way parseAllAtoms does, and chain/label preference
+// matches parseStructureChains so the keep-set keys line up.
+function structureExportCifColumns(text) {
+    const idx = { asym: -1, labelAsym: -1, authSeq: -1, seq: -1 };
+    let inAtomSite = false, colIndex = 0;
+    for (const line of String(text).split(/\r?\n/)) {
+        if (line.startsWith('_atom_site.')) {
+            inAtomSite = true;
+            if (line.includes('auth_asym_id')) idx.asym = colIndex;
+            if (line.includes('label_asym_id')) idx.labelAsym = colIndex;
+            if (line.includes('auth_seq_id')) idx.authSeq = colIndex;
+            else if (line.includes('label_seq_id') && idx.authSeq === -1) idx.seq = colIndex;
+            colIndex++;
+        } else if (inAtomSite && (line.startsWith('ATOM') || line.startsWith('HETATM'))) {
+            break; // the header ends at the first atom row
+        } else if (line.startsWith('#')) {
+            inAtomSite = false;
+        }
+    }
+    return idx;
+}
+// "chain:resSeq" for one coordinate record, or null when it cannot be placed.
+function structureExportLineKey(line, ext, cif) {
+    if (ext !== 'cif') {
+        const resSeq = parseInt(line.substring(22, 26).trim(), 10);
+        return isFinite(resSeq) ? ((line.substring(21, 22) || '').trim() + ':' + resSeq) : null;
+    }
+    if (!cif) return null;
+    const cols = line.trim().split(/\s+/);
+    const seqCol = cif.authSeq >= 0 ? cif.authSeq : cif.seq;
+    if (seqCol < 0 || !cols[seqCol]) return null;
+    const chain = cif.labelAsym >= 0 ? (cols[cif.labelAsym] || '')
+        : (cif.asym >= 0 ? (cols[cif.asym] || '') : '_');
+    const resSeq = parseInt(cols[seqCol], 10);
+    return isFinite(resSeq) ? chain + ':' + resSeq : null;
+}
+// Builds the filtered structure text. Pure apart from reading the session's
+// selection, so the harness can assert the text it produces.
+function buildStructureExport(fileName, opts) {
+    const o = opts || {};
+    const text = cachedStructureTexts[fileName];
+    if (!text) return { ok: false, reason: 'missing', message: 'That structure file is no longer in this session - re-attach it to export it.' };
+    const ext = structureExportExt(fileName);
+    const referenceAA = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const refIdxSet = (o.all === true) ? new Set() : structureExportSelection();
+    const keep = structureExportKeepSet(parseStructureChains(text, ext), refIdxSet, referenceAA);
+    const cif = (ext === 'cif') ? structureExportCifColumns(text) : null;
+    const whole = keep.size === 0;
+    const keptChains = new Set(), allChains = new Set();
+    let kept = 0, total = 0;
+    const out = [];
+    String(text).split(/\r?\n/).forEach(line => {
+        const isCoord = line.startsWith('ATOM') || line.startsWith('HETATM') || line.startsWith('ANISOU');
+        if (!isCoord) { out.push(line); return; } // headers, TER, CONECT, END, loops
+        total++;
+        const key = structureExportLineKey(line, ext, cif);
+        const chain = key ? key.slice(0, key.lastIndexOf(':')) : null;
+        if (chain) allChains.add(chain);
+        if (whole || (key && keep.has(key))) {
+            out.push(line);
+            kept++;
+            if (chain) keptChains.add(chain);
+        }
+    });
+    const src = (p3dModelSources && p3dModelSources[fileName]) || '';
+    const notes = [
+        'Quick2DViewer ' + APP_VERSION + ' structure export',
+        'source ' + fileName + (src ? ' (' + src + ')' : ''),
+        whole ? 'scope whole model (no selection)' : 'scope current selection (' + refIdxSet.size + ' reference residue(s))',
+        'numbering original and unrenumbered; chain IDs as deposited/predicted'
+    ];
+    // PDB takes REMARK, mmCIF takes #-comments: the header must not make the
+    // file unreadable to whichever tool receives it.
+    const header = (ext === 'cif' ? notes.map(n => '# ' + n) : notes.map(n => 'REMARK   1 ' + n)).concat(['']);
+    return {
+        ok: true, fileName: fileName, ext: ext, whole: whole,
+        text: header.concat(out).join('\n'),
+        keptAtoms: kept, totalAtoms: total,
+        chains: Array.from(keptChains), allChains: Array.from(allChains),
+        referenceResidues: refIdxSet.size
+    };
+}
+// The Export menu action. Whole model when nothing is selected, the selection
+// otherwise; the toast says which, so an accidental empty selection cannot
+// quietly produce a full-length file that looks like a trimmed one.
+// Async because a file that only exists in the device cache (the usual state
+// right after a reload, while rehydration is still in flight) has to be re-read
+// from IndexedDB before it can be filtered.
+async function exportStructureFile() {
+    const targets = structureExportTargets();
+    if (!targets.length) {
+        showToast('No structure attached to export - attach a PDB or CIF first.', 'error');
+        return null;
+    }
+    const fileName = targets[0];
+    if (!cachedStructureTexts[fileName]) {
+        const entry = cachedStructureIndex[fileName];
+        if (entry && entry.hash) {
+            try {
+                const rec = await structureCacheGet(entry.hash);
+                if (rec && rec.text) cachedStructureTexts[fileName] = rec.text;
+            } catch (err) { /* the toast below explains it */ }
+        }
+    }
+    const built = buildStructureExport(fileName);
+    if (!built.ok) { showToast(built.message, 'error'); return null; }
+    const suffix = built.whole ? '' : '-selection';
+    const name = 'q2dv-' + (structBaseName(fileName) || 'structure') + suffix + '.' + built.ext;
+    downloadTextFile(name, built.text, built.ext === 'cif' ? 'chemical/x-mmcif' : 'chemical/x-pdb');
+    showToast('Exported ' + built.keptAtoms + ' of ' + built.totalAtoms + ' atoms' +
+        (built.whole ? ' (whole model)' : ' (selection)') +
+        (built.chains.length ? ' · chain ' + built.chains.join(', ') : '') + '.', 'success');
+    return built;
 }
 
 function closeMetricsTable() {

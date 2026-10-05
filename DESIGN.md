@@ -708,3 +708,225 @@ Checklist before UI work on a new feature:
 3. Make the feature read the session state rather than duplicate it (a macro
    step must not become a second input system).
 4. Tests assert the placement (element ids on the right surface).
+
+## 21. AI hand-off pack (planning, 2026-10)
+
+**Status (2026-10-04): deferred.** Priority is the GFP/TerC evidence features
+(§22, §23, §24); the pack can be revisited once those surfaces exist, since it
+is largely a presentation layer over their output.
+
+**Decision.** Q2DV exports a self-contained "AI pack" that the user hands to a
+model of their choosing; the app never calls one. The pack is assembled locally
+from state that already exists and is copied or downloaded like any other
+export. It carries an explicit recommendation to use a **local/private model**
+for unpublished or confidential material, and states the hosted-tier caveats
+(consumer plans may train on content; API/enterprise tiers differ; jurisdiction
+and retention vary by provider).
+
+**Contents** (all from existing functions):
+- header/provenance: `APP_VERSION`, protein label, length, date, sequence hash;
+- sequence + FASTA (`copySequenceFasta` / `downloadSequenceFasta`);
+- `buildMethodsReport()` sections: intake, coverage, loaded evidence, template
+  quality, rules, TM cross-check, read-out, citations;
+- `hypothesisTSV()` candidate table;
+- metrics TSV, topology consensus summary, interface summary;
+- a per-track provenance digest from `trackMeta`, with **trust labels**:
+  API-fetched / computed client-side / **user-entered (unverified)**;
+- a caveat block ("suggestions to evaluate, not conclusions") and a short
+  prompt scaffold (cite only provided data, no invented positions, state
+  uncertainty).
+
+**Format.** Markdown (human-readable, paste-ready) plus the existing save JSON
+(machine-readable). The raw save alone is not sent: per-residue arrays are
+token-heavy and invite arithmetic errors; tables and summaries carry the signal.
+
+**Deliberately out of scope.** PDF ingestion, embeddings/RAG, hosted API calls
+and in-app model execution. These break the single-file/no-backend/no-network
+invariants and belong to dedicated tools (PaperQA2, NotebookLM, Zotero) or the
+user's model of choice.
+
+**Placement (§20).** Deliverable; action on the Integrate step. No new
+top-level surface.
+
+**Tests.** Assert the pack contains every section, the trust labels, the caveat
+line and the citation list; feature card in `QA_CHECKLIST.md`.
+
+## 22. Metal-site coordination analysis (planning, 2026-10)
+
+**Decision.** Implement the coordination analysis **in-house from the parsed
+coordinates**, not by porting or calling MetalHawk. MetalHawk is GPL-3.0 and
+ships ~1 MB pickled models plus a PyMOL dependency; the properties needed here
+are published deterministic methods (FindGeo geometry templates, CheckMyMetal
+bond-valence parameters), and Q2DV already parses atom records and does Kabsch
+superposition. MetalHawk's CSV becomes the **benchmark** for the local
+implementation, never a dependency; no MetalHawk code or weights are used.
+
+**Data basis.** The same parser `extractCofactorNeighborhoods()` uses:
+ATOM/HETATM groups (`chain`/`resSeq`/`iCode`/`resName`, per-atom
+element/coords/B-factor), hydrogen-filtered, `MSE`/`SEC` excluded. A metal
+centre is a metal-element atom inside any hetero group (`HEM`/`FE`, `ZN`, `MG`,
+`CA`, `MN`, `CU`, `FES`, ...). Multi-metal clusters and bridging donors are v2.
+
+**Computed per metal centre:**
+
+| Output | Definition | Method / source |
+|---|---|---|
+| first shell / CN | donor atoms within a metal-donor cutoff (covalent radii + tolerance; default 2.8 A), C/H excluded, waters listed separately | Harding 2004; FindGeo |
+| geometry + distortion | M-L distances normalised, Kabsch against ideal templates, permutation search for n<=6; best RMSD + runner-up gap | FindGeo |
+| valence / oxidation state, completeness | bond-valence sum + nVECSUM with published R0/b parameters; acceptable/borderline/dubious bands | Brese & O'Keeffe 1991; CheckMyMetal |
+| vacancy / occupancy / B-factor | preferred CN vs observed; metal vs donor B-factor mismatch; alternate-conformer flags | CheckMyMetal |
+| heme axial ligands | porphyrin N4 + axial His/Cys/Met/Tyr; extends the existing `axialDist` cofactor class | existing machinery |
+
+v1 template library: linear, trigonal planar, tetrahedral, square planar,
+trigonal bipyramidal, square pyramidal, octahedral, trigonal prismatic.
+
+**Entropy - three definitions, each labelled honestly:**
+1. *geometry ambiguity* (single model): Shannon entropy over template weights
+   derived from their RMSDs; high = distorted or between geometries. This is
+   the deterministic analogue of MetalHawk's output entropy (its paper
+   correlates that entropy with distortion/misclassification).
+2. *donor diversity* (single model): Shannon entropy over donor atom/residue
+   classes.
+3. *ensemble coordination* (many models): per site, distribution of donor sets
+   and geometry classes across attached models/seeds/frames -> entropy; reuses
+   the ensemble machinery.
+
+Not computed: thermodynamic dS, ligand exchange rates, density-map validation.
+The tooltip states this; Q2DV is a read-out, not CheckMyMetal.
+
+**Surfaces (§20).** Computed `COORD_<metal>_<id>` categorical tracks marking
+coordinating residues; a **Metal sites** table in the Data modal (copy TSV,
+methods report, AI pack); numeric rule sources `CN:`, `geometry_RMSD:`, `BVS:`,
+`donor_entropy:`, `geometry_entropy:`; first-shell highlight in 3D. Provenance
+`computed (client-side)`.
+
+**Validation.** Compare in-app CN/geometry against the MetalHawk Colab CSV on
+the same files (GPL output is data, not code) and against the published
+FindGeo/CheckMyMetal examples. Fixtures: carbonic-anhydrase Zn (tetrahedral), a
+5-coordinate heme, an Fe-S cluster. Tests + QA card.
+
+**Citations (Crossref/Europe PMC-resolved 2026-10).**
+- FindGeo: Andreini et al., Bioinformatics 2012. `10.1093/bioinformatics/bts246`
+- CheckMyMetal: Zheng et al., Acta Cryst D 2017. `10.1107/S2059798317001061`;
+  Gucwa et al., Protein Sci 2022. `10.1002/pro.4525`; protocol: Zheng et al.,
+  Nat Protoc 2014. `10.1038/nprot.2013.172`
+- Harding, Acta Cryst D 2004. `10.1107/S0907444904004081`
+- Brese & O'Keeffe, Acta Cryst B 1991. `10.1107/S0108768190011041`
+- MetalHawk (cross-reference only): Sgueglia et al., JCIM 2023.
+  `10.1021/acs.jcim.3c00873`
+
+## 23. New external evidence sources (planning, 2026-10)
+
+All endpoints were CORS-probed 2026-10 from a browser Origin and answered with
+`access-control-allow-origin: *`; re-verify at implementation per §3. Each
+becomes a `SERVICE_REGISTRY` provider with provenance tagging.
+
+| Source | Endpoint / notes | Category (§16) | Guide home | Why |
+|---|---|---|---|---|
+| AlphaFill | `https://alphafill.eu/v1/aff/{AF-ID}`; ligand/cofactor transplants with confidence; label as predicted | Evidence source | Structure | AF monomer models are usually apo; heme/metal state is invisible today |
+| AlphaFold PAE | AlphaFold DB API `/api/prediction/{acc}` exposes `paeDocUrl`/`paeImageUrl`; also import AF3 JSON | Evidence source | Structure + Interfaces | domain boundaries and inter-chain/interface confidence - no PAE anywhere today |
+| Europe PMC + UniProt refs | Europe PMC REST search; UniProt `references[]` from the already-fetched entry | Evidence source + Deliverable | Annotation | study-system literature seeds, PMIDs/DOIs/BibTeX; feeds §21 |
+| STRING | `https://string-db.org/api/json/interaction_partners` (correct identifiers/species; check terms) | Evidence source | Annotation (function unknown) | fills the "no interaction evidence" gap |
+| gnomAD / ClinVar | gnomAD GraphQL (preflight OK); ClinVar via EBI/NCBI | Evidence source | Variants | human variant context; low priority per §2 step 5 |
+
+Citations: AlphaFill, Nat Methods 2022, `10.1038/s41592-022-01685-y`; STRING,
+NAR 2023, `10.1093/nar/gkac1000`.
+
+## 24. Client-side features and deliverables (planning, 2026-10)
+
+| Feature | What / where | Category (§16) | Notes |
+|---|---|---|---|
+| Wet-lab constants | pI, MW, A280 extinction, GRAVY; sequence panel, methods report, AI pack | Step extension | pure JS; none of these exist today |
+| DNA construct export | codon back-translation with host codon tables, GC/forbidden-site flags; Construct designer | Deliverable | not primer design (still out of scope) |
+| MSA export | FASTA/Stockholm/Clustal from the stored alignment rows; optional NJ tree later | Deliverable | addresses EVALUATION dim. 12; no alignment export today |
+| Ensemble conformer clustering | cluster the existing pairwise RMSD matrix into states; label/colour models | Step extension | reuses 0.66.9 machinery |
+| UniProt functional summary | function text, EC, GO terms, keywords, subcellular location from the fetched JSON | Interpretation | Annotation step + AI pack |
+| Client-side geometry QC | disulfide SG-SG, first-shell clash for predicted models where PDBe validation cannot apply | Step extension | resolves the written validation blindspot without a service |
+| 3D measurement | distance/angle between selected atoms/residues | Step extension | verifies coordination geometry by eye |
+| Figure captions | generate legends from active tracks + citations | Deliverable | open-science packaging |
+
+## 25. Candidates to test, and open decisions (planning, 2026-10)
+
+**Test-first (CORS unverified).**
+- **OPM** membrane orientation (model vs membrane planes) - relevant to the
+  membrane-protein audience only.
+- **PDB-REDO** improved deposited models - same attach pipeline.
+- **AllMetal3D / Metal3D / PRIME** predict metal sites in apo models; no
+  verified browser API - hand-off only if demand appears.
+
+**Open decisions.**
+- Q2DV ships **no LICENSE** today. The AI pack, the independent metal
+  implementation and any future permissive release depend on that choice
+  (MIT/Apache-2.0 for permissive; GPL-3.0 only if GPL-derived artifacts are
+  ever embedded). Decide before optional work that incorporates third-party
+  content.
+- Any candidate promoted to a pipeline stage must go through §16 (likely a
+  Step candidate needs a `WORKFLOW_STEPS` entry + regenerated `WORKFLOW.md`).
+
+## 26. CHARMM-GUI / MD round trip (planning, 2026-10)
+
+**Decision.** Treat molecular dynamics as a *stability and homogeneity filter*
+over candidate constructs/states, with Q2DV as the comparison layer on both
+ends of the trip; Q2DV neither builds nor runs simulations. The iteration loop:
+construct/state candidates -> CHARMM-GUI build -> MD -> per-residue results and
+representative frames imported into Q2DV -> compare against predictions ->
+rank/fix candidates -> repeat. The loop targets specific questions (trimer
+interface stability, heme retention, which termini/loops to trim), not a broad
+search: data-free MD does not turn a plausible model into a high-resolution
+structure.
+
+**Honest limits (recorded so the loop is not over-read).**
+- MD relaxes local geometry and tests physical plausibility under a force
+  field; it does not converge on the true structure, and systematic force-field
+  error can move a model away from truth.
+- Heme/metal parameters are approximate (no polarization; oxidation/spin state
+  and covalent c-type links must be set up deliberately).
+- Crystallization/purification *conditions* are empirical (screens). Q2DV/MD can
+  rank constructs and surface properties; they cannot predict precipitant, pH
+  or additive conditions.
+- High-resolution information still comes from experiment (cryo-EM/
+  crystallography, SAXS, SEC-MALS, labeling); MD supports interpretation and
+  candidate choice.
+- A heme trimer in explicit solvent is expensive to simulate; iterate on a few
+  targeted hypotheses, not brute-force.
+
+**Q2DV -> the builder (hand-off).**
+- export the chosen model/selection as PDB with original numbering/chain IDs;
+- a simulation-prep block in the methods report: state (monomer/dimer/trimer,
+  heme count), disulfide pairs, cofactor identity + axial ligands (covalent
+  c-type vs non-covalent b-type), oxidation-state hint from BVS, and the
+  residue-numbering offset;
+- construct candidates from the Construct designer (trim disordered termini,
+  drop low-pLDDT/unmodelled regions);
+- orientation for membrane builds from the topology consensus + OPM
+  (test-first, §25), preferring PPM in the builder because OPM PDBs lack TER
+  records and are often misread.
+
+**The builder -> Q2DV (results).**
+- import per-residue MD analysis (RMSF, RMSD, SASA, H-bond/contact counts) as
+  `_EXP` tracks; extend the experimental importer to named/multi-column CSV;
+- attach an equilibrated representative frame (and optionally a few frames) as
+  a model; the numbering-offset machinery re-places imported values;
+- §22 coordination on frames: axial-ligand occupancy, geometry distribution,
+  BVS plausibility, disulfide persistence;
+- predicted-vs-MD `XC_` cross-checks: pLDDT vs MD RMSF, ensemble RMSF vs MD
+  RMSF, conservation vs MD rigidity, interfaces/PAE vs contact frequency,
+  topology vs TM persistence. Disagreement is the "look here" signal for
+  experiment or model repair.
+
+**What Q2DV will not do.** Build CHARMM inputs, parameterize ligands, parse
+DCD/XTC trajectories in-browser, or automate the CHARMM-GUI REST API (JWT,
+credentials, no-backend). Automation belongs in an external script.
+
+**Work items.**
+1. ~~PDB export (selection/model, original numbering).~~ **Done (0.69.0)** - Export menu
+   -> *Structure file (PDB/CIF)*; filters the cached original text, so numbering,
+   chain IDs, record types and HETATM survive; mmCIF gets a `#` header; a
+   cache-only file is re-read from IndexedDB before filtering.
+2. Simulation-prep report block.
+3. ~~Multi-column MD CSV import (extends the experimental importer).~~ **Done
+   (0.69.0)** - a header row makes each numeric column its own experimental
+   row; new `MD / trajectory metric` kind for the interpretation text.
+4. Predicted-vs-MD `XC_` cross-check (the existing TM cross-check pattern).
+5. Frame-aware §22 coordination.
+Tests: synthetic MD CSV fixture + the 1GFL fixtures; QA card.

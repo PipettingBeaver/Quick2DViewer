@@ -12,6 +12,44 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.27] - 2026-10-04
+
+### Added
+- **Export ▸ Structure file (PDB/CIF).** The attached model, or just the selected
+  residues, written out as the *original* coordinate text: residue numbering,
+  chain IDs, insertion codes, record types, `TER`/`ANISOU` and every `HETATM`
+  line are preserved because the cached text is filtered rather than
+  re-serialised from parsed atoms. Nothing is renumbered and no coordinate is
+  rewritten, which is the point - a simulation builder (CHARMM-GUI and friends)
+  or a refinement job receives the real file, narrowed. No selection means the
+  whole model, and the toast says which was exported so an empty selection
+  cannot quietly produce a full-length file. The active 3D model is preferred;
+  a file that only exists in the device cache is offered too, since its text can
+  be re-read from IndexedDB. mmCIF input is supported and gets a `#`-commented
+  header instead of `REMARK`, so the file stays valid. Residues are located
+  through the same aligner the validation/interface/ensemble paths use, so a
+  model numbered from its own mature chain still exports the right residues.
+- **Named multi-column tables in the experimental importer.** A pasted table with
+  a header row (`resid,rmsf,rmsd,sasa`) now adds one row per numeric column
+  instead of flattening to an arbitrary one, which is how a trajectory analysis
+  drops in: each metric becomes its own experimental row, individually
+  graphable, individually usable as an `EXP:` rule source, and cross-read
+  against conservation. Columns with fewer than three values are skipped and
+  reported rather than imported as noise. The existing `position value` and
+  single-series contracts are unchanged (and still covered by their own checks).
+- **A "MD / trajectory metric" kind** for that importer, with the interpretation
+  text that says what RMSF/RMSD/SASA/contact-frequency rows mean and that they
+  should be read against the ensemble RMSF row and pLDDT.
+
+### Changed
+- DESIGN gains §§21-26: the AI hand-off pack (deferred), the in-house metal-site
+  coordination analysis (decided against MetalHawk's GPL weights, with the three
+  entropy definitions), the CORS-verified new evidence sources (AlphaFill,
+  AlphaFold PAE, Europe PMC + UniProt references, STRING, gnomAD/ClinVar), the
+  client-side additions, the test-first candidates, and the CHARMM-GUI/MD round
+  trip - including an explicit "honest limits" note that MD is a stability and
+  homogeneity filter, not a way to a higher-resolution model without data.
+
 ## [0.66.26] - 2026-10-01
 
 ### Fixed

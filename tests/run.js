@@ -3555,6 +3555,161 @@ assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_search.providers[0].enabl
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_search.providers[0].adapter`) === 'foldseek', 'structure_search -> foldseek adapter');
 assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 'function'`), 'registry helpers present');
 
+// A two-chain model whose CA residues spell the reference exactly, so the
+// alignment-based reference mapping is the identity and the assertions below
+// pin real behaviour rather than the aligner's tie-breaks. Chain B is numbered
+// from 11, which is the whole point: numbering is not trustworthy, the
+// sequence alignment is.
+const exportThree = { A: 'ALA', C: 'CYS', D: 'ASP' };
+const exportPdbLine = (resName, chain, resSeq, serial, x, record) => {
+    const L = new Array(80).fill(' ');
+    const put = (st, str) => { for (let k = 0; k < str.length; k++) L[st + k] = str[k]; };
+    put(0, record || 'ATOM'); put(6, String(serial).padStart(5));
+    put(12, ' CA '); put(17, resName); put(21, chain); put(22, String(resSeq).padStart(4));
+    put(30, x.toFixed(3).padStart(8)); put(38, '10.000'.padStart(8)); put(46, '10.000'.padStart(8));
+    put(60, '90.00'.padStart(6)); put(77, 'C');
+    return L.join('');
+};
+const exportPdb = [
+    'HEADER    TEST',
+    exportPdbLine(exportThree.A, 'A', 1, 1, 10),
+    exportPdbLine(exportThree.C, 'A', 2, 2, 20),
+    exportPdbLine(exportThree.D, 'A', 3, 3, 30),
+    'TER',
+    exportPdbLine(exportThree.A, 'B', 11, 4, 11),
+    exportPdbLine(exportThree.C, 'B', 12, 5, 21),
+    exportPdbLine(exportThree.D, 'B', 13, 6, 31),
+    exportPdbLine('FE', 'A', 201, 7, 30, 'HETATM'),
+    exportPdbLine('HOH', 'A', 301, 8, 32, 'HETATM'),
+    'END'
+].join(String.fromCharCode(10));
+sandbox.__exportPdb = exportPdb;
+
+section('structure export (PDB/CIF hand-off)');
+ctxRun(`
+    parsedTracks = { AA: 'ACD' };
+    cachedStructureTexts = { 'model.pdb': window.__exportPdb };
+    cachedStructureIndex = {}; uploadedStructureFiles = []; p3dModel = null;
+    selectionMode = 'point'; rowRanges = []; selectStart = null; selectEnd = null;
+    referenceOffset = 0; trackOffsets = {};
+`);
+assert(HTML.indexOf(`menuBarAction('structure')`) !== -1 && HTML.indexOf('Structure file (PDB/CIF)') !== -1, 'the Export menu carries the structure export');
+
+const expWhole = ctxRun(`buildStructureExport('model.pdb')`);
+assert(expWhole.ok === true && expWhole.whole === true, 'with no selection the export is the whole model');
+assert(expWhole.totalAtoms === 8 && expWhole.keptAtoms === 8, 'every coordinate record survives (got ' + expWhole.keptAtoms + '/' + expWhole.totalAtoms + ')');
+assert(expWhole.text.indexOf('REMARK   1') === 0 && expWhole.text.indexOf('scope whole model (no selection)') !== -1, 'the header states it is the whole model');
+assert(expWhole.text.indexOf('HEADER    TEST') !== -1 && expWhole.text.indexOf('TER') !== -1 && expWhole.text.indexOf('END') !== -1, 'headers, TER and END are passed through untouched');
+assert(expWhole.text.indexOf('HETATM') !== -1 && expWhole.chains.join(',') === 'A,B', 'HETATM cofactors/waters stay and both chains are reported (got ' + expWhole.chains.join(',') + ')');
+
+ctxRun(`selectionMode = 'point'; rowRanges = []; selectStart = 1; selectEnd = 1;`);
+const expSel = ctxRun(`buildStructureExport('model.pdb')`);
+assert(expSel.whole === false && expSel.referenceResidues === 1, 'a selection narrows the export');
+const expSelLines = expSel.text.split(String.fromCharCode(10));
+const flatRes = t => t.split(String.fromCharCode(10)).filter(l => l.indexOf(' CA ') !== -1).map(l => l.substring(21, 26).trim().replace(/\s+/g, ' '));
+const selResidues = flatRes(expSel.text);
+assert(selResidues.join(',') === 'A 2,B 12', 'only the selected residue is kept, from every chain that has it, with original numbering (got ' + selResidues.join(',') + ')');
+assert(expSelLines.filter(l => l.startsWith('HETATM')).length === 0, 'the cofactor and water that were not in the selection are dropped');
+assert(expSel.text.indexOf('scope current selection (1 reference residue(s))') !== -1, 'the header says it is the selection');
+
+ctxRun(`rowRanges = [[1, 2]]; selectionMode = 'row'; selectStart = null; selectEnd = null;`);
+const expRow = ctxRun(`buildStructureExport('model.pdb')`);
+const rowResidues = flatRes(expRow.text);
+assert(rowResidues.join(',') === 'A 2,A 3,B 12,B 13', 'a row selection spans the range in both chains (got ' + rowResidues.join(',') + ')');
+const expRowWhole = ctxRun(`buildStructureExport('model.pdb', { all: true })`);
+assert(expRowWhole.ok === true && expRowWhole.whole === true && expRowWhole.keptAtoms === 8, 'the {all:true} option overrides an active selection and exports everything (got ' + expRowWhole.keptAtoms + ')');
+ctxRun(`selectStart = null; selectEnd = null; rowRanges = [];`);
+
+ctxRun(`delete cachedStructureTexts['model.pdb'];`);
+assert(ctxRun(`buildStructureExport('model.pdb').ok`) === false, 'an unavailable file fails cleanly instead of exporting nothing');
+ctxRun(`cachedStructureIndex = { 'from-cache.pdb': { hash: 'deadbeef', ext: 'pdb', size: 1 } };`);
+assert(ctxRun(`structureExportTargets().indexOf('from-cache.pdb')`) !== -1, 'a file only in the device cache is still offered (its text can be re-read)');
+ctxRun(`
+    parsedTracks = { AA: 'ACD' };
+    cachedStructureTexts = { 'model.pdb': window.__exportPdb };
+    cachedStructureIndex = {}; p3dModel = null;
+    selectionMode = 'point'; rowRanges = []; selectStart = null; selectEnd = null;
+`);
+
+// mmCIF had no fixture coverage at all before this; the exporter has to resolve
+// the _atom_site loop's own column order, and comment its header with # rather
+// than REMARK so the file stays valid.
+const exportCif = [
+    'data_test',
+    'loop_',
+    '_atom_site.group_PDB',
+    '_atom_site.id',
+    '_atom_site.label_atom_id',
+    '_atom_site.label_comp_id',
+    '_atom_site.label_asym_id',
+    '_atom_site.label_seq_id',
+    '_atom_site.Cartn_x',
+    '_atom_site.Cartn_y',
+    '_atom_site.Cartn_z',
+    '_atom_site.occupancy',
+    '_atom_site.B_iso_or_equiv',
+    'ATOM 1 CA ALA A 1 0.000 0.000 0.000 1.00 90.00',
+    'ATOM 2 CA CYS A 2 3.000 0.000 0.000 1.00 90.00',
+    'ATOM 3 CA ASP A 3 6.000 0.000 0.000 1.00 90.00',
+    '#'
+].join(String.fromCharCode(10));
+sandbox.__exportCif = exportCif;
+
+section('structure export: mmCIF');
+ctxRun(`cachedStructureTexts = { 'm.cif': window.__exportCif };`);
+const cifCols = ctxRun(`structureExportCifColumns(cachedStructureTexts['m.cif'])`);
+assert(cifCols.labelAsym === 4 && cifCols.seq === 5, 'the _atom_site column order is resolved (got asym ' + cifCols.labelAsym + ', seq ' + cifCols.seq + ')');
+const cifWhole = ctxRun(`buildStructureExport('m.cif')`);
+assert(cifWhole.ok === true && cifWhole.ext === 'cif' && cifWhole.keptAtoms === 3, 'an mmCIF model exports whole');
+assert(cifWhole.text.indexOf('# Quick2DViewer') === 0 && cifWhole.text.indexOf('REMARK') === -1, 'the mmCIF header is commented with #, never REMARK');
+ctxRun(`selectStart = 1; selectEnd = 1; selectionMode = 'point'; rowRanges = [];`);
+const cifSel = ctxRun(`buildStructureExport('m.cif')`);
+assert(cifSel.keptAtoms === 1 && cifSel.text.indexOf('CYS') !== -1 && cifSel.text.indexOf('ALA') === -1, 'the mmCIF selection keeps only the chosen residue');
+ctxRun(`selectStart = null; selectEnd = null; cachedStructureTexts = {}; p3dModel = null;`);
+
+section('experimental data: named multi-column tables');
+const expCols = ctxRun(`parseExperimentalColumns(['# md analysis', 'resid,rmsf,rmsd', '1,1.5,0.20', '2,2.5,0.30', '3,0.5,0.10'].join(String.fromCharCode(10)))`);
+assert(expCols.mode === 'named' && expCols.series.length === 2, 'a header row with two numeric columns yields two series (got ' + expCols.mode + ' / ' + expCols.series.length + ')');
+assert(expCols.series[0].name === 'rmsf' && expCols.series[0].rows.length === 3 && expCols.series[0].rows[1].val === 2.5, 'each series keeps its own name and values');
+assert(expCols.series[1].name === 'rmsd' && expCols.series[1].rows[2].pos === 3 && expCols.series[1].rows[2].val === 0.1, 'the second column maps positions independently');
+assert(ctxRun(`parseExperimentalColumns('1 0.42' + String.fromCharCode(10) + '2 0.55' + String.fromCharCode(10) + '3 0.91')`).mode === 'single', 'the plain position/value table still takes the single path');
+assert(ctxRun(`parseExperimentalColumns('0.2 0.3 0.9 0.4 0.5')`).mode === 'single', 'one long series is untouched');
+assert(ctxRun(`parseExperimentalColumns('resid,rmsf' + String.fromCharCode(10) + '1,1.5' + String.fromCharCode(10) + '2,2.5')`).mode === 'single', 'a column too short to be a series falls back instead of importing');
+assert(ctxRun(`parseExperimentalColumns('resid,note,rmsf' + String.fromCharCode(10) + '1,x,1.5' + String.fromCharCode(10) + '2,y,2.5' + String.fromCharCode(10) + '3,z,3.5').skipped`) === 1, 'a column whose values are not numbers is skipped and reported (got ' + ctxRun(`parseExperimentalColumns('resid,note,rmsf' + String.fromCharCode(10) + '1,x,1.5' + String.fromCharCode(10) + '2,y,2.5' + String.fromCharCode(10) + '3,z,3.5').skipped`) + ')');
+
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(10) };
+    experimentalTracksInfo = {}; referenceOffset = 0; trackOffsets = {};
+    document.getElementById('expNameInput').value = 'MD';
+    document.getElementById('expKindSelect').value = 'md';
+    document.getElementById('expPasteInput').value = ['resid,rmsf,rmsd,sasa', '1,1.5,0.20,55.0', '2,2.5,0.30,40.0', '3,0.5,0.10,70.0', '4,3.0,0.40,20.0'].join(String.fromCharCode(10));
+    document.getElementById('expStatus').textContent = '';
+    addExperimentalTrack();
+`);
+const expKeys = ctxRun(`Object.keys(parsedTracks).filter(k => k.indexOf('MD_') === 0)`);
+assert(expKeys.length === 3, 'one pasted table adds a row per numeric column (got ' + expKeys.join(',') + ')');
+assert(ctxRun(`parsedTracks['MD_rmsf_EXP'][1].val`) === 2.5 && ctxRun(`parsedTracks['MD_sasa_EXP'][2].val`) === 70, 'the values land on the right residues');
+assert(ctxRun(`experimentalTracksInfo['MD_rmsf_EXP'].kind`) === 'md', 'the row carries the MD kind');
+assert(ctxRun(`formatTrackLabel('MD_rmsf_EXP')`) === 'MD rmsf (experimental)' && ctxRun(`isGraphCapable(getTrackGroup('MD_rmsf_EXP'))`) === true, 'each named row is a normal, graphable experimental row');
+assert(ctxRun(`ruleNumericValue('EXP:MD_rmsf_EXP', 1)`) === 2.5, 'each named row is usable as its own rule source');
+const expMultiStatus = ctxRun(`document.getElementById('expStatus').textContent`);
+assert(/Added 3 row\(s\)/.test(expMultiStatus) && /rmsf, rmsd, sasa/.test(expMultiStatus), 'the status names every column that was added (got ' + expMultiStatus + ')');
+assert(ctxRun(`EXPERIMENTAL_KINDS.md.label.indexOf('MD')`) !== -1, 'the MD kind is a known interpretation');
+assert(HTML.indexOf('value="md">MD / trajectory metric') !== -1, 'the Experimental category offers the MD kind');
+
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(10) };
+    experimentalTracksInfo = {};
+    document.getElementById('expNameInput').value = 'DMS tolerance';
+    document.getElementById('expKindSelect').value = 'dms';
+    document.getElementById('expPasteInput').value = ['1 0.10', '2 0.20', '3 0.30', '4 0.40'].join(String.fromCharCode(10));
+    document.getElementById('expStatus').textContent = '';
+    addExperimentalTrack();
+`);
+assert(ctxRun(`Array.isArray(parsedTracks['DMS_tolerance_EXP'])`) === true, 'the two-column path is unchanged');
+assert(/Added "DMS tolerance"/.test(ctxRun(`document.getElementById('expStatus').textContent`)), 'and keeps its own status wording');
+ctxRun(`parsedTracks = {}; experimentalTracksInfo = {}; cachedStructureTexts = {}; cachedStructureIndex = {}; uploadedStructureFiles = [];`);
+
 // ---------- async tests ----------
 (async () => {
     let err = null;
@@ -3959,6 +4114,37 @@ assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 
     ctxRun(`renderHypothesisModal();`);
     assert(ctxRun(`document.getElementById('hypothesisTable').innerHTML`).indexOf('Annotated functional site') !== -1, 'the modal renders the table with each rationale on the row');
     ctxRun(`parsedTracks = {}; uniprotFeatureTracks = {}; keyedVariantsInfo = {};`);
+
+    // The Export action re-reads a cache-only file through IndexedDB, which the
+    // harness cannot stub, so this checks both endings of that path: a cache
+    // miss explains itself and exports nothing, and a file whose text is in hand
+    // produces the file and logs it.
+    section('structure export: the Export action');
+    ctxRun(`
+        parsedTracks = { AA: 'ACD' };
+        cachedStructureTexts = {};
+        cachedStructureIndex = { 'from-cache.pdb': { hash: 'deadbeef', ext: 'pdb', size: 1 } };
+        uploadedStructureFiles = []; p3dModel = null; actionLog = [];
+        selectionMode = 'point'; rowRanges = []; selectStart = null; selectEnd = null;
+    `);
+    const expNoCache = await ctxRun(`exportStructureFile()`);
+    assert(expNoCache === null, 'a cache-only file with no reachable text exports nothing');
+    assert(ctxRun(`actionLog.some(e => e.kind === 'export')`) === false, 'and nothing is logged as exported');
+    ctxRun(`
+        cachedStructureIndex = {};
+        cachedStructureTexts = { 'model.pdb': window.__exportPdb };
+        actionLog = [];
+    `);
+    const expDownloaded = await ctxRun(`exportStructureFile()`);
+    assert(expDownloaded && expDownloaded.ok === true && expDownloaded.keptAtoms === 8, 'a file in hand exports whole');
+    assert(ctxRun(`actionLog.some(e => e.kind === 'export' && e.label === 'q2dv-model.pdb')`) === true, 'and is logged under the name it was written as');
+    ctxRun(`
+        selectStart = 1; selectEnd = 1; actionLog = [];
+    `);
+    const expDownloadedSel = await ctxRun(`exportStructureFile()`);
+    assert(expDownloadedSel && expDownloadedSel.whole === false && expDownloadedSel.keptAtoms === 2, 'with a selection it exports only that residue, from both chains');
+    assert(ctxRun(`actionLog.some(e => e.label === 'q2dv-model-selection.pdb')`) === true, 'and the filename says it was narrowed');
+    ctxRun(`cachedStructureTexts = {}; parsedTracks = {}; selectStart = null; selectEnd = null;`);
 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);
