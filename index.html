@@ -10754,7 +10754,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.28';
+const APP_VERSION = '0.66.29';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -12582,10 +12582,10 @@ function parseAllAtoms(text, ext) {
             if (isHydrogenAtom(element, atomName)) continue;
             if (MODIFIED_RESIDUE_IGNORE.has(resName)) continue;
             const bFactorRaw = parseFloat(line.substring(60, 66));
-            const atom = { x, y, z, bFactor: Number.isFinite(bFactorRaw) ? bFactorRaw : null };
+            const atom = { x, y, z, bFactor: Number.isFinite(bFactorRaw) ? bFactorRaw : null, element: element || '', atomName: atomName };
 
             if (isAtomRec) {
-                addAtom(proteinResidues, `${chain}_${resSeq}${iCode}`, { chain, resSeq, iCode }, atom);
+                addAtom(proteinResidues, `${chain}_${resSeq}${iCode}`, { chain, resSeq, iCode, resName }, atom);
             } else {
                 addAtom(hetGroups, `${chain}_${resSeq}${iCode}_${resName}`, { resName, chain, resSeq, iCode }, atom);
             }
@@ -12625,11 +12625,11 @@ function parseAllAtoms(text, ext) {
                 if (isHydrogenAtom(element, atomName)) continue;
                 if (MODIFIED_RESIDUE_IGNORE.has(resName)) continue;
                 const bFactorRaw = idx.bFactor >= 0 ? parseFloat(cols[idx.bFactor]) : NaN;
-                const atom = { x, y, z, bFactor: Number.isFinite(bFactorRaw) ? bFactorRaw : null };
+                const atom = { x, y, z, bFactor: Number.isFinite(bFactorRaw) ? bFactorRaw : null, element: (idx.elem >= 0 ? cols[idx.elem] : '') || '', atomName: atomName };
                 const iCode = ''; // mmCIF insertion codes are rarely populated; not tracked here
 
                 if (group === 'ATOM') {
-                    addAtom(proteinResidues, `${chain}_${resSeq}${iCode}`, { chain, resSeq, iCode }, atom);
+                    addAtom(proteinResidues, `${chain}_${resSeq}${iCode}`, { chain, resSeq, iCode, resName }, atom);
                 } else {
                     addAtom(hetGroups, `${chain}_${resSeq}${iCode}_${resName}`, { resName, chain, resSeq, iCode }, atom);
                 }
@@ -12754,6 +12754,254 @@ function extractCofactorNeighborhoods(text, ext) {
     const labelByResSeq = new Map();
     bestByResSeq.forEach((v, resSeq) => labelByResSeq.set(resSeq, v.cofactorIndex));
     return { cofactors, labelByResSeq };
+}
+
+// --- Metal-site coordination analysis (DESIGN 22) ---------------------------
+// Implemented from the published methods rather than by calling MetalHawk, whose
+// weights are GPL-3.0 and ~1 MB: the coordination number and donor list come from
+// metal-donor distances (Harding 2004), the geometry class by superposing the
+// first shell onto ideal templates and ranking by RMSD (FindGeo, Andreini et al.
+// Bioinformatics 2012), and the distortion is that RMSD. Bond-valence
+// bookkeeping (Brese & O'Keeffe 1991; CheckMyMetal) is deliberately *not* here
+// yet: its R0 parameters have to be verified against the source tables before the
+// app quotes a valence, so it waits for its own slice rather than shipping
+// plausible-looking numbers.
+// Everything is computed from the parsed atoms, client-side, with no service.
+const METAL_ELEMENTS = new Set(['LI', 'NA', 'MG', 'K', 'CA', 'SC', 'V', 'CR', 'MN', 'FE', 'CO', 'NI', 'CU', 'ZN', 'MO', 'CD', 'W', 'PT', 'AU', 'AG', 'HG']);
+const DONOR_ELEMENTS = new Set(['N', 'O', 'S']);
+const METAL_METAL_CUTOFF = 3.4;      // A: metals this close are one cluster, not two sites
+const METAL_COORDINATION_CUTOFF = 2.8; // A: FindGeo's default coordination distance
+const METAL_AXIAL_CUTOFF = 2.6;       // A: tighter band used to name axial ligands
+const WATER_RESNAMES = new Set(['HOH', 'WAT', 'DOD', 'H2O', 'TIP', 'SOL']);
+const MACROCYCLE_RESNAMES = new Set(['HEM', 'HEA', 'HEC', 'HEA3', 'HEMB']);
+const TWO_LETTER_ELEMENTS = new Set(['ZN', 'FE', 'MG', 'MN', 'CU', 'NI', 'CO', 'CA', 'NA', 'CD', 'MO', 'SE', 'CL', 'BR', 'HG', 'PT', 'AU', 'AG', 'AL', 'SI', 'LI', 'BE', 'SR', 'BA']);
+function isWaterResidue(resName) { return WATER_RESNAMES.has(String(resName || '').toUpperCase()); }
+// The element of an atom, preferring the file's own column and falling back to
+// the atom name when there is none (older PDB files, some mmCIF loops). The
+// fallback tries the two-letter reading first, because a metal named "ZN" must
+// not be read as zinc's first letter.
+function atomElementOf(atom) {
+    const declared = String((atom && atom.element) || '').toUpperCase().replace(/[^A-Z]/g, '');
+    const name = String((atom && atom.atomName) || '').replace(/^[0-9]+/, '').replace(/[^A-Za-z]/g, '').toUpperCase();
+    let fromName = '';
+    if (name) fromName = TWO_LETTER_ELEMENTS.has(name.slice(0, 2)) ? name.slice(0, 2) : name.charAt(0);
+    // A declared single letter that is only the first half of the name's
+    // two-letter element ("Z" for an atom named ZN) is a truncated column rather
+    // than the element, and that is exactly where metals are; prefer the name.
+    // Otherwise the file's own column wins.
+    if (fromName.length === 2 && declared.length === 1 && declared === fromName.charAt(0)) return fromName;
+    return declared || fromName;
+}
+// Every metal atom in the file becomes a candidate site, including the iron
+// *inside* a heme (there is no standalone FE record) and metals inside clusters.
+function findMetalCenters(parsed) {
+    const centers = [];
+    (parsed.hetGroups || new Map()).forEach((group, key) => {
+        (group.atoms || []).forEach((atom) => {
+            const el = atomElementOf(atom);
+            if (!METAL_ELEMENTS.has(el)) return;
+            centers.push({
+                id: centers.length + 1, element: el,
+                groupResName: group.resName, chain: group.chain, resSeq: group.resSeq, key: key,
+                inMacrocycle: MACROCYCLE_RESNAMES.has(String(group.resName || '').toUpperCase()),
+                x: atom.x, y: atom.y, z: atom.z, bFactor: atom.bFactor
+            });
+        });
+    });
+    // Flag metals that sit close enough to another metal to be one cluster
+    // (Fe-S, di-iron). Coordination *number* is not meaningful for those, so the
+    // caller is told to skip the single-site interpretation.
+    centers.forEach((c) => {
+        c.clusterPartners = centers.filter(o => o !== c && dist3D(c, o) <= METAL_METAL_CUTOFF).length;
+        c.isCluster = c.clusterPartners > 0;
+    });
+    return centers;
+}
+// The first coordination shell: donor atoms within the cutoff, carbon and
+// hydrogen excluded, waters kept but tagged (a water ligand and a side-chain
+// donor are different stories about a site).
+function metalFirstShell(center, parsed, opts) {
+    const o = opts || {};
+    const cutoff = o.cutoff || METAL_COORDINATION_CUTOFF;
+    const donors = [];
+    // A donor is N/O/S within the cutoff. Metal atoms are skipped rather than
+    // their whole hetero group, because a heme's porphyrine nitrogens *are*
+    // donors to the iron sitting in the same residue.
+    const consider = (atom, meta, kind) => {
+        const el = atomElementOf(atom);
+        if (!DONOR_ELEMENTS.has(el)) return;
+        const d = dist3D(center, atom);
+        if (!(d <= cutoff)) return;
+        donors.push({
+            x: atom.x, y: atom.y, z: atom.z,
+            kind: kind, resName: meta.resName, chain: meta.chain, resSeq: meta.resSeq, iCode: meta.iCode,
+            atomName: atom.atomName || '', element: el, distance: d,
+            water: kind === 'het' && isWaterResidue(meta.resName),
+            axial: d <= (o.axialCutoff || METAL_AXIAL_CUTOFF)
+        });
+    };
+    (parsed.proteinResidues || new Map()).forEach((res) => {
+        (res.atoms || []).forEach(a => consider(a, res, 'protein'));
+    });
+    (parsed.hetGroups || new Map()).forEach((group) => {
+        (group.atoms || []).forEach((a) => {
+            if (METAL_ELEMENTS.has(atomElementOf(a))) return; // metal-metal: reported as a cluster, not a donor
+            consider(a, group, 'het');
+        });
+    });
+    donors.sort((a, b) => a.distance - b.distance);
+    return donors;
+}
+// Ideal first-shell shapes at unit bond length. Enough to separate the common
+// coordination environments without pretending to be FindGeo's 36-template
+// library; adding one is a table entry plus nothing else.
+const IDEAL_GEOMETRIES = [
+    { name: 'linear', cn: 2, points: [[1, 0, 0], [-1, 0, 0]] },
+    { name: 'trigonal planar', cn: 3, points: [[1, 0, 0], [-0.5, 0.8660, 0], [-0.5, -0.8660, 0]] },
+    { name: 'trigonal pyramidal', cn: 3, points: [[0.9428, 0, 0.3333], [-0.4714, 0.8165, 0.3333], [-0.4714, -0.8165, 0.3333]] },
+    { name: 'tetrahedral', cn: 4, points: [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]] },
+    { name: 'square planar', cn: 4, points: [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]] },
+    { name: 'trigonal bipyramidal', cn: 5, points: [[1, 0, 0], [-0.5, 0.8660, 0], [-0.5, -0.8660, 0], [0, 0, 1], [0, 0, -1]] },
+    { name: 'square pyramidal', cn: 5, points: [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1]] },
+    { name: 'octahedral', cn: 6, points: [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] },
+    { name: 'trigonal prismatic', cn: 6, points: [[1, 0, 0], [-0.5, 0.8660, 0], [-0.5, -0.8660, 0], [1, 0, 2 * 0.8165], [-0.5, 0.8660, 2 * 0.8165], [-0.5, -0.8660, 2 * 0.8165]] }
+];
+function permutations(n) {
+    if (n === 0) return [[]];
+    if (n === 1) return [[0]];
+    const out = [];
+    for (let i = 0; i < n; i++) {
+        const rest = permutations(n - 1);
+        for (const p of rest) out.push([i].concat(p));
+    }
+    return out;
+}
+// Radial rescale of a centred shell to a common mean bond length, so the
+// comparison that follows is about *shape* and not about absolute bond lengths -
+// the same trick FindGeo uses (it scales both sets to 3.0 A).
+function normalizeShell(points, targetLength) {
+    let sum = 0;
+    points.forEach(p => { sum += Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z); });
+    const mean = sum / (points.length || 1) || 1;
+    const scale = (mean > 0 ? targetLength / mean : 1);
+    return points.map(p => ({ x: p.x * scale, y: p.y * scale, z: p.z * scale }));
+}
+// Best-fit RMSD of the observed shell onto one ideal template, searching the
+// donor-to-vertex assignment (n! <= 720 for n <= 6). Returns the RMSD in A with
+// both shells scaled to the observed mean bond length.
+function matchGeometry(donorPts, geometry) {
+    const n = Math.min(donorPts.length, geometry.points.length);
+    if (n < 2 || n !== geometry.points.length) return null;
+    let meanLen = 0;
+    donorPts.forEach(p => { meanLen += Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z); });
+    meanLen /= n;
+    const target = meanLen > 0 ? meanLen : 1;
+    if (n === 2) {
+        // Kabsch needs three points, and with two donors the only shape variable
+        // is the L-M-L angle, so the deviation is read straight off the ideal
+        // 180 degrees and expressed as a length at the mean bond distance.
+        const v1 = donorPts[0], v2 = donorPts[1];
+        const l1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z) || 1;
+        const l2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z) || 1;
+        const cosT = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z) / (l1 * l2)));
+        const angle = Math.acos(cosT) * 180 / Math.PI;
+        return Math.abs(180 - angle) / 180 * target;
+    }
+    const shell = normalizeShell(donorPts, target);
+    const template = geometry.points.map(p => {
+        const len = Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) || 1;
+        return { x: p[0] / len * target, y: p[1] / len * target, z: p[2] / len * target };
+    });
+    let best = Infinity;
+    permutations(n).forEach((perm) => {
+        const reordered = perm.map(i => template[i]);
+        const fit = kabschSuperpose(shell, reordered);
+        if (fit && isFinite(fit.rmsd) && fit.rmsd < best) best = fit.rmsd;
+    });
+    return isFinite(best) ? best : null;
+}
+// Geometry class + distortion for one site. Reports the best template and the
+// runner-up gap; a small gap means the site sits between two shapes, which is
+// what the ambiguity entropy below quantifies.
+function classifyCoordinationGeometry(donorPts) {
+    const cn = donorPts.length;
+    if (cn < 2) return { cn: cn, geometry: null, rmsd: null, runnerUp: null, candidates: [] };
+    const candidates = [];
+    IDEAL_GEOMETRIES.forEach(g => {
+        if (g.cn !== cn) return;
+        const rmsd = matchGeometry(donorPts, g);
+        if (rmsd != null) candidates.push({ name: g.name, rmsd: rmsd });
+    });
+    candidates.sort((a, b) => a.rmsd - b.rmsd);
+    const best = candidates[0] || null;
+    return {
+        cn: cn,
+        geometry: best ? best.name : null,
+        rmsd: best ? best.rmsd : null,
+        runnerUp: candidates[1] ? candidates[1].rmsd : null,
+        candidates: candidates
+    };
+}
+function shannonEntropy(weights) {
+    const total = weights.reduce((a, b) => a + b, 0);
+    if (!(total > 0)) return null;
+    let h = 0;
+    weights.forEach(w => { const p = w / total; if (p > 0) h -= p * Math.log2(p); });
+    return h;
+}
+// Entropy over the geometry candidates, each weighted by how well it fits. This
+// is the deterministic stand-in for MetalHawk's output entropy: a distorted site
+// fits several templates about equally well and scores high, an ideal site fits
+// one and scores ~0. It measures ambiguity, not thermodynamic freedom.
+function geometryAmbiguityEntropy(classification, sigma) {
+    const s = sigma || 0.15;
+    const cands = (classification && classification.candidates) || [];
+    if (cands.length < 2) return 0;
+    const weights = cands.map(c => Math.exp(-(c.rmsd * c.rmsd) / (2 * s * s)));
+    const h = shannonEntropy(weights);
+    return h == null ? null : h;
+}
+// Shannon entropy over the donor element classes (N/O/S). A porphyrin N4 site is
+// homogeneous and scores 0; a mixed N/O or N/S site scores high. Called
+// "donor diversity" in the UI because that is what it is.
+function donorDiversityEntropy(donors) {
+    const counts = {};
+    donors.forEach(d => { const el = d.element || '?'; counts[el] = (counts[el] || 0) + 1; });
+    const keys = Object.keys(counts);
+    if (!keys.length) return null;
+    return shannonEntropy(keys.map(k => counts[k]));
+}
+// The full read-out for one metal site. Everything the surfaces need, computed
+// in one pass so a table row and a track agree by construction.
+function analyzeMetalSite(center, parsed, opts) {
+    const donors = metalFirstShell(center, parsed, opts);
+    // Geometry matching is scale- and origin-free, but the radial normalisation
+    // has to be measured *from the metal*, so the shell is moved onto the origin
+    // first. Absolute coordinates would otherwise read as a huge bond length.
+    const local = donors.map(d => ({ x: d.x - center.x, y: d.y - center.y, z: d.z - center.z }));
+    const classification = classifyCoordinationGeometry(local);
+    const axial = donors.filter(d => d.axial);
+    return {
+        center: center,
+        element: center.element,
+        chain: center.chain, resSeq: center.resSeq, groupResName: center.groupResName,
+        inMacrocycle: center.inMacrocycle, isCluster: center.isCluster,
+        cn: classification.cn,
+        donors: donors,
+        donorElements: donors.reduce((acc, d) => { acc[d.element] = (acc[d.element] || 0) + 1; return acc; }, {}),
+        proteinDonors: donors.filter(d => d.kind === 'protein').map(d => ({ chain: d.chain, resSeq: d.resSeq, atomName: d.atomName, distance: d.distance })),
+        axialLigands: axial.map(d => ({ kind: d.kind, resName: d.resName, chain: d.chain, resSeq: d.resSeq, atomName: d.atomName, distance: d.distance })),
+        waterDonors: donors.filter(d => d.water).length,
+        geometry: classification.geometry,
+        geometryRmsd: classification.rmsd,
+        geometryRunnerUp: classification.runnerUp,
+        geometryCandidates: classification.candidates,
+        geometryEntropy: geometryAmbiguityEntropy(classification, (opts || {}).sigma),
+        donorEntropy: donorDiversityEntropy(donors)
+    };
+}
+function analyzeMetalSites(parsed, opts) {
+    return findMetalCenters(parsed).map(c => analyzeMetalSite(c, parsed, opts));
 }
 
 // --- HHpred .hhr import ("Homolog" annotation layers) ----------------------

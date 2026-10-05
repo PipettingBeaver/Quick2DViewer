@@ -761,6 +761,15 @@ bond-valence parameters), and Q2DV already parses atom records and does Kabsch
 superposition. MetalHawk's CSV becomes the **benchmark** for the local
 implementation, never a dependency; no MetalHawk code or weights are used.
 
+**Status (2026-10-04).** Computation core **done (0.69.2)**: metal centres (including
+the iron inside a heme and metals inside clusters), first shell / CN / donors,
+axial ligands, geometry class + distortion from the template RMSD, and the two
+entropies. Still to do: the surfaces (`COORD_` tracks, the Metal sites table,
+rule sources, the 3D first-shell highlight), frame-aware ensemble coordination,
+and bond-valence / nVECSUM - the last held back until its R0 parameters are
+verified against the source tables, because a plausible-looking valence is worse
+than none.
+
 **Data basis.** The same parser `extractCofactorNeighborhoods()` uses:
 ATOM/HETATM groups (`chain`/`resSeq`/`iCode`/`resName`, per-atom
 element/coords/B-factor), hydrogen-filtered, `MSE`/`SEC` excluded. A metal

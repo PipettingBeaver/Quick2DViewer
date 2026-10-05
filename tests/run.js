@@ -3738,6 +3738,121 @@ assert(HTML.indexOf('id="constantsDisplay"') !== -1 && HTML.indexOf('GRAVY') !==
 assert(/const\s+TERMINAL/.test(HTML) || /free N- and C-termini/.test(HTML), 'and states the terminal/cysteine assumption it makes');
 ctxRun(`parsedTracks = {}; experimentalTracksInfo = {}; cachedStructureTexts = {};`);
 
+section('metal-site coordination: donors, CN, geometry, entropy');
+// A synthetic single-site model, written in fixed columns so the existing parser
+// is exercised for real: one Zn on a tetrahedral N3 + water shell.
+const metalPdbLine = (record, name, resName, chain, resSeq, serial, x, y, z, element) => {
+    const L = new Array(80).fill(' ');
+    const put = (st, str) => { for (let k = 0; k < str.length; k++) L[st + k] = str[k]; };
+    put(0, record); put(6, String(serial).padStart(5));
+    put(13, name.padEnd(3)); put(17, resName); put(21, chain); put(22, String(resSeq).padStart(4));
+    put(30, x.toFixed(3).padStart(8)); put(38, y.toFixed(3).padStart(8)); put(46, z.toFixed(3).padStart(8));
+    put(60, '10.00'.padStart(6)); put(76, element.padStart(2));
+    return L.join('');
+};
+const tetrahedral = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]];
+// Three protein nitrogens on three vertices of an ideal tetrahedron and a water
+// oxygen on the fourth: the classic Zn His3+H2O site, so the expected CN,
+// geometry and distortion are all known exactly.
+const zincLines = [0, 1, 2].map((k, i) => {
+    const v = tetrahedral[k];
+    return metalPdbLine('ATOM', 'NE2', 'HIS', 'A', [57, 87, 112][i], 10 + i, v[0] * 1.16, v[1] * 1.16, v[2] * 1.16, 'N');
+}).concat([
+    metalPdbLine('HETATM', 'ZN', 'ZN', 'A', 200, 20, 0, 0, 0, 'ZN'),
+    metalPdbLine('HETATM', 'O', 'HOH', 'A', 301, 21, tetrahedral[3][0] * 1.16, tetrahedral[3][1] * 1.16, tetrahedral[3][2] * 1.16, 'O'),
+    'END'
+]);
+sandbox.__zincPdb = zincLines.join(String.fromCharCode(10));
+
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(120) };
+    cachedStructureTexts = { 'zn.pdb': window.__zincPdb };
+    uploadedStructureFiles = [];
+`);
+const znParsed = ctxRun(`parseAllAtoms(cachedStructureTexts['zn.pdb'], 'pdb')`);
+assert(znParsed.hetGroups.size === 2, 'the Zn and the water are hetero groups (got ' + znParsed.hetGroups.size + ')');
+assert(ctxRun(`[...parseAllAtoms(cachedStructureTexts['zn.pdb'],'pdb').proteinResidues.values()][0].resName`) === 'HIS', 'protein residues keep their resName for donor naming');
+const znCenters = ctxRun(`findMetalCenters(parseAllAtoms(cachedStructureTexts['zn.pdb'], 'pdb'))`);
+assert(znCenters.length === 1 && znCenters[0].element === 'ZN', 'exactly one metal centre is found (got ' + znCenters.length + ')');
+assert(znCenters[0].isCluster === false, 'a lone metal is not flagged as a cluster');
+
+const znSites = ctxRun(`analyzeMetalSites(parseAllAtoms(cachedStructureTexts['zn.pdb'], 'pdb'))`);
+const znSite = znSites[0];
+assert(znSite.cn === 4, 'an ideal tetrahedral N3+water shell is coordination number 4 (got ' + znSite.cn + ')');
+assert(znSite.donorElements.N === 3 && znSite.donorElements.O === 1, 'donor elements are counted separately (got ' + JSON.stringify(znSite.donorElements) + ')');
+assert(znSite.proteinDonors.length === 3 && znSite.waterDonors === 1, 'three protein donors and one water donor');
+assert(znSite.geometry === 'tetrahedral', 'the geometry is classified tetrahedral (got ' + znSite.geometry + ')');
+assert(znSite.geometryRmsd < 0.05, 'an ideal tetrahedron scores ~0 A distortion (got ' + znSite.geometryRmsd.toFixed(4) + ')');
+assert(znSite.geometryEntropy < 0.01, 'and ~0 bits of ambiguity (got ' + znSite.geometryEntropy.toFixed(4) + ')');
+assert(znSite.donorEntropy > 0.7 && znSite.donorEntropy < 0.9, 'a 3N+1O shell has real donor diversity (got ' + znSite.donorEntropy.toFixed(3) + ' bits)');
+assert(znSite.proteinDonors.every(d => d.resSeq >= 57), 'and the three protein donors are the histidines, not the zinc record');
+assert(Math.abs(znSite.proteinDonors[0].distance - 2.01) < 0.05, 'donor distances are real metal-donor distances (got ' + znSite.proteinDonors[0].distance.toFixed(2) + ')');
+
+// A distorted octahedral shell must be *called* distorted and ambiguous, which is
+// the whole reason the ambiguity entropy exists.
+// A flattened six-donor shell is *distorted* but not *ambiguous*: it still fits
+// the octahedron far better than the prism. Distortion and ambiguity are
+// different claims, and the test pins both.
+const distortedPdb = [[2.1, 0, 0], [-2.1, 0, 0], [0, 2.1, 0], [0, -2.1, 0], [0, 0, 1.0], [0, 0, -1.0]].map((v, i) =>
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 20 + i, 30 + i, v[0], v[1], v[2], 'N')
+).concat([metalPdbLine('HETATM', 'ZN', 'ZN', 'A', 200, 40, 0, 0, 0, 'ZN'), 'END']).join(String.fromCharCode(10));
+sandbox.__distortedPdb = distortedPdb;
+const distSite = ctxRun(`analyzeMetalSites(parseAllAtoms(window.__distortedPdb, 'pdb'))[0]`);
+assert(distSite.cn === 6, 'a flattened six-donor shell reads CN 6 (got ' + distSite.cn + ')');
+assert(distSite.geometry === 'octahedral', 'and is still called octahedral, not prismatic (got ' + distSite.geometry + ')');
+assert(distSite.geometryRmsd > 0.2, 'but its distortion is reported (RMSD ' + distSite.geometryRmsd.toFixed(3) + ' A)');
+assert(distSite.geometryCandidates.length === 2, 'both six-coordinate templates are reported as candidates (got ' + distSite.geometryCandidates.length + ')');
+assert(distSite.geometryEntropy < 0.1, 'and distortion alone does not create ambiguity (' + distSite.geometryEntropy.toFixed(3) + ' bits)');
+
+// Genuine ambiguity: three donors at a height halfway between a plane and a
+// pyramid, so the planar and pyramidal templates fit about equally well. This is
+// the case the ambiguity entropy exists for, and the deterministic stand-in for
+// MetalHawk's output entropy.
+const shallow = [];
+for (let i = 0; i < 3; i++) {
+    const a = i * 2 * Math.PI / 3;
+    shallow.push([Math.cos(a), Math.sin(a), 0.18]);
+}
+const shallowPdb = shallow.map((v, i) => {
+    const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    return metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 20 + i, 70 + i, v[0] / len * 2.0, v[1] / len * 2.0, v[2] / len * 2.0, 'N');
+}).concat([metalPdbLine('HETATM', 'ZN', 'ZN', 'A', 200, 80, 0, 0, 0, 'ZN'), 'END']).join(String.fromCharCode(10));
+sandbox.__shallowPdb = shallowPdb;
+const shallowSite = ctxRun(`analyzeMetalSites(parseAllAtoms(window.__shallowPdb, 'pdb'))[0]`);
+assert(shallowSite.cn === 3, 'a three-donor shell reads CN 3 (got ' + shallowSite.cn + ')');
+const shallowGap = ctxRun(`analyzeMetalSites(parseAllAtoms(window.__shallowPdb,'pdb'))[0].geometryCandidates[1].rmsd - analyzeMetalSites(parseAllAtoms(window.__shallowPdb,'pdb'))[0].geometryCandidates[0].rmsd`);
+assert(shallowGap < 0.2, 'the two three-coordinate templates fit within 0.2 A of each other (gap ' + shallowGap.toFixed(3) + ')');
+assert(shallowSite.geometryEntropy > 0.3, 'so the ambiguity entropy is high (' + shallowSite.geometryEntropy.toFixed(3) + ' bits)');
+assert(shallowSite.geometryEntropy > ctxRun(`analyzeMetalSites(parseAllAtoms(cachedStructureTexts['zn.pdb'],'pdb'))[0].geometryEntropy`) + 0.2, 'and far above the ideal tetrahedral site it is being compared with');
+
+const octaPdb = [[2, 0, 0], [-2, 0, 0], [0, 2, 0], [0, -2, 0], [0, 0, 2], [0, 0, -2]].map((v, i) =>
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 20 + i, 50 + i, v[0], v[1], v[2], 'N')
+).concat([metalPdbLine('HETATM', 'ZN', 'ZN', 'A', 200, 60, 0, 0, 0, 'ZN'), 'END']).join(String.fromCharCode(10));
+sandbox.__octaPdb = octaPdb;
+const octaSite = ctxRun(`analyzeMetalSites(parseAllAtoms(window.__octaPdb, 'pdb'))[0]`);
+assert(octaSite.geometry === 'octahedral', 'an ideal octahedron is octahedral, not trigonal prismatic (got ' + octaSite.geometry + ')');
+assert(octaSite.geometryRmsd < 0.02, 'with near-zero distortion (got ' + octaSite.geometryRmsd.toFixed(4) + ')');
+
+// A metal-metal pair must be reported as a cluster, because single-site
+// coordination number is meaningless for Fe-S / di-iron.
+const clusterPdb = [
+    metalPdbLine('HETATM', 'FE', 'FES', 'A', 500, 70, 0, 0, 0, 'FE'),
+    metalPdbLine('HETATM', 'FE', 'FES', 'A', 500, 71, 2.6, 0, 0, 'FE'),
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 21, 72, 0.2, 2.05, 0, 'N'),
+    metalPdbLine('ATOM', 'NE2', 'HIS', 'A', 51, 73, 2.4, -2.05, 0, 'N'),
+    'END'
+].join(String.fromCharCode(10));
+sandbox.__clusterPdb = clusterPdb;
+const clusterSites = ctxRun(`analyzeMetalSites(parseAllAtoms(window.__clusterPdb, 'pdb'))`);
+assert(clusterSites.length === 2 && clusterSites[0].isCluster === true, 'two metals 2.6 A apart are one cluster (got ' + clusterSites.length + ' centres)');
+assert(clusterSites[0].donors.length === 1, 'and neither metal counts the other as a donor');
+assert(clusterSites.every(s => s.element === 'FE'), 'both are recognised as iron inside an FES group');
+
+assert(ctxRun(`analyzeMetalSites(parseAllAtoms('END','pdb'))`).length === 0, 'a file with no metals yields no sites, not an error');
+assert(ctxRun(`atomElementOf({element:'', atomName:'ZN'})`) === 'ZN' && ctxRun(`atomElementOf({element:'', atomName:'CA'})`) === 'CA' && ctxRun(`atomElementOf({element:'', atomName:' O '})`) === 'O', 'element falls back to the atom name, two-letter metals first');
+assert(ctxRun(`atomElementOf({element:'Z', atomName:'ZN'})`) === 'ZN' && ctxRun(`atomElementOf({element:'N', atomName:'NE2'})`) === 'N', 'a truncated element column is recovered from the atom name');
+ctxRun(`cachedStructureTexts = {}; parsedTracks = {};`);
+
 // ---------- async tests ----------
 (async () => {
     let err = null;

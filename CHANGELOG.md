@@ -12,6 +12,37 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.66.29] - 2026-10-04
+
+### Added
+- **Metal-site coordination analysis (core).** The first slice of DESIGN §22:
+  every metal in an attached structure is now found and characterised client-side,
+  including the iron *inside* a heme (there is no standalone `FE` record) and
+  metals inside Fe-S / di-iron clusters. For each site it reports the first
+  coordination shell (donor atoms within a 2.8 Å cutoff, carbon and hydrogen
+  excluded, waters tagged separately), the coordination number, the donor-element
+  composition, the axial ligands, the geometry class and its distortion, and two
+  entropies. The geometry call superposes the first shell onto nine ideal
+  templates (linear through trigonal prismatic) and ranks them by RMSD, searching
+  the donor-to-vertex assignment - the FindGeo approach, reimplemented from the
+  paper rather than by calling MetalHawk, whose weights are GPL-3.0 and ~1 MB.
+  The **ambiguity entropy** is the deterministic stand-in for MetalHawk's output
+  entropy: an ideal site fits one template and scores ~0 bits, a site sitting
+  between two shapes fits both about equally and scores high. Bond-valence /
+  nVECSUM is deliberately *not* in this slice - its R0 parameters have to be
+  checked against the source tables before the app quotes a valence.
+- `parseAllAtoms` now keeps each atom's element and name and each protein
+  residue's resName, which the coordination analysis needs to name donors. Purely
+  additive; existing cofactor and interface consumers are untouched.
+
+### Not yet reachable
+This slice is the computation core only. There is no surface yet: no track row, no
+table, no rule source, nothing in a menu. It is unit-tested against synthetic
+sites with known geometry (ideal Zn His3+H2O, ideal octahedron, a flattened
+octahedron, a genuinely ambiguous three-coordinate site, and a two-iron cluster).
+The surfaces - `COORD_` tracks, the Metal sites table, rule sources, the 3D
+first-shell highlight - are the next slice.
+
 ## [0.66.28] - 2026-10-04
 
 ### Added

@@ -101,6 +101,44 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Metal-site coordination analysis — 0.69.2 (core only, no surface yet)
+
+**Surface.** None yet, deliberately. The computation lives behind
+`analyzeMetalSites(parseAllAtoms(text, ext))` and is covered by the headless
+checks; the track/table/rule surfaces are the next slice (DESIGN §22). **There is
+nothing to click yet** - do not go looking for a menu item.
+
+**Should do (when the surface lands).** For every metal in an attached structure,
+report the first shell, coordination number, donor composition, axial ligands,
+geometry class + distortion and the two entropies, all computed locally from the
+parsed atoms.
+
+**Already checked headlessly (so QA should not re-derive these).**
+- An ideal Zn His3+H2O shell reads CN 4, tetrahedral, ~0 Å distortion, ~0 bits ambiguity.
+- An ideal octahedron is octahedral, not trigonal prismatic.
+- A *flattened* octahedron is still octahedral but with high distortion and **low**
+  ambiguity - distortion and ambiguity are separate claims, and the tests pin both.
+- A three-donor site at half-height between plane and pyramid fits both templates
+  within 0.2 A and scores high ambiguity: that is the case the entropy is for.
+- Two irons 2.6 Å apart are flagged as a cluster and neither counts the other as a donor.
+- Element recovery: a truncated element column ("Z" for an atom named `ZN`) is read
+  from the atom name, with two-letter metals preferred.
+
+**Edge cases to carry into the surface slice.**
+- *No metals.* Must say so quietly, not error (checked: zero sites, no throw).
+- *Fe-S / di-iron.* Single-site CN is meaningless; the surface must present these
+  differently or decline to classify them, not print CN 2.
+- *A metal with no donor at all* (e.g. a bare ion far from everything): CN 0 and no
+  geometry class - not a division by zero, not a crash.
+- *A heme:* the porphyrine nitrogens must appear as donors to the iron in the *same*
+  residue. This is covered by construction, not yet by a fixture - add a real heme
+  fixture when the surface lands.
+- Unknown residues (X/U/O) and files with no element column.
+- Headless coverage: centres, donors, CN, geometry, distortion, entropies, cluster
+  flagging and element recovery. The 3D highlight and any table are untestable here.
+
+---
+
 ### Protein constants (mass, pI, A280, GRAVY) — 0.69.1
 
 **Surface.** Selection tab → *Protein constants* block (`constantsDisplay`), beside FASTA
