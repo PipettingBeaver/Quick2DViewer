@@ -3436,6 +3436,40 @@ assert(ctxRun(`Object.keys(guideProfile).length === 0 && Object.keys(guideOverri
 assert(ctxRun(`guideIntakeOpen === null && guideTask === null`), 'and resets the accordion + any running task');
 assert(HTML.indexOf('resetGuideState();') !== -1, 'Reset Data calls it');
 
+section('guide view choice (guided vs full)');
+// incomplete intake: the two views stack as before, prompt + toggle hidden
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; guideViewMode = null; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
+let viewHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(viewHtml.indexOf('<div class="guide-next"><div class="guide-progress">') !== -1, 'incomplete intake still shows the guided view');
+assert(viewHtml.indexOf('<div class="guide-steps">') !== -1, 'and the full step cards');
+assert(viewHtml.indexOf('<div class="guide-view-prompt" hidden>') !== -1, 'the view prompt stays hidden');
+assert(viewHtml.indexOf('<div class="guide-view-toggle" hidden>') !== -1, 'and so does the toggle');
+// complete intake: the prompt replaces both views
+ctxRun(`GUIDE_QUESTIONS.forEach(q => { guideProfile[q.id] = q.options[0].value; }); guideViewMode = null; guideIntakeOpen = null; renderWorkflowGuide();`);
+viewHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(viewHtml.indexOf('<div class="guide-view-prompt">') !== -1, 'a completed intake shows the view prompt');
+assert(viewHtml.indexOf('Proceed with full or guided view for evaluation steps?') !== -1, 'the prompt asks the question');
+assert(viewHtml.indexOf('<div class="guide-next" hidden>') !== -1 && viewHtml.indexOf('<div class="guide-steps" hidden>') !== -1, 'both views are hidden until answered');
+// guided view
+ctxRun(`setGuideViewMode('guided');`);
+viewHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(ctxRun(`guideViewMode`) === 'guided', 'the guided choice is stored');
+assert(viewHtml.indexOf('<div class="guide-next"><div class="guide-progress">') !== -1, 'guided shows the recommendation card');
+assert(viewHtml.indexOf('<div class="guide-steps" hidden>') !== -1, 'guided hides the step cards');
+assert(viewHtml.indexOf('<div class="guide-view-toggle">') !== -1 && viewHtml.indexOf('guide-view-tab-on') !== -1, 'the bottom toggle is shown with a current tab');
+// full view opens Step 1
+ctxRun(`setGuideViewMode('full');`);
+viewHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(viewHtml.indexOf('<div class="guide-steps">') !== -1, 'full shows the step cards');
+assert(viewHtml.indexOf('<div class="guide-next" hidden>') !== -1, 'full hides the recommendation card');
+const firstStep = ctxRun(`guideProgress().rows[0].step.id`);
+assert(viewHtml.indexOf('data-step="' + firstStep + '" open') !== -1, 'full opens Step 1');
+assert(ctxRun(`gatherPersistableState().preferences.guideViewMode`) === 'full', 'the view choice is persisted');
+assert(HTML.indexOf("guideViewMode = (prefs.guideViewMode === 'guided'") !== -1, 'the view choice is restored from a save');
+ctxRun(`resetGuideState();`);
+assert(ctxRun(`guideViewMode === null`), 'reset clears the view choice');
+ctxRun(`guideProfile = {}; parsedTracks = {};`);
+
 section('guide coachmarks (walk the user to a submenu)');
 assert(ctxRun(`Object.keys(GUIDE_COACHMARKS).join(',')`) === 'rules,interfaces', 'coachmarks are declared for the two submenu hand-offs');
 assert(ctxRun(`GUIDE_COACHMARKS.rules.banner`) === 'guideCoachmarkRules' && ctxRun(`GUIDE_COACHMARKS.interfaces.banner`) === 'guideCoachmarkInterfaces', 'each coachmark owns a banner');

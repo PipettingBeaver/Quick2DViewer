@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.3] - 2026-10-06
+
+### Added
+- **Guide view choice.** Once the Protein Background intake is complete, the
+  guide asks whether to proceed in **guided** or **full** view: guided shows the
+  single recommendation card, full shows every step card (Step 1 expanded).
+  Both stay hidden until the choice is made, and a toggle at the bottom switches
+  between them. The choice persists in saves.
+
+### Fixed
+- **Protein Background now actually collapses when complete.** Its open state
+  was captured by the `toggle` event, which also fired for the programmatic open
+  on every render and pinned it open; it is now recorded only on a user click,
+  so the panel closes at (Complete).
+
 ## [0.67.2] - 2026-10-06
 
 ### Changed

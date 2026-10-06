@@ -1312,6 +1312,13 @@
         .guide-opt:hover { border-color:#93c5fd; }
         .guide-opt-on { background:#2563eb; border-color:#2563eb; color:#fff; font-weight:600; }
         .guide-next { margin-bottom:10px; }
+        .guide-view-prompt { border:1px solid #bfdbfe; background:#eff6ff; border-radius:6px; padding:10px; margin-bottom:10px; }
+        .guide-view-q { font-size:0.76rem; font-weight:700; color:#1e3a8a; margin-bottom:8px; }
+        .guide-view-btns { display:flex; gap:6px; flex-wrap:wrap; }
+        .guide-view-toggle { display:flex; align-items:center; gap:6px; margin-top:10px; padding-top:8px; border-top:1px solid #e2e8f0; font-size:0.7rem; color:#64748b; }
+        .guide-view-toggle-label { color:#475569; }
+        .guide-view-tab { border:1px solid #cbd5e1; background:#fff; color:#475569; font-size:0.68rem; padding:2px 10px; border-radius:999px; cursor:pointer; }
+        .guide-view-tab-on { background:#2563eb; color:#fff; border-color:#2563eb; }
         .guide-progress { font-size:0.7rem; color:#475569; display:flex; align-items:center; gap:6px; margin-bottom:6px; }
         .guide-bar { flex:1; height:5px; background:#e2e8f0; border-radius:999px; overflow:hidden; }
         .guide-bar > span { display:block; height:100%; background:#22c55e; }
@@ -8882,6 +8889,11 @@ function openTopologyPanel() {
 // never disable a step's action: any step can be re-run at any time, even when
 // its category already has data.
 let guideOverrides = {};
+// Which evaluation view the guide shows once the intake is complete: null until
+// the user chooses (the prompt is shown), then 'guided' or 'full'.
+let guideViewMode = null;
+// Set when switching into full view so the first step card renders expanded.
+let guideExpandFirstStep = false;
 
 function setGuideAnswer(id, value) {
     guideProfile[id] = value;
@@ -8914,6 +8926,17 @@ function resetGuideState() {
     guideAnswers = {};
     guideIntakeOpen = null;
     guideTask = null;
+    guideViewMode = null;
+    guideExpandFirstStep = false;
+}
+// Switch between the guided (recommendation) and full (all step cards) views.
+// Entering full view expands the first step card once.
+function setGuideViewMode(mode) {
+    if (mode !== 'guided' && mode !== 'full') return;
+    guideViewMode = mode;
+    if (mode === 'full') guideExpandFirstStep = true;
+    schedulePersist();
+    renderWorkflowGuide();
 }
 function guideStepStatus() {
     return WORKFLOW_STEPS.map((step, index) => {
@@ -9604,11 +9627,18 @@ function renderWorkflowGuide() {
     const overrideCount = Object.keys(guideOverrides).length;
     let html = '';
 
-    const intakeOpen = guideIntakeOpen === null ? (answered < GUIDE_QUESTIONS.length) : guideIntakeOpen;
-    html += '<details class="guide-intake" id="guideIntake"' + (intakeOpen ? ' open' : '') +
-        ' ontoggle="guideIntakeOpen = this.open;">' +
-        '<summary><span>Protein Background</span><span class="guide-count">' +
-        (answered >= GUIDE_QUESTIONS.length ? '(Complete)' : answered + '/' + GUIDE_QUESTIONS.length) +
+    const intakeComplete = answered >= GUIDE_QUESTIONS.length;
+    const intakeOpen = guideIntakeOpen === null ? !intakeComplete : guideIntakeOpen;
+    // Below the intake: while it is incomplete the two evaluation views stack as
+    // before; once complete they are replaced by a single view chosen explicitly
+    // (guided or full), with a toggle at the bottom to switch.
+    const showStacked = !intakeComplete;
+    const showPrompt = intakeComplete && !guideViewMode;
+    const showGuided = guideViewMode === 'guided';
+    const showFull = guideViewMode === 'full';
+    html += '<details class="guide-intake" id="guideIntake"' + (intakeOpen ? ' open' : '') + '>' +
+        '<summary onclick="var _gi=this.parentNode; setTimeout(function(){ guideIntakeOpen = _gi.open; }, 0);"><span>Protein Background</span><span class="guide-count">' +
+        (intakeComplete ? '(Complete)' : answered + '/' + GUIDE_QUESTIONS.length) +
         '</span></summary>';
     GUIDE_QUESTIONS.forEach(q => {
         html += '<div class="guide-q"><div class="guide-q-label">' + q.label + '</div><div class="guide-q-opts">';
@@ -9623,7 +9653,14 @@ function renderWorkflowGuide() {
     }
     html += '</details>';
 
-    html += '<div class="guide-next"><div class="guide-progress"><span class="guide-bar"><span style="width:' +
+    html += '<div class="guide-view-prompt"' + (showPrompt ? '' : ' hidden') + '>' +
+        '<div class="guide-view-q">Proceed with full or guided view for evaluation steps?</div>' +
+        '<div class="guide-view-btns">' +
+        '<button type="button" class="guide-run" onclick="setGuideViewMode(\'guided\')">Guided view</button>' +
+        '<button type="button" class="guide-run guide-run-alt" onclick="setGuideViewMode(\'full\')">Full view</button>' +
+        '</div></div>';
+
+    html += '<div class="guide-next"' + ((showStacked || showGuided) ? '' : ' hidden') + '><div class="guide-progress"><span class="guide-bar"><span style="width:' +
         Math.round((prog.covered / prog.denominator) * 100) + '%"></span></span>' + prog.covered + ' of ' + prog.denominator +
         ' covered' + (prog.skipped ? ' · ' + prog.skipped + ' skipped' : '') +
         (prog.notRelevant ? ' · ' + prog.notRelevant + ' not relevant' : '') +
@@ -9667,7 +9704,7 @@ function renderWorkflowGuide() {
     }
     html += '</div>';
 
-    html += '<div class="guide-steps">';
+    html += '<div class="guide-steps"' + ((showStacked || showFull) ? '' : ' hidden') + '>';
     prog.rows.forEach(r => {
         const act = resolveStepAction(r.step);
         const taskRun = STEP_TASK_RUNS[r.step.id] || '';
@@ -9685,8 +9722,9 @@ function renderWorkflowGuide() {
             : r.notRelevant ? 'Status: not relevant for this protein. ' + (r.step.relevantNote ? r.step.relevantNote + ' ' : '') + 'Mark done or skip to settle it.'
             : r.autoDone ? 'Status: detected from the loaded data.'
             : 'Status: not detected yet.';
+        const forceOpen = guideExpandFirstStep && r.index === 0;
         html += '<details class="guide-step' + (r.done ? ' guide-step-done' : '') + (r.skipped ? ' guide-step-skip' : '') +
-            (r.step.id === nextId ? ' guide-step-current' : '') + '" data-step="' + r.step.id + '">' +
+            (r.step.id === nextId ? ' guide-step-current' : '') + '" data-step="' + r.step.id + '"' + (forceOpen ? ' open' : '') + '>' +
             '<summary><span class="guide-num">' + (r.index + 1) + '</span><span class="guide-title">' + r.step.title + '</span>' + guideChip(r) + '</summary>' +
             '<div class="guide-body">' +
             '<p class="guide-desc">' + r.step.desc + '</p>' +
@@ -9722,10 +9760,16 @@ function renderWorkflowGuide() {
 
     const insights = computeGuideInsights();
     if (insights.length) {
-        html += '<div class="guide-insights"><div class="guide-insights-head">Automated read-out</div>';
+        html += '<div class="guide-insights"' + (showPrompt ? ' hidden' : '') + '><div class="guide-insights-head">Automated read-out</div>';
         insights.forEach(i => { html += '<div class="guide-insight guide-insight-' + i.level + '">' + i.text + '</div>'; });
         html += '</div>';
     }
+    html += '<div class="guide-view-toggle"' + (guideViewMode ? '' : ' hidden') + '>' +
+        '<span class="guide-view-toggle-label">Evaluation view:</span>' +
+        '<button type="button" class="guide-view-tab' + (guideViewMode === 'guided' ? ' guide-view-tab-on' : '') + '" onclick="setGuideViewMode(\'guided\')">Guided</button>' +
+        '<button type="button" class="guide-view-tab' + (guideViewMode === 'full' ? ' guide-view-tab-on' : '') + '" onclick="setGuideViewMode(\'full\')">Full</button>' +
+        '</div>';
+    guideExpandFirstStep = false;
     el.innerHTML = html;
     openIds.forEach(id => {
         const d = el.querySelector('details.guide-step[data-step="' + id + '"]');
@@ -10777,7 +10821,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.2';
+const APP_VERSION = '0.67.3';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -19610,6 +19654,7 @@ function gatherPersistableState() {
             guideProfile,
             guideOverrides,
             guideAnswers,
+            guideViewMode,
             selectionScope,
             gridCellW,
             commandEngineId,
@@ -20056,6 +20101,7 @@ function applyPersistedState(state) {
     guideProfile = (prefs.guideProfile && typeof prefs.guideProfile === 'object') ? prefs.guideProfile : {};
     guideOverrides = (prefs.guideOverrides && typeof prefs.guideOverrides === 'object') ? prefs.guideOverrides : {};
     guideAnswers = (prefs.guideAnswers && typeof prefs.guideAnswers === 'object') ? prefs.guideAnswers : {};
+    guideViewMode = (prefs.guideViewMode === 'guided' || prefs.guideViewMode === 'full') ? prefs.guideViewMode : null;
     // The homologs route question used to be HHpred-only ('ready' / 'no').
     // Migrate restored answers onto the agnostic values so the right pill is
     // highlighted and the resolver picks the intended action.

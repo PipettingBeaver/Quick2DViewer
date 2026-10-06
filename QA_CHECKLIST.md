@@ -103,6 +103,36 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Guide view choice (guided vs full) + intake collapse — 0.67.3
+
+**Surface.** The **Guide** tab (Evaluation Guide): the Protein Background
+accordion and the evaluation region below it. No new top-level surface.
+
+**Should do.** Protein Background collapses to **(Complete)** once all six
+questions are answered. The guide then asks "Proceed with full or guided view
+for evaluation steps?" - both views hidden until answered - and a bottom toggle
+switches between guided (one recommendation card) and full (all step cards,
+Step 1 expanded).
+
+**Try.**
+1. Open the Guide with nothing loaded, answer all six questions. Expect the
+   accordion to **close** and read **(Complete)**, and the view prompt to appear.
+2. Press **Guided view**. Expect the Step N recommendation card only; the step
+   cards are hidden.
+3. Press **Full** at the bottom. Expect every step card, with **Step 1 open**.
+4. Switch back to **Guided** and reload. Expect the choice to persist.
+
+**Edge cases.**
+- *Answer changes after completion* - the prompt does not return; the chosen
+  view stays until Reset Data.
+- *Reset Data* - clears the intake, the view choice and the step answers.
+- *Re-open the accordion by hand after (Complete)* - it stays open until you
+  close it (auto-close only applies when you have not toggled it).
+- *Harness limit* - the DOM stubs cannot render `hidden`; the collapse and
+  view-switch behaviour is a manual browser check.
+
+---
+
 ### Protein-named saves + UniProt rows rebuilt on load — 0.67.1
 
 **Surface.** The **Save** action (full session save) and **Options -> Data
