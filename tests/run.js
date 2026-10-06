@@ -113,6 +113,18 @@ assert(ctxRun(`getTrackSource('HL_09_src')`) === 'Foldseek', 'homolog source rea
 ctxRun(`setTrackMeta('SS_PSIPRED', { source: 'Custom' });`);
 assert(ctxRun(`getTrackSource('SS_PSIPRED')`) === 'Custom', 'trackMeta override wins over derived source');
 
+section('source colouring');
+assert(ctxRun(`typeof sourceColorFor === 'function' && typeof isSourceColorOn === 'function' && typeof setSourceColor === 'function'`), 'source-colour helpers are defined');
+assert(ctxRun(`SOURCE_COLORS['HHpred'] !== SOURCE_COLORS['BLAST']`), 'HHpred and BLAST get distinct colours');
+assert(ctxRun(`sourceColorFor('HHpred') === sourceColorFor('HHpred')`), 'a source colour is stable');
+assert(ctxRun(`/^#[0-9a-f]{6}$/.test(sourceColorFor('Some Brand New Source'))`), 'an unknown source falls back to a palette colour');
+assert(ctxRun(`sourceColorFor('HMMER (Pfam)') === sourceColorFor('HMMER (InterPro)')`), 'a database suffix collapses to the family colour');
+assert(ctxRun(`getDefaultTrackControlState().sourceColor === false`), 'source colouring defaults off');
+ctxRun(`trackControlState = getDefaultTrackControlState(); setSourceColor(true);`);
+assert(ctxRun(`isSourceColorOn() === true`), 'the toggle turns source colouring on');
+ctxRun(`trackControlState = getDefaultTrackControlState();`);
+assert(HTML.indexOf('.track-label.source-colored') !== -1, 'the source-coloured label stripe is styled');
+
 section('core: track rows render for every track type');
 const R = 'MKTAYIAKQRQISFVKSHFSRQDILQDILDLWIYHTQGYFP'.slice(0, 37);
 ctxRun(`parsedTracks = { AA: ${JSON.stringify(R)},

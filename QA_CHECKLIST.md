@@ -103,6 +103,35 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Track source colouring — 0.67.0
+
+**Surface.** Existing **Track Control** popover header (the bar opened from the
+sidebar Track Control button); adds one `Source color` toggle beside Hide All /
+Full manager / Reset. No new top-level surface (DESIGN 20).
+
+**Should do.** When off, rows look unchanged. When on, every track label in the
+viewer gets a left stripe coloured by its provenance (`getTrackSource`), so
+HHpred vs BLAST homologs, UniProt vs Quick2D, etc. read at a glance; a swatch
+legend appears in the popover. All-or-none; persisted in saves; off by default.
+
+**Try.**
+1. Load GFP (P42212), open Track Control -> press **Source color**. Expect every
+   label gains a coloured left stripe and the popover shows a legend
+   (Quick2D, UniProt, and the homolog sources present).
+2. Run **Search homologs (phmmer)**, then switch the picker to **BLAST** and run
+   again. Expect the phmmer and BLAST rows to carry different stripe colours.
+3. Reload the page. Expect the toggle to still be on.
+4. Press **Reset**. Expect colouring to return to off and stripes to disappear.
+
+**Edge cases.**
+- *Toggle on with no tracks* — legend reads "No tracks loaded."; no error.
+- *Unknown/new source* — falls back to a deterministic palette colour, not
+  blank; the same source keeps the same colour across reloads.
+- *Active row* — the blue active-row fill keeps the source stripe visible.
+- *Pre-0.67.0 saved sessions* — no `sourceColor` key restores as off.
+
+---
+
 ### Metal-site coordination on the cofactor rows — 0.66.30
 
 **Surface.** No new surface: the coordination read-out hangs off the existing

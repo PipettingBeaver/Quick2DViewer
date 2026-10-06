@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.0] - 2026-10-06
+
+### Added
+- **Track source colouring.** The Track Control bar gains a **Source color**
+  toggle. With it on, every track label in the viewer carries a left stripe
+  coloured by its provenance, so HHpred / BLAST / phmmer homologs and
+  Quick2D / UniProt / Structure rows separate at a glance, plus a swatch
+  legend in the popover. All-or-none, persisted in saves, off by default.
+
 ## [0.66.31] - 2026-10-05
 
 ### Fixed

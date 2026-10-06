@@ -640,6 +640,11 @@
         }
         .track-label:hover { background: #eef2f7; }
         .track-label.active-row { background: #2563eb; color: #fff; }
+        /* Source colouring: a stripe on the label whose hue is the track's
+           provenance. The stripe replaces the left padding so the label text
+           stays aligned with the grid whether the mode is on or off. */
+        .track-label.source-colored { border-left: 4px solid var(--source-color, #94a3b8); padding-left: 20px; }
+        .track-label.source-colored.active-row { border-left-color: var(--source-color, #94a3b8); }
         .track-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
         .type-badges { display: flex; gap: 3px; margin-left: 6px; flex-shrink: 0; }
         /* Type badges are selection affordances - reveal them on row hover
@@ -1766,6 +1771,10 @@
         }
         .tctl-head-btn:hover { background: #dbeafe; border-color: #93c5fd; }
         .tctl-head-btn.tctl-on { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .tctl-source-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; padding: 6px 10px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.68rem; color: #475569; }
+        .tctl-source-legend-title { font-weight: bold; color: #334155; }
+        .tctl-source-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+        .tctl-source-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; border: 1px solid rgba(0,0,0,0.12); }
         .tctl-grid {
             display: grid;
             grid-template-columns: 1fr 88px 104px 56px;
@@ -2390,15 +2399,18 @@
             <details class="workflow-section" id="constantsSection" style="margin-top: 10px;">
                 <summary>Protein constants <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
                     <strong>Protein constants</strong><br>
-                    Computed from the loaded sequence, offline, with standard average residue masses
-                    (so they always match what is in the session): molecular weight, isoelectric point,
-                    net charge at pH 7, the 280 nm extinction coefficient and mean hydropathy (GRAVY).<br><br>
-                    <strong>Caveats.</strong> pI assumes free N- and C-termini and unpaired cysteines
-                    (pairing them raises it); A280 counts Trp, Tyr and cystine only, so a mature
-                    fluorescent-protein chromophore - which dominates its own extinction - is not
-                    counted here and the literature value should be used instead.<br><br>
-                    Useful before a construct decision: a very low pI or a high GRAVY predicts poor
-                    solubility and behaviour on ion exchange.
+                    Computed offline from the loaded sequence using standard average monomer masses
+                    to ensure consistency across the session: molecular weight, isoelectric point (pI),
+                    net charge at pH 7, molar extinction coefficient, and hydropathy index
+                    (e.g., GRAVY).<br><br>
+                    <strong>Caveats.</strong> Charge and pI calculations assume standard unmodified
+                    termini and functional groups. Extinction calculations account only for canonical
+                    monomers; mature fluorophores, chromophores, or secondary chemical modifications
+                    that dominate absorbance are not included and require empirical or literature
+                    values.<br><br>
+                    <strong>Usage.</strong> Useful for construct design in that extreme pI values or
+                    high hydropathy predict poor solubility, aggregation, or non-ideal behavior during
+                    purification and ion exchange.
                 </span></span></summary>
                 <div class="data-box" id="constantsDisplay" style="margin-top: 6px; white-space: pre-wrap;">No sequence loaded.</div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
@@ -10754,7 +10766,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.66.31';
+const APP_VERSION = '0.67.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -11357,6 +11369,27 @@ function buildTctlMasterTrackRow(g, key, isLast) {
     return row;
 }
 
+// Compact swatch legend shown while Source colouring is on: the provenance
+// values present in the current session, deduped, in grid order.
+function buildSourceColorLegend(groups) {
+    const wrap = mkEl('div', 'tctl-source-legend');
+    wrap.appendChild(mkEl('span', 'tctl-source-legend-title', 'Source color:'));
+    const seen = {};
+    (groups || []).forEach(g => getGroupTrackKeys(g).forEach(k => {
+        const src = getTrackSource(k);
+        if (seen[src]) return;
+        seen[src] = true;
+        const item = mkEl('span', 'tctl-source-legend-item');
+        const sw = mkEl('span', 'tctl-source-swatch');
+        sw.style.background = sourceColorFor(src);
+        item.appendChild(sw);
+        item.appendChild(document.createTextNode(src));
+        wrap.appendChild(item);
+    }));
+    if (!Object.keys(seen).length) wrap.appendChild(mkEl('span', 'tctl-source-legend-item', 'No tracks loaded.'));
+    return wrap;
+}
+
 // The master list view: header bar (TRACK CONTROLS + Hide All + Reset), the
 // table header row (Category / View as / Config), then one row per type group.
 // Expanding a group's chevron inserts the per-track rows right under it.
@@ -11375,6 +11408,13 @@ function buildTctlMasterList(pop) {
         tctlAfterChange();
     });
     actions.appendChild(hideAll);
+    const srcBtn = mkEl('button', 'tctl-head-btn' + (isSourceColorOn() ? ' tctl-on' : ''), 'Source color');
+    srcBtn.title = isSourceColorOn()
+        ? 'Track labels are coloured by provenance - click to turn off'
+        : 'Colour each track label by its provenance (HHpred, BLAST, UniProt, ...)';
+    srcBtn.setAttribute('aria-pressed', isSourceColorOn() ? 'true' : 'false');
+    srcBtn.addEventListener('click', () => { setSourceColor(!isSourceColorOn()); tctlAfterChange(); });
+    actions.appendChild(srcBtn);
     const fullBtn = mkEl('button', 'tctl-head-btn', 'Full manager \u2197');
     fullBtn.title = 'Open the sidebar Track Visibility list (every track, grouped by type)';
     fullBtn.addEventListener('click', openTrackManagerFromPopover);
@@ -11399,6 +11439,8 @@ function buildTctlMasterList(pop) {
     colh.appendChild(mkEl('div', 'tctl-color-cell', 'Color'));
     colh.appendChild(mkEl('div', 'tctl-config-cell', 'Config'));
     pop.appendChild(colh);
+
+    if (isSourceColorOn()) pop.appendChild(buildSourceColorLegend(groups));
 
     if (!groups.length) {
         pop.appendChild(mkEl('div', 'tctl-row-count', 'No typed tracks loaded yet.'));
@@ -14689,7 +14731,7 @@ const TRACK_GROUP_LABELS = {
     other: 'Other',
     EXP: 'Experimental'
 };
-let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {}, consColor: {}, colorMode: {}, viewOverride: {} };
+let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}, aaSeq: {}, consColor: {}, colorMode: {}, viewOverride: {}, sourceColor: false };
 
 // Fresh-install / cleared-cache default: Transmembrane rows start in "Bar"
 // (fullBar) mode so new users see labeled bars instead of letters, and Homolog
@@ -14697,7 +14739,7 @@ let trackControlState = { hidden: {}, hideSymbols: {}, fullBar: {}, filtered: {}
 // glance. Persisted preferences override this when loading a previous session.
 // (The old `fullBar.HH` key predated the HH_ -> HL_ rename, so it never applied.)
 function getDefaultTrackControlState() {
-    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true }, filtered: {}, aaSeq: { HL: true }, consColor: {}, colorMode: {}, viewOverride: {} };
+    return { hidden: {}, hideSymbols: {}, fullBar: { TM: true }, filtered: {}, aaSeq: { HL: true }, consColor: {}, colorMode: {}, viewOverride: {}, sourceColor: false };
 }
 
 function getTrackGroup(key) {
@@ -14753,6 +14795,50 @@ function getTrackSource(key) {
     if (key.endsWith('_pLDDT') || key.endsWith('_RSA') || key.endsWith('_Cofactors')) return 'Structure';
     return 'Other';
 }
+// --- Provenance colouring ---------------------------------------------------
+// One global toggle paints each row label with a colour derived from its source,
+// so a glance separates HHpred from BLAST homologs, UniProt from Quick2D, etc.
+// The colour is keyed by the provenance string `getTrackSource` already returns;
+// unknown sources are hashed into a stable fallback palette so new providers
+// still get a consistent colour without a code change.
+const SOURCE_COLORS = {
+    'Input': '#64748b',
+    'AA': '#64748b',
+    'Quick2D': '#2563eb',
+    'UniProt': '#7c3aed',
+    'Topology': '#0d9488',
+    'Conservation': '#ca8a04',
+    'Variant FASTA': '#db2777',
+    'Rule': '#ea580c',
+    'Interface': '#4f46e5',
+    'Cross-check': '#0284c7',
+    'Ensemble': '#9333ea',
+    'Structure': '#16a34a',
+    'HHpred': '#1d4ed8',
+    'BLAST': '#dc2626',
+    'phmmer': '#b45309',
+    'Foldseek': '#059669',
+    'HMMER': '#9333ea',
+    'ESMFold': '#16a34a',
+    'AlphaFold': '#15803d',
+    'PDBe': '#0891b2',
+    'Homolog': '#0f766e',
+    'Custom': '#475569',
+    'Other': '#94a3b8'
+};
+const SOURCE_COLOR_FALLBACK = ['#0f766e', '#b45309', '#1d4ed8', '#be123c', '#6d28d9', '#0e7490', '#a16207', '#047857'];
+function sourceColorFor(source) {
+    const s = String(source == null ? '' : source);
+    if (SOURCE_COLORS[s]) return SOURCE_COLORS[s];
+    // 'HMMER (Pfam)' / 'HMMER (InterPro)' collapse to the HMMER hue.
+    const base = s.replace(/^([A-Za-z]+)\s*\(.*\)$/, '$1');
+    if (SOURCE_COLORS[base]) return SOURCE_COLORS[base];
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return SOURCE_COLOR_FALLBACK[h % SOURCE_COLOR_FALLBACK.length];
+}
+function isSourceColorOn() { return !!trackControlState.sourceColor; }
+function setSourceColor(on) { trackControlState.sourceColor = !!on; }
 function isTrackGroupHidden(g) { return !!trackControlState.hidden[g]; }
 function isTrackGroupSymbolsHidden(g) { return !!trackControlState.hideSymbols[g]; }
 function isTrackGroupFullBar(g) { return !!trackControlState.fullBar[g]; }
@@ -15349,8 +15435,14 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     if (isTrackEmpty(key)) rowEl.classList.add('track-empty');
 
     const labelEl = document.createElement('div');
-    labelEl.className = 'track-label';
+    labelEl.className = 'track-label' + (isSourceColorOn() ? ' source-colored' : '');
     labelEl.dataset.track = key;
+    if (isSourceColorOn()) {
+        const src = getTrackSource(key);
+        labelEl.dataset.source = src;
+        labelEl.style.setProperty('--source-color', sourceColorFor(src));
+        labelEl.title = 'Source: ' + src;
+    }
     labelEl.addEventListener('click', (e) => {
         if (e.target.closest('.info-icon')) return; // let the icon's own click (pin/unpin) handle itself
         if (e.target.closest('.tctl-chevron')) return; // chevron owns its own popup
@@ -19528,7 +19620,8 @@ function gatherPersistableState() {
                 aaSeq: Object.assign({}, trackControlState.aaSeq),
                 consColor: Object.assign({}, trackControlState.consColor),
                 colorMode: Object.assign({}, trackControlState.colorMode),
-                viewOverride: Object.assign({}, trackControlState.viewOverride)
+                viewOverride: Object.assign({}, trackControlState.viewOverride),
+                sourceColor: !!trackControlState.sourceColor
             },
             savedSelections: savedSelections.map(slot => slot ? { ranges: slot.ranges.map(r => [r[0], r[1]]), row: slot.row || null, label: slot.label || null } : null)
         }
@@ -19996,7 +20089,8 @@ function applyPersistedState(state) {
             filtered: (tc && tc.filtered) || {},
             aaSeq: savedAaSeq,
             consColor: (tc && tc.consColor) || {},
-            viewOverride: (tc && tc.viewOverride) || {}
+            viewOverride: (tc && tc.viewOverride) || {},
+            sourceColor: !!(tc && tc.sourceColor)
         };
     } else {
         trackControlState = getDefaultTrackControlState();
