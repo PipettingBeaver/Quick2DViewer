@@ -1301,8 +1301,6 @@
             font-size:0.72rem; font-weight:700; color:#334155;
         }
         .guide-intake > summary::-webkit-details-marker { display:none; }
-        .guide-intake > summary::before { content:'\u25b8'; color:#94a3b8; font-size:0.7rem; }
-        .guide-intake[open] > summary::before { content:'\u25be'; }
         .guide-intake[open] > summary { margin-bottom:6px; }
         .guide-intake > summary > .guide-count { margin-left:auto; font-weight:400; color:#64748b; }
         .guide-count { font-weight:400; color:#64748b; }
@@ -2543,10 +2541,8 @@
             <details class="workflow-section qa-new" id="guideSection" open>
             <summary>Evaluation Guide</summary>
             <p style="font-size:0.72rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
-                The literature-backed characterization pipeline
-                (<button type="button" class="guide-link" onclick="openWorkflowDoc()">reference doc</button>),
-                with a live status per step. Answer the questions to re-rank the steps for your protein; each
-                step can be marked done, skipped, or re-run. Every tool stays available manually.
+                The Protein Guide is an interactive characterization workflow that recommends and tracks
+                steps based on the protein's profile.
             </p>
             <div id="guidePanel"></div>
             <button type="button" class="tb-btn tb-btn-secondary" onclick="exportMethodsReport()" style="font-size:0.72rem; padding:3px 8px; margin-top:8px; width:100%;"
@@ -5196,7 +5192,8 @@ async function fetchUniProtAnnotations() {
 // Builds the UP_ string tracks from the fetched features and re-renders. Each
 // category becomes one row with a marker char per covered residue; feature
 // metadata is kept in uniprotFeatureTracks for tooltips/colors.
-function applyUniProtFeatures() {
+function applyUniProtFeatures(opts) {
+    const silent = !!(opts && opts.silent);
     const aaLen = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
     Object.keys(parsedTracks).forEach(k => { if (k.startsWith('UP_')) delete parsedTracks[k]; });
     uniprotFeatureTracks = {};
@@ -5223,8 +5220,10 @@ function applyUniProtFeatures() {
         parsedTracks[key] = track.join('');
         uniprotFeatureTracks[key] = { type, category: cat, color: UNIPROT_CATEGORY_COLORS[cat] || '#e2e8f0', features };
     });
-    renderViewer(parsedTracks);
-    schedulePersist();
+    if (!silent) {
+        renderViewer(parsedTracks);
+        schedulePersist();
+    }
 }
 
 function syncUniProtOptionControls() {
@@ -8184,28 +8183,28 @@ const WORKFLOW_STEPS = [
 // Short questions whose answers re-rank the pipeline for this protein. They are
 // deliberately few: each maps to a concrete change in what the guide recommends.
 const GUIDE_QUESTIONS = [
-    { id: 'membrane', label: 'Is it membrane-associated or secreted?', options: [
+    { id: 'membrane', label: 'Is this protein membrane-associated or secreted?', options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] },
-    { id: 'structure', label: 'What structure evidence do you have?', options: [
+    { id: 'structure', label: 'What structure evidence exists for this protein?', options: [
         { value: 'experimental', label: 'Experimental (X-ray / cryo-EM / NMR)' },
         { value: 'predicted', label: 'Predicted only (AlphaFold / ESMFold)' },
         { value: 'none', label: 'None yet' },
         { value: 'unsure', label: 'Not sure' }] },
-    { id: 'homologs', label: 'Are homologs / an HHpred MSA in hand?', options: [
+    { id: 'homologs', label: 'Is homology or HHpred MSA data available for this protein?', options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] },
-    { id: 'variants', label: 'Are you evaluating sequence variants?', options: [
+    { id: 'variants', label: 'Are sequence variants being evaluated for this protein?', options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] },
     // Declared oligomeric state: a sequence-only session (FASTA or Quick2D) has
     // no way to say "this is a homotrimer", yet the biology matters for the
     // interface step and for how the write-up reads.
-    { id: 'chains', label: 'What is its oligomeric state?', options: [
+    { id: 'chains', label: "What is the protein's oligomeric state?", options: [
         { value: 'monomer', label: 'Monomer' },
         { value: 'homo2', label: 'Homodimer' },
         { value: 'homo3', label: 'Homotrimer' },
         { value: 'homo4', label: 'Homotetramer or larger' },
         { value: 'hetero', label: 'Hetero-oligomer' },
         { value: 'unknown', label: 'Unknown' }] },
-    { id: 'unknownFunction', label: 'Is the function / domain architecture unknown?', options: [
+    { id: 'unknownFunction', label: "Is the protein's function / domain architecture unknown?", options: [
         { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }] }
 ];
 let guideProfile = {};
@@ -8246,30 +8245,30 @@ let guideIntakeOpen = null;
 // instead of a generic one. Stored flat as '<stepId>.<questionId>'.
 const STEP_QUESTIONS = {
     sequence: [
-        { id: 'source', label: 'How is the sequence coming in?', options: [
+        { id: 'source', label: 'What is the sequence input source?', options: [
             { value: 'quick2d', label: 'Quick2D output' },
             { value: 'fasta', label: 'FASTA / paste' },
             { value: 'uniprot', label: 'UniProt accession' }] }
     ],
     features: [
-        { id: 'ready', label: 'Are the Quick2D predictions ready to paste?', options: [
+        { id: 'ready', label: 'Are Quick2D predictions available to input?', options: [
             { value: 'yes', label: 'Yes' },
             { value: 'no', label: 'Not yet' }] }
     ],
     annotation: [
-        { id: 'have', label: 'Do you already have the accession or family?', options: [
+        { id: 'have', label: 'Is the accession or family available?', options: [
             { value: 'accession', label: 'Yes, fetch it' },
             { value: 'search', label: 'No, search for it' },
             { value: 'domains', label: 'Only Pfam domains' }] }
     ],
     homologs: [
-        { id: 'hhpred', label: 'For homologs, would you prefer MPI\'s HHpred, phmmer, or both?', options: [
+        { id: 'hhpred', label: 'Which homolog source: MPI\'s HHpred, phmmer, or both?', options: [
             { value: 'hhpred', label: 'MPI\'s HHpred (have it, or will run it)' },
             { value: 'phmmer', label: 'phmmer (search Swiss-Prot in-app)' },
             { value: 'both', label: 'Both' }] }
     ],
     structure: [
-        { id: 'model', label: 'Where should the model come from?', options: [
+        { id: 'model', label: 'What is the structural model source?', options: [
             { value: 'afdb', label: 'AlphaFold DB' },
             { value: 'pdb', label: 'PDB / CIF file' },
             { value: 'esmfold', label: 'Predict (ESMFold)' }] }
@@ -8282,14 +8281,14 @@ const STEP_QUESTIONS = {
             { value: 'bfvd', label: 'bfvd' }] }
     ],
     topology: [
-        { id: 'predictor', label: 'Which predictor output do you have?', options: [
+        { id: 'predictor', label: 'Which topology predictor output is available?', options: [
             { value: 'tmhmm', label: 'TMHMM' },
             { value: 'phobius', label: 'Phobius' },
             { value: 'deeptmhmm', label: 'DeepTMHMM' },
             { value: 'none', label: 'None yet' }] }
     ],
     integration: [
-        { id: 'goal', label: 'What are you closing on?', options: [
+        { id: 'goal', label: 'What is the integration objective?', options: [
             { value: 'characterize', label: 'Characterizing an unresolved fold' },
             { value: 'variants', label: 'Variant triage' },
             { value: 'interface', label: 'Binding interface' },
@@ -8905,6 +8904,16 @@ function resetGuideOverrides() {
     guideOverrides = {};
     schedulePersist();
     renderWorkflowGuide();
+}
+// Comprehensive guide reset, called by Reset Data (which clears the session
+// cache and preferences): the intake answers, per-step answers, overrides and
+// any running task all go, so Protein Background does not survive a reset.
+function resetGuideState() {
+    guideProfile = {};
+    guideOverrides = {};
+    guideAnswers = {};
+    guideIntakeOpen = null;
+    guideTask = null;
 }
 function guideStepStatus() {
     return WORKFLOW_STEPS.map((step, index) => {
@@ -9598,7 +9607,9 @@ function renderWorkflowGuide() {
     const intakeOpen = guideIntakeOpen === null ? (answered < GUIDE_QUESTIONS.length) : guideIntakeOpen;
     html += '<details class="guide-intake" id="guideIntake"' + (intakeOpen ? ' open' : '') +
         ' ontoggle="guideIntakeOpen = this.open;">' +
-        '<summary><span>Protein Background</span><span class="guide-count">' + answered + '/' + GUIDE_QUESTIONS.length + '</span></summary>';
+        '<summary><span>Protein Background</span><span class="guide-count">' +
+        (answered >= GUIDE_QUESTIONS.length ? '(Complete)' : answered + '/' + GUIDE_QUESTIONS.length) +
+        '</span></summary>';
     GUIDE_QUESTIONS.forEach(q => {
         html += '<div class="guide-q"><div class="guide-q-label">' + q.label + '</div><div class="guide-q-opts">';
         q.options.forEach(o => {
@@ -9625,7 +9636,7 @@ function renderWorkflowGuide() {
         // an unanswered question is the prompt, an answered one collapses to the
         // tailored action + hint. The full context stays in the step card below.
         const nextQs = (STEP_QUESTIONS[next.step.id] || []).filter(q => !getStepAnswer(next.step.id, q.id));
-        html += '<div class="guide-next-action"><strong>Next:</strong> ' + next.step.title;
+        html += '<div class="guide-next-action"><strong>Step ' + (next.index + 1) + ':</strong> ' + next.step.title;
         if (nextQs.length) {
             html += '<div class="guide-next-q">' + nextQs.map(q =>
                 '<div class="guide-q"><div class="guide-q-label">' + q.label + '</div><div class="guide-q-opts">' +
@@ -9633,7 +9644,7 @@ function renderWorkflowGuide() {
                 '</div></div>').join('') + '</div>';
             // The option pills and the action buttons are both rows of buttons;
             // without a labelled divider they read as one merged cluster.
-            html += '<div class="guide-next-or">or go straight to:</div>';
+            html += '<div class="guide-next-or">or select an action:</div>';
         } else if (nextAct.hint) {
             html += '<br><span class="guide-next-hint">' + nextAct.hint + '</span>';
         }
@@ -10766,7 +10777,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.0';
+const APP_VERSION = '0.67.2';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -19642,6 +19653,31 @@ function gatherPersistableState() {
 // recognition/routing side of this.
 const SAVE_FORMAT_VERSION = 1;
 
+// Filename for a full save. Prefer the protein's short name from its
+// FASTA/Quick2D header (entry name, then protein name, then gene, then
+// accession); fall back to the first few residues when nothing is nameable,
+// so a save is identifiable at a glance instead of a timestamp.
+function slugifySaveName(s) {
+    return String(s == null ? '' : s)
+        .replace(/[^A-Za-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40);
+}
+function suggestSaveFileName(label, sequence) {
+    let name = '';
+    if (label && typeof parseProteinHeaderLine === 'function') {
+        const p = parseProteinHeaderLine(label);
+        if (p) name = p.entryName || p.proteinName || p.gene || p.accession || '';
+    }
+    if (!name) name = label || '';
+    let slug = slugifySaveName(name);
+    if (!slug) {
+        const seq = String(sequence || '').toUpperCase().replace(/[^A-Z]/g, '');
+        slug = seq ? seq.slice(0, 10) : 'session';
+    }
+    return 'q2dv-save-' + slug + '.json';
+}
+
 function exportFullSave() {
     if (!parsedTracks.AA) {
         showToast('Nothing to export yet - paste and parse a sequence first.', 'error');
@@ -19665,10 +19701,9 @@ function exportFullSave() {
         return;
     }
 
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `q2dv-save-${stamp}.json`;
+    a.download = suggestSaveFileName(currentProteinLabel, parsedTracks.AA);
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -20101,6 +20136,14 @@ function applyPersistedState(state) {
     savedSelections = Array.isArray(prefs.savedSelections) ? prefs.savedSelections.map(slot => {
         return (slot && Array.isArray(slot.ranges)) ? { ranges: slot.ranges.map(r => [Number(r[0]), Number(r[1])]), row: slot.row || null, label: typeof slot.label === 'string' && slot.label ? slot.label : null } : null;
     }) : [null, null, null, null, null];
+
+    // A save can carry the raw UniProt fetch without its derived UP_ rows (the
+    // rows are rebuilt from `uniprotFeatures`); re-apply so stored features such
+    // as the GFP chromophore cross-link are actually shown on load.
+    if (uniprotFeatures && Array.isArray(uniprotFeatures.features) && uniprotFeatures.features.length
+        && !Object.keys(parsedTracks).some(k => k.startsWith('UP_'))) {
+        applyUniProtFeatures({ silent: true });
+    }
 
     renderViewer(parsedTracks);
     renderSavedSelectionsBar();
@@ -20744,6 +20787,7 @@ async function resetAllData() {
     applyTypePalette('default');
     trackControlState = getDefaultTrackControlState();
     closeTctlPopup();
+    resetGuideState();
     savedSelections = [null, null, null, null, null];
     renderSavedSelectionsBar();
     seqSearchMatches = [];
@@ -20780,6 +20824,7 @@ async function resetAllData() {
     renderCachedDataInfo();
     renderStructureCacheInfo();
     renderDataModal();
+    renderWorkflowGuide();
 }
 
 function copyText(elementId) {

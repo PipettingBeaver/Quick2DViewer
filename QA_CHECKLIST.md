@@ -103,6 +103,34 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Protein-named saves + UniProt rows rebuilt on load — 0.67.1
+
+**Surface.** The **Save** action (full session save) and **Options -> Data
+Sources -> UniProt** (the `UP_` rows it produces). No new surface.
+
+**Should do.** A full save downloads as `q2dv-save-<short-name>.json` (entry
+name, then protein name, gene, accession; else the first residues). Loading a
+save that stored a UniProt fetch but not its derived `UP_` rows rebuilds them,
+so the chromophore/domains/variants are visible again.
+
+**Try.**
+1. Load GFP (P42212), **Save**. Expect `q2dv-save-GFP_AEQVI.json` (not a
+   timestamp).
+2. Open the example save `GFP/q2dv-save-GFP_AEQVI.json`. Expect the
+   UniProt group to reappear with `UP_Cross_link` (65-67) and
+   `UP_Modified_residue` (66) amber PTM rows - the GFP chromophore.
+3. Hover those residues. Expect the tooltip naming the chemistry
+   ("5-imidazolinone (Ser-Gly)", "(Z)-2,3-didehydrotyrosine").
+
+**Edge cases.**
+- *No header name* — the filename falls back to the first 10 residues.
+- *No sequence and no name* — `q2dv-save-session.json`.
+- *Unsafe characters* — slugged to `[A-Za-z0-9_]`; never a path separator.
+- *A save that already has `UP_` rows* — not rebuilt twice (guard checks for
+  existing rows).
+
+---
+
 ### Track source colouring — 0.67.0
 
 **Surface.** Existing **Track Control** popover header (the bar opened from the

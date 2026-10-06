@@ -18,12 +18,12 @@ then asks its own short questions (below) that pick the *specific* action and
 defaults to offer. Everything is advisory: any step can be marked done,
 skipped or re-run at any time, and all tools stay reachable from the menus.
 
-- **Is it membrane-associated or secreted?**: Yes / No / Not sure
-- **What structure evidence do you have?**: Experimental (X-ray / cryo-EM / NMR) / Predicted only (AlphaFold / ESMFold) / None yet / Not sure
-- **Are homologs / an HHpred MSA in hand?**: Yes / No / Not sure
-- **Are you evaluating sequence variants?**: Yes / No / Not sure
-- **What is its oligomeric state?**: Monomer / Homodimer / Homotrimer / Homotetramer or larger / Hetero-oligomer / Unknown
-- **Is the function / domain architecture unknown?**: Yes / No / Not sure
+- **Is this protein membrane-associated or secreted?**: Yes / No / Not sure
+- **What structure evidence exists for this protein?**: Experimental (X-ray / cryo-EM / NMR) / Predicted only (AlphaFold / ESMFold) / None yet / Not sure
+- **Is homology or HHpred MSA data available for this protein?**: Yes / No / Not sure
+- **Are sequence variants being evaluated for this protein?**: Yes / No / Not sure
+- **What is the protein's oligomeric state?**: Monomer / Homodimer / Homotrimer / Homotetramer or larger / Hetero-oligomer / Unknown
+- **Is the protein's function / domain architecture unknown?**: Yes / No / Not sure
 
 ## Steps
 
@@ -41,7 +41,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- How is the sequence coming in?: Quick2D output / FASTA / paste / UniProt accession
+- What is the sequence input source?: Quick2D output / FASTA / paste / UniProt accession
 
 **Promoted when.** Always. It is the prerequisite for every other step.
 
@@ -62,7 +62,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Are the Quick2D predictions ready to paste?: Yes / Not yet
+- Are Quick2D predictions available to input?: Yes / Not yet
 
 **Promoted when.** Promoted when the protein is flagged membrane-associated or secreted.
 
@@ -88,7 +88,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Do you already have the accession or family?: Yes, fetch it / No, search for it / Only Pfam domains
+- Is the accession or family available?: Yes, fetch it / No, search for it / Only Pfam domains
 
 **Promoted when.** Promoted when the function or domain architecture is unknown or unclear.
 
@@ -111,7 +111,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- For homologs, would you prefer MPI's HHpred, phmmer, or both?: MPI's HHpred (have it, or will run it) / phmmer (search Swiss-Prot in-app) / Both
+- Which homolog source: MPI's HHpred, phmmer, or both?: MPI's HHpred (have it, or will run it) / phmmer (search Swiss-Prot in-app) / Both
 
 **Promoted when.** Always. Homology is the main cross-check on the sequence-based layers.
 
@@ -136,7 +136,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Where should the model come from?: AlphaFold DB / PDB / CIF file / Predict (ESMFold)
+- What is the structural model source?: AlphaFold DB / PDB / CIF file / Predict (ESMFold)
 
 **Promoted when.** Always. The structural homology and interface steps both need a model.
 
@@ -182,7 +182,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- Which predictor output do you have?: TMHMM / Phobius / DeepTMHMM / None yet
+- Which topology predictor output is available?: TMHMM / Phobius / DeepTMHMM / None yet
 
 **Promoted when.** Promoted when the protein is flagged membrane-associated or secreted.
 
@@ -205,7 +205,7 @@ skipped or re-run at any time, and all tools stay reachable from the menus.
 
 **Guided questions** (the answers choose the concrete action offered).
 
-- What are you closing on?: Characterizing an unresolved fold / Variant triage / Binding interface / Construct design / Figure / report
+- What is the integration objective?: Characterizing an unresolved fold / Variant triage / Binding interface / Construct design / Figure / report
 
 **Promoted when.** Always. It is where the collected evidence is combined.
 

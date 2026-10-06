@@ -12,6 +12,51 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.2] - 2026-10-06
+
+### Changed
+- **Guide copy rewritten in an objective, domain-explicit register.** The Guide
+  description is now a single sentence ("...based on the protein's profile"),
+  and the six intake questions name the protein explicitly rather than
+  "it"/"you" ("Is this protein membrane-associated or secreted?", "What
+  structure evidence exists for this protein?", "Is homology or HHpred MSA data
+  available for this protein?", "Are sequence variants being evaluated for this
+  protein?", "What is the protein's oligomeric state?", "Is the protein's
+  function / domain architecture unknown?"). `WORKFLOW.md` regenerated to
+  match. The inline *reference doc* link was folded out of the description; the
+  reference stays reachable from Help.
+- **The recommendation card is numbered by pipeline step** (`Step 3: Load
+  sequence`) instead of `Next:`, and a completed **Protein Background** intake
+  reads **(Complete)** in grey and collapses.
+- **Per-step questions rewritten to full-sentence, domain-explicit forms**
+  ("What is the structural model source?", "What is the integration objective?",
+  "Which topology predictor output is available?", etc.), and the short-form
+  divider now reads "or select an action:".
+
+### Fixed
+- **Reset Data now clears the guide.** The Protein Background intake and the
+  per-step answers/overrides previously survived a reset; `resetGuideState()`
+  now runs as part of Reset Data.
+
+### Removed
+- The redundant disclosure triangle beside **Protein Background**; the
+  completed/answered count already marks the accordion, which stays clickable.
+
+## [0.67.1] - 2026-10-06
+
+### Added
+- **Saves are named after the protein.** The full save downloads as
+  `q2dv-save-<short-name>.json` using the header's entry name (then protein
+  name, gene, accession), falling back to the first residues of the sequence
+  when nothing is nameable - no more opaque timestamp.
+
+### Fixed
+- **A stored UniProt fetch now rebuilds its `UP_` rows on load.** A save that
+  carried `uniprotFeatures` but not the derived rows restored with the
+  chromophore, domains and variants invisible; the rows are rebuilt from the
+  stored fetch, so e.g. the GFP chromophore cross-link (65-67) and modified
+  residue (66) appear again.
+
 ## [0.67.0] - 2026-10-06
 
 ### Added

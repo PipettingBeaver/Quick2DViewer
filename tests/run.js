@@ -631,7 +631,7 @@ ctxRun(`
 ctxRun(`runTmCrossCheck();`);
 let report = ctxRun(`buildMethodsReport()`);
 assert(report.indexOf('# Quick2DViewer methods summary') === 0, 'the report opens with a title');
-assert(report.indexOf('## Intake') !== -1 && report.indexOf('Is it membrane-associated or secreted?: Yes') !== -1, 'the report records the intake answers');
+assert(report.indexOf('## Intake') !== -1 && report.indexOf('Is this protein membrane-associated or secreted?: Yes') !== -1, 'the report records the intake answers');
 assert(report.indexOf('## Workflow coverage') !== -1 && report.indexOf('| # | Step | Status | Answer(s) |') !== -1, 'the report has a coverage table');
 assert(report.indexOf('Coverage: ' + ctxRun(`guideProgress().covered`) + ' of ' + ctxRun(`guideProgress().denominator`)) !== -1,
     'the report states the coverage count (' + ctxRun(`guideProgress().covered`) + '/' + ctxRun(`guideProgress().denominator`) + ')');
@@ -714,6 +714,29 @@ ctxRun(`removeTracks(['TP_TMHMM_run'], { silent: true });`);
 assert(ctxRun(`topologySources.length`) === 0, 'removing the restored topology row removes its source');
 assert(ctxRun(`Object.keys(parsedTracks).filter(k => k.indexOf('TP_') === 0).length`) === 0, 'the topology group is left empty rather than resurrected');
 ctxRun(`parsedTracks = {}; topologySources = []; uniprotFeatures = null; uniprotFeatureTracks = {}; domainHitsInfo = {}; guideProfile = {}; guideOverrides = {}; guideAnswers = {};`);
+
+section('save filename from the protein name');
+assert(ctxRun(`suggestSaveFileName('sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria GN=GFP', 'MSKGEELFTG')`) === 'q2dv-save-GFP_AEQVI.json', 'the entry name names the save');
+assert(ctxRun(`suggestSaveFileName('', 'MSKGEELFTGVVP')`) === 'q2dv-save-MSKGEELFTG.json', 'falls back to the first residues');
+assert(ctxRun(`suggestSaveFileName('', '')`) === 'q2dv-save-session.json', 'a nameless empty session still gets a safe name');
+assert(ctxRun(`/^q2dv-save-[A-Za-z0-9_]*\\.json$/.test(suggestSaveFileName('weird / name: *', ''))`), 'unsafe characters are slugged');
+
+section('UniProt rows rebuild from a stored fetch on restore');
+ctxRun(`
+    parsedTracks = { AA: 'MSKGEELFTG' };
+    uniprotFeatures = { accession: 'P42212', features: [
+        { type: 'Cross-link', start: 5, end: 7, description: '5-imidazolinone (Ser-Gly)' },
+        { type: 'Modified residue', start: 6, end: 6, description: '(Z)-2,3-didehydrotyrosine' }
+    ] };
+    uniprotFeatureTracks = {};
+`);
+const savedUp = ctxRun(`gatherPersistableState()`);
+ctxRun(`parsedTracks = {}; uniprotFeatures = null; uniprotFeatureTracks = {};`);
+ctxRun(`applyPersistedState(${JSON.stringify(savedUp)})`);
+assert(ctxRun(`Object.keys(parsedTracks).indexOf('UP_Cross_link') !== -1`), 'the chromophore cross-link row is rebuilt on load');
+assert(ctxRun(`Object.keys(parsedTracks).indexOf('UP_Modified_residue') !== -1`), 'the modified-residue row is rebuilt on load');
+assert(ctxRun(`uniprotFeatureTracks['UP_Cross_link'] && uniprotFeatureTracks['UP_Cross_link'].category === 'ptm'`), 'the rebuilt row keeps its PTM category');
+ctxRun(`parsedTracks = {}; uniprotFeatures = null; uniprotFeatureTracks = {};`);
 
 section('identifier parsing + lookup defaults');
 const headerFull = 'sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria GN=GFP PE=1 SV=1';
@@ -822,13 +845,13 @@ ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks 
 let undoHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 const sliceNext2 = (h) => h.slice(h.indexOf('guide-next-action'), h.indexOf('guide-steps'));
 let ub = sliceNext2(undoHtml);
-assert(ub.indexOf('or go straight to:') !== -1, 'an unanswered question is separated from the action buttons by a labelled divider');
+assert(ub.indexOf('or select an action:') !== -1, 'an unanswered question is separated from the action buttons by a labelled divider');
 assert(ub.indexOf(UNDO) === -1, 'no undo is offered before anything is picked');
 
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'ready'); setStepAnswer('structure', 'model', 'esmfold');`);
 undoHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 ub = sliceNext2(undoHtml);
-assert(ub.indexOf('or go straight to:') === -1, 'the divider goes away once the question is answered');
+assert(ub.indexOf('or select an action:') === -1, 'the divider goes away once the question is answered');
 assert(ub.indexOf(UNDO) !== -1, 'the short form offers an undo once an answer exists');
 assert(ub.indexOf('Undo') !== -1, 'the undo is labelled, not icon-only');
 assert(undoHtml.indexOf('Undo answer') !== -1, 'the step card offers the undo next to the answer record');
@@ -840,7 +863,7 @@ assert(ctxRun(`guideHasStepAnswer('homologs')`) === false, 'undo clears the chos
 assert(ctxRun(`guideHasStepAnswer('structure')`) === true, 'undo leaves other steps alone');
 assert(ctxRun(`getStepAnswer('structure', 'model')`) === 'esmfold', 'the other step answer survives');
 undoHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
-assert(sliceNext2(undoHtml).indexOf('or go straight to:') !== -1 || ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) !== 'homologs', 'the question comes back after undo');
+assert(sliceNext2(undoHtml).indexOf('or select an action:') !== -1 || ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) !== 'homologs', 'the question comes back after undo');
 ctxRun(`clearStepAnswers('structure');`);
 assert(ctxRun(`Object.keys(guideAnswers).length`) === 0, 'clearing the last answer empties the map');
 ctxRun(`guideAnswers = {}; parsedTracks = {};`);
@@ -3282,7 +3305,7 @@ assert(typeof ctxRun(`openWorkflowDoc`) === 'function' && typeof ctxRun(`closeWo
 assert(HTML.indexOf("fetch('WORKFLOW.md')") !== -1, 'it fetches the doc beside the app');
 assert(HTML.indexOf('id="workflowDocModal"') !== -1 && HTML.indexOf('id="workflowDocBody"') !== -1, 'it has its own modal + body');
 assert(HTML.indexOf('href="WORKFLOW.md"') === -1, 'nothing links to the raw markdown file any more');
-assert(HTML.indexOf('openWorkflowDoc()') !== -1, 'the guide header opens it');
+assert(HTML.indexOf('openWorkflowDoc()') !== -1, 'the workflow reference is wired to a control');
 // the fallback points at the rendered GitHub view, not the raw file
 assert(ctxRun(`docFallbackHtml('WORKFLOW.md', 'workflow reference')`).indexOf('github.com/PipettingBeaver/Quick2DViewer/blob/main/WORKFLOW.md') !== -1, 'the fallback links the rendered doc');
 assert(ctxRun(`docFallbackHtml('CHANGELOG.md', 'changelog')`).indexOf('blob/main/CHANGELOG.md') !== -1, 'the changelog fallback does too (same raw-file problem)');
@@ -3297,7 +3320,7 @@ let gHtml2 = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 const sliceNext = (h) => h.slice(h.indexOf('guide-next-action'), h.indexOf('guide-steps'));
 let nextBlk = sliceNext(gHtml2);
 assert(ctxRun(`(function(){ var n = nextGuideStep(); return n ? n.step.id : null; })()`) === 'homologs', 'with only a sequence loaded the homologs step is next (matches the reported case)');
-assert(nextBlk.indexOf('For homologs, would you prefer') !== -1, 'the short form asks the current step question');
+assert(nextBlk.indexOf('Which homolog source') !== -1, 'the short form asks the current step question');
 assert(nextBlk.indexOf('phmmer (search Swiss-Prot in-app)') !== -1 && nextBlk.indexOf('Both') !== -1, 'the route options are answerable from the short form');
 assert(nextBlk.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') === -1, 'the long description is NOT repeated in the short form (was the redundancy)');
 assert(gHtml2.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') !== -1, 'the description still lives in the step card below');
@@ -3305,7 +3328,7 @@ assert(gHtml2.indexOf('toolkit.tuebingen.mpg.de/tools/hhpred') !== -1, 'the desc
 ctxRun(`setStepAnswer('homologs', 'hhpred', 'hhpred');`);
 gHtml2 = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 nextBlk = sliceNext(gHtml2);
-assert(nextBlk.indexOf('For homologs, would you prefer') === -1, 'answering collapses the question away');
+assert(nextBlk.indexOf('Which homolog source') === -1, 'answering collapses the question away');
 assert(nextBlk.indexOf('attach the resulting .hhr') !== -1, 'the tailored hint replaces it');
 assert(nextBlk.indexOf('Load .hhr / variant FASTA') !== -1, 'the tailored action is offered');
 assert(gHtml2.indexOf('guide-opt-on') !== -1, 'the step card keeps the question as the editable record of the answer');
@@ -3392,9 +3415,11 @@ ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks 
 let guideHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 assert(guideHtml.indexOf('Protein Background') !== -1, 'the accordion renders');
 assert(guideHtml.indexOf('guideIntake" open') !== -1, 'it starts open while questions are unanswered');
+assert(/Step \d+:/.test(guideHtml) && guideHtml.indexOf('Next:') === -1, 'the recommendation is numbered by pipeline step (no "Next:")');
 ctxRun(`GUIDE_QUESTIONS.forEach(q => { guideProfile[q.id] = q.options[0].value; }); guideIntakeOpen = null; renderWorkflowGuide();`);
 guideHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 assert(guideHtml.indexOf('guideIntake" open') === -1, 'it compresses once every question is answered');
+assert(guideHtml.indexOf('(Complete)') !== -1, 'a completed intake is marked (Complete)');
 assert(guideHtml.indexOf('reset answers') !== -1, 'a reset affordance is still offered');
 ctxRun(`guideIntakeOpen = true; renderWorkflowGuide();`);
 assert(ctxRun(`document.getElementById('guidePanel').innerHTML`).indexOf('guideIntake" open') !== -1, 'the user can re-open it for the session');
@@ -3403,6 +3428,13 @@ assert(ctxRun(`document.getElementById('guidePanel').innerHTML`).indexOf('guideI
 assert(HTML.indexOf('for the record') === -1, 'the filler "for the record" sign-off is gone');
 assert(HTML.indexOf('All steps covered</strong>') !== -1, 'the all-covered state is a plain status line');
 ctxRun(`guideProfile = {}; guideIntakeOpen = null; parsedTracks = {};`);
+
+section('Reset Data clears the guide state');
+ctxRun(`guideProfile = { membrane: 'yes' }; guideOverrides = { sequence: 'done' }; guideAnswers = { 'sequence.source': 'fasta' }; guideTask = { stepId: 'sequence' }; guideIntakeOpen = true;`);
+ctxRun(`resetGuideState();`);
+assert(ctxRun(`Object.keys(guideProfile).length === 0 && Object.keys(guideOverrides).length === 0 && Object.keys(guideAnswers).length === 0`), 'resetGuideState clears intake, step answers and overrides');
+assert(ctxRun(`guideIntakeOpen === null && guideTask === null`), 'and resets the accordion + any running task');
+assert(HTML.indexOf('resetGuideState();') !== -1, 'Reset Data calls it');
 
 section('guide coachmarks (walk the user to a submenu)');
 assert(ctxRun(`Object.keys(GUIDE_COACHMARKS).join(',')`) === 'rules,interfaces', 'coachmarks are declared for the two submenu hand-offs');
