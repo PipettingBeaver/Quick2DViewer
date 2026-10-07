@@ -269,18 +269,20 @@ assert(ctxRun(`qaHighlightsEnabled`) === false, 'new-feature highlights are off 
 assert(HTML.indexOf("qaHighlightsEnabled = prefs.qaHighlightsEnabled === true;") !== -1, 'a saved session only re-enables them when explicitly on');
 
 section('onboarding + clear-data split');
-assert(ctxRun(`typeof maybeShowWelcome === 'function' && typeof startTour === 'function' && typeof endTour === 'function' && typeof tryGfpExample === 'function'`), 'onboarding entry points are defined');
+assert(ctxRun(`typeof maybeShowWelcome === 'function' && typeof startTour === 'function' && typeof endTour === 'function'`), 'onboarding entry points are defined');
 assert(ctxRun(`typeof clearInputData === 'function' && typeof clearAllData === 'function' && typeof resetInputDataState === 'function' && typeof resetPreferencesState === 'function'`), 'clear-data split functions are defined');
 assert(ctxRun(`WELCOME_KEY === 'q2dViewer_welcome_v1'`), 'the welcome memory has its own storage key');
-assert(/Try GFP/.test(ctxRun('EMPTY_STATE_HTML')), 'the empty state offers Try GFP');
-assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Paste Quick2D') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'and the paste/attach actions');
+assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Open Input Data') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'the empty state points at Input Data and Attach files');
+assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Try GFP') === -1`), 'the empty state no longer has a direct Try GFP shortcut');
 assert(HTML.indexOf('id="welcomeModal"') !== -1 && HTML.indexOf('id="tourBar"') !== -1, 'the welcome modal and tour bar exist in the markup');
-assert(HTML.indexOf('id="tryGfpBtn"') !== -1, 'a header Try GFP button exists');
+assert(HTML.indexOf('id="tryGfpBtn"') === -1 && ctxRun(`typeof tryGfpExample === 'undefined'`), 'there is no header Try GFP button or helper');
+assert(HTML.indexOf('Load example protein') !== -1 && HTML.indexOf('id="inputAccessionPreset"') !== -1, 'Input Data exposes a Load example protein control');
 assert(HTML.indexOf('onclick="clearInputData()"') !== -1 && HTML.indexOf('onclick="clearAllData()"') !== -1, 'the Storage cache controls offer both clear actions');
 assert(HTML.indexOf("menuBarAction('clearInput')") !== -1 && HTML.indexOf("menuBarAction('clearAll')") !== -1, 'the File menu exposes both clear actions');
 assert(ctxRun('TOUR_STEPS.length') >= 3, 'the tour has at least three steps');
-assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'tryGfpBtn,sidebarTabs,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
-['tryGfpBtn', 'sidebarTabs', 'tab-guide', 'menubar-export-btn'].forEach(id => {
+assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'menubar-file-btn,sidebarTabs,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
+assert(ctxRun(`TOUR_STEPS[0].body.indexOf('Load example protein') !== -1 && TOUR_STEPS[0].body.indexOf('GFP') !== -1`), 'the tour tells the user how to load GFP');
+['menubar-file-btn', 'sidebarTabs', 'tab-guide', 'menubar-export-btn'].forEach(id => {
     assert(HTML.indexOf('id="' + id + '"') !== -1, 'tour target id exists in the markup: ' + id);
 });
 sandbox.localStorage._s = {};

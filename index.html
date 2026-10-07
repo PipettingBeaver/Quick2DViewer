@@ -2086,7 +2086,6 @@
     <div class="app-header">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <h2>Quick2DViewer - 1D Protein Viewer <button type="button" class="app-version" id="appVersion" title="View the changelog" onclick="openChangelogModal()"></button></h2>
-            <button type="button" id="tryGfpBtn" class="tb-btn tb-btn-primary" onclick="tryGfpExample()" title="Load the GFP example (P42212) from UniProt to see a full session">Try GFP</button>
             <span class="jump-box">
                 <input id="jumpInput" type="search" placeholder="Jump to…" autocomplete="off"
                     aria-label="Jump to a menu, tab, guide step, data source or loaded track"
@@ -2215,8 +2214,8 @@
                             style="font-size:0.72rem; padding:3px 8px;" title="Download an experimental entry from RCSB PDB by id and attach it; validation and the 3D viewer then work on it">Fetch PDB entry</button>
                         <select id="inputAccessionPreset" class="q2dv-select" onchange="onInputAccessionPreset(this.value)"
                             style="font-size:0.72rem; padding:2px 4px; max-width:190px;"
-                            title="Load an example protein: fetches its UniProt entry and, when no sequence is loaded, its FASTA sequence">
-                            <option value="">Example proteins&hellip;</option>
+                            title="Load example protein: fetches the chosen UniProt entry and, when no sequence is loaded, its FASTA sequence">
+                            <option value="">Load example protein&hellip;</option>
                         </select>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="openDataSources('uniprot')"
                             style="font-size:0.72rem; padding:3px 8px;" title="UniProt lookup, domain families, homologs, structure models, validation and variant effects - all in Options -> Data Sources">Data sources&hellip;</button>
@@ -2320,10 +2319,9 @@
     <div class="grid-layout" role="main">
         <div class="alignment-grid" id="alignmentGrid" tabindex="0" role="application"
             aria-label="Protein viewer. Use Left/Right arrow keys to move the selection, Shift+arrows to extend it, Home/End to jump to the start or end, and Enter to pin the row under the selection.">
-            <p style="padding: 16px 20px 4px; color:#94a3b8; text-align:center; margin:0;">No data loaded yet.</p>
+            <p style="padding: 16px 20px 4px; color:#94a3b8; text-align:center; margin:0;">No data loaded yet. Open Input Data to load an example protein, paste Quick2D output, or attach a file.</p>
             <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding: 8px 20px 20px;">
-                <button type="button" class="tb-btn tb-btn-primary" onclick="tryGfpExample()">Try GFP</button>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="openInputDataModal()">Paste Quick2D</button>
+                <button type="button" class="tb-btn tb-btn-primary" onclick="openInputDataModal()">Open Input Data</button>
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="attachStructures()">Attach files</button>
             </div>
         </div>
@@ -3188,11 +3186,10 @@
             <button onclick="dismissWelcome()" style="background:#ef4444; padding:4px 10px; font-size:0.8rem;">Close</button>
         </div>
         <p style="font-size:0.85rem; color:#475569; line-height:1.6; margin:14px 0 10px;">
-            View one protein's sequence predictions and structure annotations together. To start, try the built-in example, paste Quick2D output, or attach a file.
+            View one protein's sequence predictions and structure annotations together. To start, open <strong>Input Data</strong> and choose a protein under <strong>Load example protein</strong>, paste Quick2D output, or attach a file.
         </p>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-            <button type="button" class="tb-btn tb-btn-primary" onclick="tryGfpExample()">Try GFP</button>
-            <button type="button" class="tb-btn tb-btn-secondary" onclick="startTour()">Show me around</button>
+            <button type="button" class="tb-btn tb-btn-primary" onclick="startTour()">Show me around</button>
             <button type="button" class="tb-btn tb-btn-secondary" onclick="dismissWelcome()">I'll explore on my own</button>
         </div>
         <p style="font-size:0.75rem; color:#94a3b8; margin:0; line-height:1.5;">
@@ -3589,17 +3586,16 @@ const WELCOME_KEY = 'q2dViewer_welcome_v1';
 let welcomeSeen = false;
 // The empty viewer's call to action. Used by the initial markup and by
 // resetInputDataState(), so the two cannot drift.
-const EMPTY_STATE_HTML = '<p style="padding: 16px 20px 4px; color:#94a3b8; text-align:center; margin:0;">No data loaded yet.</p>'
+const EMPTY_STATE_HTML = '<p style="padding: 16px 20px 4px; color:#94a3b8; text-align:center; margin:0;">No data loaded yet. Open Input Data to load an example protein, paste Quick2D output, or attach a file.</p>'
     + '<div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding: 8px 20px 20px;">'
-    + '<button type="button" class="tb-btn tb-btn-primary" onclick="tryGfpExample()">Try GFP</button>'
-    + '<button type="button" class="tb-btn tb-btn-secondary" onclick="openInputDataModal()">Paste Quick2D</button>'
+    + '<button type="button" class="tb-btn tb-btn-primary" onclick="openInputDataModal()">Open Input Data</button>'
     + '<button type="button" class="tb-btn tb-btn-secondary" onclick="attachStructures()">Attach files</button>'
     + '</div>';
 // First-run coachmark tour: each step pulses one existing control and shows a
 // caption in the fixed bottom bar. Targets are element ids asserted in tests so
 // the tour cannot point at a control that was renamed or removed.
 const TOUR_STEPS = [
-    { target: 'tryGfpBtn', title: 'Start with an example', body: 'Load GFP (P42212) from UniProt to see a full session: sequence, domains, variants and the chromophore.' },
+    { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Open File \u2192 Input Data\u2026, then pick a protein under "Load example protein" (GFP is a good one), paste Quick2D output, or attach a file.' },
     { target: 'sidebarTabs', title: 'Your workspace', body: 'Selection, Tracks, Analyze, Guide and Commands hold everything you do with the loaded protein.' },
     { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.' },
     { target: 'menubar-export-btn', title: 'Export your work', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL.' }
@@ -10690,11 +10686,6 @@ function dismissWelcome() {
     closeWelcomeModal();
     endTour();
 }
-async function tryGfpExample() {
-    dismissWelcome();
-    logAction('session', 'try GFP example');
-    await onInputAccessionPreset('P42212');
-}
 let tourIndex = 0;
 function startTour() {
     closeWelcomeModal();
@@ -11325,7 +11316,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.6';
+const APP_VERSION = '0.0.7';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

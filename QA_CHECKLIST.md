@@ -103,31 +103,56 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### GFP moves to Input Data — 0.0.7
+
+**Surface.** Header (no Try GFP button), welcome modal, viewer empty state,
+Input Data → **Load example protein**, the tour.
+
+**Should do.** There is no direct GFP shortcut anywhere; GFP is loaded from the
+**Load example protein** dropdown in Input Data, and the tour's first step says so.
+
+**Try.**
+1. Fresh session: the welcome modal has **Show me around** and **I'll explore on
+   my own** only - no Try GFP. The header has no Try GFP button.
+2. **Show me around**: step 1 points at the **File** menu and says to open
+   Input Data and pick a protein under **Load example protein** (naming GFP).
+3. Empty viewer offers **Open Input Data / Attach files**; Input Data's first
+   dropdown reads **Load example protein…** and lists GFP among the examples.
+4. Pick GFP: the sequence and UniProt rows load as before.
+
+**Edge cases.**
+- *Harness limit* - the tour highlight and dropdown are manual-only; the harness
+  asserts the buttons/helper are gone, the relabelled control exists, and the
+  tour's first step names both "Load example protein" and "GFP".
+
+---
+
 ### Get started onboarding + clear-data split — 0.0.3
 
-**Surface.** Header (**Try GFP**), the viewer empty state, Help menu, File menu,
-Options → Storage, the welcome modal and the tour bar.
+**Surface.** The viewer empty state, Help menu, File menu, Options → Storage, the
+welcome modal and the tour bar. (The direct **Try GFP** entries here were replaced
+by **Input Data → Load example protein** in 0.0.7 - see that card.)
 
-**Should do.** A first-time visitor gets a dismissible welcome panel once; **Try GFP**
-loads P42212; **Clear input data** drops the loaded session but keeps preferences, and
+**Should do.** A first-time visitor gets a dismissible welcome panel once;
+**Clear input data** drops the loaded session but keeps preferences, and
 **Clear all data** also wipes preferences and the welcome memory.
 
 **Try.**
 1. Fresh browser (or *Clear all data* first), then reload. Expect the Welcome modal
    once. Close it, reload again - it does not come back.
-2. Empty viewer shows **Try GFP / Paste Quick2D / Attach files**. Press **Try GFP**:
-   expect the GFP sequence and UniProt annotation rows (no confirm on the deployed
-   site; on `file://` the external-services confirm still appears once).
-3. Help → **Getting started** reopens the welcome; **Show me around** pulses the Try GFP
-   button, the sidebar tabs, the Guide tab and the Export menu, with a bottom caption bar
-   (Next / Back / Skip).
+2. Empty viewer shows **Open Input Data / Attach files**. Open Input Data, choose
+   GFP under **Load example protein**: expect the GFP sequence and UniProt rows
+   (no confirm on the deployed site; on `file://` the confirm still appears once).
+3. Help → **Getting started** reopens the welcome; **Show me around** pulses the File
+   menu, the sidebar tabs, the Guide tab and the Export menu, with a bottom caption
+   bar (Next / Back / Skip).
 4. Change a preference (e.g. palette), load data, then File → **Clear input data**. Expect
    the data gone and the palette still changed; a reload must not resurrect the old data.
 5. File → **Clear all data**. Expect an empty viewer, default palette, external services
    OFF, and the Welcome modal back on the next load.
 
 **Edge cases.**
-- *No network / `file://`* - Try GFP must fail with a clear toast, not a silent no-op.
+- *No network / `file://`* - an example fetch must fail with a clear toast, not a silent no-op.
 - *Structure cache* - neither clear action deletes cached PDB/CIF copies (that stays under
   **Clear Structure Cache**).
 - *Harness limit* - modal layout, the pulsing highlight and the tour-bar position are
@@ -147,8 +172,9 @@ call still asks.
 **Try.**
 1. Load the deployed site fresh (Clear all data first). Options → Data Sources →
    External services should read **ON** before any call.
-2. Press **Try GFP**; it should fetch without a confirm prompt.
-3. Toggle the switch OFF, then press **Try GFP** again: expect a clear
+2. Open Input Data → **Load example protein** → GFP; it should fetch without a
+   confirm prompt.
+3. Toggle the switch OFF, then load an example again: expect a clear
    "enable external services" prompt or a blocked-call message, not a silent hang.
    Toggle back ON and reload - the ON/OFF choice persists.
 

@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.7] - 2026-10-07
+
+### Changed
+- **GFP moves into Input Data.** The header **Try GFP** button and the welcome
+  modal's **Try GFP** button are gone; the loader lives in Input Data as
+  **Load example protein** (the existing example-protein dropdown, relabelled).
+  The empty state now offers **Open Input Data** / **Attach files** instead of a
+  direct GFP shortcut, and the tour's first step teaches the path: File ->
+  Input Data... -> Load example protein -> GFP.
+
 ## [0.0.6] - 2026-10-07
 
 ### Added
