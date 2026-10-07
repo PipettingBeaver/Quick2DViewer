@@ -941,3 +941,114 @@ credentials, no-backend). Automation belongs in an external script.
 4. Predicted-vs-MD `XC_` cross-check (the existing TM cross-check pattern).
 5. Frame-aware §22 coordination.
 Tests: synthetic MD CSV fixture + the 1GFL fixtures; QA card.
+
+## 27. Usability closures for a first-time researcher (planning, 2026-10)
+
+Context: a 2026-10-07 audit against a professor persona ("show me how GFP works")
+found that the mechanism is reachable only by the intended one-click path
+(Input Data example -> GFP macro) and invisible to a newcomer who looks for a
+search box or a plain-language summary. Five gaps were selected for closure, and
+three (Get Started, the protein summary panel, and the header jump box) were
+explicitly prioritised. This section is the backlog; each item ships on its own
+day-based release per the release invariant, and each needs a `tests/run.js`
+check plus a `QA_CHECKLIST.md` card because the stubbed harness cannot verify
+rendered UI.
+
+| Pri | Feature | Approach chosen | Category (§16) | Effort | Release |
+|---|---|---|---|---|---|
+| P1 | **Get Started** onboarding | welcome modal + coachmark tour, header **Try GFP**, empty-state card | Background (onboarding) | 1.5-2.5 d | 0.0.3 |
+| P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.4 |
+| P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.5 |
+| P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.6 |
+| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.7 |
+
+### P1 - Get Started (0.0.3)
+
+Shipped (0.0.3). Welcome panel (dismissible, remembered under its own
+`q2dViewer_welcome_v1` key), coachmark tour, header Try GFP, and the three-action
+empty state. The same release split the old "Reset Data" into **Clear input
+data** (session only) and **Clear all data** (also preferences + welcome), so
+onboarding state has a deliberate lifetime.
+
+Decision. A first-run **welcome modal** introduces the three moves (try an
+example, paste Quick2D, attach files) and offers a short **coachmark tour** of the
+sidebar tabs, reusing the existing `GUIDE_COACHMARKS` machinery
+(`index.html:9882`). The example is also a persistent **Try GFP** button in the
+header and a **three-button empty-state card** replacing the current "No data
+loaded. Add input data under File..." text (`index.html:2288`). Try GFP reuses
+`ACCESSION_PRESETS` GFP (`index.html:7408`) and the "GFP, API-Only" preset
+(`index.html:7477`).
+
+Placement (§20). The header button and empty-state card are new top-level
+entries; the justification is onboarding - a newcomer has no loaded session, so
+Input Data is unreachable until the first load. The tour navigates; it does not
+run actions (§19 rule).
+
+Dependencies and limits. Try GFP performs UniProt/BLAST/1GFL calls, so on a
+fresh session it still trips the current per-action opt-in confirm until P4
+lands; it must show an explicit "network needed" state under `file://` rather
+than failing silently. The tour is dismissed per browser and must not re-open on
+every load.
+
+Non-goals. No product tour across every surface; no sample data bundle shipped
+in-repo beyond the existing presets.
+
+### P2 - Protein summary panel (0.0.4)
+
+Decision. Extend the UniProt fetch (`useUniProtAccession`, `index.html:5106`,
+which today requests features + FASTA only) to also read the FUNCTION comment,
+keywords, GO terms and subcellular location, and render a readable **Protein
+summary** block. This is the existing §24 "UniProt functional summary" row
+promoted from plan to work, and it is the direct answer to "how does this
+protein work".
+
+Placement (§16). Interpretation: belongs on the annotation step and in the
+methods report / AI pack, not as a new pipeline stage. Reuses fetched JSON, so it
+adds no new outbound call.
+
+Non-goals. No GO enrichment, no pathway diagrams; no summary for proteins loaded
+without a UniProt accession (show the existing empty state).
+
+### P3 - Header jump box (0.0.5)
+
+Decision. Add a header input that searches a locally built index of menu
+commands, sidebar tabs, guide step labels/questions, Options categories, and -
+extending §19's v1 non-goal - the **loaded track names**. Results navigate and
+highlight; they never execute, per the §19 decision. This is the lightweight
+sibling of §19's planned Ctrl/Cmd+K palette; the palette can subsume it later.
+
+Testability. The index builder stays pure and unit-tested; a test asserts every
+menu item, guide step and Options category is present, and that each highlight
+target resolves to a real element id.
+
+Non-goals. No remote/doc search, no residue-pattern search (the existing
+`seqSearchInput` at `index.html:2349` already covers that).
+
+### P4 - Network opt-in default ON (0.0.6)
+
+Decision. Default external services ON when the page is served over `http(s)`
+(the deployed site), keep the confirm gate for `file://`, and show an always
+visible network indicator with an off switch. This rewrites the §3 invariant,
+which currently promises no outbound call absent opt-in; the section and
+`AGENTS.md` must be updated in the same change, and the switch must persist.
+
+Non-goals. No silent sending: the indicator and the per-action disclosure line
+remain; the off switch is honoured everywhere.
+
+### P5 - Accessibility pass (0.0.7)
+
+Decision. Make the `ⓘ` `.tooltip-content` reachable by keyboard (`:focus-visible`
+on the already-focusable info icons) and disable transitions under
+`prefers-reduced-motion`. Optionally route toasts/status lines through a polite
+`aria-live` region. Continues the 0.0.2 `role="tab"` / menu-role work and closes
+the highest-value items from EVALUATION dimension 7.
+
+Non-goals. A full WCAG 2.1 AA audit (contrast tokenisation, focus-order review,
+automated axe pass) remains a separate future item.
+
+### Sequencing
+
+P1 -> P2 -> P3 (the prioritised three), then P4 -> P5. P1 ships usable without
+P4 because the existing opt-in confirm still enables the APIs after one click.
+Tests and QA cards are written per release; versions are renumbered rather than
+bundled if work overlaps.

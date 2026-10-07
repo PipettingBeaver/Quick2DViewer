@@ -1389,6 +1389,20 @@
         }
         .guide-coachmark button:hover { background:#6d28d9; }
         .coachmark-on .rp-suggested { box-shadow:0 0 0 2px #ddd6fe; }
+        .tour-highlight { outline: 3px solid #7c3aed; outline-offset: 2px; border-radius: 4px; position: relative; z-index: 3001; }
+        .tour-bar {
+            position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+            width: min(560px, calc(100vw - 24px));
+            background:#1e293b; color:#f1f5f9; border-radius:8px;
+            padding:12px 14px; box-shadow:0 8px 24px rgba(15,23,42,0.35); z-index:3000;
+        }
+        .tour-bar-text { font-size:0.8rem; line-height:1.5; margin-bottom:10px; }
+        .tour-bar-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
+        .tour-bar-actions .copy-btn { background:#334155; color:#e2e8f0; }
+        .tour-bar-actions .copy-btn:hover { background:#475569; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; scroll-behavior:auto !important; }
+        }
         .track-row.track-empty { opacity:0.55; }
         .track-empty-tag { margin-left: 6px; font-size: 0.68rem; color: #94a3b8; font-style: italic; }
         .task-running { opacity:0.85; cursor:progress; }
@@ -2059,7 +2073,10 @@
 
 <div class="container">
     <div class="app-header">
-        <h2>Quick2DViewer - 1D Protein Viewer <button type="button" class="app-version" id="appVersion" title="View the changelog" onclick="openChangelogModal()"></button></h2>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <h2>Quick2DViewer - 1D Protein Viewer <button type="button" class="app-version" id="appVersion" title="View the changelog" onclick="openChangelogModal()"></button></h2>
+            <button type="button" id="tryGfpBtn" class="tb-btn tb-btn-primary" onclick="tryGfpExample()" title="Load the GFP example (P42212) from UniProt to see a full session">Try GFP</button>
+        </div>
         <div class="app-header-tools menubar" role="menubar" aria-label="Main menu">
             <div class="menubar-item">
                 <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-file" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
@@ -2067,7 +2084,8 @@
                     <button type="button" role="menuitem" onclick="menuBarAction('input')">Input Data…</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('save')">Save session (.json)</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('options')">Options…</button>
-                    <button type="button" role="menuitem" onclick="menuBarAction('reset')">Reset Data</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('clearInput')">Clear input data</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('clearAll')">Clear all data…</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -2102,7 +2120,7 @@
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-export" onclick="toggleMenuBarMenu('export', this)">Export ▾</button>
+                <button type="button" id="menubar-export-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-export" onclick="toggleMenuBarMenu('export', this)">Export ▾</button>
                 <div class="menubar-menu" id="menubar-export" role="menu" hidden>
                     <button type="button" role="menuitem" onclick="menuBarAction('json')">Metrics as JSON</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('tsv')">Data as TSV</button>
@@ -2285,11 +2303,16 @@
     <div class="grid-layout" role="main">
         <div class="alignment-grid" id="alignmentGrid" tabindex="0" role="application"
             aria-label="Protein viewer. Use Left/Right arrow keys to move the selection, Shift+arrows to extend it, Home/End to jump to the start or end, and Enter to pin the row under the selection.">
-            <p style="padding: 20px; color: #94a3b8; text-align: center;">No data loaded. Add input data under File to use Quick2DViewer.</p>
+            <p style="padding: 16px 20px 4px; color:#94a3b8; text-align:center; margin:0;">No data loaded yet.</p>
+            <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding: 8px 20px 20px;">
+                <button type="button" class="tb-btn tb-btn-primary" onclick="tryGfpExample()">Try GFP</button>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="openInputDataModal()">Paste Quick2D</button>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="attachStructures()">Attach files</button>
+            </div>
         </div>
 
         <div class="sidebar" role="region" aria-label="Selection Workspace">
-            <div class="sidebar-tabs" role="tablist" aria-label="Workspace panels">
+            <div class="sidebar-tabs" id="sidebarTabs" role="tablist" aria-label="Workspace panels">
                 <button type="button" id="tab-selection" class="sidebar-tab active" role="tab" aria-selected="true" aria-controls="side-panel-selection" data-tab="selection" onclick="switchSidebarTab('selection')">Selection</button>
                 <button type="button" id="tab-tracks" class="sidebar-tab" role="tab" aria-selected="false" aria-controls="side-panel-tracks" data-tab="tracks" onclick="switchSidebarTab('tracks')">Tracks</button>
                 <button type="button" id="tab-analyze" class="sidebar-tab" role="tab" aria-selected="false" aria-controls="side-panel-analyze" data-tab="analyze" onclick="switchSidebarTab('analyze')">Analyze</button>
@@ -3042,18 +3065,19 @@
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Cached Data</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Your pasted Quick2D text, the pLDDT/RSA data derived from attached structure files, current selection, and view preferences are saved automatically in this browser (via <code>localStorage</code>) so they survive a page refresh or reopening this tab later. Nothing is uploaded anywhere - it never leaves your device.<br><br>
-                <span style="color: #94a3b8;">Note: this session cache does NOT include the raw structure file text - that lives in the separate, device-local structure cache below, so "Reset Data" (which clears this session cache) won't delete your cached PDB/CIF copies.</span>
+                <span style="color: #94a3b8;">Note: this session cache does NOT include the raw structure file text - that lives in the separate, device-local structure cache below, so clearing the input data won't delete your cached PDB/CIF copies.</span>
             </p>
             <div id="cachedDataInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">No cached data yet.</div>
-            <button onclick="resetAllData()" style="background: #dc2626; margin-top: 10px;">Reset Data</button>
-            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px;">Clears the cached session data above and resets the page - cached PDB/CIF copies below are left intact.</span>
+            <button onclick="clearInputData()" style="margin-top: 10px;">Clear input data</button>
+            <button onclick="clearAllData()" style="background: #dc2626; margin-top: 10px; margin-left: 8px;">Clear all data…</button>
+            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px; display:block; margin-top: 6px;">Clear input data removes the sequence, structures, annotations and selection but keeps your preferences. Clear all data also wipes preferences and the welcome state. Cached PDB/CIF copies below are left intact by both.</span>
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Local Structure Cache (this device)</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Raw PDB/CIF text you've attached is cached on this device (via <code>IndexedDB</code>) so 3D models reappear instantly after a refresh or a save re-import - never re-uploading the same file twice. It never leaves this device and is <strong>not</strong> embedded in exported saves, so a save taken to another machine will ask for its local files there (Data &gt; Structure Files &gt; Find to locate them). Old copies no longer referenced by the current session are automatically evicted, oldest-first, beyond the 100&nbsp;MB soft cap.<br><br>
-                <span style="color: #94a3b8;">Clearing this is separate from "Reset Data" above - use it only when you want to free up space without touching the data you have loaded.</span>
+                <span style="color: #94a3b8;">Clearing this is separate from the cache controls above - use it only when you want to free up space without touching the data you have loaded.</span>
             </p>
             <div id="structureCacheInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">Loading…</div>
             <button onclick="clearStructureCache()" style="background: #dc2626; margin-top: 10px;">Clear Structure Cache</button>
@@ -3131,6 +3155,37 @@
 </div>
 
 <!-- Help Modal -->
+<!-- Welcome / first-run onboarding -->
+<div class="modal-overlay" id="welcomeModal" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+    <div class="modal-content" style="width: 540px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+            <h3 id="welcomeTitle" style="margin:0; color:#0f172a;">Welcome to Quick2DViewer</h3>
+            <button onclick="dismissWelcome()" style="background:#ef4444; padding:4px 10px; font-size:0.8rem;">Close</button>
+        </div>
+        <p style="font-size:0.85rem; color:#475569; line-height:1.6; margin:14px 0 10px;">
+            View one protein's sequence predictions and structure annotations together. To start, try the built-in example, paste Quick2D output, or attach a file.
+        </p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            <button type="button" class="tb-btn tb-btn-primary" onclick="tryGfpExample()">Try GFP</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="startTour()">Show me around</button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="dismissWelcome()">I'll explore on my own</button>
+        </div>
+        <p style="font-size:0.75rem; color:#94a3b8; margin:0; line-height:1.5;">
+            This won't show again. Reopen it any time from Help &rarr; Getting started. Nothing leaves your device unless you enable external services.
+        </p>
+    </div>
+</div>
+
+<div id="tourBar" class="tour-bar" role="dialog" aria-label="Quick tour" hidden>
+    <div id="tourBarText" class="tour-bar-text"></div>
+    <div class="tour-bar-actions">
+        <span id="tourBarProgress" style="font-size:0.72rem; color:#94a3b8; margin-right:auto;"></span>
+        <button type="button" class="copy-btn" onclick="tourPrev()">Back</button>
+        <button type="button" class="tb-btn tb-btn-primary" id="tourNextBtn" onclick="tourNext()">Next</button>
+        <button type="button" class="copy-btn" onclick="endTour()">Skip</button>
+    </div>
+</div>
+
 <div class="modal-overlay" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
     <div class="modal-content" style="width: 480px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
@@ -3139,12 +3194,11 @@
         </div>
         <div style="margin-top: 18px;">
             <p style="font-size: 0.85rem; color: #64748b; line-height: 1.5;">
-                Help content is on the way - this panel will cover pasting/attaching data, keyboard shortcuts, and how to read each view.
-            </p>
-            <p style="font-size: 0.85rem; color: #64748b; line-height: 1.5;">
-                In the meantime, every ⓘ icon throughout the page (legend, row labels, sidebar fields) explains that specific piece in place.
+                New here? Open <strong>Getting started</strong> for the welcome panel and a short tour. Every ⓘ icon throughout the page (legend, row labels, sidebar fields) explains that specific piece in place.
             </p>
             <div style="margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="tb-btn tb-btn-primary" onclick="closeHelpModal(); openWelcomeModal();" style="font-size:0.78rem; padding:4px 10px;">Getting started</button>
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); startTour();" style="font-size:0.78rem; padding:4px 10px;">Take the tour</button>
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openWorkflowDoc();" style="font-size:0.78rem; padding:4px 10px;">Workflow reference</button>
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openChangelogModal();" style="font-size:0.78rem; padding:4px 10px;">Changelog</button>
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="closeHelpModal(); openActionLog();" style="font-size:0.78rem; padding:4px 10px;">Activity log</button>
@@ -3502,6 +3556,29 @@ document.addEventListener('keydown', (e) => {
 // alongside parsedTracks so the Options > Cached Data panel can list them
 // and so a page reload can show what's cached without re-deriving anything.
 const STORAGE_KEY = 'q2dViewer_state_v1';
+// Onboarding memory lives under its own key so it survives "Clear input data"
+// (which keeps preferences) but not "Clear all data" (which forgets the welcome
+// so a wiped install shows it again). Kept out of STORAGE_KEY because the
+// session blob is only read back when a sequence is present.
+const WELCOME_KEY = 'q2dViewer_welcome_v1';
+let welcomeSeen = false;
+// The empty viewer's call to action. Used by the initial markup and by
+// resetInputDataState(), so the two cannot drift.
+const EMPTY_STATE_HTML = '<p style="padding: 16px 20px 4px; color:#94a3b8; text-align:center; margin:0;">No data loaded yet.</p>'
+    + '<div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding: 8px 20px 20px;">'
+    + '<button type="button" class="tb-btn tb-btn-primary" onclick="tryGfpExample()">Try GFP</button>'
+    + '<button type="button" class="tb-btn tb-btn-secondary" onclick="openInputDataModal()">Paste Quick2D</button>'
+    + '<button type="button" class="tb-btn tb-btn-secondary" onclick="attachStructures()">Attach files</button>'
+    + '</div>';
+// First-run coachmark tour: each step pulses one existing control and shows a
+// caption in the fixed bottom bar. Targets are element ids asserted in tests so
+// the tour cannot point at a control that was renamed or removed.
+const TOUR_STEPS = [
+    { target: 'tryGfpBtn', title: 'Start with an example', body: 'Load GFP (P42212) from UniProt to see a full session: sequence, domains, variants and the chromophore.' },
+    { target: 'sidebarTabs', title: 'Your workspace', body: 'Selection, Tracks, Analyze, Guide and Commands hold everything you do with the loaded protein.' },
+    { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.' },
+    { target: 'menubar-export-btn', title: 'Export your work', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL.' }
+];
 let uploadedStructureFiles = []; // [{name, ext, size}] - metadata only, see note at push() site below
 // Per-track metadata for imported HHpred hits (rank, hit id, description,
 // summary stats) - keyed by the track key (e.g. "HH_01_9UMG_F"), used to
@@ -8554,8 +8631,8 @@ async function undoGuideStep(stepId) {
     const spec = STEP_UNDO[stepId];
     if (!spec) return;
     if (spec.reset) {
-        if (await confirmDialog('Reset the whole session? Every loaded track, attached structure and selection is cleared.',
-            { okLabel: 'Reset', danger: true })) resetAllData();
+        if (await confirmDialog('Clear the loaded input data? Every loaded track, attached structure and selection is removed. Your preferences are kept.',
+            { okLabel: 'Clear input data', danger: true })) clearInputData();
         return;
     }
     const keys = guideStepUndoKeys(stepId);
@@ -8932,9 +9009,9 @@ function resetGuideOverrides() {
     schedulePersist();
     renderWorkflowGuide();
 }
-// Comprehensive guide reset, called by Reset Data (which clears the session
-// cache and preferences): the intake answers, per-step answers, overrides and
-// any running task all go, so Protein Background does not survive a reset.
+// Comprehensive guide reset, called by the clear-data paths (which drop the
+// loaded session): the intake answers, per-step answers, overrides and any
+// running task all go, so Protein Background does not survive a reset.
 function resetGuideState() {
     guideProfile = {};
     guideOverrides = {};
@@ -10194,7 +10271,9 @@ function menuBarAction(action) {
     switch (action) {
         case 'input': openInputDataModal(); break;
         case 'save': exportFullSave(); break;
-        case 'reset': resetAllData(); break;
+        case 'reset': clearInputData(); break;
+        case 'clearInput': clearInputData(); break;
+        case 'clearAll': clearAllData(); break;
         case 'toggleExternal': toggleExternalServices(); break;
         case 'toggleQa': toggleQaHighlights(); break;
         case 'graphPlddt': toggleGraphMode('pLDDT'); break;
@@ -10314,6 +10393,64 @@ function openHelpModal() {
 }
 function closeHelpModal() {
     closeModalAsDialog('helpModal');
+}
+
+// --- First-run onboarding: welcome panel + coachmark tour ------------------
+// The welcome panel auto-opens once (WELCOME_KEY absent) and is remembered when
+// dismissed; the tour pulses one control per step and captions it in the fixed
+// bottom bar. Both are reopenable from Help.
+function maybeShowWelcome() {
+    if (welcomeSeen) return;
+    openWelcomeModal();
+}
+function openWelcomeModal() { openModalAsDialog('welcomeModal'); }
+function closeWelcomeModal() { closeModalAsDialog('welcomeModal'); }
+function dismissWelcome() {
+    welcomeSeen = true;
+    try { localStorage.setItem(WELCOME_KEY, '1'); } catch (err) { console.error(err); }
+    closeWelcomeModal();
+    endTour();
+}
+async function tryGfpExample() {
+    dismissWelcome();
+    logAction('session', 'try GFP example');
+    await onInputAccessionPreset('P42212');
+}
+let tourIndex = 0;
+function startTour() {
+    closeWelcomeModal();
+    tourIndex = 0;
+    renderTour();
+}
+function renderTour() {
+    const step = TOUR_STEPS[tourIndex];
+    if (!step) { endTour(); return; }
+    document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+    const target = document.getElementById(step.target);
+    if (target && target.classList) target.classList.add('tour-highlight');
+    const text = document.getElementById('tourBarText');
+    if (text) text.innerHTML = '<strong>' + structureEscapeHtml(step.title) + '</strong><br>' + structureEscapeHtml(step.body);
+    const prog = document.getElementById('tourBarProgress');
+    if (prog) prog.textContent = 'Step ' + (tourIndex + 1) + ' of ' + TOUR_STEPS.length;
+    const next = document.getElementById('tourNextBtn');
+    if (next) next.textContent = (tourIndex === TOUR_STEPS.length - 1) ? 'Done' : 'Next';
+    const bar = document.getElementById('tourBar');
+    if (bar) bar.hidden = false;
+}
+function tourNext() {
+    if (tourIndex >= TOUR_STEPS.length - 1) { endTour(); return; }
+    tourIndex++;
+    renderTour();
+}
+function tourPrev() {
+    if (tourIndex <= 0) return;
+    tourIndex--;
+    renderTour();
+}
+function endTour() {
+    document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+    const bar = document.getElementById('tourBar');
+    if (bar) bar.hidden = true;
 }
 
 // --- Confirm dialog (headless-safe replacement for window.confirm) --------
@@ -10909,7 +11046,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.2';
+const APP_VERSION = '0.0.3';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -19376,9 +19513,9 @@ function onTypePaletteChange() {
 //   • re-uploading a file you've cached before is deduplicated by hash,
 //   • exported saves stay small and portable - they only carry metadata
 //     (structureReferences: fileName -> { hash, ext, size }),
-//   • Reset Data (the session cache) never touches this store - it has its
-//     own clear control in Options, so you can switch between loaded datasets
-//     without losing your cached PDB/CIF copies.
+//   • the clear-data controls (the session cache) never touch this store - it
+//     has its own clear control in Options, so you can switch between loaded
+//     datasets without losing your cached PDB/CIF copies.
 // Entries unreferenced by the current session are evicted oldest-first when
 // the total exceeds the soft cap below.
 const STRUCTURE_CACHE_DB = 'q2dv-structure-cache';
@@ -20364,7 +20501,7 @@ function renderCachedDataInfo() {
     try {
         state = JSON.parse(raw);
     } catch (err) {
-        el.textContent = 'Cached data is present but could not be read (possibly corrupted). Use Reset Data below to clear it.';
+        el.textContent = 'Cached data is present but could not be read (possibly corrupted). Use Clear input data below to clear it.';
         return;
     }
 
@@ -20908,13 +21045,13 @@ function copyDataJSON() {
     navigator.clipboard.writeText(text).then(() => { showToast('Copied JSON to clipboard.', 'success'); });
 }
 
-async function resetAllData() {
-    if (!(await confirmDialog('This permanently deletes all cached data - parsed sequence, structure files, selection, and preferences - and resets the page. Continue?', { okLabel: 'Reset Data' }))) {
-        return;
-    }
-    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.error(err); }
-    lastPersistError = null;
-
+// The session has two layers: the loaded input data (sequence, structures,
+// annotations, selection, guide answers) and the user's customization
+// (appearance, sources, rules, saved selections, command engine). "Clear input
+// data" drops the first and keeps the second; "Clear all data" drops both and
+// also forgets the welcome state. The device-local structure cache (IndexedDB)
+// has its own "Clear Structure Cache" control and is left alone by both.
+function resetInputDataState() {
     parsedTracks = {};
     currentProteinLabel = null;
     uploadedStructureFiles = [];
@@ -20934,46 +21071,25 @@ async function resetAllData() {
     homologHitsInfo = {};
     validationHitsInfo = {};
     experimentalTracksInfo = {};
+    domainHitsInfo = {};
     referenceOffset = 0;
     trackOffsets = {};
     keyedVariantsInfo = {};
-    conservationMetric = 'shannon';
-    conservationIncludeHHR = true;
-    fastaAlignmentMode = 'auto';
-    uniprotAnnotationMode = 'accession';
     uniprotAccession = '';
     sessionSpeciesToken = '';
     sessionSpeciesLabel = '';
     sessionSpeciesManual = false;
+    updateSpeciesUI();
     uniprotFeatures = null;
     uniprotFeatureTracks = {};
     uniprotLogEntries = [];
     topologySources = [];
     graphHighlights = {};
     selectStart = null; selectEnd = null; selectionMode = 'point';
-    selectionScope = 'full';
-    renderSelectionScopeToggle();
-    gridCellW = CELL_WIDTH_BASE;
-    applyGridZoom();
     activeRowKey = null; activeRowType = null; rowRanges = [];
     dragOriginTrackKey = null; crossRefTrackKey = '';
     lastRanges = null;
-    graphMode = { pLDDT: false, RSA: false };
-    syncGraphModeControls();
-    externalServicesEnabled = false;
-    qaHighlightsEnabled = false;
-    syncQaHighlights();
-    trackManagerExpanded = {};
-    syncExternalServicesMenu();
-    analysisRules = [];
-    renderRulesList();
-    commandEngineId = 'chimerax';
-    applyTypePalette('default');
-    trackControlState = getDefaultTrackControlState();
-    closeTctlPopup();
     resetGuideState();
-    savedSelections = [null, null, null, null, null];
-    renderSavedSelectionsBar();
     seqSearchMatches = [];
     seqSearchActive = false;
     const seqResEl = document.getElementById('seqSearchResults');
@@ -20981,34 +21097,87 @@ async function resetAllData() {
     const seqInputEl = document.getElementById('seqSearchInput');
     if (seqInputEl) seqInputEl.value = '';
     resetSeqSearchPresetSelect();
-
     document.getElementById('rawInput').value = '';
     document.getElementById('structureUpload').value = '';
     setDrawerOpen(false);
-    const legendEl = document.getElementById('mainLegend');
-    const legendBtn = document.getElementById('btnToggleLegend');
-    if (legendEl) legendEl.hidden = false;
-    if (legendBtn) { legendBtn.setAttribute('aria-expanded', 'true'); legendBtn.textContent = 'Hide Legend ▾'; }
-    populateCommandEngineSelect();
-    updateSidebarCommandLabels();
-    document.getElementById('chimeraxTarget').value = COMMAND_ENGINES[0].targetDefault;
-    document.getElementById('cxCommand').value = 'color';
-    document.getElementById('cxColor').value = 'match';
-    document.getElementById('cxColor').style.display = '';
     document.getElementById('rangeDisplay').textContent = 'No selection active';
     document.getElementById('fastaDisplay').textContent = '-';
     updateHomologFastaSection();
     setMetricsBase('Select a region or graph point for statistics.');
     document.getElementById('chimeraxDisplay').textContent = '-';
     document.getElementById('metricsCrossRef').innerHTML = '<option value="">- none -</option>';
-
-    document.getElementById('alignmentGrid').innerHTML =
-        '<p style="padding: 20px; color: #94a3b8; text-align: center;">No data loaded. Add input data under File to use Quick2DViewer.</p>';
-
+    document.getElementById('alignmentGrid').innerHTML = EMPTY_STATE_HTML;
     renderCachedDataInfo();
     renderStructureCacheInfo();
     renderDataModal();
     renderWorkflowGuide();
+}
+
+function resetPreferencesState() {
+    conservationMetric = 'shannon';
+    conservationIncludeHHR = true;
+    fastaAlignmentMode = 'auto';
+    uniprotAnnotationMode = 'accession';
+    selectionScope = 'full';
+    renderSelectionScopeToggle();
+    gridCellW = CELL_WIDTH_BASE;
+    applyGridZoom();
+    graphMode = { pLDDT: false, RSA: false };
+    syncGraphModeControls();
+    externalServicesEnabled = false;
+    syncExternalServicesMenu();
+    qaHighlightsEnabled = false;
+    syncQaHighlights();
+    trackManagerExpanded = {};
+    analysisRules = [];
+    renderRulesList();
+    commandEngineId = 'chimerax';
+    populateCommandEngineSelect();
+    updateSidebarCommandLabels();
+    applyTypePalette('default');
+    trackControlState = getDefaultTrackControlState();
+    closeTctlPopup();
+    savedSelections = [null, null, null, null, null];
+    renderSavedSelectionsBar();
+    const legendEl = document.getElementById('mainLegend');
+    const legendBtn = document.getElementById('btnToggleLegend');
+    if (legendEl) legendEl.hidden = false;
+    if (legendBtn) { legendBtn.setAttribute('aria-expanded', 'true'); legendBtn.textContent = 'Hide Legend ▾'; }
+    document.getElementById('chimeraxTarget').value = COMMAND_ENGINES[0].targetDefault;
+    document.getElementById('cxCommand').value = 'color';
+    document.getElementById('cxColor').value = 'match';
+    document.getElementById('cxColor').style.display = '';
+}
+
+async function clearInputData() {
+    if (!(await confirmDialog('Clear the loaded input data? The sequence, attached structures, annotations, selection and guide answers are removed. Your appearance and source preferences are kept.', { okLabel: 'Clear input data' }))) {
+        return;
+    }
+    resetInputDataState();
+    // saveStateToStorage() refuses to write once the sequence is gone, so drop
+    // the key directly - otherwise a refresh would restore the cleared session.
+    lastPersistError = null;
+    clearTimeout(persistTimer);
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.error(err); }
+    renderCachedDataInfo();
+    logAction('session', 'cleared input data');
+    showToast('Input data cleared. Preferences are kept.', 'success');
+}
+
+async function clearAllData() {
+    if (!(await confirmDialog('This permanently deletes everything: the loaded input data, your preferences and customization, and the welcome state. Continue?', { okLabel: 'Clear all data', danger: true }))) {
+        return;
+    }
+    resetInputDataState();
+    resetPreferencesState();
+    welcomeSeen = false;
+    lastPersistError = null;
+    clearTimeout(persistTimer);
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.error(err); }
+    try { localStorage.removeItem(WELCOME_KEY); } catch (err) { console.error(err); }
+    renderCachedDataInfo();
+    logAction('session', 'cleared all data');
+    showToast('All data and preferences cleared.', 'success');
 }
 
 function copyText(elementId) {
@@ -21034,6 +21203,8 @@ initSeqSearch();
     if (el) el.textContent = 'v' + APP_VERSION;
 })();
 loadStateFromStorage();
+try { welcomeSeen = localStorage.getItem(WELCOME_KEY) === '1'; } catch (err) { welcomeSeen = false; }
+maybeShowWelcome();
 </script>
 
 </body>

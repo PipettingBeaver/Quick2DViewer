@@ -268,7 +268,33 @@ assert(ctxRun(`typeof toggleQaHighlights === 'function' && typeof syncQaHighligh
 assert(ctxRun(`qaHighlightsEnabled`) === false, 'new-feature highlights are off by default');
 assert(HTML.indexOf("qaHighlightsEnabled = prefs.qaHighlightsEnabled === true;") !== -1, 'a saved session only re-enables them when explicitly on');
 
+section('onboarding + clear-data split');
+assert(ctxRun(`typeof maybeShowWelcome === 'function' && typeof startTour === 'function' && typeof endTour === 'function' && typeof tryGfpExample === 'function'`), 'onboarding entry points are defined');
+assert(ctxRun(`typeof clearInputData === 'function' && typeof clearAllData === 'function' && typeof resetInputDataState === 'function' && typeof resetPreferencesState === 'function'`), 'clear-data split functions are defined');
+assert(ctxRun(`WELCOME_KEY === 'q2dViewer_welcome_v1'`), 'the welcome memory has its own storage key');
+assert(/Try GFP/.test(ctxRun('EMPTY_STATE_HTML')), 'the empty state offers Try GFP');
+assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Paste Quick2D') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'and the paste/attach actions');
+assert(HTML.indexOf('id="welcomeModal"') !== -1 && HTML.indexOf('id="tourBar"') !== -1, 'the welcome modal and tour bar exist in the markup');
+assert(HTML.indexOf('id="tryGfpBtn"') !== -1, 'a header Try GFP button exists');
+assert(HTML.indexOf('onclick="clearInputData()"') !== -1 && HTML.indexOf('onclick="clearAllData()"') !== -1, 'the Storage cache controls offer both clear actions');
+assert(HTML.indexOf("menuBarAction('clearInput')") !== -1 && HTML.indexOf("menuBarAction('clearAll')") !== -1, 'the File menu exposes both clear actions');
+assert(ctxRun('TOUR_STEPS.length') >= 3, 'the tour has at least three steps');
+assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'tryGfpBtn,sidebarTabs,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
+['tryGfpBtn', 'sidebarTabs', 'tab-guide', 'menubar-export-btn'].forEach(id => {
+    assert(HTML.indexOf('id="' + id + '"') !== -1, 'tour target id exists in the markup: ' + id);
+});
+sandbox.localStorage._s = {};
+ctxRun(`welcomeSeen = false; dismissWelcome();`);
+assert(ctxRun('welcomeSeen') === true, 'dismissing the welcome marks it seen');
+assert(sandbox.localStorage.getItem('q2dViewer_welcome_v1') === '1', 'and remembers it under its own key');
+ctxRun(`startTour();`);
+assert(ctxRun('tourIndex') === 0, 'the tour starts at the first step');
+ctxRun(`tourNext();`);
+assert(ctxRun('tourIndex') === 1, 'Next advances the tour');
+ctxRun(`endTour();`);
+
 section('UI categories + accessibility');
+
 assert(HTML.indexOf('data-tab="analyze"') !== -1 && HTML.indexOf('>Analyze</button>') !== -1, 'a dedicated Analyze tab exists');
 assert(HTML.indexOf('data-tab="workflow"') !== -1 && HTML.indexOf('>Commands</button>') !== -1, 'the external-workflow tab is renamed Commands');
 assert(HTML.indexOf('id="side-panel-analyze" role="tabpanel"') !== -1, 'the Analyze panel is a tabpanel');
@@ -1771,7 +1797,7 @@ ctxRun(`
     currentProteinLabel = 'GFP test';
 `);
 sandbox.__saved = ctxRun(`JSON.stringify(gatherPersistableState())`);
-ctxRun(`resetAllData(); applyPersistedState(JSON.parse(window.__saved));`);
+ctxRun(`resetInputDataState(); applyPersistedState(JSON.parse(window.__saved));`);
 const roundTrip = ctxRun(`
     (function () {
         const before = JSON.parse(window.__saved);
@@ -4038,11 +4064,21 @@ assert(/Cofactor #2 - ZN A300/.test(siteTip) && /ZN, CN 4, TET - tetrahedral/.te
 assert(/axial ligand/.test(siteTip) === false, 'and stays short when there is nothing axial to add');
 assert(ctxRun(`cofactorSiteTooltip('zn', 5)`) === '', 'hovering a cofactor with no metal adds nothing');
 
-ctxRun(`
-    structureCoordination = {};
-    resetAllData();
-`);
+ctxRun(`resetInputDataState();`);
 assert(ctxRun(`Object.keys(structureCoordination).length`) === 0, 'reset clears the coordination store');
+// The split: input-data reset keeps preferences, the preference reset drops them.
+ctxRun(`
+    parsedTracks = { AA: 'M'.repeat(10) };
+    externalServicesEnabled = true;
+    analysisRules = [{ id: 'r1', name: 'R', color: '#ff0000', mode: 'all', enabled: true, conditions: [] }];
+    resetInputDataState();
+`);
+assert(ctxRun(`Object.keys(parsedTracks).length`) === 0, 'clearing input data drops the loaded tracks');
+assert(ctxRun(`externalServicesEnabled === true`) === true, 'clearing input data keeps preferences (external-services flag)');
+assert(ctxRun(`analysisRules.length === 1`) === true, 'clearing input data keeps customization (rules)');
+ctxRun(`resetPreferencesState();`);
+assert(ctxRun(`externalServicesEnabled === false`) === true, 'clearing all data resets the external-services preference');
+assert(ctxRun(`analysisRules.length === 0`) === true, 'clearing all data resets customization (rules)');
 ctxRun(`parsedTracks = {}; cachedStructureTexts = {}; uploadedStructureFiles = [];`);
 
 section('homolog letter-style default (AA)');

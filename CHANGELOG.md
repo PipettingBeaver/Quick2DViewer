@@ -12,6 +12,22 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.3] - 2026-10-07
+
+### Added
+- **Get started onboarding.** A first-run **Welcome** panel (dismissible and
+  remembered) offers **Try GFP**, a **Show me around** coachmark tour, and a
+  plain "explore" close; the viewer's empty state now carries **Try GFP / Paste
+  Quick2D / Attach files**, and a persistent **Try GFP** button sits in the
+  header. The welcome and the tour are both reopenable from Help.
+
+### Changed
+- **Reset Data split in two.** **Clear input data** removes the loaded sequence,
+  structures, annotations, selection and guide answers but keeps your
+  preferences and customization; **Clear all data** also wipes preferences and
+  the welcome memory. Both are in the File menu and Options -> Storage; neither
+  touches the device-local structure cache, which keeps its own control.
+
 ## [0.0.2] - 2026-10-07
 
 ### Changed

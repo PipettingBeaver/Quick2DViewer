@@ -103,6 +103,38 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Get started onboarding + clear-data split — 0.0.3
+
+**Surface.** Header (**Try GFP**), the viewer empty state, Help menu, File menu,
+Options → Storage, the welcome modal and the tour bar.
+
+**Should do.** A first-time visitor gets a dismissible welcome panel once; **Try GFP**
+loads P42212; **Clear input data** drops the loaded session but keeps preferences, and
+**Clear all data** also wipes preferences and the welcome memory.
+
+**Try.**
+1. Fresh browser (or *Clear all data* first), then reload. Expect the Welcome modal
+   once. Close it, reload again - it does not come back.
+2. Empty viewer shows **Try GFP / Paste Quick2D / Attach files**. Press **Try GFP**:
+   expect the GFP sequence and UniProt annotation rows, plus the one-time
+   external-services confirm (until the default-ON change lands).
+3. Help → **Getting started** reopens the welcome; **Show me around** pulses the Try GFP
+   button, the sidebar tabs, the Guide tab and the Export menu, with a bottom caption bar
+   (Next / Back / Skip).
+4. Change a preference (e.g. palette), load data, then File → **Clear input data**. Expect
+   the data gone and the palette still changed; a reload must not resurrect the old data.
+5. File → **Clear all data**. Expect an empty viewer, default palette, external services
+   OFF, and the Welcome modal back on the next load.
+
+**Edge cases.**
+- *No network / `file://`* - Try GFP must fail with a clear toast, not a silent no-op.
+- *Structure cache* - neither clear action deletes cached PDB/CIF copies (that stays under
+  **Clear Structure Cache**).
+- *Harness limit* - modal layout, the pulsing highlight and the tour-bar position are
+  manual-only; the harness asserts the markup, ids and the reset split.
+
+---
+
 ### UI category sweep + accessibility — 0.0.2
 
 **Surface.** Menu bar, sidebar tabs, Options tabs, icon-only controls.
