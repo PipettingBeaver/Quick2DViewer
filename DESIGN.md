@@ -962,8 +962,8 @@ rendered UI.
 | Pri | Feature | Approach chosen | Category (§16) | Effort | Release |
 |---|---|---|---|---|---|
 | P1 | **Get Started** onboarding | welcome modal + coachmark tour, header **Try GFP**, empty-state card | Background (onboarding) | 1.5-2.5 d | 0.0.3 |
-| P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.4 |
-| P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.5 |
+| P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.5 |
+| P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.6 |
 | P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.4 |
 | P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.7 |
 
@@ -998,7 +998,15 @@ every load.
 Non-goals. No product tour across every surface; no sample data bundle shipped
 in-repo beyond the existing presets.
 
-### P2 - Protein summary panel (0.0.4)
+### P2 - Protein summary panel (0.0.5)
+
+Shipped (0.0.5). A new `protein_summary` capability (`uniprotSummary` adapter,
+`parseUniProtSummary`) reads the entry JSON; `useUniProtAccession` stores it and
+`renderProteinSummary()` fills a **Protein Summary** section in the Selection
+workspace, hidden until a summary loads. Persisted with the session and emitted
+in the methods report. It does add a second request to the same entry (features
+and summary are separate capabilities), but a summary failure is swallowed so it
+never blocks the feature tracks.
 
 Decision. Extend the UniProt fetch (`useUniProtAccession`, `index.html:5106`,
 which today requests features + FASTA only) to also read the FUNCTION comment,
@@ -1008,13 +1016,12 @@ promoted from plan to work, and it is the direct answer to "how does this
 protein work".
 
 Placement (§16). Interpretation: belongs on the annotation step and in the
-methods report / AI pack, not as a new pipeline stage. Reuses fetched JSON, so it
-adds no new outbound call.
+methods report / AI pack, not as a new pipeline stage.
 
 Non-goals. No GO enrichment, no pathway diagrams; no summary for proteins loaded
-without a UniProt accession (show the existing empty state).
+without a UniProt accession (the panel stays hidden).
 
-### P3 - Header jump box (0.0.5)
+### P3 - Header jump box (0.0.6)
 
 Decision. Add a header input that searches a locally built index of menu
 commands, sidebar tabs, guide step labels/questions, Options categories, and -
@@ -1059,7 +1066,7 @@ automated axe pass) remains a separate future item.
 
 ### Sequencing
 
-Shipped so far: P1 (0.0.3), then P4 pulled ahead at the user's request (0.0.4)
-so `Try GFP` works without the confirm click. Remaining: P2 -> P3 -> P5, in that
-order. Tests and QA cards are written per release; versions are renumbered
-rather than bundled if work overlaps.
+Shipped so far: P1 (0.0.3), P4 pulled ahead at the user's request (0.0.4), and
+P2 (0.0.5). Remaining: P3 (header jump box) then P5 (accessibility). Tests and QA
+cards are written per release; versions are renumbered rather than bundled if
+work overlaps.

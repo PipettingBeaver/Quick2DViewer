@@ -2333,6 +2333,14 @@
                 </div>
             </div>
             
+            <details class="workflow-section" id="proteinSummarySection" open style="margin-top:10px;" hidden>
+                <summary>Protein Summary <span class="info-icon" onclick="event.preventDefault()">ⓘ<span class="tooltip-content">
+                    <strong>Protein Summary</strong><br>
+                    Name, organism, EC, function text, keywords, GO terms and subcellular location, read from the fetched UniProt entry. Appears once a UniProt accession is loaded.
+                </span></span></summary>
+                <div id="proteinSummaryBody" class="data-box" style="font-size:0.74rem; line-height:1.55;"></div>
+            </details>
+
             <div style="display:flex; align-items:center; gap:4px; margin-bottom:6px;">
                 <strong>Scope:</strong>
                 <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
@@ -3629,6 +3637,10 @@ let sessionSpeciesLabel = '';
 let sessionSpeciesManual = false;
 let uniprotFeatures = null;              // { accession, features: [{type,start,end,description}], fetchedAt }
 let uniprotFeatureTracks = {};           // { 'UP_<cat>': [{start,end,type,description}] } (1-based)
+// Compact protein summary from the same UniProt entry (recommended name,
+// organism, function, EC, keywords, GO, location). Rendered in the Selection
+// workspace's "Protein Summary" panel; null until a fetch succeeds.
+let proteinSummary = null;               // { accession, name, gene, organism, ec, function, keywords, go, location, reviewed }
 let uniprotLogEntries = [];              // timestamped debug log for the fetch/BLAST pipeline
 const UNIPROT_TYPE_CATEGORIES = {
     // domains / regions (indigo)
@@ -3743,6 +3755,16 @@ const SERVICE_REGISTRY = {
                   url: 'https://rest.uniprot.org/uniprotkb/', enabled: true },
                 { id: 'ebi_proteins', label: 'EBI Proteins API', adapter: 'ebiFeatures',
                   url: 'https://www.ebi.ac.uk/proteins/api/features/', enabled: true },
+            ],
+        },
+        // The protein-level summary (function, keywords, GO, location) from the
+        // same UniProt entry as `annotation`. Kept a separate capability so the
+        // feature-track path is unchanged and a summary failure never blocks it.
+        protein_summary: {
+            label: 'Protein summary',
+            providers: [
+                { id: 'uniprot_rest_summary', label: 'UniProt (rest.uniprot.org)', adapter: 'uniprotSummary',
+                  url: 'https://rest.uniprot.org/uniprotkb/', enabled: true },
             ],
         },
         text_search: {
@@ -3901,6 +3923,14 @@ const SERVICE_ADAPTERS = {
         const features = parseUniProtFeatures(await resp.json());
         if (!features.length) throw new Error('no residue-level features');
         return features;
+    },
+    // GET {acc}.json -> compact protein summary (function, keywords, GO, location)
+    async uniprotSummary(provider, args) {
+        const resp = await fetch(provider.url + encodeURIComponent(args.accession) + '.json');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const summary = parseUniProtSummary(await resp.json());
+        if (!summary) throw new Error('no summary fields');
+        return summary;
     },
     // GET {acc}.json -> EBI Proteins features
     async ebiFeatures(provider, args) {
@@ -5066,6 +5096,44 @@ function copyUniProtLog() {
     }
 }
 
+// Abbreviates the full UniProtKB JSON to what the Protein Summary panel shows:
+// names, organism, EC, function comment, keywords, GO terms and subcellular
+// location. Values in UniProt JSON are string | {value} | arrays of that, so a
+// small coercion helper handles all three. Returns null for an empty payload so
+// the panel stays hidden rather than showing a blank card.
+function parseUniProtSummary(data) {
+    if (!data || typeof data !== 'object') return null;
+    const text = (v) => Array.isArray(v) ? text(v[0]) : (v && typeof v === 'object' ? (v.value || '') : (typeof v === 'string' ? v : ''));
+    const pd = data.proteinDescription || {};
+    const rec = pd.recommendedName || {};
+    const sub = (pd.submissionNames || [])[0] || {};
+    const name = text(rec.fullName) || text(sub.fullName) || '';
+    const ec = text((rec.ecNumbers || [])[0]);
+    const gene = text((data.genes || [])[0] && (data.genes || [])[0].geneName);
+    const organism = text(data.organism && data.organism.scientificName);
+    let funcText = '';
+    let location = '';
+    (data.comments || []).forEach(c => {
+        const t = (c.texts || []).map(x => text(x)).filter(Boolean).join(' ');
+        if (!t) return;
+        if (c.commentType === 'FUNCTION' && !funcText) funcText = t;
+        else if (c.commentType === 'SUBCELLULAR LOCATION' && !location) location = t;
+    });
+    const keywords = (data.keywords || []).map(k => text(k && k.name)).filter(Boolean);
+    const go = [];
+    (data.uniProtKBCrossReferences || []).forEach(x => {
+        if (!x || x.database !== 'GO') return;
+        const term = (x.properties || []).find(p => p && p.key === 'GoTerm');
+        const raw = term ? text(term.value) : '';
+        // "F:protein binding" -> "protein binding"; the GO id stands on its own.
+        const label = raw.replace(/^[FPC]:\s*/, '');
+        if (x.id) go.push({ id: x.id, term: label || raw });
+    });
+    const reviewed = /reviewed/i.test(String(data.entryType || ''));
+    if (!name && !funcText && !keywords.length && !go.length && !organism) return null;
+    return { accession: data.primaryAccession || '', name, gene, organism, ec, function: funcText, keywords, go, location, reviewed };
+}
+
 // Extracts residue-level features ({type,start,end,description}, 1-based) from
 // a UniProtKB JSON entry. Skips non-residue features (subcellular location,
 // etc.) whose location carries no numeric start/end.
@@ -5149,6 +5217,46 @@ async function fetchUniProtFeaturesByAccession(acc) {
     }
 }
 
+// A failed summary must never block the feature tracks (which are the point of
+// the UniProt step), so this swallows its own errors and returns null.
+async function fetchUniProtSummary(acc) {
+    uniprotLog('summary capability for ' + acc);
+    try {
+        const summary = await runCapability('protein_summary', { accession: acc }, (msg) => uniprotLog(msg));
+        if (summary) uniprotLog('summary: ' + [summary.name, summary.organism].filter(Boolean).join(' - '));
+        return summary;
+    } catch (err) {
+        uniprotLog('summary failed: ' + (err && err.message ? err.message : 'network'));
+        return null;
+    }
+}
+
+// Renders the Protein Summary panel from the stored UniProt summary. The panel
+// is hidden until a summary exists, so a failed or absent fetch leaves no empty
+// card in the workspace.
+function renderProteinSummary() {
+    const section = document.getElementById('proteinSummarySection');
+    const body = document.getElementById('proteinSummaryBody');
+    if (!section || !body) return;
+    const s = proteinSummary;
+    if (!s) { section.hidden = true; body.innerHTML = ''; return; }
+    const parts = [];
+    const title = [s.name, s.gene ? ('gene ' + s.gene) : '', s.organism].filter(Boolean).join(' \u00b7 ');
+    if (title) parts.push('<strong>' + structureEscapeHtml(title) + '</strong>');
+    const meta = [s.ec ? ('EC ' + s.ec) : '', s.reviewed ? 'reviewed (Swiss-Prot)' : '', s.accession].filter(Boolean).join(' \u00b7 ');
+    if (meta) parts.push('<span style="color:#64748b;">' + structureEscapeHtml(meta) + '</span>');
+    if (s.function) parts.push(structureEscapeHtml(s.function));
+    if (s.location) parts.push('<span style="color:#475569;">Location: ' + structureEscapeHtml(s.location) + '</span>');
+    if ((s.keywords || []).length) parts.push('<span style="color:#475569;">Keywords: ' + structureEscapeHtml(s.keywords.join(', ')) + '</span>');
+    if ((s.go || []).length) {
+        const shown = s.go.slice(0, 8).map(g => structureEscapeHtml(g.id + ' ' + g.term)).join('; ');
+        parts.push('<span style="color:#475569;">GO: ' + shown + (s.go.length > 8 ? ' …' : '') + '</span>');
+    }
+    if (!parts.length) { section.hidden = true; body.innerHTML = ''; return; }
+    section.hidden = false;
+    body.innerHTML = parts.join('<br>');
+}
+
 // Sequence -> accession via the BLAST capability (EBI NCBI-BLAST job API).
 // The provider chain (and the resilient submit/poll/result logic) now live in
 // the service registry / ebiJob adapter, so a different BLAST provider can be
@@ -5215,6 +5323,8 @@ async function useUniProtAccession(acc) {
             showToast('Loaded ' + acc + ' annotations, but its sequence could not be fetched (' + m + '). Load a FASTA to run sequence-based tools.', 'warn');
         }
     }
+    const summary = await fetchUniProtSummary(acc);
+    if (summary) { proteinSummary = summary; renderProteinSummary(); }
     schedulePersist();
 }
 
@@ -9451,6 +9561,22 @@ function buildMethodsReport() {
         L.push('');
     }
 
+    if (proteinSummary) {
+        L.push('## Protein summary');
+        L.push('');
+        L.push('From the UniProt entry' + (proteinSummary.accession ? ' ' + proteinSummary.accession : '') + '.');
+        L.push('');
+        if (proteinSummary.name) L.push('- Name: ' + proteinSummary.name);
+        if (proteinSummary.gene) L.push('- Gene: ' + proteinSummary.gene);
+        if (proteinSummary.organism) L.push('- Organism: ' + proteinSummary.organism);
+        if (proteinSummary.ec) L.push('- EC: ' + proteinSummary.ec);
+        if (proteinSummary.function) L.push('- Function: ' + proteinSummary.function);
+        if (proteinSummary.location) L.push('- Subcellular location: ' + proteinSummary.location);
+        if ((proteinSummary.keywords || []).length) L.push('- Keywords: ' + proteinSummary.keywords.join(', '));
+        if ((proteinSummary.go || []).length) L.push('- GO: ' + proteinSummary.go.map(g => g.id + ' ' + g.term).join('; '));
+        L.push('');
+    }
+
     L.push('## Workflow coverage');
     L.push('');
     L.push('| # | Step | Status | Answer(s) |');
@@ -11054,7 +11180,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.4';
+const APP_VERSION = '0.0.5';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -19921,6 +20047,7 @@ function gatherPersistableState() {
         topologySources: topologySources,
         uniprotFeatures: uniprotFeatures,
         uniprotFeatureTracks: uniprotFeatureTracks,
+        proteinSummary: proteinSummary,
         domainHitsInfo: domainHitsInfo,
         selection: {
             selectStart, selectEnd, selectionMode, activeRowKey, activeRowType,
@@ -20326,6 +20453,8 @@ function applyPersistedState(state) {
     topologySources = Array.isArray(state.topologySources) ? state.topologySources : [];
     uniprotFeatures = state.uniprotFeatures || null;
     uniprotFeatureTracks = state.uniprotFeatureTracks || {};
+    proteinSummary = state.proteinSummary || null;
+    renderProteinSummary();
     domainHitsInfo = state.domainHitsInfo || {};
     // A session saved before the info maps existed (pre-0.23.0) restores its rows
     // but not their backing data: the rows still render, yet tooltips degrade and
@@ -21092,6 +21221,8 @@ function resetInputDataState() {
     updateSpeciesUI();
     uniprotFeatures = null;
     uniprotFeatureTracks = {};
+    proteinSummary = null;
+    renderProteinSummary();
     uniprotLogEntries = [];
     topologySources = [];
     graphHighlights = {};

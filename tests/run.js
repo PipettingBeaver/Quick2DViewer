@@ -306,6 +306,38 @@ assert(ctxRun(`externalServicesEnabled === false`), 'an explicit OFF in a save i
 assert(HTML.indexOf('API access is on by default on the deployed site') !== -1, 'the Options copy explains the default');
 assert(HTML.indexOf('You can access this tutorial from Help') !== -1, 'the welcome footer points at Help -> Getting started');
 
+section('protein summary (UniProt)');
+const summaryJson = {
+    primaryAccession: 'P42212',
+    entryType: 'UniProtKB reviewed (Swiss-Prot)',
+    proteinDescription: { recommendedName: { fullName: { value: 'Green fluorescent protein' }, ecNumbers: [{ value: '1.2.3.4' }] } },
+    genes: [{ geneName: { value: 'GFP' } }],
+    organism: { scientificName: 'Aequorea victoria' },
+    comments: [
+        { commentType: 'FUNCTION', texts: [{ value: 'Energy-transfer acceptor.' }] },
+        { commentType: 'SUBCELLULAR LOCATION', texts: [{ value: 'Cytoplasm.' }] }
+    ],
+    keywords: [{ name: 'Chromophore' }],
+    uniProtKBCrossReferences: [
+        { database: 'GO', id: 'GO:0005515', properties: [{ key: 'GoTerm', value: 'F:protein binding' }] }
+    ]
+};
+const sum = ctxRun(`parseUniProtSummary(${JSON.stringify(summaryJson)})`);
+assert(sum && sum.name === 'Green fluorescent protein' && sum.gene === 'GFP' && sum.organism === 'Aequorea victoria', 'parses name/gene/organism');
+assert(sum.function === 'Energy-transfer acceptor.' && sum.location === 'Cytoplasm.', 'parses the function and location comments');
+assert(sum.ec === '1.2.3.4' && sum.reviewed === true, 'parses EC and the reviewed flag');
+assert(sum.keywords.length === 1 && sum.go.length === 1 && sum.go[0].term === 'protein binding', 'parses keywords and strips the GO aspect prefix');
+assert(ctxRun(`parseUniProtSummary(null)`) === null && ctxRun(`parseUniProtSummary({})`) === null, 'an empty payload yields null');
+assert(ctxRun(`SERVICE_REGISTRY.capabilities.protein_summary.providers[0].adapter === 'uniprotSummary'`), 'protein_summary is registered with the uniprotSummary adapter');
+assert(ctxRun(`typeof renderProteinSummary === 'function' && typeof fetchUniProtSummary === 'function'`), 'summary fetch/render functions exist');
+assert(HTML.indexOf('id="proteinSummarySection"') !== -1 && HTML.indexOf('id="proteinSummaryBody"') !== -1, 'the Protein Summary panel exists in the markup');
+ctxRun(`proteinSummary = ${JSON.stringify(sum)}; renderProteinSummary();`);
+assert(ctxRun(`document.getElementById('proteinSummarySection').hidden`) === false, 'a summary unhides the panel');
+assert(/Green fluorescent protein/.test(ctxRun(`document.getElementById('proteinSummaryBody').innerHTML`)), 'and renders the name');
+assert(ctxRun(`buildMethodsReport()`).indexOf('## Protein summary') !== -1 && ctxRun(`buildMethodsReport()`).indexOf('Energy-transfer acceptor.') !== -1, 'the methods report includes the protein summary');
+ctxRun(`proteinSummary = null; renderProteinSummary();`);
+assert(ctxRun(`document.getElementById('proteinSummarySection').hidden`) === true, 'clearing the summary hides the panel');
+
 section('UI categories + accessibility');
 
 assert(HTML.indexOf('data-tab="analyze"') !== -1 && HTML.indexOf('>Analyze</button>') !== -1, 'a dedicated Analyze tab exists');

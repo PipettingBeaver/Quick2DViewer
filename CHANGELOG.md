@@ -12,6 +12,17 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.5] - 2026-10-07
+
+### Added
+- **Protein summary panel.** Loading a UniProt accession now also fetches the
+  entry's protein-level summary - recommended name, gene, organism, EC number,
+  the FUNCTION comment, keywords, GO terms and subcellular location - and shows
+  it as a **Protein Summary** section at the top of the Selection workspace
+  (hidden until a summary is loaded). It is saved with the session, restored on
+  import, cleared with the input data, and included in the methods summary.
+  A failed summary fetch never blocks the feature tracks.
+
 ## [0.0.4] - 2026-10-07
 
 ### Changed

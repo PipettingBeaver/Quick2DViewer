@@ -160,6 +160,33 @@ call still asks.
 
 ---
 
+### Protein summary panel — 0.0.5
+
+**Surface.** Selection workspace → **Protein Summary** section; methods report.
+
+**Should do.** Loading a UniProt accession (Input Data example, manifold fetch,
+Try GFP) shows a readable name / organism / EC / function / keywords / GO /
+location block; the section is absent until a summary exists.
+
+**Try.**
+1. Load GFP (**Try GFP** or accession **P42212**). Expect the **Protein Summary**
+   section to appear at the top of the Selection tab with the recommended name,
+   *Aequorea victoria*, the function sentence, and GO/keyword lines.
+2. Hover the section's ⓘ for what it is; collapse and reopen it.
+3. Export the **Methods summary (.md)**; expect a `## Protein summary` section
+   listing the same fields.
+4. Save the session, then Clear all data and re-import the save: the summary
+   returns without a new fetch.
+
+**Edge cases.**
+- *Fetch fails / offline* - the panel stays hidden and the feature tracks still
+  load; no error toast is raised by the summary itself.
+- *Older saves* - the field is absent, so the panel is simply hidden.
+- *Harness limit* - the panel's placement and wrapping are manual-only; the
+  harness covers the parser, the registry wiring, render/hide, and the report.
+
+---
+
 ### UI category sweep + accessibility — 0.0.2
 
 **Surface.** Menu bar, sidebar tabs, Options tabs, icon-only controls.
