@@ -2945,7 +2945,6 @@
             </p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <button type="button" class="tb-btn tb-btn-primary" onclick="pasteQuick2DHere()">Paste Quick2D</button>
-                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeDataSourcesModal(); openInputDataModal();">Open Input Data</button>
                 <a class="copy-btn" style="text-decoration:none;" href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener">Open MPI Quick2D ↗</a>
             </div>
         </details>
@@ -10861,25 +10860,25 @@ function cancelRawInputDrawer() {
 }
 
 // --- Clipboard paste ---------------------------------------------------
-async function handlePasteFromClipboard() {
+// Reads the clipboard and parses it as Quick2D/FASTA. Window-agnostic: it does
+// not open or close anything, and returns true only when the parse produced new
+// tracks. Callers decide what to reveal on failure.
+async function pasteQuick2DFromClipboard() {
     if (!navigator.clipboard || !navigator.clipboard.readText) {
-        showToast('Clipboard access isn\u2019t available in this browser - paste manually below.', 'error');
-        openDrawerForManualPaste();
-        return;
+        showToast('Clipboard access isn\u2019t available in this browser - paste manually.', 'error');
+        return false;
     }
     let text;
     try {
         text = await navigator.clipboard.readText();
     } catch (err) {
         console.error('Clipboard read failed:', err);
-        showToast('Clipboard access denied - paste manually below.', 'error');
-        openDrawerForManualPaste();
-        return;
+        showToast('Clipboard access denied - paste manually.', 'error');
+        return false;
     }
     if (!text || !text.trim()) {
         showToast('Clipboard is empty.', 'error');
-        openDrawerForManualPaste();
-        return;
+        return false;
     }
     document.getElementById('rawInput').value = text;
     const beforeRef = parsedTracks;
@@ -10887,21 +10886,22 @@ async function handlePasteFromClipboard() {
     if (parsedTracks !== beforeRef) {
         setDrawerOpen(false);
         showToast('Parsed Quick2D data from clipboard.', 'success');
-    } else {
-        // Parse failed - parseAndBuildViewer already raised its own error
-        // toast. The textarea already holds what was pasted, so just reveal
-        // the drawer so the user can see and fix it, rather than clearing it.
-        setDrawerOpen(true);
-        document.getElementById('rawInput').focus();
+        return true;
     }
+    // Parse failed - parseAndBuildViewer already raised its own error toast.
+    // The textarea holds what was pasted so the Input Data drawer can show it.
+    return false;
 }
-
-// The Quick2D Annotations panel's own paste: close that window, open Input Data
-// (where the paste/drawer live), and run the same clipboard flow.
+// Input Data's Paste Quick2D: on failure reveal the manual-paste drawer.
+async function handlePasteFromClipboard() {
+    const ok = await pasteQuick2DFromClipboard();
+    if (!ok) openDrawerForManualPaste();
+}
+// The Quick2D Annotations panel's own paste: same clipboard flow, no window
+// switching, and refresh the category ✓ when it succeeds.
 async function pasteQuick2DHere() {
-    closeDataSourcesModal();
-    openInputDataModal();
-    await handlePasteFromClipboard();
+    const ok = await pasteQuick2DFromClipboard();
+    if (ok) updateDataSourcesLoadedMarks();
 }
 
 function openHelpModal() {
@@ -11556,7 +11556,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.28';
+const APP_VERSION = '0.67.29';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.29] - 2026-10-06
+
+### Changed
+- **Quick2D paste no longer switches windows.** The Quick2D Annotations panel
+  keeps only **Paste Quick2D** and the MPI Quick2D link (the Open Input Data
+  button is gone, matching the other data sources). The paste runs
+  window-agnostically: it reads the clipboard, parses, and refreshes the
+  category ✓ in place; on failure it just reports, leaving the text for the
+  Input Data drawer.
+
 ## [0.67.28] - 2026-10-06
 
 ### Changed

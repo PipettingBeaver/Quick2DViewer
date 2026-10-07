@@ -2075,7 +2075,8 @@ assert(HTML.indexOf('<option value="quick2d">Quick2D Annotations</option>') !== 
 assert(HTML.indexOf('href="https://toolkit.tuebingen.mpg.de/tools/quick2d"') !== -1, 'the Quick2D panel links to MPI Quick2D');
 assert(HTML.indexOf('last line of the segmented protein annotation split') !== -1 && HTML.indexOf('Protein ID: XXX') !== -1, 'and explains the full-header highlight-and-paste');
 assert(HTML.indexOf('onclick="pasteQuick2DHere()">Paste Quick2D</button>') !== -1, 'the Quick2D panel has its own Paste Quick2D button');
-assert(ctxRun(`typeof pasteQuick2DHere === 'function'`), 'and its handler exists');
+assert(ctxRun(`typeof pasteQuick2DHere === 'function' && typeof pasteQuick2DFromClipboard === 'function'`), 'and the window-agnostic clipboard helpers exist');
+assert(HTML.indexOf('onclick="closeDataSourcesModal(); openInputDataModal();"') === -1, 'the Quick2D panel no longer switches to Input Data');
 const switchProbe = ctxRun(`
     (function () {
         switchDataCategory('domains');
