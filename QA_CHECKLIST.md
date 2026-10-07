@@ -117,12 +117,16 @@ border and tint while open.
    by aspect; hovering a GO chip shows its id.
 2. Guide tab, fresh session: **Protein Background** is open and outlined in
    purple. Answer all six questions: the accent drops and it reads (Complete).
+   No other purple dashed "new feature" outlines should be visible (fixed
+   0.67.25; they are off by default).
 
 **Edge cases.**
 - *Legacy summary* - saved before 0.67.24 it has no GO aspects, so chips render
   uncoloured (not broken).
 - *Complete intake* - the attention style is removed once all questions are
   answered.
+- *New-feature outlines* - off at startup (0.67.25); re-enable under Options →
+  Appearance → New-feature highlights for review only.
 - *Harness limit* - the colours/wrapping are manual-only; the harness asserts the
   chip markup, the GO aspect, and the attention class on/off.
 

@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.25] - 2026-10-06
+
+### Fixed
+- **The purple "new feature" outlines no longer show on first load.** The
+  `.qa-new` markers defaulted to off but the body class that hides them was not
+  applied until the toggle was touched, so the dashed purple outline appeared on
+  the Guide and Analyze sections. It is now switched off at startup, leaving only
+  the Protein Background's attention tint.
+
 ## [0.67.24] - 2026-10-06
 
 ### Changed

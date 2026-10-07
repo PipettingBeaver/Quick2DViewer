@@ -267,6 +267,7 @@ section('QA highlights + UX');
 assert(ctxRun(`typeof toggleQaHighlights === 'function' && typeof syncQaHighlights === 'function'`), 'QA-highlight toggle functions present');
 assert(ctxRun(`qaHighlightsEnabled`) === false, 'new-feature highlights are off by default');
 assert(HTML.indexOf("qaHighlightsEnabled = prefs.qaHighlightsEnabled === true;") !== -1, 'a saved session only re-enables them when explicitly on');
+assert(HTML.indexOf('mountDataSourcesPanel();\nsyncQaHighlights();') !== -1, 'the purple new-feature outlines are switched off on first load');
 
 section('onboarding + clear-data split');
 assert(ctxRun(`typeof maybeShowWelcome === 'function' && typeof startTour === 'function' && typeof endTour === 'function'`), 'onboarding entry points are defined');
