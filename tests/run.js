@@ -338,6 +338,28 @@ assert(ctxRun(`buildMethodsReport()`).indexOf('## Protein summary') !== -1 && ct
 ctxRun(`proteinSummary = null; renderProteinSummary();`);
 assert(ctxRun(`document.getElementById('proteinSummarySection').hidden`) === true, 'clearing the summary hides the panel');
 
+section('header jump box (navigation-only)');
+assert(ctxRun(`typeof buildJumpIndex === 'function' && typeof jumpMatches === 'function' && typeof jumpSelect === 'function' && typeof jumpNavigate === 'function'`), 'jump-box functions are defined');
+const jumpEntries = JSON.parse(ctxRun(`JSON.stringify(buildJumpIndex())`));
+const jumpGroups = {};
+jumpEntries.forEach(e => { jumpGroups[e.group] = (jumpGroups[e.group] || 0) + 1; });
+assert(jumpGroups.Tab >= 5, 'the index covers the sidebar tabs');
+assert(jumpGroups.Menu >= 6, 'the index covers the menu bar');
+const wfIds = JSON.parse(ctxRun(`JSON.stringify(WORKFLOW_STEPS.map(function (s) { return s.id; }))`));
+assert(wfIds.every(id => jumpEntries.some(e => e.group === 'Guide step' && e.target === '[data-step="' + id + '"]')), 'every guide step has an index entry');
+const catKeys = JSON.parse(ctxRun(`JSON.stringify(Object.keys(DATA_CATEGORY_HINTS))`));
+assert(catKeys.every(c => jumpEntries.some(e => e.group === 'Data source' && e.target === '#optCat-' + c)), 'every Options data category has an index entry');
+jumpEntries.filter(e => /^#/.test(e.target)).forEach(e => {
+    assert(HTML.indexOf('id="' + e.target.slice(1) + '"') !== -1, 'jump target id exists: ' + e.target);
+});
+ctxRun(`parsedTracks = Object.assign({}, parsedTracks, { TM_TMHMM: 'bbbb' });`);
+assert(ctxRun(`buildJumpIndex().some(function (e) { return e.group === 'Track' && e.title === trackGroupLabel('TM'); })`), 'a loaded track group appears in the index');
+ctxRun(`parsedTracks = {};`);
+assert(ctxRun(`jumpMatches('export').some(function (e) { return e.title === 'Export menu'; })`), 'a query finds the Export menu');
+assert(ctxRun(`jumpMatches('guide').length > 0 && jumpMatches('guide')[0].title === 'Guide'`), 'a prefix match ranks the exact control first');
+assert(ctxRun(`jumpMatches('').length === 0`), 'an empty query matches nothing (no dropdown clutter)');
+assert(HTML.indexOf('id="jumpInput"') !== -1 && HTML.indexOf('id="jumpResults"') !== -1, 'the header jump box exists in the markup');
+
 section('UI categories + accessibility');
 
 assert(HTML.indexOf('data-tab="analyze"') !== -1 && HTML.indexOf('>Analyze</button>') !== -1, 'a dedicated Analyze tab exists');

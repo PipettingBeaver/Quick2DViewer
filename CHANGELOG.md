@@ -12,6 +12,17 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.6] - 2026-10-07
+
+### Added
+- **Header jump box.** A "Jump to…" box in the header searches a locally built
+  index of the sidebar tabs, the menu bar, every Evaluation Guide step, every
+  Options data source, and the loaded session's track groups and homolog hits.
+  Results only **navigate and pulse** their target (per DESIGN 19) - they never
+  run an action. Arrow keys move, Enter selects, Escape closes; the index is a
+  pure function and tests assert it covers every guide step and data category and
+  that every id target exists in the markup.
+
 ## [0.0.5] - 2026-10-07
 
 ### Added

@@ -1400,6 +1400,17 @@
         .tour-bar-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
         .tour-bar-actions .copy-btn { background:#334155; color:#e2e8f0; }
         .tour-bar-actions .copy-btn:hover { background:#475569; }
+        .jump-box { position: relative; display: inline-flex; }
+        #jumpInput { font-size:0.78rem; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; width:190px; }
+        .jump-results {
+            position:absolute; top:100%; left:0; margin-top:4px; width:340px; max-height:320px; overflow:auto;
+            background:#fff; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 8px 24px rgba(15,23,42,0.18); z-index:3500; padding:4px;
+        }
+        .jump-result { display:block; width:100%; text-align:left; border:none; background:#fff; padding:6px 8px; border-radius:4px; cursor:pointer; }
+        .jump-result:hover, .jump-result.active { background:#eff6ff; }
+        .jump-result-title { display:block; font-size:0.78rem; font-weight:600; color:#1e293b; }
+        .jump-result-meta { display:block; font-size:0.68rem; color:#64748b; }
+        .jump-highlight { outline:3px solid #f59e0b; outline-offset:2px; border-radius:4px; }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; scroll-behavior:auto !important; }
         }
@@ -2076,10 +2087,16 @@
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <h2>Quick2DViewer - 1D Protein Viewer <button type="button" class="app-version" id="appVersion" title="View the changelog" onclick="openChangelogModal()"></button></h2>
             <button type="button" id="tryGfpBtn" class="tb-btn tb-btn-primary" onclick="tryGfpExample()" title="Load the GFP example (P42212) from UniProt to see a full session">Try GFP</button>
+            <span class="jump-box">
+                <input id="jumpInput" type="search" placeholder="Jump to…" autocomplete="off"
+                    aria-label="Jump to a menu, tab, guide step, data source or loaded track"
+                    oninput="onJumpInput(this.value)" onkeydown="onJumpKeydown(event)" onfocus="onJumpInput(this.value)">
+                <div id="jumpResults" class="jump-results" role="listbox" hidden></div>
+            </span>
         </div>
         <div class="app-header-tools menubar" role="menubar" aria-label="Main menu">
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-file" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
+                <button type="button" id="menubar-file-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-file" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
                 <div class="menubar-menu" id="menubar-file" role="menu" hidden>
                     <button type="button" role="menuitem" onclick="menuBarAction('input')">Input Data…</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('save')">Save session (.json)</button>
@@ -2089,7 +2106,7 @@
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-view" onclick="toggleMenuBarMenu('view', this)">View ▾</button>
+                <button type="button" id="menubar-view-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-view" onclick="toggleMenuBarMenu('view', this)">View ▾</button>
                 <div class="menubar-menu" id="menubar-view" role="menu" hidden>
                     <button type="button" role="menuitem" onclick="menuBarAction('graphPlddt')">Toggle pLDDT graph</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('graphRsa')">Toggle RSA graph</button>
@@ -2099,7 +2116,7 @@
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-data" onclick="toggleMenuBarMenu('data', this)">Analyze ▾</button>
+                <button type="button" id="menubar-data-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-data" onclick="toggleMenuBarMenu('data', this)">Analyze ▾</button>
                 <div class="menubar-menu" id="menubar-data" role="menu" hidden>
                     <button type="button" role="menuitem" onclick="menuBarAction('data')">Data report…</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('rules')">Analysis Rules…</button>
@@ -2112,7 +2129,7 @@
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-session" onclick="toggleMenuBarMenu('session', this)">Session ▾</button>
+                <button type="button" id="menubar-session-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-session" onclick="toggleMenuBarMenu('session', this)">Session ▾</button>
                 <div class="menubar-menu" id="menubar-session" role="menu" hidden>
                     <button type="button" role="menuitem" onclick="openMacroModal()" title="Record, export and replay a workflow as a macro: the API/import steps with their providers and parameters">Macro</button>
                     <button type="button" role="menuitem" onclick="openHypothesisModal()" title="Rank candidate residues from the loaded evidence and suggest a test for each, with the evidence that drove it">Hypotheses</button>
@@ -2132,7 +2149,7 @@
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" role="menuitem" onclick="menuBarAction('help')">Help</button>
+                <button type="button" id="menubar-help-btn" class="menubar-btn" role="menuitem" onclick="menuBarAction('help')">Help</button>
             </div>
         </div>
     </div>
@@ -10440,6 +10457,134 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest || !e.target.closest('.menubar-item')) closeMenuBarMenus();
 });
 
+// --- Header jump box (navigation-only search; DESIGN 19 + 27) ---------------
+// The index is built locally from literals plus the loaded session, and a result
+// only navigates and pulses its target - it never runs an action (DESIGN 19).
+const JUMP_SIDEBAR_TABS = [
+    { id: 'selection', label: 'Selection', target: '#tab-selection' },
+    { id: 'tracks', label: 'Tracks', target: '#tab-tracks' },
+    { id: 'analyze', label: 'Analyze tab', target: '#tab-analyze' },
+    { id: 'guide', label: 'Guide', target: '#tab-guide' },
+    { id: 'workflow', label: 'Commands', target: '#tab-commands' }
+];
+const JUMP_MENUS = [
+    { key: 'file', label: 'File menu', target: '#menubar-file-btn', dropdown: true },
+    { key: 'view', label: 'View menu', target: '#menubar-view-btn', dropdown: true },
+    { key: 'data', label: 'Analyze menu', target: '#menubar-data-btn', dropdown: true },
+    { key: 'session', label: 'Session menu', target: '#menubar-session-btn', dropdown: true },
+    { key: 'export', label: 'Export menu', target: '#menubar-export-btn', dropdown: true },
+    { key: 'help', label: 'Help', target: '#menubar-help-btn', dropdown: false }
+];
+const JUMP_DATA_LABELS = {
+    uniprot: 'UniProt lookup', conservation: 'Conservation scoring', topology: 'Membrane topology',
+    domains: 'Domain families', homologs: 'Homolog search', structure: 'Structure models & validation',
+    experimental: 'Experimental data (DMS / HDX)', ddg: 'Stability predictions (dG)',
+    foldseek: 'Structural homology (Foldseek)', variants: 'Variant effects', services: 'External services'
+};
+// Pure: enumerates every navigable destination for the current session. Order is
+// stable so tests can assert coverage of the literals it draws from.
+function buildJumpIndex() {
+    const entries = [];
+    JUMP_SIDEBAR_TABS.forEach(t => entries.push({ title: t.label, group: 'Tab', desc: 'Sidebar tab', target: t.target, open: { kind: 'tab', id: t.id } }));
+    JUMP_MENUS.forEach(m => entries.push({ title: m.label, group: 'Menu', desc: 'Menu bar', target: m.target, open: { kind: 'menu', key: m.key, dropdown: m.dropdown } }));
+    (WORKFLOW_STEPS || []).forEach(s => entries.push({ title: s.title, group: 'Guide step', desc: s.desc || '', target: '[data-step="' + s.id + '"]', open: { kind: 'guide', id: s.id } }));
+    Object.keys(DATA_CATEGORY_HINTS).forEach(c => entries.push({ title: JUMP_DATA_LABELS[c] || c, group: 'Data source', desc: DATA_CATEGORY_HINTS[c] || '', target: '#optCat-' + c, open: { kind: 'options', id: c } }));
+    const groups = {};
+    Object.keys(parsedTracks).forEach(k => { if (k === 'AA') return; const g = getTrackGroup(k); groups[g] = (groups[g] || 0) + 1; });
+    Object.keys(groups).forEach(g => entries.push({ title: trackGroupLabel(g), group: 'Track', desc: groups[g] + ' track(s) in the session', target: '#side-panel-tracks', open: { kind: 'tab', id: 'tracks' } }));
+    Object.keys(homologHitsInfo || {}).forEach(k => {
+        const info = homologHitsInfo[k] || {};
+        const id = info.hitId || info.hit_id || info.label || '';
+        if (id) entries.push({ title: String(id), group: 'Homolog', desc: 'Homolog hit in the session', target: '#side-panel-tracks', open: { kind: 'tab', id: 'tracks' } });
+    });
+    return entries;
+}
+// Rank: exact title, then prefix, then title substring, then description.
+function jumpMatches(query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    const scored = [];
+    buildJumpIndex().forEach(e => {
+        const t = e.title.toLowerCase();
+        let rank = -1;
+        if (t === q) rank = 0;
+        else if (t.indexOf(q) === 0) rank = 1;
+        else if (t.indexOf(q) !== -1) rank = 2;
+        else if ((e.desc || '').toLowerCase().indexOf(q) !== -1) rank = 3;
+        if (rank >= 0) scored.push({ e, rank });
+    });
+    scored.sort((a, b) => a.rank - b.rank || a.e.title.localeCompare(b.e.title));
+    return scored.slice(0, 12).map(s => s.e);
+}
+let jumpList = [];
+let jumpActive = -1;
+function onJumpInput(value) {
+    jumpList = jumpMatches(value);
+    jumpActive = jumpList.length ? 0 : -1;
+    renderJumpResults();
+}
+function renderJumpResults() {
+    const results = document.getElementById('jumpResults');
+    if (!results) return;
+    if (!jumpList.length) { results.hidden = true; results.innerHTML = ''; return; }
+    results.hidden = false;
+    results.innerHTML = jumpList.map((e, i) =>
+        '<button type="button" role="option" class="jump-result' + (i === jumpActive ? ' active' : '') + '" onclick="jumpSelect(' + i + ')">' +
+        '<span class="jump-result-title">' + structureEscapeHtml(e.title) + '</span>' +
+        '<span class="jump-result-meta">' + structureEscapeHtml(e.group + (e.desc ? ' \u00b7 ' + e.desc : '')) + '</span>' +
+        '</button>').join('');
+}
+function onJumpKeydown(ev) {
+    if (ev.key === 'Escape') { closeJumpResults(); return; }
+    if (!jumpList.length) return;
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); jumpActive = (jumpActive + 1) % jumpList.length; renderJumpResults(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); jumpActive = (jumpActive - 1 + jumpList.length) % jumpList.length; renderJumpResults(); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); jumpSelect(jumpActive); }
+}
+function closeJumpResults() {
+    const results = document.getElementById('jumpResults');
+    if (results) { results.hidden = true; results.innerHTML = ''; }
+    jumpList = [];
+    jumpActive = -1;
+}
+function jumpSelect(i) {
+    const entry = jumpList[i];
+    if (!entry) return;
+    jumpNavigate(entry);
+    closeJumpResults();
+    const input = document.getElementById('jumpInput');
+    if (input) input.value = '';
+}
+// Navigate (open the surface that holds the target), then pulse it. Never runs
+// the target's own action.
+function jumpNavigate(entry) {
+    const o = entry.open || {};
+    if (o.kind === 'tab') {
+        if (typeof switchSidebarTab === 'function') switchSidebarTab(o.id);
+    } else if (o.kind === 'menu' && o.dropdown) {
+        const btn = document.getElementById(String(entry.target || '').replace('#', ''));
+        if (typeof toggleMenuBarMenu === 'function' && btn) toggleMenuBarMenu(o.key, btn);
+    } else if (o.kind === 'options') {
+        if (typeof openDataSources === 'function') openDataSources(o.id);
+    } else if (o.kind === 'guide') {
+        if (typeof switchSidebarTab === 'function') switchSidebarTab('guide');
+        if (guideViewMode !== 'full' && typeof setGuideViewMode === 'function') setGuideViewMode('full');
+    }
+    setTimeout(() => pulseJumpTarget(entry.target), 60);
+    logAction('menu', 'jump', entry.group + ': ' + entry.title);
+}
+function pulseJumpTarget(selector) {
+    let el = null;
+    try { el = document.querySelector(selector); } catch (err) { el = null; }
+    if (!el || !el.classList) return;
+    el.classList.add('jump-highlight');
+    setTimeout(() => { try { el.classList.remove('jump-highlight'); } catch (err) {} }, 1400);
+}
+document.addEventListener('click', (e) => {
+    const box = document.querySelector('.jump-box');
+    if (box && e.target && !box.contains(e.target)) closeJumpResults();
+});
+
 // --- Collapsible legend (T4) ----------------------------------------------
 // Hides/shows the legend block with a small toggle button. Independent of
 // the Top-UI collapse above (which hides the whole legend + toggle row).
@@ -11180,7 +11325,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.5';
+const APP_VERSION = '0.0.6';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

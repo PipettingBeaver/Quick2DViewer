@@ -1023,6 +1023,15 @@ without a UniProt accession (the panel stays hidden).
 
 ### P3 - Header jump box (0.0.6)
 
+Shipped (0.0.6). `buildJumpIndex()` is the pure index; `jumpMatches()` ranks
+exact > prefix > substring > description; `jumpNavigate()` opens the surface
+(tab / menu dropdown / Options data category / Guide full view) and
+`pulseJumpTarget()` flashes the target. Indexed: 5 sidebar tabs, 6 menu-bar
+entries, all `WORKFLOW_STEPS`, all `DATA_CATEGORY_HINTS`, loaded track groups,
+and homolog hit ids. Tests assert coverage and that every id target is in the
+markup. No menu *items* individually yet (top-level menus are the targets), and
+guide-step targets use `[data-step]` selectors, not ids.
+
 Decision. Add a header input that searches a locally built index of menu
 commands, sidebar tabs, guide step labels/questions, Options categories, and -
 extending §19's v1 non-goal - the **loaded track names**. Results navigate and
@@ -1066,7 +1075,7 @@ automated axe pass) remains a separate future item.
 
 ### Sequencing
 
-Shipped so far: P1 (0.0.3), P4 pulled ahead at the user's request (0.0.4), and
-P2 (0.0.5). Remaining: P3 (header jump box) then P5 (accessibility). Tests and QA
-cards are written per release; versions are renumbered rather than bundled if
-work overlaps.
+Shipped so far: P1 (0.0.3), P4 pulled ahead at the user's request (0.0.4),
+P2 (0.0.5), P3 (0.0.6). Remaining: P5 (accessibility). Tests and QA cards are
+written per release; versions are renumbered rather than bundled if work
+overlaps.

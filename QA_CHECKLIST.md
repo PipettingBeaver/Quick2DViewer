@@ -187,6 +187,38 @@ location block; the section is absent until a summary exists.
 
 ---
 
+### Header jump box — 0.0.6
+
+**Surface.** The **Jump to…** box in the header; the tab / menu / Options
+surfaces it navigates to.
+
+**Should do.** Typing a term lists matching tabs, menu-bar entries, Guide steps,
+Options data sources, and the loaded session's tracks/homologs; selecting one
+opens the surface and briefly flashes the target, never running an action.
+
+**Try.**
+1. Type `guide`: the first result is **Guide**; Enter lands on the Guide tab and
+   the tab pulses.
+2. Type `export`: pick **Export menu**; the Export dropdown opens and its button
+   pulses (the menu does not run anything).
+3. Type `variant`: pick **Variant effects**; Options opens on Data Sources with
+   the Variants category shown and pulsed.
+4. Load data, then type a track group (e.g. `transmembrane`) or a homolog id:
+   selecting it lands on the Tracks tab.
+5. Arrow Down/Up move the highlight, Enter selects, Escape closes; clicking
+   outside the box closes the list.
+
+**Edge cases.**
+- *Empty query* - shows nothing (no dropdown clutter), by design.
+- *Many matches* - capped at 12, ranked exact > prefix > substring > description.
+- *No session* - tabs, menus, guide steps and data sources still resolve; track
+  and homolog entries simply do not appear.
+- *Harness limit* - the dropdown layout, pulse animation and focus behaviour are
+  manual-only; the harness covers the index contents, ranking, coverage and that
+  every id target exists in the markup.
+
+---
+
 ### UI category sweep + accessibility — 0.0.2
 
 **Surface.** Menu bar, sidebar tabs, Options tabs, icon-only controls.
