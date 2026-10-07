@@ -12,6 +12,17 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.24] - 2026-10-06
+
+### Changed
+- **Protein Summary is now structured and colour-coded.** Name over
+  gene/organism, accession/EC/reviewed as chips, the function as a paragraph,
+  keywords as chips, and GO terms as chips coloured by aspect (molecular
+  function / biological process / cellular component) with the GO id in the
+  tooltip - instead of one run-on block of text.
+- **The Protein Background intake draws attention while unfinished.** Its open
+  state gets an accent border and tint until all six questions are answered.
+
 ## [0.67.23] - 2026-10-06
 
 ### Changed

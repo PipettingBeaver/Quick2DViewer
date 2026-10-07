@@ -360,6 +360,7 @@ assert(sum && sum.name === 'Green fluorescent protein' && sum.gene === 'GFP' && 
 assert(sum.function === 'Energy-transfer acceptor.' && sum.location === 'Cytoplasm.', 'parses the function and location comments');
 assert(sum.ec === '1.2.3.4' && sum.reviewed === true, 'parses EC and the reviewed flag');
 assert(sum.keywords.length === 1 && sum.go.length === 1 && sum.go[0].term === 'protein binding', 'parses keywords and strips the GO aspect prefix');
+assert(sum.go[0].aspect === 'F', 'and keeps the GO aspect for colour-coding');
 assert(ctxRun(`parseUniProtSummary(null)`) === null && ctxRun(`parseUniProtSummary({})`) === null, 'an empty payload yields null');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.protein_summary.providers[0].adapter === 'uniprotSummary'`), 'protein_summary is registered with the uniprotSummary adapter');
 assert(ctxRun(`typeof renderProteinSummary === 'function' && typeof fetchUniProtSummary === 'function'`), 'summary fetch/render functions exist');
@@ -367,6 +368,8 @@ assert(HTML.indexOf('id="proteinSummarySection"') !== -1 && HTML.indexOf('id="pr
 ctxRun(`proteinSummary = ${JSON.stringify(sum)}; renderProteinSummary();`);
 assert(ctxRun(`document.getElementById('proteinSummarySection').hidden`) === false, 'a summary unhides the panel');
 assert(/Green fluorescent protein/.test(ctxRun(`document.getElementById('proteinSummaryBody').innerHTML`)), 'and renders the name');
+const psHtml = ctxRun(`document.getElementById('proteinSummaryBody').innerHTML`);
+assert(psHtml.indexOf('ps-name') !== -1 && psHtml.indexOf('ps-chip ps-chip-acc') !== -1 && psHtml.indexOf('ps-kw') !== -1 && psHtml.indexOf('ps-go ps-go-f') !== -1, 'the summary renders structured chips (name/accession/keyword/GO aspect)');
 assert(ctxRun(`buildMethodsReport()`).indexOf('## Protein summary') !== -1 && ctxRun(`buildMethodsReport()`).indexOf('Energy-transfer acceptor.') !== -1, 'the methods report includes the protein summary');
 ctxRun(`proteinSummary = null; renderProteinSummary();`);
 assert(ctxRun(`document.getElementById('proteinSummarySection').hidden`) === true, 'clearing the summary hides the panel');
@@ -1025,6 +1028,10 @@ section('answer separation + undo');
 const UNDO = String.fromCharCode(0x21ba);
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
 let undoHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
+assert(undoHtml.indexOf('guide-intake-attn') !== -1, 'an unfinished Protein Background gets the attention style');
+ctxRun(`guideProfile = {}; GUIDE_QUESTIONS.forEach(function (q) { guideProfile[q.id] = q.options[0].value; }); guideIntakeOpen = null; renderWorkflowGuide();`);
+assert(ctxRun(`document.getElementById('guidePanel').innerHTML`).indexOf('guide-intake-attn') === -1, 'a complete Protein Background drops the attention style');
+ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; guideIntakeOpen = null; renderWorkflowGuide();`);
 const sliceNext2 = (h) => h.slice(h.indexOf('guide-next-action'), h.indexOf('guide-steps'));
 let ub = sliceNext2(undoHtml);
 assert(ub.indexOf('or select an action:') !== -1, 'an unanswered question is separated from the action buttons by a labelled divider');

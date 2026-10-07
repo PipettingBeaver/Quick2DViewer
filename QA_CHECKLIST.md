@@ -103,6 +103,31 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Protein Summary restyle + intake attention — 0.67.24
+
+**Surface.** Selection → **Protein Summary**; Guide → **Protein Background**.
+
+**Should do.** The summary is structured (name / chips / function / keyword chips
+/ GO chips coloured by aspect); an unfinished Protein Background gets an accent
+border and tint while open.
+
+**Try.**
+1. Load Lysozyme: the summary shows name over gene/organism, accession/EC/
+   reviewed chips, the function paragraph, keyword chips, and GO chips coloured
+   by aspect; hovering a GO chip shows its id.
+2. Guide tab, fresh session: **Protein Background** is open and outlined in
+   purple. Answer all six questions: the accent drops and it reads (Complete).
+
+**Edge cases.**
+- *Legacy summary* - saved before 0.67.24 it has no GO aspects, so chips render
+  uncoloured (not broken).
+- *Complete intake* - the attention style is removed once all questions are
+  answered.
+- *Harness limit* - the colours/wrapping are manual-only; the harness asserts the
+  chip markup, the GO aspect, and the attention class on/off.
+
+---
+
 ### UniProt rows render on load — 0.67.22
 
 **Surface.** Input Data → **Load example protein** (any accession fetch into an
@@ -396,7 +421,7 @@ call still asks.
 
 ---
 
-### Protein summary panel — 0.67.9
+### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.
 
@@ -405,9 +430,10 @@ Try GFP) shows a readable name / organism / EC / function / keywords / GO /
 location block; the section is absent until a summary exists.
 
 **Try.**
-1. Load GFP (**Try GFP** or accession **P42212**). Expect the **Protein Summary**
-   section to appear at the top of the Selection tab with the recommended name,
-   *Aequorea victoria*, the function sentence, and GO/keyword lines.
+1. Load Lysozyme (**Input Data → Load example protein**, or **P00698**). Expect
+   the **Protein Summary** section: the name over *gene LYZ · Gallus gallus*,
+   chips for the accession / EC / reviewed, the function paragraph, keyword
+   chips, and GO chips coloured by aspect (0.67.24). Hover a GO chip for its id.
 2. Hover the section's ⓘ for what it is; collapse and reopen it.
 3. Export the **Methods summary (.md)**; expect a `## Protein summary` section
    listing the same fields.
@@ -417,9 +443,11 @@ location block; the section is absent until a summary exists.
 **Edge cases.**
 - *Fetch fails / offline* - the panel stays hidden and the feature tracks still
   load; no error toast is raised by the summary itself.
-- *Older saves* - the field is absent, so the panel is simply hidden.
+- *Older saves* - the field is absent (or lacks GO aspects), so the panel is
+  hidden / uncoloured rather than broken.
 - *Harness limit* - the panel's placement and wrapping are manual-only; the
-  harness covers the parser, the registry wiring, render/hide, and the report.
+  harness covers the parser, the registry wiring, render/hide, the chip markup
+  and the report.
 
 ---
 
