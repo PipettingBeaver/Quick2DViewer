@@ -12,6 +12,14 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.14] - 2026-10-07
+
+### Added
+- **Help quick start + get-started checklist.** The Help modal now lists the
+  five moves (load, fetch from Data, explore the tabs, export, jump/ⓘ), and the
+  empty viewer is a short checklist - load a protein, fetch data, explore/export
+  - with Open Input Data, Attach files and Take the tour buttons.
+
 ## [0.0.13] - 2026-10-07
 
 ### Changed

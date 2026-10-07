@@ -103,6 +103,29 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Help quick start + empty-state checklist — 0.0.14
+
+**Surface.** Help menu → **Help** modal; the empty viewer (`#alignmentGrid`).
+
+**Should do.** The Help modal lists a five-item quick start; the empty viewer is
+a get-started checklist with Open Input Data / Attach files / Take the tour.
+
+**Try.**
+1. Help → **Help**: a **Quick start** list appears (load, fetch from Data,
+   explore the tabs, export, jump/ⓘ), above the existing buttons.
+2. Fresh session: the viewer shows **"No data loaded yet. Get started:"** with
+   three numbered steps; **open Data Sources** in step 2 opens Options on
+   UniProt; **Take the tour** starts the interactive tour.
+3. Clear all data and confirm the same checklist returns (not the old sentence).
+
+**Edge cases.**
+- *Overflow* - the checklist is taller than the old empty state; check it fits
+  the viewer area without pushing the sidebar.
+- *Harness limit* - layout is manual-only; the harness asserts the checklist
+  copy and the Help quick start.
+
+---
+
 ### Tour covers Data + Tracks — 0.0.13
 
 **Surface.** The tour bar; the new **Data** menu; the sidebar **Tracks** tab.

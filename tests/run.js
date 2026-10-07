@@ -273,7 +273,9 @@ assert(ctxRun(`typeof maybeShowWelcome === 'function' && typeof startTour === 'f
 assert(ctxRun(`typeof clearInputData === 'function' && typeof clearAllData === 'function' && typeof resetInputDataState === 'function' && typeof resetPreferencesState === 'function'`), 'clear-data split functions are defined');
 assert(ctxRun(`WELCOME_KEY === 'q2dViewer_welcome_v1'`), 'the welcome memory has its own storage key');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Open Input Data') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'the empty state points at Input Data and Attach files');
+assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Get started') !== -1 && EMPTY_STATE_HTML.indexOf('Take the tour') !== -1 && EMPTY_STATE_HTML.indexOf("openDataSources('uniprot')") !== -1`), 'the empty state is a get-started checklist with a tour link');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Try GFP') === -1`), 'the empty state no longer has a direct Try GFP shortcut');
+assert(HTML.indexOf('>Quick start</h4>') !== -1 && HTML.indexOf('<strong>Data</strong> menu opens every source') !== -1, 'the Help modal carries a quick start naming the Data menu');
 assert(HTML.indexOf('id="welcomeModal"') !== -1 && HTML.indexOf('id="tourBar"') !== -1, 'the welcome modal and tour bar exist in the markup');
 assert(HTML.indexOf('recommended to click <strong>Show me around</strong>') !== -1, 'the welcome modal recommends the tour');
 assert(HTML.indexOf('id="tryGfpBtn"') === -1 && ctxRun(`typeof tryGfpExample === 'undefined'`), 'there is no header Try GFP button or helper');
