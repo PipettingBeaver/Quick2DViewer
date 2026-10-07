@@ -410,6 +410,7 @@ assert(HTML.indexOf('max-height: calc(100vh - 72px); overflow-y: auto;') !== -1,
 assert(ctxRun(`typeof clampMenuBarMenu === 'function'`), 'menu dropdowns are clamped to the visible width');
 // Data Sources is its own window, linked from File, with loaded-checkmarks
 assert(HTML.indexOf('id="dataSourcesModal"') !== -1 && HTML.indexOf('id="dataSourcesBody"') !== -1, 'Data Sources has its own window');
+assert(HTML.indexOf('id="dataSourcesBody" style="margin-top: 12px; min-height: 460px;"') !== -1, 'the Data Sources window has a stable minimum height');
 assert(HTML.indexOf('onclick="openDataSourcesModal()">Data Sources…</button>') !== -1, 'the File menu links to the Data Sources window');
 assert(HTML.indexOf('id="menubar-datasources"') === -1, 'the temporary top-level Data menu is gone');
 assert(ctxRun(`typeof openDataSourcesModal === 'function' && typeof closeDataSourcesModal === 'function' && typeof updateDataSourcesLoadedMarks === 'function' && typeof dataSourceLoaded === 'function'`), 'the Data Sources window and checkmark helpers exist');

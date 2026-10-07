@@ -12,6 +12,12 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.23] - 2026-10-06
+
+### Changed
+- **Data Sources window keeps a stable height.** A minimum height stops the
+  window resizing as you switch between categories of different content length.
+
 ## [0.67.22] - 2026-10-06
 
 ### Fixed

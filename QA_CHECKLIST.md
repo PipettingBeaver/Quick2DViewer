@@ -212,6 +212,8 @@ is gone; Settings keeps Appearance / Commands / Storage.
 3. Guide "⚙ Data sources" links, the Input Data "Data sources…" button, and the
    empty-state "open Data Sources" all open this same window on the right
    category.
+4. Switch between categories (e.g. UniProt → Variants → External services): the
+   window keeps a stable height and does not jump/resize (min-height, 0.67.23).
 
 **Edge cases.**
 - *Panel mount* - the category panel is moved into the window at page init; if
