@@ -4572,6 +4572,13 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
     sandbox.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve('>other\nAAAAA\n'), json: () => Promise.resolve({}) });
     await ctxRun(`useUniProtAccession('P42212')`);
     assert(ctxRun(`parsedTracks.AA`) === 'MKV', 'a loaded sequence is never overwritten by the accession FASTA');
+    // The actual example-preset path (Input Data -> Load example protein) must
+    // build the rows in the same pass, not only after a reload.
+    ctxRun(`parsedTracks = {}; uniprotAccession = ''; uniprotFeatures = null; uniprotFeatureTracks = {};`);
+    sandbox.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve('>sp|P00698|LYSC_CHICK\nKVFGRCELAAAMKRHGLDNYR\n'), json: () => Promise.resolve({}) });
+    assert(await ctxRun(`onInputAccessionPreset('P00698')`) === true, 'loading Lysozyme by example succeeds');
+    assert(ctxRun(`parsedTracks.AA`) === 'KVFGRCELAAAMKRHGLDNYR', 'and it adopts the example sequence');
+    assert(ctxRun(`Object.keys(parsedTracks).some(function (k) { return k.startsWith('UP_'); })`), 'and builds its UniProt rows immediately');
     sandbox.fetch = origSandboxFetch;
     ctxRun(`
         runCapability = window.__origRunCap;
