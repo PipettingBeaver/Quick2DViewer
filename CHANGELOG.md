@@ -12,6 +12,29 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.2] - 2026-10-07
+
+### Changed
+- **UI category sweep.** A dedicated **Analyze** sidebar tab now holds Rules,
+  Interfaces, Ensemble variance and Cross-checks (Tracks is visibility only).
+  The external-workflow sidebar tab and the Options Workflow tab are renamed
+  **Commands**; the two JSON exports are disambiguated (**Save session (.json)**
+  vs **Metrics as JSON**); "Data & Structures…" is **Data report…**; Macro /
+  Hypotheses / Log are grouped under a **Session** menu; the File-menu
+  preferences moved out (QA highlights now under Options -> Appearance); the
+  Data Sources "External services & activity log" category is **External
+  services**; and the methods export is labelled **Methods summary (.md)**
+  everywhere.
+
+### Accessibility
+- Sidebar and Options tab strips expose `role="tab"` / `aria-selected` /
+  `aria-controls` with a matching `tabpanel`, plus Left/Right arrow navigation.
+- The menu bar exposes `role="menuitem"` and `aria-haspopup` / `aria-expanded`,
+  with Left/Right/Down/Escape keys.
+- ⓘ info icons are labelled buttons; icon-only controls (−, +, ×, ▸) inherit
+  their `title` as an `aria-label`.
+- Modest root font-size bump (16 -> 17px) for legibility.
+
 ## [0.0.1] - 2026-10-07
 
 ### Changed

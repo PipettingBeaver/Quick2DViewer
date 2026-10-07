@@ -103,6 +103,31 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### UI category sweep + accessibility — 0.0.2
+
+**Surface.** Menu bar, sidebar tabs, Options tabs, icon-only controls.
+
+**Should do.** Analysis lives under Analyze; Commands names the external-tool
+panel; JSON exports are disambiguated; tabs and menus are keyboard-operable and
+screen-reader-labelled.
+
+**Try.**
+1. Sidebar: **Analyze** holds Rules / Interfaces / Ensemble / Cross-checks;
+   **Tracks** holds only Track Visibility.
+2. Analyze menu -> Rules or Interfaces -> lands on the **Analyze** tab.
+3. Tab through the sidebar tabs (Left/Right arrows) and the menu bar
+   (Left/Right, Down, Escape).
+4. Screen reader: the − / + / × / ▸ controls announce their purpose; ⓘ icons
+   read "More information: …".
+
+**Edge cases.**
+- *Reset Data* still clears everything; QA highlights now live in Options ->
+  Appearance (default off).
+- *Harness limit* - the rendered keyboard/ARIA behaviour is a manual browser
+  check; the harness asserts the markup and roles.
+
+---
+
 ### Guide: choosing a view closes the intake — 0.68.0
 
 **Surface.** The Guide tab; the view prompt / bottom toggle.

@@ -268,6 +268,20 @@ assert(ctxRun(`typeof toggleQaHighlights === 'function' && typeof syncQaHighligh
 assert(ctxRun(`qaHighlightsEnabled`) === false, 'new-feature highlights are off by default');
 assert(HTML.indexOf("qaHighlightsEnabled = prefs.qaHighlightsEnabled === true;") !== -1, 'a saved session only re-enables them when explicitly on');
 
+section('UI categories + accessibility');
+assert(HTML.indexOf('data-tab="analyze"') !== -1 && HTML.indexOf('>Analyze</button>') !== -1, 'a dedicated Analyze tab exists');
+assert(HTML.indexOf('data-tab="workflow"') !== -1 && HTML.indexOf('>Commands</button>') !== -1, 'the external-workflow tab is renamed Commands');
+assert(HTML.indexOf('id="side-panel-analyze" role="tabpanel"') !== -1, 'the Analyze panel is a tabpanel');
+assert(HTML.indexOf('id="side-panel-tracks" role="tabpanel"') !== -1, 'the Tracks tab is a tabpanel (visibility only)');
+assert(HTML.indexOf('role="tab" aria-selected="true"') !== -1 && HTML.indexOf('role="tab" aria-selected="false"') !== -1, 'tabs expose role=tab + aria-selected');
+assert(HTML.indexOf('id="menubar-session" role="menu"') !== -1, 'Macro/Hypotheses/Log are grouped under a Session menu');
+assert(HTML.indexOf('role="menuitem"') !== -1, 'menu items expose role=menuitem');
+assert(HTML.indexOf('>Save session (.json)</button>') !== -1 && HTML.indexOf('>Metrics as JSON</button>') !== -1, 'the two JSON exports are disambiguated');
+assert(HTML.indexOf('>Data report…</button>') !== -1, 'Data & Structures is renamed Data report');
+assert(HTML.indexOf('>External services</option>') !== -1, 'the Data Sources services category is renamed');
+assert(HTML.indexOf('>Methods summary (.md)</button>') !== -1 && HTML.indexOf('Export methods summary') === -1, 'the methods export label is unified');
+assert(ctxRun(`(function(){ const i = buildInfoIcon('<strong>Foo</strong><br>bar'); return i.getAttribute('role') + '|' + i.getAttribute('aria-label'); })()`) === 'button|More information: Foo', 'built info icons are labelled buttons');
+
 section('graph mode via Track Control');
 ctxRun(`graphMode = { pLDDT: false, RSA: false }; trackControlState = { hidden:{}, hideSymbols:{}, fullBar:{}, filtered:{}, aaSeq:{}, consColor:{}, viewOverride:{} };`);
 const plddtOpts = ctxRun(`(function(){ const s = buildGroupViewSelect('pLDDT'); return (s.children || []).map(o => o.value); })()`);

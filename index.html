@@ -12,6 +12,8 @@
             --q2dv-M-bg: #e98cd3; --q2dv-M-fg: #6b21a8;
             --q2dv-D-bg: #eccd9e; --q2dv-D-fg: #9a3412;
         }
+        /* Slightly larger root so the dense 0.7rem labels stay legible. */
+        html { font-size: 17px; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             padding: 0;
@@ -2060,56 +2062,59 @@
         <h2>Quick2DViewer - 1D Protein Viewer <button type="button" class="app-version" id="appVersion" title="View the changelog" onclick="openChangelogModal()"></button></h2>
         <div class="app-header-tools menubar" role="menubar" aria-label="Main menu">
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
-                <div class="menubar-menu" id="menubar-file" hidden>
-                    <button type="button" onclick="menuBarAction('input')">Input Data…</button>
-                    <button type="button" onclick="menuBarAction('save')">Export Save (.json)</button>
-                    <button type="button" onclick="menuBarAction('options')">Options…</button>
-                    <button type="button" onclick="menuBarAction('reset')">Reset Data</button>
-                    <button type="button" id="menuExternalServices" onclick="menuBarAction('toggleExternal')">External services: OFF</button>
-                    <button type="button" id="menuQaHighlights" onclick="menuBarAction('toggleQa')">New-feature highlights: OFF</button>
+                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-file" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
+                <div class="menubar-menu" id="menubar-file" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="menuBarAction('input')">Input Data…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('save')">Save session (.json)</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('options')">Options…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('reset')">Reset Data</button>
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('view', this)">View ▾</button>
-                <div class="menubar-menu" id="menubar-view" hidden>
-                    <button type="button" onclick="menuBarAction('graphPlddt')">Toggle pLDDT graph</button>
-                    <button type="button" onclick="menuBarAction('graphRsa')">Toggle RSA graph</button>
-                    <button type="button" onclick="menuBarAction('graphEns')">Toggle Ensemble RMSF graph</button>
-                    <button type="button" onclick="menuBarAction('legend')">Show / Hide Legend</button>
-                    <button type="button" onclick="menuBarAction('p3d')">Toggle 3D Viewer</button>
+                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-view" onclick="toggleMenuBarMenu('view', this)">View ▾</button>
+                <div class="menubar-menu" id="menubar-view" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="menuBarAction('graphPlddt')">Toggle pLDDT graph</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('graphRsa')">Toggle RSA graph</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('graphEns')">Toggle Ensemble RMSF graph</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('legend')">Show / Hide Legend</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('p3d')">Toggle 3D Viewer</button>
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('data', this)">Analyze ▾</button>
-                <div class="menubar-menu" id="menubar-data" hidden>
-                    <button type="button" onclick="menuBarAction('data')">Data &amp; Structures…</button>
-                    <button type="button" onclick="menuBarAction('rules')">Analysis Rules…</button>
-                    <button type="button" onclick="menuBarAction('interfaces')">Interfaces…</button>
-                    <button type="button" onclick="menuBarAction('domains')">Scan Domains (HMMER)…</button>
-                    <button type="button" onclick="menuBarAction('homologs_phmmer')">Search Homologs (phmmer)…</button>
-                    <button type="button" onclick="menuBarAction('homologs_blast')">Search Homologs (BLAST)…</button>
-                    <button type="button" onclick="menuBarAction('crosschecks')">Cross-checks…</button>
-                    <button type="button" onclick="menuBarAction('ensemble')">Ensemble variance…</button>
+                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-data" onclick="toggleMenuBarMenu('data', this)">Analyze ▾</button>
+                <div class="menubar-menu" id="menubar-data" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="menuBarAction('data')">Data report…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('rules')">Analysis Rules…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('interfaces')">Interfaces…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('domains')">Scan Domains (HMMER)…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('homologs_phmmer')">Search Homologs (phmmer)…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('homologs_blast')">Search Homologs (BLAST)…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('crosschecks')">Cross-checks…</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('ensemble')">Ensemble variance…</button>
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" onclick="openMacroModal()" title="Record, export and replay a workflow as a macro: the API/import steps with their providers and parameters">Macro</button>
-                <button type="button" class="menubar-btn" onclick="openHypothesisModal()" title="Rank candidate residues from the loaded evidence and suggest a test for each, with the evidence that drove it">Hypotheses</button>
-                <button type="button" class="menubar-btn" onclick="openActionLog()" title="Everything this session: clicks, menu choices, API jobs and what came back - newest first">Log</button>
-                <button type="button" class="menubar-btn" onclick="toggleMenuBarMenu('export', this)">Export ▾</button>
-                <div class="menubar-menu" id="menubar-export" hidden>
-                    <button type="button" onclick="menuBarAction('json')">Q2DV Data as JSON</button>
-                    <button type="button" onclick="menuBarAction('tsv')">Data as TSV</button>
-                    <button type="button" onclick="menuBarAction('csv')">Data as CSV</button>
-                    <button type="button" onclick="menuBarAction('svg')">Viewport as SVG</button>
-                    <button type="button" onclick="menuBarAction('png')">Viewport as PNG</button>
-                    <button type="button" onclick="menuBarAction('structure')" title="The attached model (or just the selected residues) as the original PDB/CIF text - unrenumbered, for a simulation builder or a colleague">Structure file (PDB/CIF)</button>
-                    <button type="button" onclick="menuBarAction('methods')">Methods summary (.md)</button>
+                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-session" onclick="toggleMenuBarMenu('session', this)">Session ▾</button>
+                <div class="menubar-menu" id="menubar-session" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="openMacroModal()" title="Record, export and replay a workflow as a macro: the API/import steps with their providers and parameters">Macro</button>
+                    <button type="button" role="menuitem" onclick="openHypothesisModal()" title="Rank candidate residues from the loaded evidence and suggest a test for each, with the evidence that drove it">Hypotheses</button>
+                    <button type="button" role="menuitem" onclick="openActionLog()" title="Everything this session: clicks, menu choices, API jobs and what came back - newest first">Log</button>
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" class="menubar-btn" onclick="menuBarAction('help')">Help</button>
+                <button type="button" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-export" onclick="toggleMenuBarMenu('export', this)">Export ▾</button>
+                <div class="menubar-menu" id="menubar-export" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="menuBarAction('json')">Metrics as JSON</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('tsv')">Data as TSV</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('csv')">Data as CSV</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('svg')">Viewport as SVG</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('png')">Viewport as PNG</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('structure')" title="The attached model (or just the selected residues) as the original PDB/CIF text - unrenumbered, for a simulation builder or a colleague">Structure file (PDB/CIF)</button>
+                    <button type="button" role="menuitem" onclick="menuBarAction('methods')">Methods summary (.md)</button>
+                </div>
+            </div>
+            <div class="menubar-item">
+                <button type="button" class="menubar-btn" role="menuitem" onclick="menuBarAction('help')">Help</button>
             </div>
         </div>
     </div>
@@ -2285,13 +2290,14 @@
 
         <div class="sidebar" role="region" aria-label="Selection Workspace">
             <div class="sidebar-tabs" role="tablist" aria-label="Workspace panels">
-                <button type="button" class="sidebar-tab active" data-tab="selection" onclick="switchSidebarTab('selection')">Selection</button>
-                <button type="button" class="sidebar-tab" data-tab="tracks" onclick="switchSidebarTab('tracks')">Tracks</button>
-                <button type="button" class="sidebar-tab" data-tab="guide" onclick="switchSidebarTab('guide')">Guide</button>
-                <button type="button" class="sidebar-tab" data-tab="workflow" onclick="switchSidebarTab('workflow')">Workflow</button>
+                <button type="button" id="tab-selection" class="sidebar-tab active" role="tab" aria-selected="true" aria-controls="side-panel-selection" data-tab="selection" onclick="switchSidebarTab('selection')">Selection</button>
+                <button type="button" id="tab-tracks" class="sidebar-tab" role="tab" aria-selected="false" aria-controls="side-panel-tracks" data-tab="tracks" onclick="switchSidebarTab('tracks')">Tracks</button>
+                <button type="button" id="tab-analyze" class="sidebar-tab" role="tab" aria-selected="false" aria-controls="side-panel-analyze" data-tab="analyze" onclick="switchSidebarTab('analyze')">Analyze</button>
+                <button type="button" id="tab-guide" class="sidebar-tab" role="tab" aria-selected="false" aria-controls="side-panel-guide" data-tab="guide" onclick="switchSidebarTab('guide')">Guide</button>
+                <button type="button" id="tab-commands" class="sidebar-tab" role="tab" aria-selected="false" aria-controls="side-panel-workflow" data-tab="workflow" onclick="switchSidebarTab('workflow')">Commands</button>
             </div>
 
-            <div class="sidebar-panel" id="side-panel-selection">
+            <div class="sidebar-panel" id="side-panel-selection" role="tabpanel" aria-labelledby="tab-selection" tabindex="0">
             <div class="sel-workspace-header">
                 <h3 class="sidebar-title" style="margin:0; font-size:1.1rem; color:#0f172a;">Selection Workspace</h3>
                 <div id="savedSelectionsBar" class="saved-selections-bar">
@@ -2449,7 +2455,7 @@
             </details>
             </div>
 
-            <div class="sidebar-panel" id="side-panel-tracks" hidden>
+            <div class="sidebar-panel" id="side-panel-tracks" role="tabpanel" aria-labelledby="tab-tracks" tabindex="0" hidden>
                 <details class="workflow-section qa-new" id="trackManagerSection" open>
                     <summary>Track Visibility (full manager)</summary>
                     <p style="font-size:0.72rem; color:#64748b; margin:0 0 6px; line-height:1.4;">
@@ -2465,8 +2471,10 @@
                     </div>
                     <div id="trackManagerList"></div>
                 </details>
+            </div>
 
-                <details class="workflow-section qa-new" id="rulesSection" open style="margin-top: 12px;"
+            <div class="sidebar-panel" id="side-panel-analyze" role="tabpanel" aria-labelledby="tab-analyze" tabindex="0" hidden>
+                <details class="workflow-section qa-new" id="rulesSection" open style="margin-top: 0;"
                     ontoggle="if (!this.open) clearGuideCoachmark();">
                     <summary>Rules (contradiction / co-localization)</summary>
                     <div id="guideCoachmarkRules" class="guide-coachmark" hidden></div>
@@ -2544,7 +2552,7 @@
                 </details>
             </div>
 
-            <div class="sidebar-panel" id="side-panel-guide" hidden>
+            <div class="sidebar-panel" id="side-panel-guide" role="tabpanel" aria-labelledby="tab-guide" tabindex="0" hidden>
             <details class="workflow-section qa-new" id="guideSection" open>
             <summary>Evaluation Guide</summary>
             <p style="font-size:0.72rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
@@ -2553,11 +2561,11 @@
             </p>
             <div id="guidePanel"></div>
             <button type="button" class="tb-btn tb-btn-secondary" onclick="exportMethodsReport()" style="font-size:0.72rem; padding:3px 8px; margin-top:8px; width:100%;"
-                title="Download a Markdown methods summary: intake answers, step coverage, loaded evidence, rules, read-out and references">Export methods summary (.md)</button>
+                title="Download a Markdown methods summary: intake answers, step coverage, loaded evidence, rules, read-out and references">Methods summary (.md)</button>
             </details>
             </div>
 
-            <div class="sidebar-panel" id="side-panel-workflow" hidden>
+            <div class="sidebar-panel" id="side-panel-workflow" role="tabpanel" aria-labelledby="tab-commands" tabindex="0" hidden>
             <details class="workflow-section" open>
             <summary>External Workflow</summary>
             <div>
@@ -2686,13 +2694,13 @@
         </div>
 
         <div class="options-tabs" role="tablist" aria-label="Options categories">
-            <button type="button" class="options-tab active" data-tab="appearance" onclick="switchOptionsTab('appearance')">Appearance</button>
-            <button type="button" class="options-tab" data-tab="data" onclick="switchOptionsTab('data')">Data Sources</button>
-            <button type="button" class="options-tab" data-tab="workflow" onclick="switchOptionsTab('workflow')">Workflow</button>
-            <button type="button" class="options-tab" data-tab="storage" onclick="switchOptionsTab('storage')">Storage</button>
+            <button type="button" id="optab-appearance" class="options-tab active" role="tab" aria-selected="true" aria-controls="opt-tab-appearance" data-tab="appearance" onclick="switchOptionsTab('appearance')">Appearance</button>
+            <button type="button" id="optab-data" class="options-tab" role="tab" aria-selected="false" aria-controls="opt-tab-data" data-tab="data" onclick="switchOptionsTab('data')">Data Sources</button>
+            <button type="button" id="optab-workflow" class="options-tab" role="tab" aria-selected="false" aria-controls="opt-tab-workflow" data-tab="workflow" onclick="switchOptionsTab('workflow')">Commands</button>
+            <button type="button" id="optab-storage" class="options-tab" role="tab" aria-selected="false" aria-controls="opt-tab-storage" data-tab="storage" onclick="switchOptionsTab('storage')">Storage</button>
         </div>
 
-        <div class="options-tab-panel" id="opt-tab-workflow" hidden>
+        <div class="options-tab-panel" id="opt-tab-workflow" role="tabpanel" aria-labelledby="optab-workflow" hidden>
         <div style="margin-top: 18px;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Command Engine</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
@@ -2705,7 +2713,7 @@
         </div>
         </div>
 
-        <div class="options-tab-panel" id="opt-tab-appearance">
+        <div class="options-tab-panel" id="opt-tab-appearance" role="tabpanel" aria-labelledby="optab-appearance">
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Annotation Colors</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
@@ -2719,9 +2727,16 @@
                 <option value="high-contrast">High contrast</option>
             </select>
         </div>
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Review aids</h4>
+            <p style="font-size: 0.8rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                Aids for reviewing the app itself. External services (network calls) live under Storage.
+            </p>
+            <button type="button" class="tb-btn tb-btn-secondary" id="menuQaHighlights" onclick="toggleQaHighlights()" style="font-size:0.78rem; padding:4px 10px;">New-feature highlights: OFF</button>
+        </div>
         </div>
 
-        <div class="options-tab-panel" id="opt-tab-data" hidden>
+        <div class="options-tab-panel" id="opt-tab-data" role="tabpanel" aria-labelledby="optab-data" hidden>
         <div style="display:flex; align-items:center; gap:8px; margin: 6px 0 4px; flex-wrap: wrap;">
             <label for="optDataCategory" style="font-size:0.8rem; font-weight:600; color:#475569;">Data source</label>
             <select id="optDataCategory" class="q2dv-select" onchange="switchDataCategory(this.value)" style="flex:1; min-width:220px; font-size:0.85rem; padding:6px;">
@@ -2735,7 +2750,7 @@
                 <option value="ddg">Stability predictions (dG)</option>
                 <option value="foldseek">Structural homology (Foldseek)</option>
                 <option value="variants">Variant effects</option>
-                <option value="services">External services &amp; activity log</option>
+                <option value="services">External services</option>
             </select>
         </div>
         <p id="optDataCategoryHint" style="font-size:0.78rem; color:#64748b; margin:0 0 4px; line-height:1.4;"></p>
@@ -3012,7 +3027,7 @@
         </div>
         </div>
 
-        <div class="options-tab-panel" id="opt-tab-storage" hidden>
+        <div class="options-tab-panel" id="opt-tab-storage" role="tabpanel" aria-labelledby="optab-storage" hidden>
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Save File</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
@@ -5879,7 +5894,7 @@ function renderEnsembleModelList() {
     wrap.innerHTML = html;
 }
 function showEnsemblePanel() {
-    switchSidebarTab('tracks');
+    switchSidebarTab('analyze');
     const sec = document.getElementById('ensembleSection');
     if (sec) {
         sec.open = true;
@@ -6462,7 +6477,7 @@ function renderRulesListInner() {
             '<span style="color:#94a3b8; flex-shrink:0;">(' + r.conditions.length + ' cond, ' + (r.mode === 'any' ? 'any' : 'all') + ')</span>' +
             '<button type="button" class="copy-btn" onclick="selectRuleMatches(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;" title="Select matching residues">select</button>' +
             '<button type="button" class="copy-btn" onclick="openRuleEditor(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;">edit</button>' +
-            '<button type="button" class="copy-btn" onclick="deleteRule(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;">×</button>' +
+            '<button type="button" class="copy-btn" onclick="deleteRule(\'' + structureEscapeHtml(r.id) + '\')" style="padding:1px 6px;" aria-label="Delete rule">×</button>' +
             '</div>';
     });
     wrap.innerHTML = html;
@@ -6505,7 +6520,7 @@ function renderRuleConditions() {
         if (c.kind === 'numeric' || c.op === 'eq') {
             html += '<input type="text" class="rule-value" value="' + structureEscapeHtml(c.value || '') + '" oninput="onRuleValueInput(' + idx + ', this.value)" placeholder="value" style="width:70px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px;">';
         }
-        html += '<button type="button" class="copy-btn" onclick="removeRuleCondition(' + idx + ')" style="padding:1px 6px;">×</button>';
+        html += '<button type="button" class="copy-btn" onclick="removeRuleCondition(' + idx + ')" style="padding:1px 6px;" aria-label="Remove condition">×</button>';
         html += '</div>';
     });
     if (!ruleEditing.conditions.length) html = '<p style="color:#94a3b8; font-size:0.75rem;">No conditions yet. Add one below.</p>';
@@ -9952,20 +9967,20 @@ function returnToGuide() {
 }
 
 function showCrossCheckPanel() {
-    switchSidebarTab('tracks');
+    switchSidebarTab('analyze');
     const sec = document.getElementById('crossCheckSection');
     if (sec) { sec.open = true; if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' }); }
 }
 
 function showInterfacesPanel() {
-    switchSidebarTab('tracks');
+    switchSidebarTab('analyze');
     const sec = document.getElementById('interfaceSection');
     if (sec) { sec.open = true; if (typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'nearest' }); }
 }
 
 // Jumps to the Rules panel (right sidebar -> Tracks tab) and expands it.
 function showRulesPanel() {
-    switchSidebarTab('tracks');
+    switchSidebarTab('analyze');
     const sec = document.getElementById('rulesSection');
     if (sec) {
         sec.open = true;
@@ -9992,12 +10007,33 @@ function openTrackControlsFromSidebar() {
 }
 
 function switchSidebarTab(name) {
-    document.querySelectorAll('.sidebar-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.sidebar-tab').forEach(b => {
+        const on = b.dataset.tab === name;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.tabIndex = on ? 0 : -1;
+    });
     document.querySelectorAll('.sidebar-panel').forEach(p => { p.hidden = (p.id !== 'side-panel-' + name); });
-    if (name === 'tracks') { renderTrackManager(); renderRulesList(); }
+    if (name === 'tracks') { renderTrackManager(); }
+    else if (name === 'analyze') { renderRulesList(); }
     else clearGuideCoachmark();
     if (name === 'guide') { renderWorkflowGuide(); }
 }
+// Left/Right arrows move between sidebar tabs (roving tabindex).
+(function initSidebarTabKeys() {
+    const list = document.querySelector('.sidebar-tabs');
+    if (!list || typeof list.addEventListener !== 'function') return;
+    list.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        const tabs = Array.prototype.slice.call(document.querySelectorAll('.sidebar-tab'));
+        const i = tabs.indexOf(document.activeElement);
+        if (i === -1) return;
+        e.preventDefault();
+        const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+        tabs[next].focus();
+        switchSidebarTab(tabs[next].dataset.tab);
+    });
+})();
 
 // JalView-style track manager: one row per type group (with a show/hide eye)
 // and an indented row per individual track. Visibility routes through the same
@@ -10031,7 +10067,7 @@ function trackManagerRowHtml(k) {
         (isTrackEmpty(k) ? ' <em style="color:#94a3b8;" title="Nothing annotated: the import found nothing for this protein">(Empty)</em>' : '') +
         (!vis ? ' <em style="color:#b45309;" title="Filtered out in the quick controls popover; the track is loaded but not drawn">(filtered)</em>' : '') +
         badge + '</span>' +
-        '<button type="button" class="tm-remove" data-k="' + structureEscapeHtml(k) + '" onclick="confirmRemoveTrack(this.dataset.k)" title="Remove this track and its data">×</button>' +
+        '<button type="button" class="tm-remove" data-k="' + structureEscapeHtml(k) + '" onclick="confirmRemoveTrack(this.dataset.k)" title="Remove this track and its data" aria-label="Remove this track and its data">×</button>' +
         '</div>';
 }
 function renderTrackManager() {
@@ -10052,7 +10088,7 @@ function renderTrackManager() {
             '<button type="button" class="tm-chevron" data-g="' + gEsc + '" onclick="toggleTrackManagerExpand(this.dataset.g)" title="' + (expanded ? 'Collapse' : 'Expand') + ' individual tracks">' + (expanded ? '▾' : '▸') + '</button>' +
             '<button type="button" class="tm-eye" data-g="' + gEsc + '" onclick="toggleTrackManagerGroup(this.dataset.g)" title="Show/hide all ' + structureEscapeHtml(trackGroupLabel(g)) + '">' + (groupHidden ? '○' : '●') + '</button>' +
             '<span class="tm-group-name" style="cursor:pointer;" onclick="toggleTrackManagerExpand(\'' + gEsc + '\')">' + structureEscapeHtml(trackGroupLabel(g)) + ' <span style="color:#94a3b8;">(' + keys.length + ')</span></span>' +
-            '<button type="button" class="tm-remove" data-g="' + gEsc + '" onclick="confirmRemoveGroup(this.dataset.g)" title="Remove all ' + structureEscapeHtml(trackGroupLabel(g)) + ' tracks and their data">×</button>' +
+            '<button type="button" class="tm-remove" data-g="' + gEsc + '" onclick="confirmRemoveGroup(this.dataset.g)" title="Remove all ' + structureEscapeHtml(trackGroupLabel(g)) + ' tracks and their data" aria-label="Remove all ' + structureEscapeHtml(trackGroupLabel(g)) + ' tracks and their data">×</button>' +
             '</div>';
         if (expanded) {
             if (g === 'HL') {
@@ -10118,14 +10154,40 @@ function refreshInputDataModalIfVisible() {
 // --- Top menu bar (File / View / Data / Export / Help) --------------------
 function closeMenuBarMenus() {
     document.querySelectorAll('.menubar-menu').forEach(m => { m.hidden = true; });
+    document.querySelectorAll('.menubar-btn[aria-haspopup]').forEach(b => b.setAttribute('aria-expanded', 'false'));
 }
-function toggleMenuBarMenu(name) {
+function toggleMenuBarMenu(name, btn) {
     const menu = document.getElementById('menubar-' + name);
     if (!menu) return;
     const willOpen = menu.hidden;
     closeMenuBarMenus();
     menu.hidden = !willOpen;
+    if (btn) btn.setAttribute('aria-expanded', String(willOpen));
+    if (willOpen) { const first = menu.querySelector('button'); if (first && first.focus) first.focus(); }
 }
+// Keyboard model for the menu bar: Left/Right move between menus, Down opens,
+// Escape closes. (Tab still reaches every control.)
+(function initMenuBarKeys() {
+    const bar = document.querySelector('.menubar');
+    if (!bar || typeof bar.addEventListener !== 'function') return;
+    bar.addEventListener('keydown', (e) => {
+        const btns = Array.prototype.slice.call(bar.querySelectorAll('.menubar-btn'));
+        const i = btns.indexOf(document.activeElement);
+        if (e.key === 'Escape') { closeMenuBarMenus(); if (i !== -1) btns[i].focus(); return; }
+        if (i === -1) return;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const next = e.key === 'ArrowRight' ? (i + 1) % btns.length : (i - 1 + btns.length) % btns.length;
+            btns[next].focus();
+        } else if (e.key === 'ArrowDown') {
+            const btn = btns[i];
+            if (btn.getAttribute('aria-haspopup')) {
+                e.preventDefault();
+                toggleMenuBarMenu((btn.getAttribute('aria-controls') || '').replace('menubar-', ''), btn);
+            }
+        }
+    });
+})();
 function menuBarAction(action) {
     logAction('menu', action);
     closeMenuBarMenus();
@@ -10617,9 +10679,16 @@ function buildPredictorTooltipHTML(info) {
 // hidden-template pattern as the static legend/sidebar icons in the HTML,
 // so both static and JS-generated icons are picked up by the same
 // delegated hover/click handlers below.
+function infoIconLabel(html) {
+    const m = String(html || '').match(/<strong[^>]*>([^<]+)<\/strong>/i);
+    return 'More information: ' + (m ? m[1] : 'details');
+}
 function buildInfoIcon(html, wide) {
     const icon = document.createElement('span');
     icon.className = 'info-icon' + (wide ? ' tt-wide' : '');
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('tabindex', '0');
+    icon.setAttribute('aria-label', infoIconLabel(html));
     icon.textContent = 'ⓘ';
     const content = document.createElement('span');
     content.className = 'tooltip-content';
@@ -10627,6 +10696,25 @@ function buildInfoIcon(html, wide) {
     icon.appendChild(content);
     return icon;
 }
+// Accessibility pass: the static ⓘ icons become labelled buttons, and any
+// icon-only button (single symbol) inherits its title as an aria-label so the
+// −, +, × and ▸ controls are announced. Dynamic icons/buttons set their own.
+(function labelIconControls() {
+    document.querySelectorAll('.info-icon').forEach(icon => {
+        if (!icon.getAttribute('role')) icon.setAttribute('role', 'button');
+        if (!icon.getAttribute('tabindex')) icon.setAttribute('tabindex', '0');
+        if (!icon.getAttribute('aria-label')) {
+            const c = icon.querySelector('.tooltip-content');
+            icon.setAttribute('aria-label', infoIconLabel(c ? c.innerHTML : ''));
+        }
+    });
+    document.querySelectorAll('button').forEach(b => {
+        if (b.getAttribute('aria-label')) return;
+        const t = (b.textContent || '').trim();
+        const title = b.getAttribute('title');
+        if (title && t.length <= 2) b.setAttribute('aria-label', title);
+    });
+})();
 
 // The pLDDT/RSA color-band swatches in the top legend are static HTML (like
 // the SS/CC/TM/DO swatches), but their tooltip text is filled in here from
@@ -10821,7 +10909,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.1';
+const APP_VERSION = '0.0.2';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -15562,6 +15650,7 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
         chevron.title = `Track Control: ${trackGroupLabel(group)}`;
         chevron.setAttribute('role', 'button');
         chevron.tabIndex = 0;
+        chevron.setAttribute('aria-label', chevron.title);
         chevron.dataset.tctlGroup = group;
         chevron.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -20337,7 +20426,10 @@ function closeOptionsModal() {
 // Sources / Workflow / Storage).
 function switchOptionsTab(name) {
     document.querySelectorAll('#optionsModal .options-tab').forEach(b => {
-        b.classList.toggle('active', b.dataset.tab === name);
+        const on = b.dataset.tab === name;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.tabIndex = on ? 0 : -1;
     });
     document.querySelectorAll('#optionsModal .options-tab-panel').forEach(p => {
         p.hidden = (p.id !== 'opt-tab-' + name);
