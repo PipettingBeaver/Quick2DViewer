@@ -289,6 +289,7 @@ assert(ctxRun(`TOUR_STEPS[0].require === 'menu-open:file' && TOUR_STEPS[1].requi
 assert(ctxRun(`TOUR_STEPS[2].body.indexOf('Load example protein') !== -1 && TOUR_STEPS[2].body.indexOf('GFP') !== -1`), 'the Load example step tells the user about GFP');
 assert(ctxRun(`TOUR_STEPS[2].advanceOn === 'example-loaded' && !TOUR_STEPS[2].require`), 'picking an example auto-advances the Load example step (Next stays available)');
 assert(ctxRun(`TOUR_STEPS[3].body.indexOf('Data Sources') !== -1 && !TOUR_STEPS[3].require`), 'the Data Sources step is optional and points at File -> Data Sources');
+assert(ctxRun(`TOUR_STEPS[3].body.indexOf('UniProt') !== -1 && TOUR_STEPS[3].body.indexOf('import') !== -1`), 'the Data Sources step notes the auto UniProt fetch and that other data can be imported/called');
 assert(ctxRun(`TOUR_STEPS[4].target === 'tab-tracks' && TOUR_STEPS[4].require === 'tab-open:tracks'`), 'the Tracks step is required (click the Tracks tab)');
 assert(ctxRun(`!TOUR_STEPS.some(function (s) { return s.require && s.target === 'menubar-export-btn'; })`), 'the Export step is optional (no requirement)');
 ['menubar-file-btn', 'menubar-file-input', 'inputAccessionPreset', 'tab-tracks', 'tab-guide', 'menubar-export-btn'].forEach(id => {
@@ -412,6 +413,8 @@ assert(HTML.indexOf('>External services</option>') !== -1, 'the Data Sources ser
 assert(HTML.indexOf('>Methods summary (.md)</button>') !== -1 && HTML.indexOf('Export methods summary') === -1, 'the methods export label is unified');
 assert(HTML.indexOf('max-height: calc(100vh - 72px); overflow-y: auto;') !== -1, 'menu dropdowns are height-bounded');
 assert(ctxRun(`typeof clampMenuBarMenu === 'function'`), 'menu dropdowns are clamped to the visible width');
+assert(HTML.indexOf('if (typeof closeMenuBarMenus === \'function\') closeMenuBarMenus();') !== -1, 'opening a modal dismisses any open menu dropdown');
+assert(HTML.indexOf('window.setTimeout(settle, 240);') !== -1, 'the 3D viewer re-places after its size transition settles');
 // Data Sources is its own window, linked from File, with loaded-checkmarks
 assert(HTML.indexOf('id="dataSourcesModal"') !== -1 && HTML.indexOf('id="dataSourcesBody"') !== -1, 'Data Sources has its own window');
 assert(HTML.indexOf('id="dataSourcesBody" style="margin-top: 12px; min-height: 460px;"') !== -1, 'the Data Sources window has a stable minimum height');
@@ -1550,6 +1553,28 @@ const selHtml = ctxRun(`document.getElementById('p3dColorSelect').innerHTML`);
 assert(selHtml.indexOf('Base: white') !== -1 && selHtml.indexOf('TP_Consensus') !== -1, 'the picker lists the base schemes and the available tracks (got "' + selHtml.slice(0, 90) + '")');
 assert(selHtml.indexOf('<optgroup') === -1, 'the picker is a flat list, no groups (got "' + selHtml.slice(0, 90) + '")');
 assert(selHtml.indexOf('Base: conservation') !== -1, 'conservation stays one of the base schemes');
+section('3D model default selection');
+ctxRun(`
+    window.__savedParsed = JSON.stringify(parsedTracks);
+    window.__savedCached = JSON.stringify(cachedStructureTexts);
+    window.__savedHomolog = JSON.stringify(homologHitsInfo);
+    parsedTracks = { AA: 'MKV', HL_01: 'MKV', HL_02: 'MKV' };
+    homologHitsInfo = { HL_01: { hitId: '1ABC' }, HL_02: { hitId: '2DEF' } };
+    cachedStructureTexts = { 'model.pdb': 'ATOM' };
+    p3dAutoTrackValue = ''; p3dModel = null; activeRowKey = 'HL_01';
+    refreshP3DModelOptions();
+`);
+assert(ctxRun(`document.getElementById('p3dModelSelect').value`) === 'homolog:HL_01', 'the 3D model defaults to the selected Homolog track');
+ctxRun(`activeRowKey = 'HL_02'; refreshP3DModelOptions();`);
+assert(ctxRun(`document.getElementById('p3dModelSelect').value`) === 'homolog:HL_02', 'and follows when the selected Homolog track changes');
+ctxRun(`document.getElementById('p3dModelSelect').value = 'pdb:model.pdb'; refreshP3DModelOptions();`);
+assert(ctxRun(`document.getElementById('p3dModelSelect').value`) === 'pdb:model.pdb', 'a manual model choice lingers while the track is unchanged');
+ctxRun(`
+    parsedTracks = JSON.parse(window.__savedParsed);
+    cachedStructureTexts = JSON.parse(window.__savedCached);
+    homologHitsInfo = JSON.parse(window.__savedHomolog);
+    activeRowKey = null; p3dModel = null; p3dAutoTrackValue = '';
+`);
 // Conservation as a track path still exists (robustness), but the picker does
 // not list it: homolog/conservation colouring is the toggle's job.
 ctxRun(`parsedTracks.CONSERVATION = { type: 'conservation', metric: 'shannon', values: [0, 0.5, 1, 0.9] };`);

@@ -103,6 +103,35 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Menu dismiss + 3D bounds + model follow — 0.67.26
+
+**Surface.** File/Settings menus → modals; the floating 3D viewer (size + Model
+dropdown); the tour's Data Sources step.
+
+**Should do.** Opening a modal closes the menu dropdown; the enlarged 3D viewer
+stays on screen; the 3D Model defaults to the selected Homolog track; the tour
+Data Sources step mentions the auto UniProt fetch.
+
+**Try.**
+1. **File ▾ → Data Sources…**: the File dropdown closes as the window opens (no
+   lingering menu).
+2. Open the 3D viewer (View → Toggle 3D Viewer) and press **+** to enlarge: it
+   re-centres and stays fully on screen (try near a screen edge, and at a small
+   window size).
+3. Select a Homolog row: the Model dropdown switches to that homolog. Select a
+   different homolog: it follows. Pick a cached PDB from the dropdown: it stays
+   until the track changes (Lock freezes it).
+4. Run the tour: the Data Sources step says the example already tried UniProt and
+   that other data can be imported/called.
+
+**Edge cases.**
+- *Unavailable model* - selecting an unfetched homolog shows a notice but keeps
+  the currently rendered model (does not blank the viewer).
+- *Harness limit* - layout/transition are manual-only; the harness asserts the
+  menu-dismiss call, the post-transition re-place, and the model-follow logic.
+
+---
+
 ### Protein Summary restyle + intake attention — 0.67.24
 
 **Surface.** Selection → **Protein Summary**; Guide → **Protein Background**.

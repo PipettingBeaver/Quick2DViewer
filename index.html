@@ -3532,6 +3532,7 @@ let p3dViewerOpen = false;   // is the floating viewer showing
 let p3dLocked = false;       // Lock Model: keep the current structure loaded (colouring still follows the selection)
 let p3dHomologFlat = false;  // Flat / Per-residue toggle: flat = per-hit model-score colour, else conservation gradient
 let p3dLarge = false;        // false = small (default) | true = large
+let p3dAutoTrackValue = '';  // last track model auto-selected (so a manual pick is not fought)
 let p3dLoaded = false;       // $3Dmol engine ready
 let p3dView = null;          // GLViewer instance
 let p3dModel = null;         // { kind:'pdb'|'homolog', key?, fileName? }
@@ -3569,6 +3570,9 @@ function getModalEl(id) { return document.getElementById(id); }
 function openModalAsDialog(id) {
     const modal = getModalEl(id);
     if (!modal) return;
+    // A modal opened from a menu item must dismiss the dropdown behind it,
+    // otherwise the menu lingers over the modal until the next outside click.
+    if (typeof closeMenuBarMenus === 'function') closeMenuBarMenus();
     if (activeModalId && activeModalId !== id) closeModalAsDialog(activeModalId);
     activeModalId = id;
     modalOpener = document.activeElement;
@@ -3673,7 +3677,7 @@ const TOUR_STEPS = [
     { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Click the highlighted File menu to begin.', require: 'menu-open:file' },
     { target: 'menubar-file-input', title: 'Open Input Data', body: 'Now click Input Data… to load a protein.', require: 'input-modal-open' },
     { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Picking one continues the tour; otherwise click Next when ready.', leave: 'closeInputData', advanceOn: 'example-loaded' },
-    { target: 'menubar-file-btn', title: 'Fetch data from public sources', body: 'Open File ▸ Data Sources… to fetch from public sources (UniProt, topology, domains, homologs, structure, variants…). Each source shows a ✓ once its data is loaded. Try it, then click Next.', optional: true },
+    { target: 'menubar-file-btn', title: 'Fetch data from public sources', body: 'The example protein already tried to fetch its UniProt entry automatically. Open File ▸ Data Sources… to import or call other data too (topology, domains, homologs, structure, variants…); each source shows a ✓ once loaded. Try it, then click Next.', optional: true },
     { target: 'tab-tracks', title: 'Look at the tracks', body: 'Click Tracks to show or hide rows and change their colours and filters.', require: 'tab-open:tracks' },
     { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.', optional: true },
     { target: 'menubar-export-btn', title: 'Export your work (optional)', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL. This step is just for reference.', optional: true }
@@ -11525,7 +11529,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.25';
+const APP_VERSION = '0.67.26';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -19112,10 +19116,12 @@ function toggleP3DSize() {
     const el = document.getElementById('p3dViewer');
     el.classList.toggle('p3d-large', p3dLarge);
     el.classList.toggle('p3d-small', !p3dLarge);
-    window.setTimeout(() => {
-        placeP3DViewer();
-        p3dSafeRender();
-    }, 0);
+    const settle = () => { placeP3DViewer(); p3dSafeRender(); };
+    window.setTimeout(settle, 0);
+    // The width/height transition runs ~180ms. Re-place once it has finished so
+    // the clamp measures the FINAL size; measuring mid-transition used the old
+    // (small) size and left the enlarged viewer hanging off the screen edge.
+    window.setTimeout(settle, 240);
     updateP3DToolbar();
 }
 // The 3D colour picker: base schemes (white/spectrum/chain/hydro/conservation)
@@ -19511,8 +19517,9 @@ function refreshP3DModelOptions() {
     const sel = document.getElementById('p3dModelSelect');
     if (!sel) return;
     const current = sel.value;
+    const homologOpts = p3dHomologOptions(); // the selected Homolog row, if any
     const opts = [];
-    p3dHomologOptions().forEach(o => opts.push(o));
+    homologOpts.forEach(o => opts.push(o));
     Object.keys(cachedStructureTexts).forEach(fn => {
         if (!p3dUsableStructure(fn)) return;
         opts.push({ value: 'pdb:' + fn, label: structBaseName(fn) });
@@ -19524,14 +19531,21 @@ function refreshP3DModelOptions() {
         op.textContent = o.label;
         sel.appendChild(op);
     });
-    if (opts.some(o => o.value === current)) {
-        sel.value = current;
+    // Default: follow the selected track's model when the track changes; else
+    // linger on the model already chosen (if still available); else the first.
+    const trackOpt = homologOpts.length ? homologOpts[0] : null;
+    let chosen = '';
+    if (trackOpt && trackOpt.value !== p3dAutoTrackValue) {
+        p3dAutoTrackValue = trackOpt.value;
+        chosen = trackOpt.value;
+    } else if (opts.some(o => o.value === current)) {
+        chosen = current;
     } else if (opts.length) {
-        sel.value = opts[0].value;
-        loadP3DModel(p3dParseModelValue(opts[0].value));
-    } else {
-        sel.value = '';
+        chosen = opts[0].value;
     }
+    if (!trackOpt) p3dAutoTrackValue = '';
+    sel.value = chosen;
+    if (chosen && chosen !== current) loadP3DModel(p3dParseModelValue(chosen));
 }
 function onP3DModelChange() {
     const sel = document.getElementById('p3dModelSelect');
@@ -19593,17 +19607,21 @@ function updateP3DModelInfo() {
     el.hidden = false;
 }
 function loadP3DModel(model) {
-    p3dModel = model;
-    updateP3DModelInfo();
-    if (!p3dModel) return;
-    if (!p3dLoaded || !p3dView) { setP3DNotice('3D engine not ready. Toggle 3D again.'); return; }
+    if (!model) {
+        p3dModel = null;
+        updateP3DModelInfo();
+        if (p3dLoaded && p3dView) { p3dView.removeAllModels(); p3dSafeRender(); }
+        return;
+    }
+    if (!p3dLoaded || !p3dView) { p3dModel = model; updateP3DModelInfo(); setP3DNotice('3D engine not ready. Toggle 3D again.'); return; }
     let fileName = null;
     if (model.kind === 'homolog') {
         fileName = p3dHomologStructureFile(model.key);
         if (!fileName) {
             // No matching cached file. If the hit looks like an RCSB PDB ID
             // (e.g. "7MDF_A"), fetch the structure on the fly; otherwise (e.g.
-            // a UniProt-style name) explain what to attach.
+            // a UniProt-style name) explain what to attach. Keep the currently
+            // shown model until the new one is actually available.
             p3dRemoteFetchForHomolog(model.key);
             return;
         }
@@ -19612,6 +19630,8 @@ function loadP3DModel(model) {
     }
     const text = cachedStructureTexts[fileName];
     if (!text) { setP3DNotice('Structure text not available for "' + fileName + '".'); return; }
+    p3dModel = model;
+    updateP3DModelInfo();
     setP3DNotice(null);
     setP3DStatus('Rendering ' + p3dModelDisplayName() + ' …');
     p3dView.removeAllModels();

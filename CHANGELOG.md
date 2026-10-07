@@ -12,6 +12,25 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.26] - 2026-10-06
+
+### Fixed
+- **Opening a modal dismisses the menu behind it.** The File/Settings dropdowns
+  lingered over the Data Sources window until an outside click; any modal now
+  closes the open menu bar dropdown.
+- **The enlarged 3D viewer stays on screen.** The size change is animated, and
+  the position clamp measured the old size mid-transition; it now re-places after
+  the transition settles, so the enlarged panel never hangs off the edge.
+
+### Changed
+- **3D model follows the selected track.** The Model dropdown defaults to the
+  selected Homolog row's structure, and follows when the selection moves to
+  another homolog; a manual choice lingers while the track is unchanged, and an
+  unavailable model no longer clears the one currently shown.
+- **Tour wording.** The Data Sources step now notes that the example protein
+  already tries to fetch its UniProt entry, and that other data can be imported
+  or called from Data Sources.
+
 ## [0.67.25] - 2026-10-06
 
 ### Fixed
