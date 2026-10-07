@@ -103,6 +103,29 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Tour covers Data + Tracks — 0.0.13
+
+**Surface.** The tour bar; the new **Data** menu; the sidebar **Tracks** tab.
+
+**Should do.** After loading an example the tour points at the **Data** menu
+(optional), then requires opening **Tracks**, then Guide, then optional Export.
+
+**Try.**
+1. Run the tour: step 3 (Load example) → Next → step 4 highlights **Data** and is
+   optional (Next available). Open Data ▸ → UniProt lookup to see the fetch
+   surface, then Next.
+2. Step 5 highlights **Tracks** and has no Next: click **Tracks** to advance.
+   An unrelated tab (e.g. Guide) does not advance it.
+3. Steps 6–7 (Guide, Export) advance with Next; Skip ends the tour anywhere.
+
+**Edge cases.**
+- *Offline* - the Data step is optional, so a fetch that cannot run never blocks
+  the tour.
+- *Harness limit* - highlight/bar layout is manual-only; the harness drives the
+  gating through `tourOnUiEvent('tab-open:tracks')` and asserts the step order.
+
+---
+
 ### Data + Settings menus — 0.0.12
 
 **Surface.** The menu bar (**Data**, **Settings**); the Options modal.
@@ -173,7 +196,8 @@ a "waiting" caption. The Export step is informational (highlighted, not required
    Click **Input Data…**: the modal opens and the tour advances to
    **Load example protein** with a Next button.
 3. Pick a protein (or just press **Next**): the modal closes and the tour
-   highlights the sidebar tabs, then the Guide tab, then the Export button.
+   highlights the **Data** menu (optional), then the **Tracks** tab, the Guide
+   tab, then the Export button (see the 0.0.13 card).
 4. **Back** works on the informational steps; **Skip** ends the tour at any point.
 
 **Edge cases.**

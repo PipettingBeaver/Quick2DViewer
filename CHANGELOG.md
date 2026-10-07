@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.13] - 2026-10-07
+
+### Changed
+- **The tour now covers data sources and tracks.** After loading an example it
+  highlights the new **Data** menu (optional: "fetch data from public sources"),
+  then requires opening the **Tracks** tab to see row visibility and colours,
+  then the Guide and the optional Export step. Tracks were absent from onboarding
+  before; the Data step shows where the public-API sources live now that they are
+  one click from the menu bar.
+
 ## [0.0.12] - 2026-10-07
 
 ### Added

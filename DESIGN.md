@@ -965,7 +965,7 @@ rendered UI.
 | P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.5 |
 | P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.6 |
 | P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.4 |
-| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.13 |
+| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.14 |
 
 ### P1 - Get Started (0.0.3)
 
@@ -990,6 +990,12 @@ for the File menu to open (`tourOnUiEvent('menu-open:file')`, fired from
 with a `require` hides the Next button and shows a "waiting" caption; the
 `leave: 'closeInputData'` flag closes the modal when the Load-example step is
 done. The Export step stays informational (highlighted, no requirement).
+
+Revised (0.0.13). The tour grew to cover data sources and tracks: after loading
+an example it highlights the new **Data** menu (optional), then requires the
+**Tracks** tab to open (`tourOnUiEvent('tab-open:tracks')`, fired from
+`switchSidebarTab`), then the Guide and the optional Export step. Tracks were
+absent from onboarding before.
 
 Decision. A first-run **welcome modal** introduces the three moves (try an
 example, paste Quick2D, attach files) and offers a short **coachmark tour** of the
@@ -1078,7 +1084,7 @@ which currently promises no outbound call absent opt-in; the section and
 Non-goals. No silent sending: the indicator and the per-action disclosure line
 remain; the off switch is honoured everywhere.
 
-### P5 - Accessibility pass (0.0.13)
+### P5 - Accessibility pass (0.0.14)
 
 Decision. Make the `ⓘ` `.tooltip-content` reachable by keyboard (`:focus-visible`
 on the already-focusable info icons) and disable transitions under

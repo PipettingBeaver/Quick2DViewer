@@ -3633,9 +3633,10 @@ const TOUR_STEPS = [
     { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Click the highlighted File menu to begin.', require: 'menu-open:file' },
     { target: 'menubar-file-input', title: 'Open Input Data', body: 'Now click Input Data… to load a protein.', require: 'input-modal-open' },
     { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Click Next when ready.', leave: 'closeInputData' },
-    { target: 'sidebarTabs', title: 'Your workspace', body: 'Selection, Tracks, Analyze, Guide and Commands hold everything you do with the loaded protein.' },
-    { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.' },
-    { target: 'menubar-export-btn', title: 'Export your work (optional)', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL. This step is just for reference.' }
+    { target: 'menubar-datasources-btn', title: 'Fetch data from public sources', body: 'Open Data ▸ to reach every data source in one click - for example UniProt lookup to fetch the curated entry. Try it, then click Next.', optional: true },
+    { target: 'tab-tracks', title: 'Look at the tracks', body: 'Click Tracks to show or hide rows and change their colours and filters.', require: 'tab-open:tracks' },
+    { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.', optional: true },
+    { target: 'menubar-export-btn', title: 'Export your work (optional)', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL. This step is just for reference.', optional: true }
 ];
 let uploadedStructureFiles = []; // [{name, ext, size}] - metadata only, see note at push() site below
 // Per-track metadata for imported HHpred hits (rank, hit id, description,
@@ -10321,6 +10322,7 @@ function switchSidebarTab(name) {
     else if (name === 'analyze') { renderRulesList(); }
     else clearGuideCoachmark();
     if (name === 'guide') { renderWorkflowGuide(); }
+    if (typeof tourOnUiEvent === 'function') tourOnUiEvent('tab-open:' + name);
 }
 // Left/Right arrows move between sidebar tabs (roving tabindex).
 (function initSidebarTabKeys() {
@@ -11412,7 +11414,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.12';
+const APP_VERSION = '0.0.13';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
