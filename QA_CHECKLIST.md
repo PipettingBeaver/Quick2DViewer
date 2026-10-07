@@ -103,7 +103,28 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
-### Help quick start + empty-state checklist — 0.0.14
+### Tour step 3 auto-advances — 0.67.20
+
+**Surface.** The tour bar; Input Data → **Load example protein**.
+
+**Should do.** Picking a protein continues the tour automatically; Next stays
+available for people who paste/attach instead.
+
+**Try.**
+1. Run the tour to step 3 (Load example protein). Pick GFP: the tour advances to
+   the Data Sources step without pressing Next, and the Input Data modal closes.
+2. Repeat but paste Quick2D output or attach a file: Next is still available to
+   continue.
+
+**Edge cases.**
+- *No preset picked* - `example-loaded` fires only for a known example accession;
+  other loads leave the step on Next.
+- *Harness limit* - highlight/bar layout is manual-only; the harness asserts the
+  `advanceOn` field and drives the advance through `tourOnUiEvent('example-loaded')`.
+
+---
+
+### Help quick start + empty-state checklist — 0.67.18
 
 **Surface.** Help menu → **Help** modal; the empty viewer (`#alignmentGrid`).
 
@@ -126,7 +147,7 @@ a get-started checklist with Open Input Data / Attach files / Take the tour.
 
 ---
 
-### Tour covers Data + Tracks — 0.0.13
+### Tour covers Data + Tracks — 0.67.17
 
 **Surface.** The tour bar; **File → Data Sources…**; the sidebar **Tracks** tab.
 
@@ -149,7 +170,7 @@ a get-started checklist with Open Input Data / Attach files / Take the tour.
 
 ---
 
-### Data Sources window + checkmarks — 0.0.15
+### Data Sources window + checkmarks — 0.67.19
 
 **Surface.** **File → Data Sources…**; the Data Sources window; the category
 select with ✓ marks.
@@ -179,7 +200,7 @@ is gone; Settings keeps Appearance / Commands / Storage.
 
 ---
 
-### Data + Settings menus — 0.0.12 (superseded by 0.0.15)
+### Data + Settings menus — 0.67.16 (superseded by 0.67.19)
 
 **Surface.** The menu bar (**Data**, **Settings**); the Options modal.
 
@@ -192,19 +213,19 @@ opens the four Options areas on the right tab. One click each.
 2. **Data ▸ → Variant effects**: same, on Variants (species controls visible).
 3. **Settings ▸ → Storage**: Options opens on the Storage tab; **Settings ▸ →
    Commands** on Commands; **Settings ▸ → Appearance** on Appearance.
-4. The new menus stay inside the viewport (the 0.0.11 clamp) and are keyboard
+4. The new menus stay inside the viewport (the 0.67.15 clamp) and are keyboard
    reachable (Left/Right/Down/Escape).
 
 **Edge cases.**
 - *Superseded* - the **Data** menu was replaced by **File → Data Sources…** in
-  0.0.15; this card is kept for history. Settings now has three entries.
+  0.67.19; this card is kept for history. Settings now has three entries.
 - *Harness limit* - menu layout is manual-only; the harness asserts both menus
   exist, that the Data menu links every `DATA_CATEGORY_HINTS` key, and that the
   Settings menu links all four tabs.
 
 ---
 
-### Input Data reorg + PDB sequence fallback — 0.0.10
+### Input Data reorg + PDB sequence fallback — 0.67.14
 
 **Surface.** Input Data modal (top section, Import section, Loaded Data row);
 Fetch PDB entry.
@@ -233,7 +254,7 @@ a PDB entry into an empty session adopts the entry's sequence.
 
 ---
 
-### Interactive tour — 0.0.9
+### Interactive tour — 0.67.13
 
 **Surface.** The tour bar; the File menu, the Input Data modal, the header/tabs.
 
@@ -250,7 +271,7 @@ a "waiting" caption. The Export step is informational (highlighted, not required
    **Load example protein** with a Next button.
 3. Pick a protein (or just press **Next**): the modal closes and the tour
    highlights the **Data** menu (optional), then the **Tracks** tab, the Guide
-   tab, then the Export button (see the 0.0.13 card).
+   tab, then the Export button (see the 0.67.17 card).
 4. **Back** works on the informational steps; **Skip** ends the tour at any point.
 
 **Edge cases.**
@@ -264,7 +285,7 @@ a "waiting" caption. The Export step is informational (highlighted, not required
 
 ---
 
-### GFP moves to Input Data — 0.0.7
+### GFP moves to Input Data — 0.67.11
 
 **Surface.** Header (no Try GFP button), welcome modal, viewer empty state,
 Input Data → **Load example protein**, the tour.
@@ -288,11 +309,11 @@ Input Data → **Load example protein**, the tour.
 
 ---
 
-### Get started onboarding + clear-data split — 0.0.3
+### Get started onboarding + clear-data split — 0.67.7
 
 **Surface.** The viewer empty state, Help menu, File menu, Options → Storage, the
 welcome modal and the tour bar. (The direct **Try GFP** entries here were replaced
-by **Input Data → Load example protein** in 0.0.7 - see that card.)
+by **Input Data → Load example protein** in 0.67.11 - see that card.)
 
 **Should do.** A first-time visitor gets a dismissible welcome panel once;
 **Clear input data** drops the loaded session but keeps preferences, and
@@ -305,7 +326,7 @@ by **Input Data → Load example protein** in 0.0.7 - see that card.)
    GFP under **Load example protein**: expect the GFP sequence and UniProt rows
    (no confirm on the deployed site; on `file://` the confirm still appears once).
 3. Help → **Getting started** reopens the welcome; **Show me around** starts the
-   interactive tour (see the 0.0.9 card for the required File → Input Data steps).
+   interactive tour (see the 0.67.13 card for the required File → Input Data steps).
 4. Change a preference (e.g. palette), load data, then File → **Clear input data**. Expect
    the data gone and the palette still changed; a reload must not resurrect the old data.
 5. File → **Clear all data**. Expect an empty viewer, default palette, external services
@@ -320,7 +341,7 @@ by **Input Data → Load example protein** in 0.0.7 - see that card.)
 
 ---
 
-### API access on by default — 0.0.4
+### API access on by default — 0.67.8
 
 **Surface.** Options → Data Sources → External services; every outbound action
 (UniProt, BLAST/HMMER, ESMFold, Foldseek).
@@ -341,12 +362,12 @@ call still asks.
 **Edge cases.**
 - *`file://`* - starts OFF and still asks once; this is intentional.
 - *Clear all data* - returns to the platform default (ON on http(s), OFF on file://).
-- *Saved session from before 0.0.4* - an explicit OFF in the save is honoured
+- *Saved session from before 0.67.8* - an explicit OFF in the save is honoured
   (only a missing preference takes the platform default).
 
 ---
 
-### Protein summary panel — 0.0.5
+### Protein summary panel — 0.67.9
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.
 
@@ -373,7 +394,7 @@ location block; the section is absent until a summary exists.
 
 ---
 
-### Header jump box — 0.0.6
+### Header jump box — 0.67.10
 
 **Surface.** The **Jump to…** box in the header; the tab / menu / Options
 surfaces it navigates to.
@@ -405,7 +426,7 @@ opens the surface and briefly flashes the target, never running an action.
 
 ---
 
-### UI category sweep + accessibility — 0.0.2
+### UI category sweep + accessibility — 0.67.6
 
 **Surface.** Menu bar, sidebar tabs, Options tabs, icon-only controls.
 

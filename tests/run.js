@@ -275,7 +275,7 @@ assert(ctxRun(`WELCOME_KEY === 'q2dViewer_welcome_v1'`), 'the welcome memory has
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Open Input Data') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'the empty state points at Input Data and Attach files');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Get started') !== -1 && EMPTY_STATE_HTML.indexOf('Take the tour') !== -1 && EMPTY_STATE_HTML.indexOf("openDataSources('uniprot')") !== -1`), 'the empty state is a get-started checklist with a tour link');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Try GFP') === -1`), 'the empty state no longer has a direct Try GFP shortcut');
-assert(HTML.indexOf('>Quick start</h4>') !== -1 && HTML.indexOf('<strong>Data</strong> menu opens every source') !== -1, 'the Help modal carries a quick start naming the Data menu');
+assert(HTML.indexOf('>Quick start</h4>') !== -1 && HTML.indexOf('<strong>File ▸ Data Sources…</strong> opens every source') !== -1, 'the Help modal carries a quick start naming File -> Data Sources');
 assert(HTML.indexOf('id="welcomeModal"') !== -1 && HTML.indexOf('id="tourBar"') !== -1, 'the welcome modal and tour bar exist in the markup');
 assert(HTML.indexOf('recommended to click <strong>Show me around</strong>') !== -1, 'the welcome modal recommends the tour');
 assert(HTML.indexOf('id="tryGfpBtn"') === -1 && ctxRun(`typeof tryGfpExample === 'undefined'`), 'there is no header Try GFP button or helper');
@@ -286,6 +286,7 @@ assert(ctxRun('TOUR_STEPS.length') >= 3, 'the tour has at least three steps');
 assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'menubar-file-btn,menubar-file-input,inputAccessionPreset,menubar-file-btn,tab-tracks,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
 assert(ctxRun(`TOUR_STEPS[0].require === 'menu-open:file' && TOUR_STEPS[1].require === 'input-modal-open'`), 'opening File then Input Data are required steps');
 assert(ctxRun(`TOUR_STEPS[2].body.indexOf('Load example protein') !== -1 && TOUR_STEPS[2].body.indexOf('GFP') !== -1`), 'the Load example step tells the user about GFP');
+assert(ctxRun(`TOUR_STEPS[2].advanceOn === 'example-loaded' && !TOUR_STEPS[2].require`), 'picking an example auto-advances the Load example step (Next stays available)');
 assert(ctxRun(`TOUR_STEPS[3].body.indexOf('Data Sources') !== -1 && !TOUR_STEPS[3].require`), 'the Data Sources step is optional and points at File -> Data Sources');
 assert(ctxRun(`TOUR_STEPS[4].target === 'tab-tracks' && TOUR_STEPS[4].require === 'tab-open:tracks'`), 'the Tracks step is required (click the Tracks tab)');
 assert(ctxRun(`!TOUR_STEPS.some(function (s) { return s.require && s.target === 'menubar-export-btn'; })`), 'the Export step is optional (no requirement)');
@@ -310,8 +311,8 @@ assert(ctxRun('tourIndex') === 1, 'the Input Data step also waits for the action
 ctxRun(`tourOnUiEvent('input-modal-open');`);
 assert(ctxRun('tourIndex') === 2, 'opening Input Data advances the tour');
 assert(ctxRun(`document.getElementById('tourNextBtn').hidden === false`), 'the Load example step offers a Next button');
-ctxRun(`tourNext();`);
-assert(ctxRun('tourIndex') === 3, 'Next advances to the optional Data Sources step');
+ctxRun(`tourOnUiEvent('example-loaded');`);
+assert(ctxRun('tourIndex') === 3, 'picking an example protein continues to the Data Sources step');
 ctxRun(`tourNext();`);
 assert(ctxRun('tourIndex') === 4, 'Next advances to the Tracks step');
 assert(ctxRun(`document.getElementById('tourNextBtn').hidden === true`), 'the Tracks step hides Next until the tab is opened');

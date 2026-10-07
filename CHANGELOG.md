@@ -12,7 +12,19 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
-## [0.0.15] - 2026-10-07
+## [0.67.20] - 2026-10-06
+
+### Added
+- **Tour step 3 is responsive.** Picking a protein under **Load example protein**
+  now continues the tour to the next step automatically; the Next button stays
+  available for people who paste Quick2D output or attach a file instead.
+
+### Fixed
+- **Version history renumbered.** The 0.0.x entries (a numbering slip) are
+  restored to the 0.67.x line: 0.0.1 -> 0.67.5 through 0.0.15 -> 0.67.19, all
+  dated 2026-10-06.
+
+## [0.67.19] - 2026-10-06
 
 ### Changed
 - **Data Sources is its own window, opened from File.** The temporary top-level
@@ -22,7 +34,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   the Settings menu no longer duplicates Data Sources. All existing deep links
   (Guide, Input Data, empty-state checklist) open the new window.
 
-## [0.0.14] - 2026-10-07
+## [0.67.18] - 2026-10-06
 
 ### Added
 - **Help quick start + get-started checklist.** The Help modal now lists the
@@ -30,7 +42,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   empty viewer is a short checklist - load a protein, fetch data, explore/export
   - with Open Input Data, Attach files and Take the tour buttons.
 
-## [0.0.13] - 2026-10-07
+## [0.67.17] - 2026-10-06
 
 ### Changed
 - **The tour now covers data sources and tracks.** After loading an example it
@@ -40,7 +52,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   before; the Data step shows where the public-API sources live now that they are
   one click from the menu bar.
 
-## [0.0.12] - 2026-10-07
+## [0.67.16] - 2026-10-06
 
 ### Added
 - **Data and Settings menus.** A top-level **Data** menu deep-links every Data
@@ -50,7 +62,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   the Guide's "Data sources" links are unchanged; the jump box indexes the two
   new menus.
 
-## [0.0.11] - 2026-10-07
+## [0.67.15] - 2026-10-06
 
 ### Fixed
 - **Menu dropdowns stay on screen.** The right-edge **Export** menu (and any
@@ -58,7 +70,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   off the right edge, and long menus are height-bounded with internal scrolling
   so they cannot run off the bottom.
 
-## [0.0.10] - 2026-10-07
+## [0.67.14] - 2026-10-06
 
 ### Changed
 - **Input Data reorganized.** **Load example protein** now sits at the top of
@@ -72,7 +84,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   code) is adopted, so the structure has something to map onto instead of
   landing in an empty session.
 
-## [0.0.9] - 2026-10-07
+## [0.67.13] - 2026-10-06
 
 ### Changed
 - **The tour is now interactive.** The first two steps wait for the user to
@@ -81,14 +93,14 @@ sweeps), from which the usual feature/patch cadence resumes.
   is no Next button on a required step (only Back/Skip); a caption says it is
   waiting. The **Export** step stays optional - highlighted, not required.
 
-## [0.0.8] - 2026-10-07
+## [0.67.12] - 2026-10-06
 
 ### Changed
 - **Welcome copy.** The first-run panel now describes Q2DV as a unified view of
   protein sequence information, structure annotations and more, and recommends
   **Show me around** for a first-time tour.
 
-## [0.0.7] - 2026-10-07
+## [0.67.11] - 2026-10-06
 
 ### Changed
 - **GFP moves into Input Data.** The header **Try GFP** button and the welcome
@@ -98,7 +110,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   direct GFP shortcut, and the tour's first step teaches the path: File ->
   Input Data... -> Load example protein -> GFP.
 
-## [0.0.6] - 2026-10-07
+## [0.67.10] - 2026-10-06
 
 ### Added
 - **Header jump box.** A "Jump to…" box in the header searches a locally built
@@ -109,7 +121,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   pure function and tests assert it covers every guide step and data category and
   that every id target exists in the markup.
 
-## [0.0.5] - 2026-10-07
+## [0.67.9] - 2026-10-06
 
 ### Added
 - **Protein summary panel.** Loading a UniProt accession now also fetches the
@@ -120,7 +132,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   import, cleared with the input data, and included in the methods summary.
   A failed summary fetch never blocks the feature tracks.
 
-## [0.0.4] - 2026-10-07
+## [0.67.8] - 2026-10-06
 
 ### Changed
 - **API access is on by default.** External services start ON when the page is
@@ -130,7 +142,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   `DESIGN.md` §3 invariant and `AGENTS.md` were rewritten to match. The welcome
   panel's footer now simply points at Help -> Getting started.
 
-## [0.0.3] - 2026-10-07
+## [0.67.7] - 2026-10-06
 
 ### Added
 - **Get started onboarding.** A first-run **Welcome** panel (dismissible and
@@ -146,7 +158,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   the welcome memory. Both are in the File menu and Options -> Storage; neither
   touches the device-local structure cache, which keeps its own control.
 
-## [0.0.2] - 2026-10-07
+## [0.67.6] - 2026-10-06
 
 ### Changed
 - **UI category sweep.** A dedicated **Analyze** sidebar tab now holds Rules,
@@ -169,7 +181,7 @@ sweeps), from which the usual feature/patch cadence resumes.
   their `title` as an `aria-label`.
 - Modest root font-size bump (16 -> 17px) for legibility.
 
-## [0.0.1] - 2026-10-07
+## [0.67.5] - 2026-10-06
 
 ### Changed
 - **New-feature highlights are off by default.** The `.qa-new` purple outlines

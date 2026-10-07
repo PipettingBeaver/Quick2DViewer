@@ -2339,7 +2339,7 @@
                 <p style="margin:0 0 8px; text-align:center; font-weight:600; color:#334155;">No data loaded yet. Get started:</p>
                 <ol style="margin:0 auto 10px; max-width:520px; padding-left:20px; font-size:0.82rem; line-height:1.7; color:#475569;">
                     <li>Load a protein: <button type="button" class="tb-btn tb-btn-secondary" style="font-size:0.72rem; padding:2px 8px;" onclick="openInputDataModal()">Open Input Data</button> - pick an example protein, paste Quick2D output, or attach a file.</li>
-                    <li>Fetch data from public sources: open the <strong>Data</strong> menu, or <button type="button" class="tb-btn tb-btn-secondary" style="font-size:0.72rem; padding:2px 8px;" onclick="openDataSources('uniprot')">open Data Sources</button>.</li>
+                    <li>Fetch data from public sources: <button type="button" class="tb-btn tb-btn-secondary" style="font-size:0.72rem; padding:2px 8px;" onclick="openDataSources('uniprot')">open Data Sources</button> (also <strong>File ▸ Data Sources…</strong>).</li>
                     <li>Explore the sidebar tabs, follow the <strong>Guide</strong>, and export from the <strong>Export</strong> menu.</li>
                 </ol>
                 <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding: 4px 20px 20px;">
@@ -3255,7 +3255,7 @@
             <h4 style="margin:14px 0 6px; color:#0f172a; font-size:0.9rem;">Quick start</h4>
             <ol style="margin:0; padding-left:20px; font-size:0.82rem; line-height:1.6; color:#475569;">
                 <li><strong>Load a protein</strong> - <strong>Input Data</strong>: pick an example protein, paste Quick2D output, or attach a PDB/CIF/JSON/save file.</li>
-                <li><strong>Fetch data</strong> - the <strong>Data</strong> menu opens every source in one click (UniProt, topology, domains, homologs, structure, variants, and more).</li>
+                <li><strong>Fetch data</strong> - <strong>File ▸ Data Sources…</strong> opens every source in one window (UniProt, topology, domains, homologs, structure, variants, and more).</li>
                 <li><strong>Explore</strong> - the sidebar tabs: Selection, Tracks, Analyze, Guide and Commands.</li>
                 <li><strong>Export</strong> - the <strong>Export</strong> menu: session save, figures, TSV/CSV, structure file, methods summary and 3D commands.</li>
                 <li><strong>Find things</strong> - the <strong>Jump to…</strong> box in the header, and the ⓘ icons throughout.</li>
@@ -3632,7 +3632,7 @@ const EMPTY_STATE_HTML = '<div style="padding: 16px 24px 4px; color:#475569;">'
     + '<p style="margin:0 0 8px; text-align:center; font-weight:600; color:#334155;">No data loaded yet. Get started:</p>'
     + '<ol style="margin:0 auto 10px; max-width:520px; padding-left:20px; font-size:0.82rem; line-height:1.7; color:#475569;">'
     + '<li>Load a protein: <button type="button" class="tb-btn tb-btn-secondary" style="font-size:0.72rem; padding:2px 8px;" onclick="openInputDataModal()">Open Input Data</button> - pick an example protein, paste Quick2D output, or attach a file.</li>'
-    + '<li>Fetch data from public sources: open the <strong>Data</strong> menu, or <button type="button" class="tb-btn tb-btn-secondary" style="font-size:0.72rem; padding:2px 8px;" onclick="openDataSources(\'uniprot\')">open Data Sources</button>.</li>'
+    + '<li>Fetch data from public sources: <button type="button" class="tb-btn tb-btn-secondary" style="font-size:0.72rem; padding:2px 8px;" onclick="openDataSources(\'uniprot\')">open Data Sources</button> (also <strong>File \u25b8 Data Sources\u2026</strong>).</li>'
     + '<li>Explore the sidebar tabs, follow the <strong>Guide</strong>, and export from the <strong>Export</strong> menu.</li>'
     + '</ol>'
     + '<div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding: 4px 20px 20px;">'
@@ -3649,7 +3649,7 @@ const EMPTY_STATE_HTML = '<div style="padding: 16px 24px 4px; color:#475569;">'
 const TOUR_STEPS = [
     { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Click the highlighted File menu to begin.', require: 'menu-open:file' },
     { target: 'menubar-file-input', title: 'Open Input Data', body: 'Now click Input Data… to load a protein.', require: 'input-modal-open' },
-    { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Click Next when ready.', leave: 'closeInputData' },
+    { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Picking one continues the tour; otherwise click Next when ready.', leave: 'closeInputData', advanceOn: 'example-loaded' },
     { target: 'menubar-file-btn', title: 'Fetch data from public sources', body: 'Open File ▸ Data Sources… to fetch from public sources (UniProt, topology, domains, homologs, structure, variants…). Each source shows a ✓ once its data is loaded. Try it, then click Next.', optional: true },
     { target: 'tab-tracks', title: 'Look at the tracks', body: 'Click Tracks to show or hide rows and change their colours and filters.', require: 'tab-open:tracks' },
     { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.', optional: true },
@@ -7766,6 +7766,9 @@ async function onInputAccessionPreset(accession) {
     if (!accession) return false;
     const preset = ACCESSION_PRESETS.find(p => p.accession === accession);
     if (!preset) return false;
+    // The onboarding tour advances as soon as an example is picked (its Load
+    // example step also keeps a Next button for people who paste/attach instead).
+    if (typeof tourOnUiEvent === 'function') tourOnUiEvent('example-loaded');
     const speciesNote = applySpeciesForOrganism(preset.species);
     logAction('session', 'example protein', preset.name + ' (' + preset.accession + ')');
     showToast('Loading ' + preset.name + ' (' + preset.accession + ', ' + preset.organism + ')\u2026' + speciesNote, 'info');
@@ -10903,11 +10906,13 @@ function endTour() {
     const bar = document.getElementById('tourBar');
     if (bar) bar.hidden = true;
 }
-// The app calls this when a UI event the tour may be waiting on happens.
+// The app calls this when a UI event the tour may be waiting on happens. A
+// step's `require` gates it (no Next); `advanceOn` only auto-advances, so the
+// Next button stays available.
 function tourOnUiEvent(kind) {
     if (!tourActive) return;
     const step = TOUR_STEPS[tourIndex];
-    if (step && step.require === kind) tourNext(true);
+    if (step && (step.require === kind || step.advanceOn === kind)) tourNext(true);
 }
 
 // --- Confirm dialog (headless-safe replacement for window.confirm) --------
@@ -11474,7 +11479,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.15';
+const APP_VERSION = '0.67.20';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

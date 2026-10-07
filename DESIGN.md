@@ -961,21 +961,21 @@ rendered UI.
 
 | Pri | Feature | Approach chosen | Category (§16) | Effort | Release |
 |---|---|---|---|---|---|
-| P1 | **Get Started** onboarding | welcome modal + coachmark tour, header **Try GFP**, empty-state card | Background (onboarding) | 1.5-2.5 d | 0.0.3 |
-| P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.5 |
-| P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.6 |
-| P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.4 |
-| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.16 |
+| P1 | **Get Started** onboarding | welcome modal + coachmark tour, header **Try GFP**, empty-state card | Background (onboarding) | 1.5-2.5 d | 0.67.7 |
+| P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.67.9 |
+| P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.67.10 |
+| P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.67.8 |
+| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.67.21 |
 
-### P1 - Get Started (0.0.3)
+### P1 - Get Started (0.67.7)
 
-Shipped (0.0.3). Welcome panel (dismissible, remembered under its own
+Shipped (0.67.7). Welcome panel (dismissible, remembered under its own
 `q2dViewer_welcome_v1` key), coachmark tour, header Try GFP, and the three-action
 empty state. The same release split the old "Reset Data" into **Clear input
 data** (session only) and **Clear all data** (also preferences + welcome), so
 onboarding state has a deliberate lifetime.
 
-Revised (0.0.7). The direct **Try GFP** shortcuts were removed at the user's
+Revised (0.67.11). The direct **Try GFP** shortcuts were removed at the user's
 request: no header button and no welcome-modal button. The loader is the
 example-protein dropdown in **Input Data**, relabelled **Load example protein**
 (`index.html:2216`), the empty state offers **Open Input Data** / **Attach
@@ -983,7 +983,7 @@ files**, and the tour's first step teaches File -> Input Data -> Load example
 protein -> GFP. This restores §20's rule that choosing data belongs in Input
 Data; the header/empty-state entries were onboarding-only exceptions.
 
-Revised (0.0.9). The tour is interactive for the first two steps: step 1 waits
+Revised (0.67.13). The tour is interactive for the first two steps: step 1 waits
 for the File menu to open (`tourOnUiEvent('menu-open:file')`, fired from
 `toggleMenuBarMenu`) and step 2 for Input Data to open
 (`tourOnUiEvent('input-modal-open')`, fired from `openInputDataModal`). A step
@@ -991,11 +991,18 @@ with a `require` hides the Next button and shows a "waiting" caption; the
 `leave: 'closeInputData'` flag closes the modal when the Load-example step is
 done. The Export step stays informational (highlighted, no requirement).
 
-Revised (0.0.13). The tour grew to cover data sources and tracks: after loading
+Revised (0.67.17). The tour grew to cover data sources and tracks: after loading
 an example it highlights the new **Data** menu (optional), then requires the
 **Tracks** tab to open (`tourOnUiEvent('tab-open:tracks')`, fired from
 `switchSidebarTab`), then the Guide and the optional Export step. Tracks were
-absent from onboarding before.
+absent from onboarding before. (The Data step now points at File -> Data Sources
+after the 0.67.19 rework.)
+
+Revised (0.67.20). Tour step 3 is responsive: picking a protein under Load
+example protein fires `tourOnUiEvent('example-loaded')` (from
+`onInputAccessionPreset`) and continues the tour. A step's `require` still gates
+it (no Next); `advanceOn` only auto-advances, so the Next button stays available
+for paste/attach.
 
 Decision. A first-run **welcome modal** introduces the three moves (try an
 example, paste Quick2D, attach files) and offers a short **coachmark tour** of the
@@ -1020,9 +1027,9 @@ every load.
 Non-goals. No product tour across every surface; no sample data bundle shipped
 in-repo beyond the existing presets.
 
-### P2 - Protein summary panel (0.0.5)
+### P2 - Protein summary panel (0.67.9)
 
-Shipped (0.0.5). A new `protein_summary` capability (`uniprotSummary` adapter,
+Shipped (0.67.9). A new `protein_summary` capability (`uniprotSummary` adapter,
 `parseUniProtSummary`) reads the entry JSON; `useUniProtAccession` stores it and
 `renderProteinSummary()` fills a **Protein Summary** section in the Selection
 workspace, hidden until a summary loads. Persisted with the session and emitted
@@ -1043,9 +1050,9 @@ methods report / AI pack, not as a new pipeline stage.
 Non-goals. No GO enrichment, no pathway diagrams; no summary for proteins loaded
 without a UniProt accession (the panel stays hidden).
 
-### P3 - Header jump box (0.0.6)
+### P3 - Header jump box (0.67.10)
 
-Shipped (0.0.6). `buildJumpIndex()` is the pure index; `jumpMatches()` ranks
+Shipped (0.67.10). `buildJumpIndex()` is the pure index; `jumpMatches()` ranks
 exact > prefix > substring > description; `jumpNavigate()` opens the surface
 (tab / menu dropdown / Options data category / Guide full view) and
 `pulseJumpTarget()` flashes the target. Indexed: 5 sidebar tabs, 6 menu-bar
@@ -1067,9 +1074,9 @@ target resolves to a real element id.
 Non-goals. No remote/doc search, no residue-pattern search (the existing
 `seqSearchInput` at `index.html:2349` already covers that).
 
-### P4 - Network opt-in default ON (0.0.4)
+### P4 - Network opt-in default ON (0.67.8)
 
-Shipped (0.0.4). `externalServicesDefault()` returns ON unless the page is on
+Shipped (0.67.8). `externalServicesDefault()` returns ON unless the page is on
 `file://`; the saved preference overrides it when present, `Clear all data`
 restores the platform default, and the Options -> Data Sources switch shows the
 state and turns it off/on. The §3 invariant and `AGENTS.md` were rewritten in the
@@ -1084,12 +1091,12 @@ which currently promises no outbound call absent opt-in; the section and
 Non-goals. No silent sending: the indicator and the per-action disclosure line
 remain; the off switch is honoured everywhere.
 
-### P5 - Accessibility pass (0.0.16)
+### P5 - Accessibility pass (0.67.21)
 
 Decision. Make the `ⓘ` `.tooltip-content` reachable by keyboard (`:focus-visible`
 on the already-focusable info icons) and disable transitions under
 `prefers-reduced-motion`. Optionally route toasts/status lines through a polite
-`aria-live` region. Continues the 0.0.2 `role="tab"` / menu-role work and closes
+`aria-live` region. Continues the 0.67.6 `role="tab"` / menu-role work and closes
 the highest-value items from EVALUATION dimension 7.
 
 Non-goals. A full WCAG 2.1 AA audit (contrast tokenisation, focus-order review,
@@ -1097,8 +1104,9 @@ automated axe pass) remains a separate future item.
 
 ### Sequencing
 
-Shipped so far: P1 (0.0.3), P4 pulled ahead at the user's request (0.0.4),
-P2 (0.0.5), P3 (0.0.6); P1 revised (0.0.7). Remaining: P5 (accessibility).
+Shipped so far: P1 (0.67.7), P4 pulled ahead at the user's request (0.67.8),
+P2 (0.67.9), P3 (0.67.10); P1 revised (0.67.11, 0.67.13, 0.67.17, 0.67.20).
+Remaining: P5 (accessibility).
 Tests and QA cards are written per release; versions are renumbered rather than
 bundled if work overlaps.
 
@@ -1121,7 +1129,7 @@ The Options modal remains the single home; this only adds reachability. The
 Guide deep-links, the Input Data "Data sources" button, and the jump box index
 are unchanged (the jump box gained the two new menus).
 
-**Revised (0.0.15).** The top-level **Data** menu was judged a "heavy
+**Revised (0.67.19).** The top-level **Data** menu was judged a "heavy
 compromise" and removed. Data Sources is now:
 
 - its **own window** (`#dataSourcesModal`); the self-contained `#opt-tab-data`
