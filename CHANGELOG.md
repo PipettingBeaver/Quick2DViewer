@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.22] - 2026-10-06
+
+### Fixed
+- **UniProt feature rows now render immediately.** Loading an example protein
+  into an empty session built the `UP_` rows before the sequence existed, so
+  `applyUniProtFeatures` returned early and only the AA row showed until a
+  reload re-applied them from the save. The sequence is now fetched before the
+  rows are built, and the rows render in the same pass.
+
 ## [0.67.21] - 2026-10-06
 
 ### Fixed

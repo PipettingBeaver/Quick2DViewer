@@ -103,6 +103,30 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### UniProt rows render on load — 0.67.22
+
+**Surface.** Input Data → **Load example protein** (any accession fetch into an
+empty session).
+
+**Should do.** Picking an example shows the AA row **and** the UniProt feature
+rows immediately, without a reload.
+
+**Try.**
+1. Clear input data, then Load example protein → GFP: expect the AA row plus the
+   UniProt rows (Mutagenesis, Beta strand, Helix, Turn, Variant, …) right away.
+2. Reload: the same rows are there (previously they only appeared after this
+   reload).
+
+**Edge cases.**
+- *Sequence already loaded* - the fetch keeps the loaded sequence and still
+  builds the rows.
+- *FASTA fetch fails* - with no sequence the rows cannot be indexed; the warn
+  toast says so.
+- *Harness limit* - rendering is manual-only; the harness asserts the `UP_` rows
+  exist right after `useUniProtAccession` on an empty session.
+
+---
+
 ### Tour step 3 auto-advances — 0.67.20
 
 **Surface.** The tour bar; Input Data → **Load example protein**.

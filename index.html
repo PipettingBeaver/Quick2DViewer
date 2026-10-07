@@ -5372,25 +5372,28 @@ async function useUniProtAccession(acc) {
     uniprotAccession = acc;
     macroCaptureStep({ type: 'uniprot', accession: macroParam(acc) });
     uniprotFeatures = { accession: acc, features, fetchedAt: Date.now() };
-    applyUniProtFeatures();
     // Fetch the paired FASTA only when nothing is loaded: retargeting a macro
-    // or loading annotations over your own FASTA must keep your sequence.
+    // or loading annotations over your own FASTA must keep your sequence. This
+    // must happen BEFORE applyUniProtFeatures(): the feature rows are indexed to
+    // the sequence length, so building them against an empty session silently
+    // produced no rows (they only reappeared on reload).
     if (!(parsedTracks && typeof parsedTracks.AA === 'string' && parsedTracks.AA.length)) {
         try {
             const fasta = await fetchUniProtFastaSequence(acc);
             parsedTracks.AA = fasta.seq;
             if (fasta.header && !currentProteinLabel) currentProteinLabel = fasta.header;
             logAction('api', 'UniProt sequence loaded', acc + ': ' + fasta.seq.length + ' aa');
-            renderViewer(parsedTracks);
-            populateCrossRefDropdown();
-            refreshInputDataModalIfVisible();
-            refreshTrackManagerIfVisible();
         } catch (err) {
             const m = (err && err.message) || String(err);
             logAction('error', 'UniProt FASTA failed', acc + ': ' + m);
             showToast('Loaded ' + acc + ' annotations, but its sequence could not be fetched (' + m + '). Load a FASTA to run sequence-based tools.', 'warn');
         }
     }
+    applyUniProtFeatures({ silent: true });
+    renderViewer(parsedTracks);
+    populateCrossRefDropdown();
+    refreshInputDataModalIfVisible();
+    refreshTrackManagerIfVisible();
     const summary = await fetchUniProtSummary(acc);
     if (summary) { proteinSummary = summary; renderProteinSummary(); }
     schedulePersist();
@@ -11479,7 +11482,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.21';
+const APP_VERSION = '0.67.22';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

@@ -4567,6 +4567,7 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
     sandbox.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve('>sp|P42212|GFP\nMSKGEELFTG\nVVPI\n'), json: () => Promise.resolve({}) });
     await ctxRun(`useUniProtAccession('P42212')`);
     assert(ctxRun(`parsedTracks.AA`) === 'MSKGEELFTGVVPI', 'an accession-only session gets its FASTA sequence (got ' + ctxRun(`parsedTracks.AA`) + ')');
+    assert(ctxRun(`Object.keys(parsedTracks).some(function (k) { return k.startsWith('UP_'); })`), 'and its UniProt feature rows are built immediately (not only after a reload)');
     ctxRun(`parsedTracks.AA = 'MKV';`);
     sandbox.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve('>other\nAAAAA\n'), json: () => Promise.resolve({}) });
     await ctxRun(`useUniProtAccession('P42212')`);
