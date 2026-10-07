@@ -170,7 +170,7 @@ a get-started checklist with Open Input Data / Attach files / Take the tour.
 
 ---
 
-### Data Sources window + checkmarks — 0.67.19
+### Data Sources window + checkmarks — 0.67.19 (predicate fix 0.67.21)
 
 **Surface.** **File → Data Sources…**; the Data Sources window; the category
 select with ✓ marks.
@@ -194,6 +194,9 @@ is gone; Settings keeps Appearance / Commands / Storage.
   it were left behind, the Options modal would still show a hidden panel.
 - *Marks refresh* - marks update on open and whenever data changes while the
   window is open (via `refreshInputDataModalIfVisible`).
+- *False positives (fixed 0.67.21)* - the UniProt mark once counted the
+  remembered last-used accession, so a FASTA-only/restored session could be
+  marked; it now counts only `uniprotFeatures` or `UP_` rows.
 - *Harness limit* - window layout is manual-only; the harness asserts the window
   and helpers exist, the Data menu is gone, the Settings menu dropped Data
   Sources, and the `dataSourceLoaded` predicates.

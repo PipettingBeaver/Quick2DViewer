@@ -425,6 +425,9 @@ ctxRun(`parsedTracks = { AA: 'M'.repeat(10), UP_Sites: 'x', DM_Pfam: 'x', HL_01:
 assert(ctxRun(`dataSourceLoaded('uniprot') && dataSourceLoaded('domains') && dataSourceLoaded('homologs') && dataSourceLoaded('topology') && dataSourceLoaded('variants') && dataSourceLoaded('experimental') && dataSourceLoaded('structure')`), 'loaded evidence marks its source');
 ctxRun(`parsedTracks = {};`);
 assert(ctxRun(`!dataSourceLoaded('uniprot') && !dataSourceLoaded('domains') && !dataSourceLoaded('services')`), 'an empty session marks nothing (services is not a data source)');
+ctxRun(`uniprotAccession = 'P42212'; uniprotFeatures = null;`);
+assert(ctxRun(`!dataSourceLoaded('uniprot')`), 'a remembered last-used accession alone does not mark UniProt as loaded');
+ctxRun(`uniprotAccession = '';`);
 assert(ctxRun(`(function(){ const i = buildInfoIcon('<strong>Foo</strong><br>bar'); return i.getAttribute('role') + '|' + i.getAttribute('aria-label'); })()`) === 'button|More information: Foo', 'built info icons are labelled buttons');
 
 section('graph mode via Track Control');

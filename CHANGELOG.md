@@ -12,6 +12,14 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.21] - 2026-10-06
+
+### Fixed
+- **The Data Sources ✓ marks count only loaded evidence.** The UniProt checkmark
+  no longer treats the remembered last-used accession as "loaded", so a
+  FASTA-only or restored session without UniProt rows is not marked. (In the
+  reported session the fetch had genuinely run, but the predicate was too loose.)
+
 ## [0.67.20] - 2026-10-06
 
 ### Added
