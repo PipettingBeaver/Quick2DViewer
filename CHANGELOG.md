@@ -12,6 +12,18 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.1] - 2026-10-07
+
+### Changed
+- **New-feature highlights are off by default.** The `.qa-new` purple outlines
+  now start disabled; turn them on from Analyze -> New-feature highlights when
+  reviewing additions.
+
+### Fixed
+- **Choosing a guide view closes the Protein Background accordion.** Pressing
+  **Guided view** or **Full view** (or the bottom toggle) now collapses the
+  intake, as if it had been clicked shut.
+
 ## [0.67.4] - 2026-10-06
 
 ### Added

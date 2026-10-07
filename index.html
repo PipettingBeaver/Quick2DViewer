@@ -2067,7 +2067,7 @@
                     <button type="button" onclick="menuBarAction('options')">Options…</button>
                     <button type="button" onclick="menuBarAction('reset')">Reset Data</button>
                     <button type="button" id="menuExternalServices" onclick="menuBarAction('toggleExternal')">External services: OFF</button>
-                    <button type="button" id="menuQaHighlights" onclick="menuBarAction('toggleQa')">New-feature highlights: ON</button>
+                    <button type="button" id="menuQaHighlights" onclick="menuBarAction('toggleQa')">New-feature highlights: OFF</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -4119,7 +4119,7 @@ function toggleExternalServices() {
 // New UI is tagged with `.qa-new` (a purple dashed outline) so it is easy to
 // spot and test, instead of relying on verbose comments. Toggle from the File
 // menu once reviewed.
-let qaHighlightsEnabled = true;
+let qaHighlightsEnabled = false;
 function syncQaHighlights() {
     document.body.classList.toggle('qa-off', !qaHighlightsEnabled);
     const el = document.getElementById('menuQaHighlights');
@@ -8934,6 +8934,7 @@ function resetGuideState() {
 function setGuideViewMode(mode) {
     if (mode !== 'guided' && mode !== 'full') return;
     guideViewMode = mode;
+    guideIntakeOpen = false; // choosing a view closes the intake, as if clicked
     if (mode === 'full') guideExpandFirstStep = true;
     schedulePersist();
     renderWorkflowGuide();
@@ -10820,7 +10821,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.4';
+const APP_VERSION = '0.0.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -20139,7 +20140,7 @@ function applyPersistedState(state) {
     syncGraphModeControls();
     externalServicesEnabled = !!prefs.externalServicesEnabled;
     syncExternalServicesMenu();
-    qaHighlightsEnabled = prefs.qaHighlightsEnabled !== false;
+    qaHighlightsEnabled = prefs.qaHighlightsEnabled === true;
     syncQaHighlights();
     // Analysis rules (rebuild their trackMeta so the restored RULE_ tracks keep their colour).
     analysisRules = Array.isArray(prefs.analysisRules) ? prefs.analysisRules : [];
@@ -20868,7 +20869,7 @@ async function resetAllData() {
     graphMode = { pLDDT: false, RSA: false };
     syncGraphModeControls();
     externalServicesEnabled = false;
-    qaHighlightsEnabled = true;
+    qaHighlightsEnabled = false;
     syncQaHighlights();
     trackManagerExpanded = {};
     syncExternalServicesMenu();

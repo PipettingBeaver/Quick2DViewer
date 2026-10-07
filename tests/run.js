@@ -265,6 +265,8 @@ sandbox.document.getElementById = prevGetTM;
 
 section('QA highlights + UX');
 assert(ctxRun(`typeof toggleQaHighlights === 'function' && typeof syncQaHighlights === 'function'`), 'QA-highlight toggle functions present');
+assert(ctxRun(`qaHighlightsEnabled`) === false, 'new-feature highlights are off by default');
+assert(HTML.indexOf("qaHighlightsEnabled = prefs.qaHighlightsEnabled === true;") !== -1, 'a saved session only re-enables them when explicitly on');
 
 section('graph mode via Track Control');
 ctxRun(`graphMode = { pLDDT: false, RSA: false }; trackControlState = { hidden:{}, hideSymbols:{}, fullBar:{}, filtered:{}, aaSeq:{}, consColor:{}, viewOverride:{} };`);
@@ -3467,10 +3469,13 @@ viewHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 assert(viewHtml.indexOf('<div class="guide-view-prompt">') !== -1, 'a completed intake shows the view prompt');
 assert(viewHtml.indexOf('Proceed with full or guided view for evaluation steps?') !== -1, 'the prompt asks the question');
 assert(viewHtml.indexOf('<div class="guide-next" hidden>') !== -1 && viewHtml.indexOf('<div class="guide-steps" hidden>') !== -1, 'both views are hidden until answered');
-// guided view
+// guided view (and choosing it closes the intake)
+ctxRun(`guideIntakeOpen = true; renderWorkflowGuide();`);
+assert(ctxRun(`document.getElementById('guidePanel').innerHTML`).indexOf('guideIntake" open') !== -1, 'the intake can be open when the choice is made');
 ctxRun(`setGuideViewMode('guided');`);
 viewHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
 assert(ctxRun(`guideViewMode`) === 'guided', 'the guided choice is stored');
+assert(ctxRun(`guideIntakeOpen === false`) && viewHtml.indexOf('guideIntake" open') === -1, 'choosing a view closes the intake');
 assert(viewHtml.indexOf('<div class="guide-next"><div class="guide-progress">') !== -1, 'guided shows the recommendation card');
 assert(viewHtml.indexOf('<div class="guide-steps" hidden>') !== -1, 'guided hides the step cards');
 assert(viewHtml.indexOf('<div class="guide-view-toggle">') !== -1 && viewHtml.indexOf('guide-view-tab-on') !== -1, 'the bottom toggle is shown with a current tab');

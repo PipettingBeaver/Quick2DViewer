@@ -103,6 +103,22 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Guide: choosing a view closes the intake — 0.68.0
+
+**Surface.** The Guide tab; the view prompt / bottom toggle.
+
+**Should do.** Pressing **Guided view** or **Full view** (or the bottom toggle)
+collapses the Protein Background accordion, as if clicked shut.
+
+**Try.**
+1. Complete Protein Background, re-open the accordion by hand, then press
+   **Guided view**. Expect the accordion to close and the guided card to show.
+
+**Edge cases.**
+- *Re-opening the accordion afterwards* - stays open until you close it.
+
+---
+
 ### Jensen-Shannon conservation + guide visibility — 0.67.4
 
 **Surface.** Options -> Conservation (metric select); the Guide tab.
