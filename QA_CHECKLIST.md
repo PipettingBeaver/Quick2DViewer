@@ -103,31 +103,34 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
-### Data Sources shared layout — 0.67.31
+### Data Sources shared layout — 0.67.31 (Quick2D steps + UniProt log 0.67.32)
 
 **Surface.** File → Data Sources… (all 12 views); the Quick2D dropzone and
 Selection Guide.
 
 **Should do.** Every view is a two-column shell (description + input left,
 source helper right), no accordions, no repeated hint line, neutral `✕` close;
-Quick2D uses the standard dashed dropzone and a single Selection Guide animation.
+Quick2D uses the standard dashed dropzone, a numbered import list, and a single
+Selection Guide animation.
 
 **Try.**
 1. Open Data Sources: the header has a `✕` (no red Close); there is no hint line
    under the dropdown.
 2. Switch through the views: each shows the left description/input and a right
-   helper (e.g. UniProt → Open UniProt + Debug log; Structure → AlphaFold/RCSB;
-   ddG → the four stability services). No `▾ [Source Name]` accordions.
-3. Quick2D: the left shows the dropzone; clicking it (or **Paste Clipboard**)
-   imports from the clipboard; dropping a `.txt` on it parses that file. The
-   right shows the animation under **Selection Guide** (no inner sub-card).
+   helper (e.g. UniProt → Open UniProt; Structure → AlphaFold/RCSB; ddG → the
+   four stability services). No `▾ [Source Name]` accordions; UniProt has no
+   debug-log panel (0.67.32).
+3. Quick2D: the left lists the three steps (open MPI's Quick2D with your FASTA +
+   **Copy FASTA**; Copy the Results; Paste or upload), then the dropzone; the
+   **Open MPI Quick2D ↗** link is in the right column under the animation.
 
 **Edge cases.**
 - *Narrow width* - the two columns collapse to one below ~720px.
 - *No Q2D data* - the animation shows; once Q2D data is loaded it hides (0.67.30).
 - *Harness limit* - layout is manual-only; the harness asserts the shared shell
   (12 `ds-panel`), no accordions in the region, the dropzone text/button, the
-  Selection Guide, and the drop handler.
+  numbered steps, the right-column MPI link, the Selection Guide, and the drop
+  handler.
 
 ---
 

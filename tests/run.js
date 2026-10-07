@@ -2088,6 +2088,11 @@ assert(dsPanelRegion.indexOf('options-accordion') === -1, 'the per-view accordio
 assert(HTML.indexOf('class="ds-dropzone"') !== -1 && HTML.indexOf('Drag &amp; drop file here, or click to paste from clipboard') !== -1, 'Quick2D uses the standardized dropzone');
 assert(HTML.indexOf('>Selection Guide</div>') !== -1, 'the animation sits in a Selection Guide container');
 assert(ctxRun(`typeof onQuick2dDrop === 'function'`), 'the dropzone accepts dropped files');
+assert(HTML.indexOf('class="ds-steps"') !== -1 && HTML.indexOf('Select and <em>Copy</em> the Results') !== -1 && HTML.indexOf('<em>Paste</em> results on this page') !== -1, 'Quick2D has the numbered import steps');
+assert(HTML.indexOf('onclick="copySequenceFasta()"') !== -1, 'and a Copy FASTA action in step 1');
+assert(HTML.indexOf('id="uniprotAnnotationLog"') === -1, 'the UniProt debug log is removed');
+const q2dRegion = HTML.slice(HTML.indexOf('id="optCat-quick2d"'), HTML.indexOf('id="optCat-topology"'));
+assert(q2dRegion.indexOf('Open MPI Quick2D &#8599;</a>') > q2dRegion.indexOf('class="ds-right"'), 'the MPI link sits in the right column');
 assert(ctxRun(`QUICK2D_TUT_DOC.indexOf('<scr' + 'ipt>') !== -1 && QUICK2D_TUT_DOC.indexOf('AA_QUERY') !== -1 && QUICK2D_TUT_DOC.indexOf('How to import') === -1`), 'the embedded tutorial document carries the demo table and its script, without the old sub-card');
 ctxRun(`parsedTracks = {}; document.getElementById('optCat-quick2d').hidden = false; updateQuick2dTutorial();`);
 assert(ctxRun(`document.getElementById('quick2dTutWrap').hidden === false`), 'the tutorial shows while no Q2D data is loaded');

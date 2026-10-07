@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.32] - 2026-10-06
+
+### Changed
+- **Quick2D Annotations steps.** The left column now lists the three import
+  steps (open MPI's Quick2D with your FASTA + **Copy FASTA**; Copy the Results;
+  Paste or upload), and the standalone **Open MPI Quick2D ↗** link moved to the
+  right column.
+- **UniProt lookup.** The debug-log panel was removed from the Data Sources
+  view (the fetch status line remains).
+
 ## [0.67.31] - 2026-10-06
 
 ### Changed
