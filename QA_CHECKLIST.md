@@ -103,6 +103,31 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Data + Settings menus — 0.0.12
+
+**Surface.** The menu bar (**Data**, **Settings**); the Options modal.
+
+**Should do.** **Data** deep-links all 11 Data Sources categories; **Settings**
+opens the four Options areas on the right tab. One click each.
+
+**Try.**
+1. **Data ▸ → Homolog search**: Options opens on Data Sources with the Homolog
+   search category shown.
+2. **Data ▸ → Variant effects**: same, on Variants (species controls visible).
+3. **Settings ▸ → Storage**: Options opens on the Storage tab; **Settings ▸ →
+   Commands** on Commands; **Settings ▸ → Appearance** on Appearance.
+4. The new menus stay inside the viewport (the 0.0.11 clamp) and are keyboard
+   reachable (Left/Right/Down/Escape).
+
+**Edge cases.**
+- *Menu crowding* - the bar now has 8 menus; check it wraps cleanly at narrow
+  widths.
+- *Harness limit* - menu layout is manual-only; the harness asserts both menus
+  exist, that the Data menu links every `DATA_CATEGORY_HINTS` key, and that the
+  Settings menu links all four tabs.
+
+---
+
 ### Input Data reorg + PDB sequence fallback — 0.0.10
 
 **Surface.** Input Data modal (top section, Import section, Loaded Data row);

@@ -394,6 +394,17 @@ assert(HTML.indexOf('>External services</option>') !== -1, 'the Data Sources ser
 assert(HTML.indexOf('>Methods summary (.md)</button>') !== -1 && HTML.indexOf('Export methods summary') === -1, 'the methods export label is unified');
 assert(HTML.indexOf('max-height: calc(100vh - 72px); overflow-y: auto;') !== -1, 'menu dropdowns are height-bounded');
 assert(ctxRun(`typeof clampMenuBarMenu === 'function'`), 'menu dropdowns are clamped to the visible width');
+// Top-level Data + Settings menus (deep links into Options)
+assert(HTML.indexOf('id="menubar-datasources" role="menu"') !== -1 && HTML.indexOf('id="menubar-settings" role="menu"') !== -1, 'the Data and Settings menus exist');
+const dsMenu = HTML.slice(HTML.indexOf('id="menubar-datasources"'), HTML.indexOf('id="menubar-settings"'));
+JSON.parse(ctxRun(`JSON.stringify(Object.keys(DATA_CATEGORY_HINTS))`)).forEach(c => {
+    assert(dsMenu.indexOf("openDataSources('" + c + "')") !== -1, 'the Data menu links to ' + c);
+});
+const setMenu = HTML.slice(HTML.indexOf('id="menubar-settings"'), HTML.indexOf('id="menubar-session"'));
+['appearance', 'data', 'workflow', 'storage'].forEach(t => {
+    assert(setMenu.indexOf("openOptionsModal('" + t + "')") !== -1, 'the Settings menu links to ' + t);
+});
+assert(ctxRun(`JUMP_MENUS.some(function (m) { return m.key === 'datasources'; }) && JUMP_MENUS.some(function (m) { return m.key === 'settings'; })`), 'the jump box indexes the new menus');
 assert(ctxRun(`(function(){ const i = buildInfoIcon('<strong>Foo</strong><br>bar'); return i.getAttribute('role') + '|' + i.getAttribute('aria-label'); })()`) === 'button|More information: Foo', 'built info icons are labelled buttons');
 
 section('graph mode via Track Control');

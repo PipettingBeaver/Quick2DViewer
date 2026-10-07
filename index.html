@@ -2129,6 +2129,31 @@
                 </div>
             </div>
             <div class="menubar-item">
+                <button type="button" id="menubar-datasources-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-datasources" onclick="toggleMenuBarMenu('datasources', this)" title="Open Options directly on a data source">Data ▾</button>
+                <div class="menubar-menu" id="menubar-datasources" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="openDataSources('uniprot')">UniProt lookup</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('conservation')">Conservation scoring</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('topology')">Membrane topology</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('domains')">Domain families</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('homologs')">Homolog search</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('structure')">Structure models &amp; validation</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('experimental')">Experimental data (DMS / HDX)</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('ddg')">Stability predictions (dG)</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('foldseek')">Structural homology (Foldseek)</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('variants')">Variant effects</button>
+                    <button type="button" role="menuitem" onclick="openDataSources('services')">External services</button>
+                </div>
+            </div>
+            <div class="menubar-item">
+                <button type="button" id="menubar-settings-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-settings" onclick="toggleMenuBarMenu('settings', this)" title="Options, grouped by area">Settings ▾</button>
+                <div class="menubar-menu" id="menubar-settings" role="menu" hidden>
+                    <button type="button" role="menuitem" onclick="openOptionsModal('appearance')">Appearance</button>
+                    <button type="button" role="menuitem" onclick="openOptionsModal('data')">Data Sources…</button>
+                    <button type="button" role="menuitem" onclick="openOptionsModal('workflow')">Commands</button>
+                    <button type="button" role="menuitem" onclick="openOptionsModal('storage')">Storage</button>
+                </div>
+            </div>
+            <div class="menubar-item">
                 <button type="button" id="menubar-session-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-session" onclick="toggleMenuBarMenu('session', this)">Session ▾</button>
                 <div class="menubar-menu" id="menubar-session" role="menu" hidden>
                     <button type="button" role="menuitem" onclick="openMacroModal()" title="Record, export and replay a workflow as a macro: the API/import steps with their providers and parameters">Macro</button>
@@ -10539,6 +10564,8 @@ const JUMP_MENUS = [
     { key: 'file', label: 'File menu', target: '#menubar-file-btn', dropdown: true },
     { key: 'view', label: 'View menu', target: '#menubar-view-btn', dropdown: true },
     { key: 'data', label: 'Analyze menu', target: '#menubar-data-btn', dropdown: true },
+    { key: 'datasources', label: 'Data menu', target: '#menubar-datasources-btn', dropdown: true },
+    { key: 'settings', label: 'Settings menu', target: '#menubar-settings-btn', dropdown: true },
     { key: 'session', label: 'Session menu', target: '#menubar-session-btn', dropdown: true },
     { key: 'export', label: 'Export menu', target: '#menubar-export-btn', dropdown: true },
     { key: 'help', label: 'Help', target: '#menubar-help-btn', dropdown: false }
@@ -11385,7 +11412,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.11';
+const APP_VERSION = '0.0.12';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -20889,13 +20916,13 @@ function renderCachedDataInfo() {
     el.textContent = lines.join('\n');
 }
 
-function openOptionsModal() {
+function openOptionsModal(tab) {
     renderCachedDataInfo();
     void renderStructureCacheInfo();
     syncConservationOptionControls();
     syncUniProtOptionControls();
     renderTopologySourceList();
-    switchOptionsTab('appearance');
+    switchOptionsTab(tab || 'appearance');
     openModalAsDialog('optionsModal');
 }
 

@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.12] - 2026-10-07
+
+### Added
+- **Data and Settings menus.** A top-level **Data** menu deep-links every Data
+  Sources category (all 11) straight into Options, and a **Settings** menu opens
+  Appearance / Data Sources / Commands / Storage on the right tab - so a category
+  is one click instead of File -> Options -> tab -> pick. The Options modal and
+  the Guide's "Data sources" links are unchanged; the jump box indexes the two
+  new menus.
+
 ## [0.0.11] - 2026-10-07
 
 ### Fixed

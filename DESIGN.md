@@ -965,7 +965,7 @@ rendered UI.
 | P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.5 |
 | P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.6 |
 | P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.4 |
-| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.12 |
+| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.13 |
 
 ### P1 - Get Started (0.0.3)
 
@@ -1078,7 +1078,7 @@ which currently promises no outbound call absent opt-in; the section and
 Non-goals. No silent sending: the indicator and the per-action disclosure line
 remain; the off switch is honoured everywhere.
 
-### P5 - Accessibility pass (0.0.12)
+### P5 - Accessibility pass (0.0.13)
 
 Decision. Make the `ⓘ` `.tooltip-content` reachable by keyboard (`:focus-visible`
 on the already-focusable info icons) and disable transitions under
@@ -1095,3 +1095,32 @@ Shipped so far: P1 (0.0.3), P4 pulled ahead at the user's request (0.0.4),
 P2 (0.0.5), P3 (0.0.6); P1 revised (0.0.7). Remaining: P5 (accessibility).
 Tests and QA cards are written per release; versions are renumbered rather than
 bundled if work overlaps.
+
+## 28. UI linking review — Options surfaced in the menu bar (2026-10)
+
+**Problem.** Every settings area lived behind `File -> Options...`, and Data
+Sources is itself a select of 11 categories, so a category cost
+`File -> Options -> Data Sources tab -> pick category`. Only the Guide's
+"Data sources" links (`openDataSources(cat)`) shortcut it.
+
+**Decision (2026-10-07).** Two new top-level menus, chosen by the user:
+
+- **Data** menu: one item per Data Sources category, each calling the existing
+  `openDataSources(cat)` (which opens Options on the Data tab and selects the
+  category). All 11 categories are exposed.
+- **Settings** menu: Appearance / Data Sources / Commands / Storage, each
+  calling `openOptionsModal(tab)` (new optional tab argument).
+
+The Options modal remains the single home; this only adds reachability. The
+Guide deep-links, the Input Data "Data sources" button, and the jump box index
+are unchanged (the jump box gained the two new menus).
+
+**Open items for the wider review.**
+- Whether a few high-traffic categories (Homolog search, Domain families)
+  deserve their own top-level entries rather than living in the Data submenu.
+- Whether to split the Options modal into separate modals later (§27 C option),
+  which this change makes less urgent.
+- Whether "Commands" (external tool hand-offs) should be more prominent than a
+  Settings entry, given it is a research surface, not a preference.
+- The sidebar already has an "Analyze" tab distinct from the "Analyze" menu;
+  watch for menu-bar crowding now that Data and Settings sit alongside it.
