@@ -431,6 +431,9 @@ assert(ctxRun(`JUMP_MENUS.some(function (m) { return m.key === 'settings'; }) &&
 // checkmark predicates
 ctxRun(`parsedTracks = { AA: 'M'.repeat(10), UP_Sites: 'x', DM_Pfam: 'x', HL_01: 'x', TP_Consensus: 'x', VAR_01: 'x', 'foo_EXP': [1], 'm_pLDDT': [1] };`);
 assert(ctxRun(`dataSourceLoaded('uniprot') && dataSourceLoaded('domains') && dataSourceLoaded('homologs') && dataSourceLoaded('topology') && dataSourceLoaded('variants') && dataSourceLoaded('experimental') && dataSourceLoaded('structure')`), 'loaded evidence marks its source');
+assert(ctxRun(`!dataSourceLoaded('quick2d')`), 'no Q2D rows means Quick2D Annotations is unmarked');
+ctxRun(`parsedTracks.SS_PSIPRED = 'HH';`);
+assert(ctxRun(`dataSourceLoaded('quick2d')`), 'a Q2D prediction row marks Quick2D Annotations (AA alone does not)');
 ctxRun(`parsedTracks = {};`);
 assert(ctxRun(`!dataSourceLoaded('uniprot') && !dataSourceLoaded('domains') && !dataSourceLoaded('services')`), 'an empty session marks nothing (services is not a data source)');
 ctxRun(`uniprotAccession = 'P42212'; uniprotFeatures = null;`);
@@ -2066,8 +2069,11 @@ ctxRun(`pdbLookupEntries = []; renderPdbLookupResults();`);
 section('Options: data-source categories + guide deep links');
 assert(HTML.indexOf('id="optDataCategory"') !== -1 && HTML.indexOf('id="optDataCategoryHint"') !== -1, 'Options -> Data Sources has a category dropdown and a hint line');
 const catPanels = ctxRun(`Object.keys(DATA_CATEGORY_HINTS)`);
-assert(catPanels.join(',') === 'uniprot,conservation,topology,domains,homologs,structure,experimental,ddg,foldseek,variants,services', 'eleven categories are declared (got ' + catPanels.join(',') + ')');
+assert(catPanels.join(',') === 'uniprot,quick2d,conservation,topology,domains,homologs,structure,experimental,ddg,foldseek,variants,services', 'twelve categories are declared (got ' + catPanels.join(',') + ')');
 assert(catPanels.every(n => HTML.indexOf('id="optCat-' + n + '"') !== -1), 'and every category has a panel in the markup');
+assert(HTML.indexOf('<option value="quick2d">Quick2D Annotations</option>') !== -1, 'the Data Sources dropdown lists Quick2D Annotations');
+assert(HTML.indexOf('href="https://toolkit.tuebingen.mpg.de/tools/quick2d"') !== -1, 'the Quick2D panel links to MPI Quick2D');
+assert(HTML.indexOf('last line of the segmented protein annotation split') !== -1 && HTML.indexOf('Protein ID: XXX') !== -1, 'and explains the full-header highlight-and-paste');
 const switchProbe = ctxRun(`
     (function () {
         switchDataCategory('domains');

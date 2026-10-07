@@ -103,6 +103,31 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Quick2D Annotations data source — 0.67.27
+
+**Surface.** File → Data Sources… → **Quick2D Annotations**; the category's ✓.
+
+**Should do.** A new category links to MPI Quick2D and explains the
+highlight-and-paste instruction; it shows **✓** once any Q2D prediction row is
+loaded (AA alone does not count).
+
+**Try.**
+1. File → Data Sources…: the dropdown lists **Quick2D Annotations**; selecting it
+   shows the MPI Quick2D link and the "from Protein ID: XXX down to the last line
+   of the segmented protein annotation split" instruction.
+2. With no Q2D rows, the entry is unmarked. Paste a Quick2D job (or load an
+   example that includes one): reopen Data Sources and **✓ Quick2D Annotations**
+   shows. A plain FASTA (AA only) does not mark it.
+3. **Open Input Data** in the panel closes the window and opens Input Data.
+
+**Edge cases.**
+- *AA-only session* - `SS_`/`TM_`/`DO_`/`CC_`/`SP_` prefixes are the trigger, so
+  AA alone never marks it.
+- *Harness limit* - layout is manual-only; the harness asserts the option, the
+  link, the instruction text, and the `dataSourceLoaded('quick2d')` predicate.
+
+---
+
 ### Menu dismiss + 3D bounds + model follow — 0.67.26
 
 **Surface.** File/Settings menus → modals; the floating 3D viewer (size + Model

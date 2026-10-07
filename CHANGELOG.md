@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.27] - 2026-10-06
+
+### Added
+- **Quick2D Annotations data source.** Data Sources gains a **Quick2D
+  Annotations** category: it links to MPI's Quick2D and explains that the whole
+  job header (from `Protein ID: XXX` down to the last line of the segmented
+  protein annotation split) must be highlighted and pasted. It shows a **✓** when
+  the protein was initialized with a Q2D import (any `SS_`/`TM_`/`DO_`/`CC_`/`SP_`
+  row - the AA line alone does not count).
+
 ## [0.67.26] - 2026-10-06
 
 ### Fixed

@@ -2843,6 +2843,7 @@
             <label for="optDataCategory" style="font-size:0.8rem; font-weight:600; color:#475569;">Data source</label>
             <select id="optDataCategory" class="q2dv-select" onchange="switchDataCategory(this.value)" style="flex:1; min-width:220px; font-size:0.85rem; padding:6px;">
                 <option value="uniprot">UniProt lookup</option>
+                <option value="quick2d">Quick2D Annotations</option>
                 <option value="conservation">Conservation scoring</option>
                 <option value="topology">Membrane topology</option>
                 <option value="domains">Domain families</option>
@@ -2932,6 +2933,21 @@
             <a class="copy-btn" style="text-decoration:none;" href="https://www.uniprot.org/" target="_blank" rel="noopener">Open UniProt ↗</a>
         </div>
 
+        </div>
+        <div id="optCat-quick2d" class="opt-cat" hidden>
+        <details class="options-accordion" id="optSecQuick2D" open style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <summary>Quick2D Annotations</summary>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Add secondary-structure, disorder, transmembrane, coiled-coil and signal-peptide predictions from <a href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener" style="color:#2563eb;">MPI's Quick2D</a>. One Quick2D job populates several rows at once.
+            </p>
+            <p style="font-size: 0.8rem; color: #475569; margin: 0 0 10px; line-height: 1.5;">
+                On the Quick2D results page, highlight the <strong>full header of the job</strong> - from the <code>Protein ID: XXX</code> line down to the <strong>last line of the segmented protein annotation split</strong> - and paste it into <strong>Input Data &rarr; Paste Quick2D</strong> (or attach the downloaded <code>.txt</code>).
+            </p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <button type="button" class="tb-btn tb-btn-primary" onclick="closeDataSourcesModal(); openInputDataModal();">Open Input Data</button>
+                <a class="copy-btn" style="text-decoration:none;" href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener">Open MPI Quick2D ↗</a>
+            </div>
+        </details>
         </div>
         <div id="optCat-topology" class="opt-cat" hidden>
         <details class="options-accordion" id="optSecTopology" open style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
@@ -9204,6 +9220,7 @@ function downloadSequenceFasta() {
 let optDataCategory = 'uniprot';
 const DATA_CATEGORY_HINTS = {
     uniprot: 'Fetch the curated UniProt entry: sequence, domains, PTMs, variants and sites. Lookup mode and field are below.',
+    quick2d: 'Quick2D Annotations: paste the full header from "Protein ID: XXX" down to the last line of the segmented protein annotation split, or attach the downloaded .txt.',
     conservation: 'How the CONSERVATION row is scored from the loaded variant FASTA sequences.',
     topology: 'Membrane topology: run TMHMM + Phobius + SignalP in-app, or paste predictor output. Two or more sources give the majority-vote consensus.',
     domains: 'Domain families: hmmscan (Pfam), or InterProScan which adds NCBIfam for bacterial and viral families.',
@@ -9258,6 +9275,7 @@ function openDataSources(name) { openDataSourcesModal(name); }
 // Sources window prefixes those options with a checkmark.
 const DATA_SOURCE_LOADED = {
     uniprot: () => !!uniprotFeatures || Object.keys(parsedTracks).some(k => k.startsWith('UP_')),
+    quick2d: () => Object.keys(parsedTracks).some(k => /^(SS_|TM_|DO_|CC_|SP_)/.test(k)),
     conservation: () => !!parsedTracks.CONSERVATION || Object.keys(parsedTracks).some(k => k.startsWith('CONS_')) || Object.keys(keyedVariantsInfo || {}).length > 0,
     topology: () => (topologySources || []).length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('TP_')),
     domains: () => Object.keys(domainHitsInfo || {}).length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('DM_')),
@@ -10686,7 +10704,7 @@ const JUMP_MENUS = [
     { key: 'help', label: 'Help', target: '#menubar-help-btn', dropdown: false }
 ];
 const JUMP_DATA_LABELS = {
-    uniprot: 'UniProt lookup', conservation: 'Conservation scoring', topology: 'Membrane topology',
+    uniprot: 'UniProt lookup', quick2d: 'Quick2D Annotations', conservation: 'Conservation scoring', topology: 'Membrane topology',
     domains: 'Domain families', homologs: 'Homolog search', structure: 'Structure models & validation',
     experimental: 'Experimental data (DMS / HDX)', ddg: 'Stability predictions (dG)',
     foldseek: 'Structural homology (Foldseek)', variants: 'Variant effects', services: 'External services'
@@ -11529,7 +11547,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.26';
+const APP_VERSION = '0.67.27';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
