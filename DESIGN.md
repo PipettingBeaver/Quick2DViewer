@@ -965,7 +965,7 @@ rendered UI.
 | P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.5 |
 | P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.6 |
 | P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.4 |
-| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.9 |
+| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.10 |
 
 ### P1 - Get Started (0.0.3)
 
@@ -982,6 +982,14 @@ example-protein dropdown in **Input Data**, relabelled **Load example protein**
 files**, and the tour's first step teaches File -> Input Data -> Load example
 protein -> GFP. This restores §20's rule that choosing data belongs in Input
 Data; the header/empty-state entries were onboarding-only exceptions.
+
+Revised (0.0.9). The tour is interactive for the first two steps: step 1 waits
+for the File menu to open (`tourOnUiEvent('menu-open:file')`, fired from
+`toggleMenuBarMenu`) and step 2 for Input Data to open
+(`tourOnUiEvent('input-modal-open')`, fired from `openInputDataModal`). A step
+with a `require` hides the Next button and shows a "waiting" caption; the
+`leave: 'closeInputData'` flag closes the modal when the Load-example step is
+done. The Export step stays informational (highlighted, no requirement).
 
 Decision. A first-run **welcome modal** introduces the three moves (try an
 example, paste Quick2D, attach files) and offers a short **coachmark tour** of the
@@ -1070,7 +1078,7 @@ which currently promises no outbound call absent opt-in; the section and
 Non-goals. No silent sending: the indicator and the per-action disclosure line
 remain; the off switch is honoured everywhere.
 
-### P5 - Accessibility pass (0.0.9)
+### P5 - Accessibility pass (0.0.10)
 
 Decision. Make the `ⓘ` `.tooltip-content` reachable by keyboard (`:focus-visible`
 on the already-focusable info icons) and disable transitions under

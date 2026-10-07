@@ -2097,7 +2097,7 @@
             <div class="menubar-item">
                 <button type="button" id="menubar-file-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-file" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
                 <div class="menubar-menu" id="menubar-file" role="menu" hidden>
-                    <button type="button" role="menuitem" onclick="menuBarAction('input')">Input Data…</button>
+                    <button type="button" id="menubar-file-input" role="menuitem" onclick="menuBarAction('input')">Input Data…</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('save')">Save session (.json)</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('options')">Options…</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('clearInput')">Clear input data</button>
@@ -3202,6 +3202,7 @@
     <div id="tourBarText" class="tour-bar-text"></div>
     <div class="tour-bar-actions">
         <span id="tourBarProgress" style="font-size:0.72rem; color:#94a3b8; margin-right:auto;"></span>
+        <span id="tourBarHint" style="font-size:0.72rem; color:#fbbf24; display:none;"></span>
         <button type="button" class="copy-btn" onclick="tourPrev()">Back</button>
         <button type="button" class="tb-btn tb-btn-primary" id="tourNextBtn" onclick="tourNext()">Next</button>
         <button type="button" class="copy-btn" onclick="endTour()">Skip</button>
@@ -3592,13 +3593,17 @@ const EMPTY_STATE_HTML = '<p style="padding: 16px 20px 4px; color:#94a3b8; text-
     + '<button type="button" class="tb-btn tb-btn-secondary" onclick="attachStructures()">Attach files</button>'
     + '</div>';
 // First-run coachmark tour: each step pulses one existing control and shows a
-// caption in the fixed bottom bar. Targets are element ids asserted in tests so
-// the tour cannot point at a control that was renamed or removed.
+// caption in the fixed bottom bar. Steps with a `require` advance only when the
+// named UI event fires (the user performs the action); the rest advance with
+// Next. Targets are element ids asserted in tests so the tour cannot point at a
+// control that was renamed or removed.
 const TOUR_STEPS = [
-    { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Open File \u2192 Input Data\u2026, then pick a protein under "Load example protein" (GFP is a good one), paste Quick2D output, or attach a file.' },
+    { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Click the highlighted File menu to begin.', require: 'menu-open:file' },
+    { target: 'menubar-file-input', title: 'Open Input Data', body: 'Now click Input Data… to load a protein.', require: 'input-modal-open' },
+    { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Click Next when ready.', leave: 'closeInputData' },
     { target: 'sidebarTabs', title: 'Your workspace', body: 'Selection, Tracks, Analyze, Guide and Commands hold everything you do with the loaded protein.' },
     { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.' },
-    { target: 'menubar-export-btn', title: 'Export your work', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL.' }
+    { target: 'menubar-export-btn', title: 'Export your work (optional)', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL. This step is just for reference.' }
 ];
 let uploadedStructureFiles = []; // [{name, ext, size}] - metadata only, see note at push() site below
 // Per-track metadata for imported HHpred hits (rank, hit id, description,
@@ -10067,6 +10072,7 @@ function renderInputDataModal() {
 function openInputDataModal() {
     renderInputDataModal();
     openModalAsDialog('inputDataModal');
+    if (typeof tourOnUiEvent === 'function') tourOnUiEvent('input-modal-open');
 }
 function closeInputDataModal() {
     closeModalAsDialog('inputDataModal');
@@ -10388,6 +10394,7 @@ function toggleMenuBarMenu(name, btn) {
     menu.hidden = !willOpen;
     if (btn) btn.setAttribute('aria-expanded', String(willOpen));
     if (willOpen) { const first = menu.querySelector('button'); if (first && first.focus) first.focus(); }
+    if (willOpen && typeof tourOnUiEvent === 'function') tourOnUiEvent('menu-open:' + name);
 }
 // Keyboard model for the menu bar: Left/Right move between menus, Down opens,
 // Escape closes. (Tab still reaches every control.)
@@ -10687,9 +10694,11 @@ function dismissWelcome() {
     endTour();
 }
 let tourIndex = 0;
+let tourActive = false;
 function startTour() {
     closeWelcomeModal();
     tourIndex = 0;
+    tourActive = true;
     renderTour();
 }
 function renderTour() {
@@ -10703,24 +10712,48 @@ function renderTour() {
     const prog = document.getElementById('tourBarProgress');
     if (prog) prog.textContent = 'Step ' + (tourIndex + 1) + ' of ' + TOUR_STEPS.length;
     const next = document.getElementById('tourNextBtn');
-    if (next) next.textContent = (tourIndex === TOUR_STEPS.length - 1) ? 'Done' : 'Next';
+    if (next) {
+        // A required step has no Next: it advances when the user does the action.
+        next.hidden = !!step.require;
+        next.textContent = (tourIndex === TOUR_STEPS.length - 1) ? 'Done' : 'Next';
+    }
+    const hint = document.getElementById('tourBarHint');
+    if (hint) {
+        hint.textContent = step.require ? 'Waiting for you to click the highlighted control\u2026' : '';
+        hint.hidden = !step.require;
+    }
     const bar = document.getElementById('tourBar');
     if (bar) bar.hidden = false;
 }
-function tourNext() {
+// Advance one step. fromRequirement=true only when a required UI action fired,
+// so the Next button cannot skip a step that waits on the user.
+function tourNext(fromRequirement) {
+    const step = TOUR_STEPS[tourIndex];
+    if (!step) { endTour(); return; }
+    if (step.require && !fromRequirement) return;
+    if (step.leave === 'closeInputData' && typeof closeInputDataModal === 'function') closeInputDataModal();
     if (tourIndex >= TOUR_STEPS.length - 1) { endTour(); return; }
     tourIndex++;
     renderTour();
 }
 function tourPrev() {
     if (tourIndex <= 0) return;
+    const step = TOUR_STEPS[tourIndex];
+    if (step && step.leave === 'closeInputData' && typeof closeInputDataModal === 'function') closeInputDataModal();
     tourIndex--;
     renderTour();
 }
 function endTour() {
+    tourActive = false;
     document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
     const bar = document.getElementById('tourBar');
     if (bar) bar.hidden = true;
+}
+// The app calls this when a UI event the tour may be waiting on happens.
+function tourOnUiEvent(kind) {
+    if (!tourActive) return;
+    const step = TOUR_STEPS[tourIndex];
+    if (step && step.require === kind) tourNext(true);
 }
 
 // --- Confirm dialog (headless-safe replacement for window.confirm) --------
@@ -11316,7 +11349,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.8';
+const APP_VERSION = '0.0.9';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

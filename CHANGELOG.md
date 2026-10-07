@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.9] - 2026-10-07
+
+### Changed
+- **The tour is now interactive.** The first two steps wait for the user to
+  actually navigate: click the **File** menu, then click **Input Data…**, after
+  which the tour highlights **Load example protein** and lets you continue. There
+  is no Next button on a required step (only Back/Skip); a caption says it is
+  waiting. The **Export** step stays optional - highlighted, not required.
+
 ## [0.0.8] - 2026-10-07
 
 ### Changed

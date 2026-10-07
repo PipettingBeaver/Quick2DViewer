@@ -103,6 +103,36 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Interactive tour — 0.0.9
+
+**Surface.** The tour bar; the File menu, the Input Data modal, the header/tabs.
+
+**Should do.** Steps 1–2 wait for the user to actually navigate (open File, then
+click Input Data…); a required step has no Next button, only Back/Skip, and shows
+a "waiting" caption. The Export step is informational (highlighted, not required).
+
+**Try.**
+1. Welcome → **Show me around**. Step 1 highlights **File**; the bar has no Next
+   and reads "Waiting for you to click the highlighted control…". Clicking an
+   unrelated menu (e.g. View) does nothing.
+2. Click **File**: the tour advances to the **Input Data…** item (still no Next).
+   Click **Input Data…**: the modal opens and the tour advances to
+   **Load example protein** with a Next button.
+3. Pick a protein (or just press **Next**): the modal closes and the tour
+   highlights the sidebar tabs, then the Guide tab, then the Export button.
+4. **Back** works on the informational steps; **Skip** ends the tour at any point.
+
+**Edge cases.**
+- *Stuck on a required step* - Back/Skip still work; reopening File re-shows the
+  highlighted Input Data item.
+- *Modal above the bar* - the tour bar sits above the modal (z-index 3000 vs 1000),
+  so the caption and Skip stay reachable.
+- *Harness limit* - the highlight and bar layout are manual-only; the harness
+  drives the required-step gating through `tourOnUiEvent` and asserts the target
+  ids and the optional Export step.
+
+---
+
 ### GFP moves to Input Data — 0.0.7
 
 **Surface.** Header (no Try GFP button), welcome modal, viewer empty state,
@@ -143,9 +173,8 @@ by **Input Data → Load example protein** in 0.0.7 - see that card.)
 2. Empty viewer shows **Open Input Data / Attach files**. Open Input Data, choose
    GFP under **Load example protein**: expect the GFP sequence and UniProt rows
    (no confirm on the deployed site; on `file://` the confirm still appears once).
-3. Help → **Getting started** reopens the welcome; **Show me around** pulses the File
-   menu, the sidebar tabs, the Guide tab and the Export menu, with a bottom caption
-   bar (Next / Back / Skip).
+3. Help → **Getting started** reopens the welcome; **Show me around** starts the
+   interactive tour (see the 0.0.9 card for the required File → Input Data steps).
 4. Change a preference (e.g. palette), load data, then File → **Clear input data**. Expect
    the data gone and the palette still changed; a reload must not resurrect the old data.
 5. File → **Clear all data**. Expect an empty viewer, default palette, external services

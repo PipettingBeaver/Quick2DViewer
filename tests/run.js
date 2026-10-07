@@ -281,9 +281,11 @@ assert(HTML.indexOf('Load example protein') !== -1 && HTML.indexOf('id="inputAcc
 assert(HTML.indexOf('onclick="clearInputData()"') !== -1 && HTML.indexOf('onclick="clearAllData()"') !== -1, 'the Storage cache controls offer both clear actions');
 assert(HTML.indexOf("menuBarAction('clearInput')") !== -1 && HTML.indexOf("menuBarAction('clearAll')") !== -1, 'the File menu exposes both clear actions');
 assert(ctxRun('TOUR_STEPS.length') >= 3, 'the tour has at least three steps');
-assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'menubar-file-btn,sidebarTabs,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
-assert(ctxRun(`TOUR_STEPS[0].body.indexOf('Load example protein') !== -1 && TOUR_STEPS[0].body.indexOf('GFP') !== -1`), 'the tour tells the user how to load GFP');
-['menubar-file-btn', 'sidebarTabs', 'tab-guide', 'menubar-export-btn'].forEach(id => {
+assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'menubar-file-btn,menubar-file-input,inputAccessionPreset,sidebarTabs,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
+assert(ctxRun(`TOUR_STEPS[0].require === 'menu-open:file' && TOUR_STEPS[1].require === 'input-modal-open'`), 'opening File then Input Data are required steps');
+assert(ctxRun(`TOUR_STEPS[2].body.indexOf('Load example protein') !== -1 && TOUR_STEPS[2].body.indexOf('GFP') !== -1`), 'the Load example step tells the user about GFP');
+assert(ctxRun(`!TOUR_STEPS.some(function (s) { return s.require && s.target === 'menubar-export-btn'; })`), 'the Export step is optional (no requirement)');
+['menubar-file-btn', 'menubar-file-input', 'inputAccessionPreset', 'sidebarTabs', 'tab-guide', 'menubar-export-btn'].forEach(id => {
     assert(HTML.indexOf('id="' + id + '"') !== -1, 'tour target id exists in the markup: ' + id);
 });
 sandbox.localStorage._s = {};
@@ -292,9 +294,23 @@ assert(ctxRun('welcomeSeen') === true, 'dismissing the welcome marks it seen');
 assert(sandbox.localStorage.getItem('q2dViewer_welcome_v1') === '1', 'and remembers it under its own key');
 ctxRun(`startTour();`);
 assert(ctxRun('tourIndex') === 0, 'the tour starts at the first step');
+assert(ctxRun(`document.getElementById('tourNextBtn').hidden === true`), 'a required step hides the Next button');
 ctxRun(`tourNext();`);
-assert(ctxRun('tourIndex') === 1, 'Next advances the tour');
+assert(ctxRun('tourIndex') === 0, 'Next cannot skip the required File step');
+ctxRun(`tourOnUiEvent('menu-open:view');`);
+assert(ctxRun('tourIndex') === 0, 'an unrelated menu does not advance the tour');
+ctxRun(`tourOnUiEvent('menu-open:file');`);
+assert(ctxRun('tourIndex') === 1, 'opening the File menu advances the tour');
+ctxRun(`tourNext();`);
+assert(ctxRun('tourIndex') === 1, 'the Input Data step also waits for the action');
+ctxRun(`tourOnUiEvent('input-modal-open');`);
+assert(ctxRun('tourIndex') === 2, 'opening Input Data advances the tour');
+assert(ctxRun(`document.getElementById('tourNextBtn').hidden === false`), 'the Load example step offers a Next button');
+ctxRun(`tourNext();`);
+assert(ctxRun('tourIndex') === 3, 'Next advances the informational steps');
 ctxRun(`endTour();`);
+assert(ctxRun('tourActive') === false, 'ending the tour clears the active flag');
+assert(ctxRun(`typeof tourOnUiEvent === 'function'`), 'the tour exposes the UI-event hook');
 
 section('external-services platform default');
 assert(ctxRun(`typeof externalServicesDefault === 'function'`), 'externalServicesDefault is defined');
