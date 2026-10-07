@@ -103,6 +103,33 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Animated Quick2D tutorial — 0.67.30
+
+**Surface.** File → Data Sources… → **Quick2D Annotations** (lower right).
+
+**Should do.** A small animated walk-through shows highlighting the Quick2D
+results and using right-click → Copy; it appears only while no Q2D data is
+loaded.
+
+**Try.**
+1. Fresh session → File → Data Sources… → **Quick2D Annotations**: the animated
+   demo appears to the lower right of the instructions; the cursor sweeps the
+   results, opens the Copy menu and presses it.
+2. Paste a Quick2D job (or load one): the demo disappears.
+3. Confirm the demo cannot leak into the app: it is a sandboxed `srcdoc` iframe,
+   so its styles/animation stay inside the frame.
+
+**Edge cases.**
+- *Reduced motion* - the demo honours `prefers-reduced-motion` (cursor hidden, no
+  sweep).
+- *No Quick2D data* - the demo is the only thing that changes; the rest of the
+  panel (Paste Quick2D, MPI link, instruction text) is unchanged.
+- *Harness limit* - the animation and layout are manual-only; the harness asserts
+  the iframe/sandbox markup, the helpers, that the embedded document carries the
+  demo and its script, and the show/hide-by-loaded logic.
+
+---
+
 ### Quick2D Annotations data source — 0.67.27 (paste 0.67.28, window-agnostic 0.67.29)
 
 **Surface.** File → Data Sources… → **Quick2D Annotations**; the category's ✓.

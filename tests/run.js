@@ -2077,6 +2077,15 @@ assert(HTML.indexOf('last line of the segmented protein annotation split') !== -
 assert(HTML.indexOf('onclick="pasteQuick2DHere()">Paste Quick2D</button>') !== -1, 'the Quick2D panel has its own Paste Quick2D button');
 assert(ctxRun(`typeof pasteQuick2DHere === 'function' && typeof pasteQuick2DFromClipboard === 'function'`), 'and the window-agnostic clipboard helpers exist');
 assert(HTML.indexOf('onclick="closeDataSourcesModal(); openInputDataModal();"') === -1, 'the Quick2D panel no longer switches to Input Data');
+assert(HTML.indexOf('id="quick2dTutWrap"') !== -1 && HTML.indexOf('id="quick2dTutFrame"') !== -1, 'the Quick2D panel has a visual-tutorial iframe');
+assert(HTML.indexOf('sandbox="allow-scripts"') !== -1, 'the tutorial iframe is sandboxed');
+assert(ctxRun(`typeof updateQuick2dTutorial === 'function' && typeof clearQuick2dTutorial === 'function'`), 'the tutorial show/hide helpers exist');
+assert(ctxRun(`QUICK2D_TUT_DOC.indexOf('<scr' + 'ipt>') !== -1 && QUICK2D_TUT_DOC.indexOf('How to import Quick2D data') !== -1`), 'the embedded tutorial document carries the demo and its script');
+ctxRun(`parsedTracks = {}; document.getElementById('optCat-quick2d').hidden = false; updateQuick2dTutorial();`);
+assert(ctxRun(`document.getElementById('quick2dTutWrap').hidden === false`), 'the tutorial shows while no Q2D data is loaded');
+ctxRun(`parsedTracks = { AA: 'MKV', SS_PSIPRED: 'HHH' }; updateQuick2dTutorial();`);
+assert(ctxRun(`document.getElementById('quick2dTutWrap').hidden === true`), 'and hides once Q2D data is loaded');
+ctxRun(`parsedTracks = {}; document.getElementById('optCat-quick2d').hidden = true;`);
 const switchProbe = ctxRun(`
     (function () {
         switchDataCategory('domains');

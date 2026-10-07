@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.30] - 2026-10-06
+
+### Added
+- **Animated Quick2D import tutorial.** The Quick2D Annotations panel shows a
+  small visual walk-through (a cursor highlighting the Quick2D results and using
+  right-click → Copy), positioned to the lower right of the instructions. It is
+  embedded as a self-contained document in a sandboxed `srcdoc` iframe (so it
+  cannot touch the app's styles/script) and only appears while no Quick2D data is
+  loaded.
+
 ## [0.67.29] - 2026-10-06
 
 ### Changed
