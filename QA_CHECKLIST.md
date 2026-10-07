@@ -103,6 +103,35 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Input Data reorg + PDB sequence fallback — 0.0.10
+
+**Surface.** Input Data modal (top section, Import section, Loaded Data row);
+Fetch PDB entry.
+
+**Should do.** **Load example protein** is the first thing in the modal; the
+offline sample button is gone; Import explains the accepted inputs; and fetching
+a PDB entry into an empty session adopts the entry's sequence.
+
+**Try.**
+1. Open Input Data: **Load example protein** is at the top, above **Import**;
+   there is no **Load sample Quick2D data** button.
+2. Import text reads "Import a Q2DV save, PDB/CIF files, other data files, or
+   paste data from MPI's Quick2D or a FASTA sequence here."
+3. With no sequence loaded, type `1GFL` and **Fetch PDB entry**: the status says
+   a sequence was taken from the entry, and an AA row appears alongside the
+   structure.
+4. With a sequence already loaded, Fetch PDB entry attaches as before and does
+   not overwrite the sequence.
+
+**Edge cases.**
+- *CIF only* - the fallback reads the entity one-letter code; a PDB with no
+  SEQRES yields no sequence (status omits the note).
+- *Harness limit* - the modal layout is manual-only; the harness covers the
+  `sequenceFromStructureText` parser, the removal of the sample button/helper,
+  the picker-above-Import order and the Import copy.
+
+---
+
 ### Interactive tour — 0.0.9
 
 **Surface.** The tour bar; the File menu, the Input Data modal, the header/tabs.

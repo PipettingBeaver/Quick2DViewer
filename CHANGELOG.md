@@ -12,6 +12,20 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.10] - 2026-10-07
+
+### Changed
+- **Input Data reorganized.** **Load example protein** now sits at the top of
+  the modal (it was beside the PDB controls), and the offline **Load sample
+  Quick2D data** button is removed. The Import description now lists what is
+  accepted: a Q2DV save, PDB/CIF files, other data files, MPI Quick2D output or
+  a FASTA sequence. The picker keeps its id, so the tour and the macro still
+  target it.
+- **Fetch PDB entry falls back to the entry's sequence.** If no sequence is
+  loaded, the fetched PDB/CIF's polymer sequence (SEQRES / entity one-letter
+  code) is adopted, so the structure has something to map onto instead of
+  landing in an empty session.
+
 ## [0.0.9] - 2026-10-07
 
 ### Changed

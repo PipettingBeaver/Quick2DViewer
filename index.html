@@ -2175,9 +2175,21 @@
             </div>
 
             <div style="margin-top: 16px;">
+                <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Load example protein</h4>
+                <p style="font-size:0.78rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                    Fetch a curated UniProt entry (sequence and annotations) to try the viewer - GFP is a good one.
+                </p>
+                <select id="inputAccessionPreset" class="q2dv-select" onchange="onInputAccessionPreset(this.value)"
+                    style="font-size:0.8rem; padding:4px 6px; max-width:260px;"
+                    title="Load example protein: fetches the chosen UniProt entry and, when no sequence is loaded, its FASTA sequence">
+                    <option value="">Load example protein&hellip;</option>
+                </select>
+            </div>
+
+            <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
                 <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Import</h4>
                 <p style="font-size:0.78rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
-                    Copy and paste data from <a href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener" style="color:#2563eb;">MPI's Quick2D</a> or FASTA.
+                    Import a Q2DV save, PDB/CIF files, other data files, or paste data from <a href="https://toolkit.tuebingen.mpg.de/tools/quick2d" target="_blank" rel="noopener" style="color:#2563eb;">MPI's Quick2D</a> or a FASTA sequence here.
                 </p>
                 <div class="toolbar-group toolbar-group-input" style="display:flex; gap:6px; flex-wrap:wrap;">
                     <button type="button" class="tb-btn tb-btn-primary" onclick="attachStructures()">
@@ -2192,7 +2204,6 @@
                             Show raw text ▾
                         </button>
                     </span>
-                    <button type="button" class="tb-btn tb-btn-secondary" onclick="loadSampleData()" title="Offline example: a verbatim Quick2D output for histone H2A, to try the viewer without any network">Load sample Quick2D data</button>
                 </div>
                 <div id="rawInputDrawer" class="raw-input-drawer" hidden style="margin-top: 8px;">
                     <textarea id="rawInput" placeholder="Paste Quick2D output, a FASTA header + sequence, or a plain protein sequence..." aria-label="Raw Quick2D or FASTA input"></textarea>
@@ -2211,12 +2222,7 @@
                             style="width:70px; font-size:0.72rem; padding:2px 4px; border:1px solid #cbd5e1; border-radius:4px; text-transform:uppercase;"
                             title="Four-character PDB entry id, e.g. 1GFL" aria-label="PDB entry id">
                         <button type="button" id="btnFetchPdb" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="fetchPdbEntryFromInput()"
-                            style="font-size:0.72rem; padding:3px 8px;" title="Download an experimental entry from RCSB PDB by id and attach it; validation and the 3D viewer then work on it">Fetch PDB entry</button>
-                        <select id="inputAccessionPreset" class="q2dv-select" onchange="onInputAccessionPreset(this.value)"
-                            style="font-size:0.72rem; padding:2px 4px; max-width:190px;"
-                            title="Load example protein: fetches the chosen UniProt entry and, when no sequence is loaded, its FASTA sequence">
-                            <option value="">Load example protein&hellip;</option>
-                        </select>
+                            style="font-size:0.72rem; padding:3px 8px;" title="Download an experimental entry from RCSB PDB by id and attach it; if no sequence is loaded, one is taken from the entry">Fetch PDB entry</button>
                         <button type="button" class="tb-btn tb-btn-secondary" onclick="openDataSources('uniprot')"
                             style="font-size:0.72rem; padding:3px 8px;" title="UniProt lookup, domain families, homologs, structure models, validation and variant effects - all in Options -> Data Sources">Data sources&hellip;</button>
                     </span>
@@ -6849,6 +6855,35 @@ function parseStructureChains(text, ext) {
     return chains;
 }
 
+// Best-effort polymer sequence from a structure file. Used as a contingency
+// when a PDB entry is fetched into a session that has no sequence of its own
+// (the structure then has nothing to map onto). PDB: SEQRES records; mmCIF: the
+// entity polymer one-letter-code field. Returns '' when nothing usable is found.
+function sequenceFromStructureText(text, ext) {
+    const src = String(text || '');
+    if (ext === 'cif' || /^data_/m.test(src)) {
+        const m = src.match(/_entity_poly\.pdbx_seq_one_letter_code_can\s+([\s\S]*?)(?:\n#|\n_|$)/);
+        if (m) {
+            const semi = m[1].match(/;\s*\n([\s\S]*?)\n;/);
+            const seq = (semi ? semi[1] : m[1]).replace(/[^A-Za-z]/g, '').toUpperCase();
+            if (seq.length >= 10) return seq;
+        }
+        return '';
+    }
+    const chains = {};
+    for (const line of src.split('\n')) {
+        if (!line.startsWith('SEQRES')) continue;
+        const chain = (line.substring(11, 12) || '').trim() || '_';
+        (chains[chain] = chains[chain] || []).push(...line.substring(19).trim().split(/\s+/));
+    }
+    let best = '';
+    Object.keys(chains).forEach(c => {
+        const seq = chains[c].map(n => RESIDUE_3TO1[String(n).toUpperCase()] || '').join('');
+        if (seq.length > best.length) best = seq;
+    });
+    return best.length >= 10 ? best : '';
+}
+
 // Chain-pair CA-CA contacts within `cutoff` Å (default 8 Å, the standard
 // CA-based interface distance). Returns per-chain interface residue sets +
 // a pair summary. Naive O(resA × resB) per pair; fine for typical oligomers.
@@ -7285,12 +7320,24 @@ async function fetchPdbEntry(rawId) {
         if (!text || text.length < 100) throw new Error('empty response');
         await attachStructureText(id + '.' + ext, text, ext, { source: 'RCSB PDB' });
         p3dModelSources[id + '.' + ext] = { site: 'RCSB', href: 'https://www.rcsb.org/structure/' + id };
+        // Contingency: a structure attached to an empty session has no sequence
+        // to map onto. If none is loaded, take one from the entry itself.
+        let seqNote = '';
+        if (!(parsedTracks.AA && parsedTracks.AA.length)) {
+            const seq = sequenceFromStructureText(text, ext);
+            if (seq) {
+                parsedTracks.AA = seq;
+                if (!currentProteinLabel) currentProteinLabel = id + ' (PDB)';
+                seqNote = ' No sequence was loaded, so one was taken from the entry (' + seq.length + ' aa).';
+                logAction('import', 'sequence from PDB ' + id, seq.length + ' aa');
+            }
+        }
         logAction('download', 'RCSB ' + id, text.length + ' bytes (' + ext + ')');
         renderViewer(parsedTracks);
         refreshInputDataModalIfVisible();
         refreshTrackManagerIfVisible();
         schedulePersist();
-        setStatus('Fetched ' + id + ' (' + ext.toUpperCase() + ', ' + text.length + ' bytes). Fetch validation works on it now.');
+        setStatus('Fetched ' + id + ' (' + ext.toUpperCase() + ', ' + text.length + ' bytes).' + seqNote + ' Fetch validation works on it now.');
         endGuideTask('structure', 'Attached ' + id + ' from RCSB PDB', 'success');
         return true;
     } catch (err) {
@@ -10867,35 +10914,6 @@ const GRAPH_HEIGHT = 180;
 const GRAPH_TOP_PAD = 15;
 const GRAPH_BOTTOM_PAD = 15;
 
-// Verbatim Quick2D sample block (histone H2A, AAN59974.1) so users can
-// try the viewer without needing their own Quick2D output first.
-const SAMPLE_DATA = `Protein ID: AAN59974.1 histone H2A [Homo sapiens]
-AA_QUERY	1	MSGRGKQGGKARAKAKTRSSRAGLQFPVGRVHRLLRKGNYAERVGAGAPVYLAAVLEYLTAEILELAGNAARDNKKTRIIPRHLQ   85
-SS_PSIPRED		                           HHHHHHHHH     HH    HHHHHHHHHHHHHHHHHHHHHHHHH         HHHH	
-SS_SPIDER3		                  HHH      HHHHHHHHH     EE    HHHHHHHHHHHHHHHHHHHHHHHH         HHHHH	
-SS_PSSPRED4		         HHHHHHHHHH         HHHHHHHHH  HHHHH    HHHHHHHHHHHHHHHHHHHHHHHHH       HHHHH	
-SS_DEEPCNF		         HHHHHHH           HHHHHHHHHH  HHHHH   HHHHHHHHHHHHHHHHHHHHHHHHH           EE	
-SS_NETSURFP2		                           HHHHHHHHH    HHH    HHHHHHHHHHHHHHHHHHHHHHHHHH       HHHHH	
-DO_NETSURFPD2		DDDDDDDDDDDDDDDDDD                                                                   	
-DO_DISOPRED		DDDDDDDDDDDDDDDDDD                                                                   	
-DO_SPOTD		DDDDDDDDDDDDDDDDDDDDDDDD                                                             	
-DO_IUPRED		DDDDDDDDDDDDDDDDDDD  D                                                          DD   	
-AA_QUERY	86	LAIRNDEELNKLLGKVTIAQGGVLPNIQAVLLPKKTESHHKAKGK   130
-SS_PSIPRED		HHHH HHHHHHH    EE          HHH              	
-SS_SPIDER3		HHHH HHHHHHHH  EEE          HHH              	
-SS_PSSPRED4		HHHH HHHHHHHH HHEEEE      EEEEE     HHHHH    	
-SS_DEEPCNF		EEE  HHHHHHHHH  HE        EEEEE       HHH    	
-SS_NETSURFP2		HHHH  HHHHHHH               H                	
-DO_NETSURFPD2		                                 DDDDDDDDDDDD	
-DO_DISOPRED		                                   DDDDDDDDDD	
-DO_SPOTD		                                 DDDDDDDDDDDD	
-DO_IUPRED		                                 DDDDDDDDDDDD`;
-
-function loadSampleData() {
-    document.getElementById('rawInput').value = SAMPLE_DATA;
-    parseAndBuildViewer();
-}
-
 // Predictor metadata for row-label tooltips, keyed to match Quick2D track
 // keys exactly (e.g. "SS_PSIPRED"). Source: MPI Bioinformatics Toolkit docs.
 // PLDDT / RSA are generic entries (not exact track keys, since those are
@@ -11349,7 +11367,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.9';
+const APP_VERSION = '0.0.10';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

@@ -2724,6 +2724,13 @@ ctxRun(`parsedTracks = { AA: ${JSON.stringify(refSeq)} };
 // the parser carries the residue letters
 assert(ctxRun(`parseStructureChains(cachedStructureTexts['a.pdb'], 'pdb').A[0].aa`) === 'MET', 'the chain parser records the residue name');
 assert(ctxRun(`RESIDUE_3TO1.MSE`) === 'M' && ctxRun(`RESIDUE_3TO1.UNK`) === 'X', 'modified/unknown residues map too');
+// sequenceFromStructureText: the PDB-fetch contingency when no sequence is loaded
+const seqFromPdb = 'SEQRES   1 A   12  MET ALA LYS GLY SER THR VAL ARG ASN GLN ILE LEU\nATOM      1  CA  MET A   1      0.000   0.000   0.000  1.00  0.00           C';
+assert(ctxRun(`sequenceFromStructureText(${JSON.stringify(seqFromPdb)}, 'pdb')`) === 'MAKGSTVRNQIL', 'SEQRES yields the polymer sequence');
+const seqFromCif = 'data_x\n_entity_poly.pdbx_seq_one_letter_code_can   MAKGSTVRNQIL\n#';
+assert(ctxRun(`sequenceFromStructureText(${JSON.stringify(seqFromCif)}, 'cif')`) === 'MAKGSTVRNQIL', 'the mmCIF entity sequence is read');
+assert(ctxRun(`sequenceFromStructureText('ATOM only, no SEQRES', 'pdb')`) === '' && ctxRun(`sequenceFromStructureText('', 'cif')`) === '', 'no sequence yields an empty string, not a bogus one');
+assert(ctxRun(`typeof sequenceFromStructureText === 'function'`), 'the structure-sequence contingency exists');
 // numbering that matches the reference: unchanged behaviour
 let evN = ctxRun(`computeEnsembleVariance(['a.pdb', 'b.pdb'])`);
 assert(evN.ok === true, 'a renumbered model still computes');
@@ -4478,7 +4485,9 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
 
     section('accession presets live in Input Data + accession FASTA loading');
     assert(HTML.indexOf('id="inputAccessionPreset"') !== -1 && HTML.indexOf('id="macroAccessionPreset"') === -1, 'the example-protein picker sits in Input Data, not the Macro modal');
-    assert(HTML.indexOf('Load sample Quick2D data') !== -1 && HTML.indexOf('Load Sample Data') === -1, 'the sample-data button says what it is');
+    assert(HTML.indexOf('Load sample Quick2D data') === -1 && ctxRun(`typeof loadSampleData === 'undefined'`), 'the offline sample-data button and helper are gone');
+    assert(HTML.indexOf('id="inputAccessionPreset"') < HTML.indexOf('>Import</h4>'), 'the Load example protein picker sits above Import');
+    assert(HTML.indexOf('Import a Q2DV save, PDB/CIF files, other data files, or paste data from') !== -1, 'the Import description lists the accepted inputs');
     ctxRun(`inputAccessionPresetsPopulated = false; document.getElementById('inputAccessionPreset').children = []; populateInputAccessionPresets();`);
     assert(ctxRun(`document.getElementById('inputAccessionPreset').children.length`) === 7, 'the picker lists seven proteins');
     const accPresetLabels = ctxRun(`
