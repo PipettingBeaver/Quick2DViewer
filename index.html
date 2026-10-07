@@ -460,6 +460,7 @@
             position: absolute; top: 100%; left: 0; z-index: 1200; background: #fff;
             border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 8px 20px rgba(0,0,0,0.18);
             padding: 4px; min-width: 185px; display: flex; flex-direction: column;
+            max-height: calc(100vh - 72px); overflow-y: auto;
         }
         .menubar-menu[hidden] { display: none; }
         .menubar-menu button {
@@ -10430,8 +10431,25 @@ function refreshInputDataModalIfVisible() {
 
 // --- Top menu bar (File / View / Data / Export / Help) --------------------
 function closeMenuBarMenus() {
-    document.querySelectorAll('.menubar-menu').forEach(m => { m.hidden = true; });
+    document.querySelectorAll('.menubar-menu').forEach(m => { m.hidden = true; if (m.style) m.style.transform = ''; });
     document.querySelectorAll('.menubar-btn[aria-haspopup]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+// A dropdown anchored left:0 on a right-edge menu (Export) would run off the
+// screen. Nudge it back inside the viewport with a transform; the CSS max-height
+// keeps a long menu from running off the bottom.
+function clampMenuBarMenu(menu) {
+    if (!menu || !menu.style) return;
+    menu.style.transform = '';
+    const vw = (document.documentElement && document.documentElement.clientWidth)
+        || (typeof window !== 'undefined' && window.innerWidth) || 0;
+    if (!vw || typeof menu.getBoundingClientRect !== 'function') return;
+    const r = menu.getBoundingClientRect();
+    if (!r || !r.width) return;
+    const margin = 8;
+    let shift = 0;
+    if (r.right > vw - margin) shift = (vw - margin) - r.right;
+    if (r.left + shift < margin) shift = margin - r.left;
+    if (shift) menu.style.transform = 'translateX(' + Math.round(shift) + 'px)';
 }
 function toggleMenuBarMenu(name, btn) {
     const menu = document.getElementById('menubar-' + name);
@@ -10440,7 +10458,7 @@ function toggleMenuBarMenu(name, btn) {
     closeMenuBarMenus();
     menu.hidden = !willOpen;
     if (btn) btn.setAttribute('aria-expanded', String(willOpen));
-    if (willOpen) { const first = menu.querySelector('button'); if (first && first.focus) first.focus(); }
+    if (willOpen) { clampMenuBarMenu(menu); const first = menu.querySelector('button'); if (first && first.focus) first.focus(); }
     if (willOpen && typeof tourOnUiEvent === 'function') tourOnUiEvent('menu-open:' + name);
 }
 // Keyboard model for the menu bar: Left/Right move between menus, Down opens,
@@ -11367,7 +11385,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.10';
+const APP_VERSION = '0.0.11';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

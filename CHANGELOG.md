@@ -12,6 +12,14 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.11] - 2026-10-07
+
+### Fixed
+- **Menu dropdowns stay on screen.** The right-edge **Export** menu (and any
+  other) is nudged back inside the viewport with a transform when it would run
+  off the right edge, and long menus are height-bounded with internal scrolling
+  so they cannot run off the bottom.
+
 ## [0.0.10] - 2026-10-07
 
 ### Changed

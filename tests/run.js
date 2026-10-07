@@ -392,6 +392,8 @@ assert(HTML.indexOf('>Save session (.json)</button>') !== -1 && HTML.indexOf('>M
 assert(HTML.indexOf('>Data report…</button>') !== -1, 'Data & Structures is renamed Data report');
 assert(HTML.indexOf('>External services</option>') !== -1, 'the Data Sources services category is renamed');
 assert(HTML.indexOf('>Methods summary (.md)</button>') !== -1 && HTML.indexOf('Export methods summary') === -1, 'the methods export label is unified');
+assert(HTML.indexOf('max-height: calc(100vh - 72px); overflow-y: auto;') !== -1, 'menu dropdowns are height-bounded');
+assert(ctxRun(`typeof clampMenuBarMenu === 'function'`), 'menu dropdowns are clamped to the visible width');
 assert(ctxRun(`(function(){ const i = buildInfoIcon('<strong>Foo</strong><br>bar'); return i.getAttribute('role') + '|' + i.getAttribute('aria-label'); })()`) === 'button|More information: Foo', 'built info icons are labelled buttons');
 
 section('graph mode via Track Control');
