@@ -12,6 +12,13 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.33] - 2026-10-06
+
+### Changed
+- **Quick2D steps moved to the right column.** The numbered import list now sits
+  on the right, below the Selection Guide animation, leaving the left column as
+  the description and the dropzone/paste action.
+
 ## [0.67.32] - 2026-10-06
 
 ### Changed

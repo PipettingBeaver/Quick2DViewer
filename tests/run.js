@@ -2093,6 +2093,7 @@ assert(HTML.indexOf('onclick="copySequenceFasta()"') !== -1, 'and a Copy FASTA a
 assert(HTML.indexOf('id="uniprotAnnotationLog"') === -1, 'the UniProt debug log is removed');
 const q2dRegion = HTML.slice(HTML.indexOf('id="optCat-quick2d"'), HTML.indexOf('id="optCat-topology"'));
 assert(q2dRegion.indexOf('Open MPI Quick2D &#8599;</a>') > q2dRegion.indexOf('class="ds-right"'), 'the MPI link sits in the right column');
+assert(q2dRegion.indexOf('class="ds-steps"') > q2dRegion.indexOf('>Selection Guide</div>'), 'the numbered steps sit in the right column, below the animation');
 assert(ctxRun(`QUICK2D_TUT_DOC.indexOf('<scr' + 'ipt>') !== -1 && QUICK2D_TUT_DOC.indexOf('AA_QUERY') !== -1 && QUICK2D_TUT_DOC.indexOf('How to import') === -1`), 'the embedded tutorial document carries the demo table and its script, without the old sub-card');
 ctxRun(`parsedTracks = {}; document.getElementById('optCat-quick2d').hidden = false; updateQuick2dTutorial();`);
 assert(ctxRun(`document.getElementById('quick2dTutWrap').hidden === false`), 'the tutorial shows while no Q2D data is loaded');

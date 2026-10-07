@@ -103,7 +103,7 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
-### Data Sources shared layout — 0.67.31 (Quick2D steps + UniProt log 0.67.32)
+### Data Sources shared layout — 0.67.31 (Quick2D steps + UniProt log 0.67.32, steps-right 0.67.33)
 
 **Surface.** File → Data Sources… (all 12 views); the Quick2D dropzone and
 Selection Guide.
@@ -120,9 +120,10 @@ Selection Guide animation.
    helper (e.g. UniProt → Open UniProt; Structure → AlphaFold/RCSB; ddG → the
    four stability services). No `▾ [Source Name]` accordions; UniProt has no
    debug-log panel (0.67.32).
-3. Quick2D: the left lists the three steps (open MPI's Quick2D with your FASTA +
-   **Copy FASTA**; Copy the Results; Paste or upload), then the dropzone; the
-   **Open MPI Quick2D ↗** link is in the right column under the animation.
+3. Quick2D: the left is the description and the dropzone/paste action; the right
+   column is the Selection Guide animation, then the numbered steps (open MPI's
+   Quick2D with your FASTA + **Copy FASTA**; Copy the Results; Paste or upload),
+   then the **Open MPI Quick2D ↗** link.
 
 **Edge cases.**
 - *Narrow width* - the two columns collapse to one below ~720px.
