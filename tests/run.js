@@ -2067,20 +2067,28 @@ assert(HTML.indexOf('use Find PDB entries in Options -> Structure') !== -1, 'and
 ctxRun(`pdbLookupEntries = []; renderPdbLookupResults();`);
 
 section('Options: data-source categories + guide deep links');
-assert(HTML.indexOf('id="optDataCategory"') !== -1 && HTML.indexOf('id="optDataCategoryHint"') !== -1, 'Options -> Data Sources has a category dropdown and a hint line');
+assert(HTML.indexOf('id="optDataCategory"') !== -1 && HTML.indexOf('id="optDataCategoryHint"') === -1, 'Options -> Data Sources has a category dropdown, and the redundant hint line is gone');
 const catPanels = ctxRun(`Object.keys(DATA_CATEGORY_HINTS)`);
 assert(catPanels.join(',') === 'uniprot,quick2d,conservation,topology,domains,homologs,structure,experimental,ddg,foldseek,variants,services', 'twelve categories are declared (got ' + catPanels.join(',') + ')');
 assert(catPanels.every(n => HTML.indexOf('id="optCat-' + n + '"') !== -1), 'and every category has a panel in the markup');
 assert(HTML.indexOf('<option value="quick2d">Quick2D Annotations</option>') !== -1, 'the Data Sources dropdown lists Quick2D Annotations');
 assert(HTML.indexOf('href="https://toolkit.tuebingen.mpg.de/tools/quick2d"') !== -1, 'the Quick2D panel links to MPI Quick2D');
 assert(HTML.indexOf('last line of the segmented protein annotation split') !== -1 && HTML.indexOf('Protein ID: XXX') !== -1, 'and explains the full-header highlight-and-paste');
-assert(HTML.indexOf('onclick="pasteQuick2DHere()">Paste Quick2D</button>') !== -1, 'the Quick2D panel has its own Paste Quick2D button');
+assert(HTML.indexOf('onclick="pasteQuick2DHere()">Paste Clipboard</button>') !== -1, 'the Quick2D panel has a Paste Clipboard action');
 assert(ctxRun(`typeof pasteQuick2DHere === 'function' && typeof pasteQuick2DFromClipboard === 'function'`), 'and the window-agnostic clipboard helpers exist');
 assert(HTML.indexOf('onclick="closeDataSourcesModal(); openInputDataModal();"') === -1, 'the Quick2D panel no longer switches to Input Data');
 assert(HTML.indexOf('id="quick2dTutWrap"') !== -1 && HTML.indexOf('id="quick2dTutFrame"') !== -1, 'the Quick2D panel has a visual-tutorial iframe');
 assert(HTML.indexOf('sandbox="allow-scripts"') !== -1, 'the tutorial iframe is sandboxed');
 assert(ctxRun(`typeof updateQuick2dTutorial === 'function' && typeof clearQuick2dTutorial === 'function'`), 'the tutorial show/hide helpers exist');
-assert(ctxRun(`QUICK2D_TUT_DOC.indexOf('<scr' + 'ipt>') !== -1 && QUICK2D_TUT_DOC.indexOf('How to import Quick2D data') !== -1`), 'the embedded tutorial document carries the demo and its script');
+// Standardized Data Sources shell
+assert(HTML.indexOf('class="modal-close-x"') !== -1, 'the Data Sources window uses a neutral close button');
+assert((HTML.match(/class="ds-panel"/g) || []).length === 12, 'every data source view uses the shared 2-column shell (got ' + (HTML.match(/class="ds-panel"/g) || []).length + ')');
+const dsPanelRegion = HTML.slice(HTML.indexOf('id="optCat-conservation"'), HTML.indexOf('id="opt-tab-storage"'));
+assert(dsPanelRegion.indexOf('options-accordion') === -1, 'the per-view accordions are gone');
+assert(HTML.indexOf('class="ds-dropzone"') !== -1 && HTML.indexOf('Drag &amp; drop file here, or click to paste from clipboard') !== -1, 'Quick2D uses the standardized dropzone');
+assert(HTML.indexOf('>Selection Guide</div>') !== -1, 'the animation sits in a Selection Guide container');
+assert(ctxRun(`typeof onQuick2dDrop === 'function'`), 'the dropzone accepts dropped files');
+assert(ctxRun(`QUICK2D_TUT_DOC.indexOf('<scr' + 'ipt>') !== -1 && QUICK2D_TUT_DOC.indexOf('AA_QUERY') !== -1 && QUICK2D_TUT_DOC.indexOf('How to import') === -1`), 'the embedded tutorial document carries the demo table and its script, without the old sub-card');
 ctxRun(`parsedTracks = {}; document.getElementById('optCat-quick2d').hidden = false; updateQuick2dTutorial();`);
 assert(ctxRun(`document.getElementById('quick2dTutWrap').hidden === false`), 'the tutorial shows while no Q2D data is loaded');
 ctxRun(`parsedTracks = { AA: 'MKV', SS_PSIPRED: 'HHH' }; updateQuick2dTutorial();`);

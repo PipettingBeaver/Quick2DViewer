@@ -965,7 +965,7 @@ rendered UI.
 | P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.67.9 |
 | P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.67.10 |
 | P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.67.8 |
-| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.67.31 |
+| P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.67.32 |
 
 ### P1 - Get Started (0.67.7)
 
@@ -1091,7 +1091,7 @@ which currently promises no outbound call absent opt-in; the section and
 Non-goals. No silent sending: the indicator and the per-action disclosure line
 remain; the off switch is honoured everywhere.
 
-### P5 - Accessibility pass (0.67.31)
+### P5 - Accessibility pass (0.67.32)
 
 Decision. Make the `ⓘ` `.tooltip-content` reachable by keyboard (`:focus-visible`
 on the already-focusable info icons) and disable transitions under
@@ -1150,3 +1150,10 @@ the window for compatibility.
   menu-bar crowding (File / View / Analyze / Settings / Session / Export / Help).
 - Whether the ✓ marks should also appear in the category hint or the Input Data
   summary, not only the select.
+
+**Data Sources layout (0.67.31).** The window's 12 views were standardized onto
+one two-column shell (`.ds-panel`: description + input left, source helper
+right), with the per-view `<details>` accordions and the repeated dropdown hint
+removed and a neutral `✕` close. Quick2D additionally uses the shared dashed
+`.ds-dropzone` and keeps its animation in a single "Selection Guide" helper
+(0.67.30). New views should follow this shell rather than the old accordion.

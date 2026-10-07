@@ -12,6 +12,20 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.31] - 2026-10-06
+
+### Changed
+- **Data Sources refactored to one shared layout.** Every source view (all 12)
+  now uses a balanced two-column shell: the description and its input/action on
+  the left, a source-specific helper (links, run-in-app controls, formats) on the
+  right. The per-view accordions and the repeated hint line under the dropdown
+  are gone, and the window header uses a neutral `✕` instead of a red Close.
+- **Quick2D view.** Left column: the summary, a one-line instruction and a
+  standard dashed dropzone ("Drag & drop file here, or click to paste from
+  clipboard") with a **Paste Clipboard** action and the MPI Quick2D link. Right
+  column: the highlight-and-copy animation in a single **Selection Guide**
+  container (its old inner "How to import Quick2D data" sub-card is removed).
+
 ## [0.67.30] - 2026-10-06
 
 ### Added

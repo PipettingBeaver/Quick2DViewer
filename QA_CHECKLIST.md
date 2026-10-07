@@ -103,6 +103,34 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Data Sources shared layout — 0.67.31
+
+**Surface.** File → Data Sources… (all 12 views); the Quick2D dropzone and
+Selection Guide.
+
+**Should do.** Every view is a two-column shell (description + input left,
+source helper right), no accordions, no repeated hint line, neutral `✕` close;
+Quick2D uses the standard dashed dropzone and a single Selection Guide animation.
+
+**Try.**
+1. Open Data Sources: the header has a `✕` (no red Close); there is no hint line
+   under the dropdown.
+2. Switch through the views: each shows the left description/input and a right
+   helper (e.g. UniProt → Open UniProt + Debug log; Structure → AlphaFold/RCSB;
+   ddG → the four stability services). No `▾ [Source Name]` accordions.
+3. Quick2D: the left shows the dropzone; clicking it (or **Paste Clipboard**)
+   imports from the clipboard; dropping a `.txt` on it parses that file. The
+   right shows the animation under **Selection Guide** (no inner sub-card).
+
+**Edge cases.**
+- *Narrow width* - the two columns collapse to one below ~720px.
+- *No Q2D data* - the animation shows; once Q2D data is loaded it hides (0.67.30).
+- *Harness limit* - layout is manual-only; the harness asserts the shared shell
+  (12 `ds-panel`), no accordions in the region, the dropzone text/button, the
+  Selection Guide, and the drop handler.
+
+---
+
 ### Animated Quick2D tutorial — 0.67.30
 
 **Surface.** File → Data Sources… → **Quick2D Annotations** (lower right).
