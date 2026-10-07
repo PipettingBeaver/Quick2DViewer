@@ -2079,6 +2079,7 @@ assert(ctxRun(`typeof pasteQuick2DHere === 'function' && typeof pasteQuick2DFrom
 assert(HTML.indexOf('onclick="closeDataSourcesModal(); openInputDataModal();"') === -1, 'the Quick2D panel no longer switches to Input Data');
 assert(HTML.indexOf('id="quick2dTutWrap"') !== -1 && HTML.indexOf('id="quick2dTutFrame"') !== -1, 'the Quick2D panel has a visual-tutorial iframe');
 assert(HTML.indexOf('sandbox="allow-scripts"') !== -1, 'the tutorial iframe is sandboxed');
+assert(HTML.indexOf('id="quick2dTutFrame"') !== -1 && HTML.indexOf('height:260px') !== -1, 'the tutorial frame is 260px tall');
 assert(ctxRun(`typeof updateQuick2dTutorial === 'function' && typeof clearQuick2dTutorial === 'function'`), 'the tutorial show/hide helpers exist');
 // Standardized Data Sources shell
 assert(HTML.indexOf('class="modal-close-x"') !== -1, 'the Data Sources window uses a neutral close button');

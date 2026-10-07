@@ -12,6 +12,12 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.34] - 2026-10-06
+
+### Changed
+- **Quick2D Selection Guide is shorter.** The tutorial iframe height is reduced
+  from 360px to 260px so the right column is more compact.
+
 ## [0.67.33] - 2026-10-06
 
 ### Changed
