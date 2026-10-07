@@ -275,6 +275,7 @@ assert(ctxRun(`WELCOME_KEY === 'q2dViewer_welcome_v1'`), 'the welcome memory has
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Open Input Data') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'the empty state points at Input Data and Attach files');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Try GFP') === -1`), 'the empty state no longer has a direct Try GFP shortcut');
 assert(HTML.indexOf('id="welcomeModal"') !== -1 && HTML.indexOf('id="tourBar"') !== -1, 'the welcome modal and tour bar exist in the markup');
+assert(HTML.indexOf('recommended to click <strong>Show me around</strong>') !== -1, 'the welcome modal recommends the tour');
 assert(HTML.indexOf('id="tryGfpBtn"') === -1 && ctxRun(`typeof tryGfpExample === 'undefined'`), 'there is no header Try GFP button or helper');
 assert(HTML.indexOf('Load example protein') !== -1 && HTML.indexOf('id="inputAccessionPreset"') !== -1, 'Input Data exposes a Load example protein control');
 assert(HTML.indexOf('onclick="clearInputData()"') !== -1 && HTML.indexOf('onclick="clearAllData()"') !== -1, 'the Storage cache controls offer both clear actions');

@@ -12,6 +12,13 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.8] - 2026-10-07
+
+### Changed
+- **Welcome copy.** The first-run panel now describes Q2DV as a unified view of
+  protein sequence information, structure annotations and more, and recommends
+  **Show me around** for a first-time tour.
+
 ## [0.0.7] - 2026-10-07
 
 ### Changed
