@@ -2099,6 +2099,7 @@
                 <button type="button" id="menubar-file-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-file" onclick="toggleMenuBarMenu('file', this)">File ▾</button>
                 <div class="menubar-menu" id="menubar-file" role="menu" hidden>
                     <button type="button" id="menubar-file-input" role="menuitem" onclick="menuBarAction('input')">Input Data…</button>
+                    <button type="button" id="menubar-file-datasources" role="menuitem" onclick="openDataSourcesModal()">Data Sources…</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('save')">Save session (.json)</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('options')">Options…</button>
                     <button type="button" role="menuitem" onclick="menuBarAction('clearInput')">Clear input data</button>
@@ -2129,26 +2130,9 @@
                 </div>
             </div>
             <div class="menubar-item">
-                <button type="button" id="menubar-datasources-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-datasources" onclick="toggleMenuBarMenu('datasources', this)" title="Open Options directly on a data source">Data ▾</button>
-                <div class="menubar-menu" id="menubar-datasources" role="menu" hidden>
-                    <button type="button" role="menuitem" onclick="openDataSources('uniprot')">UniProt lookup</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('conservation')">Conservation scoring</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('topology')">Membrane topology</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('domains')">Domain families</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('homologs')">Homolog search</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('structure')">Structure models &amp; validation</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('experimental')">Experimental data (DMS / HDX)</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('ddg')">Stability predictions (dG)</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('foldseek')">Structural homology (Foldseek)</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('variants')">Variant effects</button>
-                    <button type="button" role="menuitem" onclick="openDataSources('services')">External services</button>
-                </div>
-            </div>
-            <div class="menubar-item">
                 <button type="button" id="menubar-settings-btn" class="menubar-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" aria-controls="menubar-settings" onclick="toggleMenuBarMenu('settings', this)" title="Options, grouped by area">Settings ▾</button>
                 <div class="menubar-menu" id="menubar-settings" role="menu" hidden>
                     <button type="button" role="menuitem" onclick="openOptionsModal('appearance')">Appearance</button>
-                    <button type="button" role="menuitem" onclick="openOptionsModal('data')">Data Sources…</button>
                     <button type="button" role="menuitem" onclick="openOptionsModal('workflow')">Commands</button>
                     <button type="button" role="menuitem" onclick="openOptionsModal('storage')">Storage</button>
                 </div>
@@ -2772,6 +2756,16 @@
 </div>
 
 <!-- Options Modal -->
+<div class="modal-overlay" id="dataSourcesModal" role="dialog" aria-modal="true" aria-labelledby="dataSourcesModalTitle">
+    <div class="modal-content" style="width: 720px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="dataSourcesModalTitle" style="margin: 0; color: #0f172a;">Data Sources</h3>
+            <button onclick="closeDataSourcesModal()" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <div id="dataSourcesBody" style="margin-top: 12px;"></div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="optionsModal" role="dialog" aria-modal="true" aria-labelledby="optionsModalTitle">
     <div class="modal-content" style="width: 560px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
@@ -2781,7 +2775,6 @@
 
         <div class="options-tabs" role="tablist" aria-label="Options categories">
             <button type="button" id="optab-appearance" class="options-tab active" role="tab" aria-selected="true" aria-controls="opt-tab-appearance" data-tab="appearance" onclick="switchOptionsTab('appearance')">Appearance</button>
-            <button type="button" id="optab-data" class="options-tab" role="tab" aria-selected="false" aria-controls="opt-tab-data" data-tab="data" onclick="switchOptionsTab('data')">Data Sources</button>
             <button type="button" id="optab-workflow" class="options-tab" role="tab" aria-selected="false" aria-controls="opt-tab-workflow" data-tab="workflow" onclick="switchOptionsTab('workflow')">Commands</button>
             <button type="button" id="optab-storage" class="options-tab" role="tab" aria-selected="false" aria-controls="opt-tab-storage" data-tab="storage" onclick="switchOptionsTab('storage')">Storage</button>
         </div>
@@ -3657,7 +3650,7 @@ const TOUR_STEPS = [
     { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Click the highlighted File menu to begin.', require: 'menu-open:file' },
     { target: 'menubar-file-input', title: 'Open Input Data', body: 'Now click Input Data… to load a protein.', require: 'input-modal-open' },
     { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Click Next when ready.', leave: 'closeInputData' },
-    { target: 'menubar-datasources-btn', title: 'Fetch data from public sources', body: 'Open Data ▸ to reach every data source in one click - for example UniProt lookup to fetch the curated entry. Try it, then click Next.', optional: true },
+    { target: 'menubar-file-btn', title: 'Fetch data from public sources', body: 'Open File ▸ Data Sources… to fetch from public sources (UniProt, topology, domains, homologs, structure, variants…). Each source shows a ✓ once its data is loaded. Try it, then click Next.', optional: true },
     { target: 'tab-tracks', title: 'Look at the tracks', body: 'Click Tracks to show or hide rows and change their colours and filters.', require: 'tab-open:tracks' },
     { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.', optional: true },
     { target: 'menubar-export-btn', title: 'Export your work (optional)', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL. This step is just for reference.', optional: true }
@@ -9187,11 +9180,55 @@ function switchDataCategory(name) {
     if (state) state.textContent = 'External services are currently ' + (externalServicesEnabled ? 'ON' : 'OFF') + '.';
     renderTopologySourceList();
 }
-// Deep link from the guide / Input Data: open Options on a data category.
-function openDataSources(name) {
-    openOptionsModal();
-    switchOptionsTab('data');
+// Deep link from the guide / Input Data / File menu: open the Data Sources
+// window on a category. The category panel is moved out of the Options modal
+// into its own window on first use (it is a self-contained #opt-tab-data node).
+function mountDataSourcesPanel() {
+    const panel = document.getElementById('opt-tab-data');
+    const host = document.getElementById('dataSourcesBody');
+    if (!panel || !host || panel.parentNode === host) return;
+    panel.classList.remove('options-tab-panel');
+    if (panel.removeAttribute) { panel.removeAttribute('role'); panel.removeAttribute('aria-labelledby'); }
+    panel.hidden = false;
+    host.appendChild(panel);
+}
+function openDataSourcesModal(name) {
+    mountDataSourcesPanel();
+    updateDataSourcesLoadedMarks();
     switchDataCategory(name || optDataCategory);
+    openModalAsDialog('dataSourcesModal');
+}
+function closeDataSourcesModal() { closeModalAsDialog('dataSourcesModal'); }
+function openDataSources(name) { openDataSourcesModal(name); }
+
+// A category counts as loaded when its evidence is in the session; the Data
+// Sources window prefixes those options with a checkmark.
+const DATA_SOURCE_LOADED = {
+    uniprot: () => !!uniprotFeatures || Object.keys(parsedTracks).some(k => k.startsWith('UP_')) || !!uniprotAccession,
+    conservation: () => !!parsedTracks.CONSERVATION || Object.keys(parsedTracks).some(k => k.startsWith('CONS_')) || Object.keys(keyedVariantsInfo || {}).length > 0,
+    topology: () => (topologySources || []).length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('TP_')),
+    domains: () => Object.keys(domainHitsInfo || {}).length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('DM_')),
+    homologs: () => Object.keys(homologHitsInfo || {}).length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('HL_')),
+    structure: () => (uploadedStructureFiles || []).length > 0 || Object.keys(parsedTracks).some(k => /_(pLDDT|RSA)$/.test(k)) || !!p3dModel,
+    experimental: () => Object.keys(experimentalTracksInfo || {}).length > 0 || Object.keys(parsedTracks).some(k => k.endsWith('_EXP')),
+    ddg: () => Object.keys(experimentalTracksInfo || {}).some(k => (experimentalTracksInfo[k] || {}).kind === 'ddg'),
+    foldseek: () => Object.keys(homologHitsInfo || {}).some(k => (homologHitsInfo[k] || {}).source === 'Foldseek'),
+    variants: () => Object.keys(keyedVariantsInfo || {}).length > 0 || Object.keys(parsedTracks).some(k => k.startsWith('VAR_')),
+    services: () => false
+};
+function dataSourceLoaded(cat) { const fn = DATA_SOURCE_LOADED[cat]; return fn ? !!fn() : false; }
+function updateDataSourcesLoadedMarks() {
+    const sel = document.getElementById('optDataCategory');
+    if (!sel) return;
+    const opts = sel.options || sel.children || [];
+    for (let i = 0; i < opts.length; i++) {
+        const opt = opts[i];
+        if (!opt) continue;
+        const cat = opt.value;
+        if (!cat) continue;
+        const label = String(opt.textContent || '').replace(/^\u2713\s*/, '');
+        opt.textContent = (dataSourceLoaded(cat) ? '\u2713 ' : '') + label;
+    }
 }
 // Opens an external site in a new tab. If the browser blocks the popup the
 // click would otherwise look broken, so the URL is surfaced instead (X6).
@@ -10184,8 +10221,7 @@ function autoLookupAccession() {
         return;
     }
     closeInputDataModal();
-    openOptionsModal();
-    switchOptionsTab('data');
+    openDataSourcesModal('uniprot');
     // Land on the section that does the work, expanded, with the mode and terms
     // the loaded identifier line already implies.
     focusUniProtSection();
@@ -10478,6 +10514,7 @@ function refreshTrackManagerIfVisible() {
 function refreshInputDataModalIfVisible() {
     const modal = document.getElementById('inputDataModal');
     if (modal && modal.style.display === 'flex') renderInputDataModal();
+    updateDataSourcesLoadedMarks();
 }
 
 // --- Top menu bar (File / View / Data / Export / Help) --------------------
@@ -10590,7 +10627,6 @@ const JUMP_MENUS = [
     { key: 'file', label: 'File menu', target: '#menubar-file-btn', dropdown: true },
     { key: 'view', label: 'View menu', target: '#menubar-view-btn', dropdown: true },
     { key: 'data', label: 'Analyze menu', target: '#menubar-data-btn', dropdown: true },
-    { key: 'datasources', label: 'Data menu', target: '#menubar-datasources-btn', dropdown: true },
     { key: 'settings', label: 'Settings menu', target: '#menubar-settings-btn', dropdown: true },
     { key: 'session', label: 'Session menu', target: '#menubar-session-btn', dropdown: true },
     { key: 'export', label: 'Export menu', target: '#menubar-export-btn', dropdown: true },
@@ -11438,7 +11474,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.14';
+const APP_VERSION = '0.0.15';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -20943,6 +20979,8 @@ function renderCachedDataInfo() {
 }
 
 function openOptionsModal(tab) {
+    // Data Sources is its own window now; route the legacy deep link there.
+    if (tab === 'data') { openDataSourcesModal(); return; }
     renderCachedDataInfo();
     void renderStructureCacheInfo();
     syncConservationOptionControls();
@@ -20968,7 +21006,6 @@ function switchOptionsTab(name) {
     document.querySelectorAll('#optionsModal .options-tab-panel').forEach(p => {
         p.hidden = (p.id !== 'opt-tab-' + name);
     });
-    if (name === 'data') switchDataCategory(optDataCategory);
 }
 
 // --- Data modal ------------------------------------------------------------
@@ -21593,6 +21630,7 @@ function copyText(elementId) {
 populateCommandEngineSelect();
 updateSidebarCommandLabels();
 syncExternalServicesMenu();
+mountDataSourcesPanel();
 applyTypePalette('default'); // fresh-visit default; loadStateFromStorage() overrides it if a saved palette exists
 initSavedSelections();
 initSelectionScope();

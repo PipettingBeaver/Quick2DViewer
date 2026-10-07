@@ -128,28 +128,58 @@ a get-started checklist with Open Input Data / Attach files / Take the tour.
 
 ### Tour covers Data + Tracks — 0.0.13
 
-**Surface.** The tour bar; the new **Data** menu; the sidebar **Tracks** tab.
+**Surface.** The tour bar; **File → Data Sources…**; the sidebar **Tracks** tab.
 
-**Should do.** After loading an example the tour points at the **Data** menu
+**Should do.** After loading an example the tour points at File → Data Sources
 (optional), then requires opening **Tracks**, then Guide, then optional Export.
 
 **Try.**
-1. Run the tour: step 3 (Load example) → Next → step 4 highlights **Data** and is
-   optional (Next available). Open Data ▸ → UniProt lookup to see the fetch
-   surface, then Next.
+1. Run the tour: step 3 (Load example) → Next → step 4 highlights **File** and is
+   optional (Next available); it says to open File ▸ Data Sources… to fetch from
+   public sources, then Next.
 2. Step 5 highlights **Tracks** and has no Next: click **Tracks** to advance.
    An unrelated tab (e.g. Guide) does not advance it.
 3. Steps 6–7 (Guide, Export) advance with Next; Skip ends the tour anywhere.
 
 **Edge cases.**
-- *Offline* - the Data step is optional, so a fetch that cannot run never blocks
-  the tour.
+- *Offline* - the Data Sources step is optional, so a fetch that cannot run never
+  blocks the tour.
 - *Harness limit* - highlight/bar layout is manual-only; the harness drives the
   gating through `tourOnUiEvent('tab-open:tracks')` and asserts the step order.
 
 ---
 
-### Data + Settings menus — 0.0.12
+### Data Sources window + checkmarks — 0.0.15
+
+**Surface.** **File → Data Sources…**; the Data Sources window; the category
+select with ✓ marks.
+
+**Should do.** Data Sources is its own window (not an Options tab), reached from
+File; each category shows **✓** when its data is loaded. The top-level Data menu
+is gone; Settings keeps Appearance / Commands / Storage.
+
+**Try.**
+1. **File → Data Sources…**: the window opens on UniProt. The Options modal no
+   longer has a Data Sources tab, and the Settings menu has no Data Sources item.
+2. With nothing loaded, no category shows a ✓. Load GFP (**Input Data → Load
+   example protein**): reopen Data Sources and **✓ UniProt lookup** shows; after
+   a homolog search, **✓ Homolog search** shows too.
+3. Guide "⚙ Data sources" links, the Input Data "Data sources…" button, and the
+   empty-state "open Data Sources" all open this same window on the right
+   category.
+
+**Edge cases.**
+- *Panel mount* - the category panel is moved into the window at page init; if
+  it were left behind, the Options modal would still show a hidden panel.
+- *Marks refresh* - marks update on open and whenever data changes while the
+  window is open (via `refreshInputDataModalIfVisible`).
+- *Harness limit* - window layout is manual-only; the harness asserts the window
+  and helpers exist, the Data menu is gone, the Settings menu dropped Data
+  Sources, and the `dataSourceLoaded` predicates.
+
+---
+
+### Data + Settings menus — 0.0.12 (superseded by 0.0.15)
 
 **Surface.** The menu bar (**Data**, **Settings**); the Options modal.
 
@@ -166,8 +196,8 @@ opens the four Options areas on the right tab. One click each.
    reachable (Left/Right/Down/Escape).
 
 **Edge cases.**
-- *Menu crowding* - the bar now has 8 menus; check it wraps cleanly at narrow
-  widths.
+- *Superseded* - the **Data** menu was replaced by **File → Data Sources…** in
+  0.0.15; this card is kept for history. Settings now has three entries.
 - *Harness limit* - menu layout is manual-only; the harness asserts both menus
   exist, that the Data menu links every `DATA_CATEGORY_HINTS` key, and that the
   Settings menu links all four tabs.

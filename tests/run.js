@@ -283,13 +283,13 @@ assert(HTML.indexOf('Load example protein') !== -1 && HTML.indexOf('id="inputAcc
 assert(HTML.indexOf('onclick="clearInputData()"') !== -1 && HTML.indexOf('onclick="clearAllData()"') !== -1, 'the Storage cache controls offer both clear actions');
 assert(HTML.indexOf("menuBarAction('clearInput')") !== -1 && HTML.indexOf("menuBarAction('clearAll')") !== -1, 'the File menu exposes both clear actions');
 assert(ctxRun('TOUR_STEPS.length') >= 3, 'the tour has at least three steps');
-assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'menubar-file-btn,menubar-file-input,inputAccessionPreset,menubar-datasources-btn,tab-tracks,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
+assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'menubar-file-btn,menubar-file-input,inputAccessionPreset,menubar-file-btn,tab-tracks,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
 assert(ctxRun(`TOUR_STEPS[0].require === 'menu-open:file' && TOUR_STEPS[1].require === 'input-modal-open'`), 'opening File then Input Data are required steps');
 assert(ctxRun(`TOUR_STEPS[2].body.indexOf('Load example protein') !== -1 && TOUR_STEPS[2].body.indexOf('GFP') !== -1`), 'the Load example step tells the user about GFP');
-assert(ctxRun(`TOUR_STEPS[3].target === 'menubar-datasources-btn' && !TOUR_STEPS[3].require`), 'the Data Sources step points at the Data menu and is optional');
+assert(ctxRun(`TOUR_STEPS[3].body.indexOf('Data Sources') !== -1 && !TOUR_STEPS[3].require`), 'the Data Sources step is optional and points at File -> Data Sources');
 assert(ctxRun(`TOUR_STEPS[4].target === 'tab-tracks' && TOUR_STEPS[4].require === 'tab-open:tracks'`), 'the Tracks step is required (click the Tracks tab)');
 assert(ctxRun(`!TOUR_STEPS.some(function (s) { return s.require && s.target === 'menubar-export-btn'; })`), 'the Export step is optional (no requirement)');
-['menubar-file-btn', 'menubar-file-input', 'inputAccessionPreset', 'menubar-datasources-btn', 'tab-tracks', 'tab-guide', 'menubar-export-btn'].forEach(id => {
+['menubar-file-btn', 'menubar-file-input', 'inputAccessionPreset', 'tab-tracks', 'tab-guide', 'menubar-export-btn'].forEach(id => {
     assert(HTML.indexOf('id="' + id + '"') !== -1, 'tour target id exists in the markup: ' + id);
 });
 sandbox.localStorage._s = {};
@@ -407,17 +407,23 @@ assert(HTML.indexOf('>External services</option>') !== -1, 'the Data Sources ser
 assert(HTML.indexOf('>Methods summary (.md)</button>') !== -1 && HTML.indexOf('Export methods summary') === -1, 'the methods export label is unified');
 assert(HTML.indexOf('max-height: calc(100vh - 72px); overflow-y: auto;') !== -1, 'menu dropdowns are height-bounded');
 assert(ctxRun(`typeof clampMenuBarMenu === 'function'`), 'menu dropdowns are clamped to the visible width');
-// Top-level Data + Settings menus (deep links into Options)
-assert(HTML.indexOf('id="menubar-datasources" role="menu"') !== -1 && HTML.indexOf('id="menubar-settings" role="menu"') !== -1, 'the Data and Settings menus exist');
-const dsMenu = HTML.slice(HTML.indexOf('id="menubar-datasources"'), HTML.indexOf('id="menubar-settings"'));
-JSON.parse(ctxRun(`JSON.stringify(Object.keys(DATA_CATEGORY_HINTS))`)).forEach(c => {
-    assert(dsMenu.indexOf("openDataSources('" + c + "')") !== -1, 'the Data menu links to ' + c);
-});
+// Data Sources is its own window, linked from File, with loaded-checkmarks
+assert(HTML.indexOf('id="dataSourcesModal"') !== -1 && HTML.indexOf('id="dataSourcesBody"') !== -1, 'Data Sources has its own window');
+assert(HTML.indexOf('onclick="openDataSourcesModal()">Data Sources…</button>') !== -1, 'the File menu links to the Data Sources window');
+assert(HTML.indexOf('id="menubar-datasources"') === -1, 'the temporary top-level Data menu is gone');
+assert(ctxRun(`typeof openDataSourcesModal === 'function' && typeof closeDataSourcesModal === 'function' && typeof updateDataSourcesLoadedMarks === 'function' && typeof dataSourceLoaded === 'function'`), 'the Data Sources window and checkmark helpers exist');
+assert(HTML.indexOf('id="opt-tab-data"') !== -1 && HTML.indexOf('id="optab-data"') === -1, 'the category panel stays in the markup but its Options tab is gone');
 const setMenu = HTML.slice(HTML.indexOf('id="menubar-settings"'), HTML.indexOf('id="menubar-session"'));
-['appearance', 'data', 'workflow', 'storage'].forEach(t => {
+['appearance', 'workflow', 'storage'].forEach(t => {
     assert(setMenu.indexOf("openOptionsModal('" + t + "')") !== -1, 'the Settings menu links to ' + t);
 });
-assert(ctxRun(`JUMP_MENUS.some(function (m) { return m.key === 'datasources'; }) && JUMP_MENUS.some(function (m) { return m.key === 'settings'; })`), 'the jump box indexes the new menus');
+assert(setMenu.indexOf("openOptionsModal('data')") === -1, 'Settings no longer duplicates Data Sources');
+assert(ctxRun(`JUMP_MENUS.some(function (m) { return m.key === 'settings'; }) && !JUMP_MENUS.some(function (m) { return m.key === 'datasources'; })`), 'the jump box indexes Settings but not the removed Data menu');
+// checkmark predicates
+ctxRun(`parsedTracks = { AA: 'M'.repeat(10), UP_Sites: 'x', DM_Pfam: 'x', HL_01: 'x', TP_Consensus: 'x', VAR_01: 'x', 'foo_EXP': [1], 'm_pLDDT': [1] };`);
+assert(ctxRun(`dataSourceLoaded('uniprot') && dataSourceLoaded('domains') && dataSourceLoaded('homologs') && dataSourceLoaded('topology') && dataSourceLoaded('variants') && dataSourceLoaded('experimental') && dataSourceLoaded('structure')`), 'loaded evidence marks its source');
+ctxRun(`parsedTracks = {};`);
+assert(ctxRun(`!dataSourceLoaded('uniprot') && !dataSourceLoaded('domains') && !dataSourceLoaded('services')`), 'an empty session marks nothing (services is not a data source)');
 assert(ctxRun(`(function(){ const i = buildInfoIcon('<strong>Foo</strong><br>bar'); return i.getAttribute('role') + '|' + i.getAttribute('aria-label'); })()`) === 'button|More information: Foo', 'built info icons are labelled buttons');
 
 section('graph mode via Track Control');

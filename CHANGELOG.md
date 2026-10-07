@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.15] - 2026-10-07
+
+### Changed
+- **Data Sources is its own window, opened from File.** The temporary top-level
+  **Data** menu is gone. **File -> Data Sources…** opens a dedicated Data Sources
+  window, and each category shows a **✓** when its data is loaded (e.g.
+  "✓ UniProt lookup"). The Options modal keeps Appearance / Commands / Storage;
+  the Settings menu no longer duplicates Data Sources. All existing deep links
+  (Guide, Input Data, empty-state checklist) open the new window.
+
 ## [0.0.14] - 2026-10-07
 
 ### Added
