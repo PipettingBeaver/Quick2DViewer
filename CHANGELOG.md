@@ -12,6 +12,13 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.28] - 2026-10-06
+
+### Changed
+- **The Quick2D Annotations panel pastes directly.** It gains its own **Paste
+  Quick2D** button (alongside Open Input Data and the MPI Quick2D link), so the
+  clipboard import can be run without leaving the Data Sources window first.
+
 ## [0.67.27] - 2026-10-06
 
 ### Added

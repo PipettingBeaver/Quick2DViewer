@@ -103,7 +103,7 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
-### Quick2D Annotations data source — 0.67.27
+### Quick2D Annotations data source — 0.67.27 (paste button 0.67.28)
 
 **Surface.** File → Data Sources… → **Quick2D Annotations**; the category's ✓.
 
@@ -118,13 +118,17 @@ loaded (AA alone does not count).
 2. With no Q2D rows, the entry is unmarked. Paste a Quick2D job (or load an
    example that includes one): reopen Data Sources and **✓ Quick2D Annotations**
    shows. A plain FASTA (AA only) does not mark it.
-3. **Open Input Data** in the panel closes the window and opens Input Data.
+3. **Paste Quick2D** in the panel closes the window, opens Input Data and runs
+   the clipboard import; **Open Input Data** just opens Input Data.
 
 **Edge cases.**
 - *AA-only session* - `SS_`/`TM_`/`DO_`/`CC_`/`SP_` prefixes are the trigger, so
   AA alone never marks it.
+- *Clipboard denied/empty* - the panel's paste falls back to the Input Data
+  drawer, where the text can be pasted by hand.
 - *Harness limit* - layout is manual-only; the harness asserts the option, the
-  link, the instruction text, and the `dataSourceLoaded('quick2d')` predicate.
+  link, the instruction text, the paste button/handler, and the
+  `dataSourceLoaded('quick2d')` predicate.
 
 ---
 
