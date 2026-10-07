@@ -116,8 +116,8 @@ loads P42212; **Clear input data** drops the loaded session but keeps preference
 1. Fresh browser (or *Clear all data* first), then reload. Expect the Welcome modal
    once. Close it, reload again - it does not come back.
 2. Empty viewer shows **Try GFP / Paste Quick2D / Attach files**. Press **Try GFP**:
-   expect the GFP sequence and UniProt annotation rows, plus the one-time
-   external-services confirm (until the default-ON change lands).
+   expect the GFP sequence and UniProt annotation rows (no confirm on the deployed
+   site; on `file://` the external-services confirm still appears once).
 3. Help → **Getting started** reopens the welcome; **Show me around** pulses the Try GFP
    button, the sidebar tabs, the Guide tab and the Export menu, with a bottom caption bar
    (Next / Back / Skip).
@@ -132,6 +132,31 @@ loads P42212; **Clear input data** drops the loaded session but keeps preference
   **Clear Structure Cache**).
 - *Harness limit* - modal layout, the pulsing highlight and the tour-bar position are
   manual-only; the harness asserts the markup, ids and the reset split.
+
+---
+
+### API access on by default — 0.0.4
+
+**Surface.** Options → Data Sources → External services; every outbound action
+(UniProt, BLAST/HMMER, ESMFold, Foldseek).
+
+**Should do.** On the deployed `http(s)` site, external calls run without a
+confirm and the switch reads **ON**; on `file://` they start OFF and the first
+call still asks.
+
+**Try.**
+1. Load the deployed site fresh (Clear all data first). Options → Data Sources →
+   External services should read **ON** before any call.
+2. Press **Try GFP**; it should fetch without a confirm prompt.
+3. Toggle the switch OFF, then press **Try GFP** again: expect a clear
+   "enable external services" prompt or a blocked-call message, not a silent hang.
+   Toggle back ON and reload - the ON/OFF choice persists.
+
+**Edge cases.**
+- *`file://`* - starts OFF and still asks once; this is intentional.
+- *Clear all data* - returns to the platform default (ON on http(s), OFF on file://).
+- *Saved session from before 0.0.4* - an explicit OFF in the save is honoured
+  (only a missing preference takes the platform default).
 
 ---
 

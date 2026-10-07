@@ -3040,7 +3040,7 @@
         <div id="optCat-services" class="opt-cat" hidden>
             <h4 style="margin: 18px 0 4px; color: #0f172a; font-size: 0.95rem;">External services &amp; activity log</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
-                API calls are opt-in: the first one asks, and the choice is remembered. The activity log records every request and what came back - open it from the menu bar ("Log") or here.
+                API access is on by default on the deployed site (and off on a local <code>file://</code> page); turn it off or on here. The activity log records every request and what came back - open it from the menu bar ("Log") or here.
             </p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <button type="button" class="tb-btn tb-btn-secondary" onclick="toggleExternalServices()" id="optExternalToggle" style="font-size:0.78rem; padding:4px 10px;">Toggle external services</button>
@@ -3171,7 +3171,7 @@
             <button type="button" class="tb-btn tb-btn-secondary" onclick="dismissWelcome()">I'll explore on my own</button>
         </div>
         <p style="font-size:0.75rem; color:#94a3b8; margin:0; line-height:1.5;">
-            This won't show again. Reopen it any time from Help &rarr; Getting started. Nothing leaves your device unless you enable external services.
+            You can access this tutorial from Help &rarr; Getting started.
         </p>
     </div>
 </div>
@@ -4183,10 +4183,14 @@ async function runCapability(capName, args, onProgress, opts) {
 function uniprotApiBase() { return SERVICE_REGISTRY.capabilities.annotation.providers[0].url; }
 
 // --- External-services opt-in ---------------------------------------------
-// Gates every outbound API call (UniProt, BLAST, ESMFold, Foldseek). The first
-// time an external action runs, the user is asked once; the choice is
-// remembered and can be flipped from File > External services.
-let externalServicesEnabled = false;
+// Gates every outbound API call (UniProt, BLAST, ESMFold, Foldseek). It is ON
+// by default on the deployed site (http/https) so the viewer works as a web
+// viewer out of the box, and OFF on a local file:// page; the toggle under
+// Options -> Data Sources turns it off (or on) and the choice is remembered.
+function externalServicesDefault() {
+    return !(typeof location !== 'undefined' && location.protocol === 'file:');
+}
+let externalServicesEnabled = externalServicesDefault();
 async function ensureExternalServices() {
     if (externalServicesEnabled) return true;
     const ok = await confirmDialog(
@@ -4199,6 +4203,10 @@ async function ensureExternalServices() {
 function syncExternalServicesMenu() {
     const el = document.getElementById('menuExternalServices');
     if (el) el.textContent = 'External services: ' + (externalServicesEnabled ? 'ON' : 'OFF');
+    const btn = document.getElementById('optExternalToggle');
+    if (btn) btn.textContent = 'Turn external services ' + (externalServicesEnabled ? 'OFF' : 'ON');
+    const state = document.getElementById('optExternalState');
+    if (state) state.textContent = 'External services are currently ' + (externalServicesEnabled ? 'ON' : 'OFF') + '.';
 }
 function toggleExternalServices() {
     externalServicesEnabled = !externalServicesEnabled;
@@ -11046,7 +11054,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.0.3';
+const APP_VERSION = '0.0.4';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -20364,7 +20372,9 @@ function applyPersistedState(state) {
         graphMode.RSA = false;
     }
     syncGraphModeControls();
-    externalServicesEnabled = !!prefs.externalServicesEnabled;
+    // Absent preference (older saves, first run) means "use the platform
+    // default": ON for http(s), OFF for file://.
+    externalServicesEnabled = (prefs.externalServicesEnabled === undefined) ? externalServicesDefault() : !!prefs.externalServicesEnabled;
     syncExternalServicesMenu();
     qaHighlightsEnabled = prefs.qaHighlightsEnabled === true;
     syncQaHighlights();
@@ -21124,7 +21134,7 @@ function resetPreferencesState() {
     applyGridZoom();
     graphMode = { pLDDT: false, RSA: false };
     syncGraphModeControls();
-    externalServicesEnabled = false;
+    externalServicesEnabled = externalServicesDefault();
     syncExternalServicesMenu();
     qaHighlightsEnabled = false;
     syncQaHighlights();
@@ -21193,6 +21203,7 @@ function copyText(elementId) {
 // visit with nothing cached would otherwise leave the Options dropdown empty.
 populateCommandEngineSelect();
 updateSidebarCommandLabels();
+syncExternalServicesMenu();
 applyTypePalette('default'); // fresh-visit default; loadStateFromStorage() overrides it if a saved palette exists
 initSavedSelections();
 initSelectionScope();

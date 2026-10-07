@@ -293,6 +293,19 @@ ctxRun(`tourNext();`);
 assert(ctxRun('tourIndex') === 1, 'Next advances the tour');
 ctxRun(`endTour();`);
 
+section('external-services platform default');
+assert(ctxRun(`typeof externalServicesDefault === 'function'`), 'externalServicesDefault is defined');
+assert(ctxRun(`externalServicesDefault() === false`), 'a file:// page defaults external services OFF (sandbox protocol)');
+const svcState = prefs => JSON.stringify({ parsedTracks: { AA: 'M'.repeat(10) }, preferences: prefs });
+ctxRun(`applyPersistedState(${svcState({})});`);
+assert(ctxRun(`externalServicesEnabled === false`), 'a save with no preference takes the platform default');
+ctxRun(`applyPersistedState(${svcState({ externalServicesEnabled: true })});`);
+assert(ctxRun(`externalServicesEnabled === true`), 'an explicit ON in a save is honoured');
+ctxRun(`applyPersistedState(${svcState({ externalServicesEnabled: false })});`);
+assert(ctxRun(`externalServicesEnabled === false`), 'an explicit OFF in a save is honoured');
+assert(HTML.indexOf('API access is on by default on the deployed site') !== -1, 'the Options copy explains the default');
+assert(HTML.indexOf('You can access this tutorial from Help') !== -1, 'the welcome footer points at Help -> Getting started');
+
 section('UI categories + accessibility');
 
 assert(HTML.indexOf('data-tab="analyze"') !== -1 && HTML.indexOf('>Analyze</button>') !== -1, 'a dedicated Analyze tab exists');

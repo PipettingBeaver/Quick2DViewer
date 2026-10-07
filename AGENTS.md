@@ -45,9 +45,11 @@ No lint, typecheck, formatter, or CI is configured.
 - `WORKFLOW_STEPS` is the single source of truth for the Evaluation Guide, Input
   Data checklist, and methods report. Place new features per `DESIGN.md` §16
   (taxonomy) and §20 (surface placement rules).
-- Nothing leaves the device unless the user enables the external-services opt-in.
-  Only add APIs whose CORS behaviour is verified (`DESIGN.md` §3); several
-  providers are deliberately registered but disabled with the reason recorded.
+- Outbound calls run only through the external-services switch (Options -> Data
+  Sources): on by default on the deployed http(s) site, off on local `file://`,
+  and off-able at any time. Only add APIs whose CORS behaviour is verified
+  (`DESIGN.md` §3); several providers are deliberately registered but disabled
+  with the reason recorded.
 
 ## Docs
 

@@ -14,7 +14,9 @@ reference, with per-residue cross-track querying.
 
 **Invariants**
 - One HTML file, no build system, no backend.
-- Nothing leaves the device unless the user **opts in** to external services.
+- Outbound API calls run only through the external-services switch, which is on
+  by default on the deployed site and off on local `file://`, and can be turned
+  off at any time.
 - Tracks live in `parsedTracks[key]` (string, or object array for numeric).
 
 ## 2. The standard characterization pipeline (5 steps)
@@ -42,8 +44,11 @@ membrane-protein work.
 | EBI BLAST (ncbiblast) | ✅ `allow-origin: *` | already integrated |
 | MPI Toolkit (HHpred etc.) | ❌ 403 | clipboard wizard only (proxy deferred) |
 
-**Opt-in gate:** a File-menu switch ("Q2DV may make API calls on your behalf")
-gates every outbound request, with a per-action disclosure line. Seamless when on.
+**Opt-in gate:** a switch under Options -> Data Sources turns outbound API
+access off or on. It is **on by default on the deployed site (http/https)** so
+Q2DV behaves as a web viewer out of the box, and **off on a local `file://`
+page**; the choice is remembered. Every request still carries a per-action
+disclosure line in the activity log.
 
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 
@@ -959,7 +964,7 @@ rendered UI.
 | P1 | **Get Started** onboarding | welcome modal + coachmark tour, header **Try GFP**, empty-state card | Background (onboarding) | 1.5-2.5 d | 0.0.3 |
 | P2 | **Protein summary panel** | fetch UniProt FUNCTION comment + keywords/GO; render beside tracks | Interpretation (annotation step + AI pack) | 0.5-1 d | 0.0.4 |
 | P3 | **Header jump box** | one box filtering menu commands, loaded track names, guide steps; navigation only | Background (discoverability) | 1-1.5 d | 0.0.5 |
-| P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.6 |
+| P4 | **Network opt-in default ON** | default ON for `http(s)`, keep the gate for `file://`; passive indicator | Background (plumbing; policy change) | 0.5-1 d | 0.0.4 |
 | P5 | **Accessibility pass** | focus-visible reveals tooltips; `prefers-reduced-motion` disables transitions | Background | 0.5-1 d | 0.0.7 |
 
 ### P1 - Get Started (0.0.3)
@@ -1024,7 +1029,13 @@ target resolves to a real element id.
 Non-goals. No remote/doc search, no residue-pattern search (the existing
 `seqSearchInput` at `index.html:2349` already covers that).
 
-### P4 - Network opt-in default ON (0.0.6)
+### P4 - Network opt-in default ON (0.0.4)
+
+Shipped (0.0.4). `externalServicesDefault()` returns ON unless the page is on
+`file://`; the saved preference overrides it when present, `Clear all data`
+restores the platform default, and the Options -> Data Sources switch shows the
+state and turns it off/on. The §3 invariant and `AGENTS.md` were rewritten in the
+same change.
 
 Decision. Default external services ON when the page is served over `http(s)`
 (the deployed site), keep the confirm gate for `file://`, and show an always
@@ -1048,7 +1059,7 @@ automated axe pass) remains a separate future item.
 
 ### Sequencing
 
-P1 -> P2 -> P3 (the prioritised three), then P4 -> P5. P1 ships usable without
-P4 because the existing opt-in confirm still enables the APIs after one click.
-Tests and QA cards are written per release; versions are renumbered rather than
-bundled if work overlaps.
+Shipped so far: P1 (0.0.3), then P4 pulled ahead at the user's request (0.0.4)
+so `Try GFP` works without the confirm click. Remaining: P2 -> P3 -> P5, in that
+order. Tests and QA cards are written per release; versions are renumbered
+rather than bundled if work overlaps.

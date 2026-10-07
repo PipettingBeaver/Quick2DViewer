@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.0.4] - 2026-10-07
+
+### Changed
+- **API access is on by default.** External services start ON when the page is
+  served over `http(s)` (the deployed site) and OFF on a local `file://` page;
+  a saved preference overrides the platform default, and the switch under
+  Options -> Data Sources shows the current state and turns it off or on. The
+  `DESIGN.md` §3 invariant and `AGENTS.md` were rewritten to match. The welcome
+  panel's footer now simply points at Help -> Getting started.
+
 ## [0.0.3] - 2026-10-07
 
 ### Added
