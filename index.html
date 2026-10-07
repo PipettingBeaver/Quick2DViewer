@@ -2126,7 +2126,7 @@
         </div>
     </div>
 
-    <input type="file" id="structureUpload" accept=".pdb,.cif,.json,.hhr,.fasta,.fa,.faa,.fas" multiple style="display: none;">
+    <input type="file" id="structureUpload" accept=".pdb,.cif,.json,.hhr,.fasta,.fa,.faa,.fas,.txt" multiple style="display: none;">
 
     <div class="modal-overlay" id="inputDataModal" role="dialog" aria-modal="true" aria-labelledby="inputDataModalTitle">
         <div class="modal-content" style="width: 640px;">
@@ -9629,10 +9629,9 @@ function renderWorkflowGuide() {
 
     const intakeComplete = answered >= GUIDE_QUESTIONS.length;
     const intakeOpen = guideIntakeOpen === null ? !intakeComplete : guideIntakeOpen;
-    // Below the intake: while it is incomplete the two evaluation views stack as
-    // before; once complete they are replaced by a single view chosen explicitly
-    // (guided or full), with a toggle at the bottom to switch.
-    const showStacked = !intakeComplete;
+    // The evaluation views stay hidden until the intake is complete AND a view
+    // has been chosen: the prompt replaces them while the choice is outstanding,
+    // then exactly one of guided (recommendation card) / full (step cards) shows.
     const showPrompt = intakeComplete && !guideViewMode;
     const showGuided = guideViewMode === 'guided';
     const showFull = guideViewMode === 'full';
@@ -9660,7 +9659,7 @@ function renderWorkflowGuide() {
         '<button type="button" class="guide-run guide-run-alt" onclick="setGuideViewMode(\'full\')">Full view</button>' +
         '</div></div>';
 
-    html += '<div class="guide-next"' + ((showStacked || showGuided) ? '' : ' hidden') + '><div class="guide-progress"><span class="guide-bar"><span style="width:' +
+    html += '<div class="guide-next"' + (showGuided ? '' : ' hidden') + '><div class="guide-progress"><span class="guide-bar"><span style="width:' +
         Math.round((prog.covered / prog.denominator) * 100) + '%"></span></span>' + prog.covered + ' of ' + prog.denominator +
         ' covered' + (prog.skipped ? ' · ' + prog.skipped + ' skipped' : '') +
         (prog.notRelevant ? ' · ' + prog.notRelevant + ' not relevant' : '') +
@@ -9704,7 +9703,7 @@ function renderWorkflowGuide() {
     }
     html += '</div>';
 
-    html += '<div class="guide-steps"' + ((showStacked || showFull) ? '' : ' hidden') + '>';
+    html += '<div class="guide-steps"' + (showFull ? '' : ' hidden') + '>';
     prog.rows.forEach(r => {
         const act = resolveStepAction(r.step);
         const taskRun = STEP_TASK_RUNS[r.step.id] || '';
@@ -9760,7 +9759,7 @@ function renderWorkflowGuide() {
 
     const insights = computeGuideInsights();
     if (insights.length) {
-        html += '<div class="guide-insights"' + (showPrompt ? ' hidden' : '') + '><div class="guide-insights-head">Automated read-out</div>';
+        html += '<div class="guide-insights"' + (guideViewMode ? '' : ' hidden') + '><div class="guide-insights-head">Automated read-out</div>';
         insights.forEach(i => { html += '<div class="guide-insight guide-insight-' + i.level + '">' + i.text + '</div>'; });
         html += '</div>';
     }
@@ -10821,7 +10820,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.3';
+const APP_VERSION = '0.67.4';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -12424,6 +12423,34 @@ async function attachStructureText(fileName, text, ext, opts) {
     return cachePromise;
 }
 
+// A Quick2D result saved as a text file (rather than pasted) is recognized by
+// its content - the "Protein ID:" header, the AA_QUERY rows, or the track
+// prefix lines - and fed through the exact parser the paste path uses. A plain
+// FASTA in a .txt is accepted too, since the paste parser already handles it.
+function looksLikePasteInput(text) {
+    const t = String(text || '');
+    if (/^\s*Protein\s*ID\s*:/im.test(t)) return true;
+    if (/\bAA_QUERY\b/.test(t)) return true;
+    if (/^(SS_|TM_|DO_|CC_|SP_)\S*[\t ]/m.test(t)) return true;
+    return typeof isPlainFastaInput === 'function' && isPlainFastaInput(t);
+}
+// Import a Quick2D text file by loading it into the raw-input box and running
+// the same parse the Paste Quick2D button runs. Returns true when a session was
+// built (so the caller can stop treating the file as a structure file).
+function importQuick2DText(text, fileName) {
+    const ta = document.getElementById('rawInput');
+    if (!ta) return false;
+    ta.value = text;
+    const beforeRef = parsedTracks;
+    parseAndBuildViewer();
+    if (parsedTracks !== beforeRef && parsedTracks.AA) {
+        saveStateToStorage();
+        showToast('Imported Quick2D data from ' + fileName + '.', 'success');
+        return true;
+    }
+    return false;
+}
+
 document.getElementById('structureUpload').addEventListener('change', async (event) => {
     const files = [...event.target.files];
 
@@ -12436,7 +12463,17 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
     // to the normal structure-file handling further down unchanged.
     const remainingFiles = [];
     for (const file of files) {
-        if (file.name.split('.').pop().toLowerCase() !== 'json') { remainingFiles.push(file); continue; }
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        // Quick2D output saved as .txt: parse it like a paste (it provides the
+        // sequence, so it must bypass the "sequence already parsed" guard below).
+        if (fileExt === 'txt') {
+            let text;
+            try { text = await file.text(); } catch (err) { remainingFiles.push(file); continue; }
+            if (looksLikePasteInput(text)) importQuick2DText(text, file.name);
+            else remainingFiles.push(file); // not Quick2D / FASTA text - let structure handling try it
+            continue;
+        }
+        if (fileExt !== 'json') { remainingFiles.push(file); continue; }
         let text, maybeSave;
         try {
             text = await file.text();
@@ -13602,16 +13639,24 @@ function computeConservationScores(aligneds, metric) {
             const Hmax = Math.log2(Math.min(letters.length, present));
             out[c] = Hmax > 0 ? Math.max(0, Math.min(1, 1 - H / Hmax)) : 1;
         } else if (metric === 'jsd') {
+            // Jensen-Shannon divergence between the observed column and the
+            // natural background, via the mixture M = (P + Q) / 2 so the result
+            // is bounded to [0, 1] bits. High divergence = the column is held
+            // away from the background = conserved. (The previous form used
+            // 0.5*KL(P||Q) + 0.5*KL(Q||P) with a 0.0001 pseudocount for absent
+            // residues, which is unbounded and scored every column 0.)
             const bg = (typeof AMINO_ACID_BG_FREQUENCIES === 'object' && AMINO_ACID_BG_FREQUENCIES) ? AMINO_ACID_BG_FREQUENCIES : {};
             const bgTotal = Object.keys(bg).reduce((s, k) => s + (bg[k] || 0), 0) || 1;
-            let kl = 0, klRev = 0;
-            letters.forEach(k => { const p = counts[k] / present; const q = (bg[k] || 0.0001) / bgTotal; if (p > 0) kl += p * Math.log2(p / q); });
+            const P = {}, Q = {};
+            let qSum = 0;
+            aaOrder.split('').forEach(a => { P[a] = counts[a] ? counts[a] / present : 0; Q[a] = (bg[a] || 0.0001) / bgTotal; qSum += Q[a]; });
+            let jsd = 0;
             aaOrder.split('').forEach(a => {
-                const q = (bg[a] || 0.0001) / bgTotal; const p = counts[a] ? counts[a] / present : 0.0001;
-                klRev += q * Math.log2(q / p);
+                const q = Q[a] / qSum; const m = 0.5 * (P[a] + q);
+                if (P[a] > 0) jsd += 0.5 * P[a] * Math.log2(P[a] / m);
+                if (q > 0) jsd += 0.5 * q * Math.log2(q / m);
             });
-            const jsd = 0.5 * kl + 0.5 * klRev;
-            out[c] = Math.max(0, Math.min(1, 1 - jsd));
+            out[c] = Math.max(0, Math.min(1, jsd));
         } else {
             const maxFreq = Math.max.apply(null, letters.map(k => counts[k]));
             const variability = (letters.length / present) / (maxFreq / present);

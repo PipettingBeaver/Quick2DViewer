@@ -18,6 +18,7 @@ const IPR_DOM_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-
 const IPR_PROSITE_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprscan-lacy-prosite.tsv'), 'utf-8');
 const PDBE_OUTLIERS_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-outliers.json'), 'utf-8');
 const PDBE_QUALITY_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-quality.json'), 'utf-8');
+const Q2D_GFP_FIXTURE = fs.readFileSync(path.join(ROOT, 'GFP/Q2D_GFP.txt'), 'utf-8');
 
 // ---------- DOM stubs ----------
 function makeEl() {
@@ -150,6 +151,10 @@ assert(ctxRun(`getTrackCategoryOrder('UP_Sites') > 0`), 'category order resolves
 section('conservation engine');
 const cons = ctxRun(`(function(){ parsedTracks = { AA: 'X'.repeat(4) }; const a = computeConservationScores(['AAAA','AAAT','AAAG'], 'shannon'); return { n: a.length, first: a[0], last: a[3] }; })()`);
 assert(cons.n === 4 && cons.first > cons.last, 'Shannon: conserved first column > divergent last column');
+const jsd = ctxRun(`(function(){ parsedTracks = { AA: 'XXX' }; return { w: computeConservationScores(['W','W','W'], 'jsd')[0], a: computeConservationScores(['A','A','A'], 'jsd')[0], mix: computeConservationScores(['A','R','N','D','G'], 'jsd')[0] }; })()`);
+assert(jsd.w > 0.9 && jsd.w <= 1, 'JSD scores a conserved rare column highly (bounded to 1)');
+assert(jsd.a > 0.5 && jsd.a <= 1, 'JSD is non-zero for a conserved common column (was always 0)');
+assert(jsd.mix < jsd.a, 'a diverse column diverges from background less than a conserved one');
 
 section('UniProt feature parsing (both backends)');
 const upA = ctxRun(`parseUniProtFeatures({ features: [ { type:'Signal', location:{ start:{value:1}, end:{value:22} } }, { type:'Subcellular location', location:{ value:'x' } } ] })`);
@@ -737,6 +742,18 @@ assert(ctxRun(`Object.keys(parsedTracks).indexOf('UP_Cross_link') !== -1`), 'the
 assert(ctxRun(`Object.keys(parsedTracks).indexOf('UP_Modified_residue') !== -1`), 'the modified-residue row is rebuilt on load');
 assert(ctxRun(`uniprotFeatureTracks['UP_Cross_link'] && uniprotFeatureTracks['UP_Cross_link'].category === 'ptm'`), 'the rebuilt row keeps its PTM category');
 ctxRun(`parsedTracks = {}; uniprotFeatures = null; uniprotFeatureTracks = {};`);
+
+section('Quick2D text file import (.txt)');
+assert(HTML.indexOf('accept=".pdb,.cif,.json,.hhr,.fasta,.fa,.faa,.fas,.txt"') !== -1, 'the file picker accepts .txt');
+assert(ctxRun(`looksLikePasteInput(${JSON.stringify(Q2D_GFP_FIXTURE)})`) === true, 'a Quick2D .txt is recognized by content');
+assert(ctxRun(`looksLikePasteInput('ATOM      1  N   MET A   1')`) === false, 'a PDB is not treated as Quick2D text');
+assert(ctxRun(`looksLikePasteInput('>sp|P42212|GFP_AEQVI GFP\\nMSKGEELFTG')`) === true, 'a plain FASTA in a .txt is accepted');
+ctxRun(`parsedTracks = {}; currentProteinLabel = null;`);
+assert(ctxRun(`importQuick2DText(${JSON.stringify(Q2D_GFP_FIXTURE)}, 'Q2D_GFP.txt')`) === true, 'importQuick2DText builds a session');
+assert(ctxRun(`parsedTracks.AA.length`) === 238, 'the 238 aa sequence is parsed');
+assert(ctxRun(`Object.keys(parsedTracks).some(k => k.startsWith('SS_'))`) === true, 'its SS tracks are built');
+assert(ctxRun(`(currentProteinLabel || '').indexOf('GFP_AEQVI') !== -1`), 'the Protein ID line sets the label');
+ctxRun(`parsedTracks = {}; currentProteinLabel = null;`);
 
 section('identifier parsing + lookup defaults');
 const headerFull = 'sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria GN=GFP PE=1 SV=1';
@@ -3440,8 +3457,8 @@ section('guide view choice (guided vs full)');
 // incomplete intake: the two views stack as before, prompt + toggle hidden
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; guideViewMode = null; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
 let viewHtml = ctxRun(`document.getElementById('guidePanel').innerHTML`);
-assert(viewHtml.indexOf('<div class="guide-next"><div class="guide-progress">') !== -1, 'incomplete intake still shows the guided view');
-assert(viewHtml.indexOf('<div class="guide-steps">') !== -1, 'and the full step cards');
+assert(viewHtml.indexOf('<div class="guide-next" hidden>') !== -1, 'incomplete intake hides the guided view');
+assert(viewHtml.indexOf('<div class="guide-steps" hidden>') !== -1, 'and the full step cards');
 assert(viewHtml.indexOf('<div class="guide-view-prompt" hidden>') !== -1, 'the view prompt stays hidden');
 assert(viewHtml.indexOf('<div class="guide-view-toggle" hidden>') !== -1, 'and so does the toggle');
 // complete intake: the prompt replaces both views

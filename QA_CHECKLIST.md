@@ -103,6 +103,54 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Jensen-Shannon conservation + guide visibility — 0.67.4
+
+**Surface.** Options -> Conservation (metric select); the Guide tab.
+
+**Should do.** Switching the Conservation metric to Jensen-Shannon keeps the
+rule presets populated (*Conserved buried residue* etc.), and the Guide shows no
+evaluation views until Protein Background is complete and a view is chosen.
+
+**Try.**
+1. Load a session with homologs, open Options -> Conservation, set the metric to
+   Jensen-Shannon. Expect the CONSERVATION row to show a spread of values, not
+   all zero.
+2. Add **Conserved buried residue** (Rules) with an RSA track loaded. Expect
+   residues to match (the GFP save yields 38).
+3. Open the Guide fresh. Expect only the Protein Background accordion - no
+   recommendation card or step cards until it is complete and a view is chosen.
+
+**Edge cases.**
+- *Shannon / Wu-Kabat* - unchanged.
+- *No homologs or variants* - the CONSERVATION row is removed (unchanged).
+
+---
+
+### Quick2D output as a .txt file — 0.67.4
+
+**Surface.** The **Attach Structure(s) or JSON** file picker (Input Data /
+toolbar).
+
+**Should do.** Selecting a `.txt` containing Quick2D output parses it exactly
+like a paste: sequence + SS/TM/disorder tracks load, and the `Protein ID:` line
+sets the label.
+
+**Try.**
+1. Input Data -> **Attach Structure(s) or JSON**, pick `GFP/Q2D_GFP.txt`.
+   Expect a session with the 238 aa GFP sequence and its PSIPRED / SPIDER3 / ...
+   SS rows, and a toast "Imported Quick2D data from Q2D_GFP.txt."
+2. Save, reload, and confirm the session persists.
+3. Pick a `.txt` that is a plain FASTA -> a sequence-only session loads.
+
+**Edge cases.**
+- *A `.txt` that is neither Quick2D nor FASTA* - falls through to structure
+  handling rather than erroring as Quick2D.
+- *A batch with the Q2D `.txt` plus a PDB* - the Q2D file supplies the sequence
+  first, then the structure attaches.
+- *The picker filter* - `.txt` must be selectable (accept list).
+
+---
+
 ### Guide view choice (guided vs full) + intake collapse — 0.67.3
 
 **Surface.** The **Guide** tab (Evaluation Guide): the Protein Background

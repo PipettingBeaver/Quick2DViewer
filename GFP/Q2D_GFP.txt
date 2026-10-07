@@ -1,0 +1,34 @@
+Protein ID: sp|P42212|GFP_AEQVI Green fluorescent protein OS=
+
+
+AA_QUERY	1	MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFK   85
+SS_PSIPRED		             EEEEEEEEE  EEEEEEEEEEE    EEEEEEEEE        HHHHEE                    HHH	
+SS_SPIDER3		             EEEEEEEEE  EEEEEEEEEEE     EEEEEEEE        HHHHHHHH   HHHH           HHH	
+SS_PSSPRED4		    HHHH   EEEEEEE      EEEEEE        EEEEEEEEEEE          EEEEEEEEEEEEE   HHHHHHHHHH	
+SS_DEEPCNF		             EEEEEEEEE  EEEEEEEE        EEEEEEEEE         EEEEEEEEEEEEE           HHH	
+SS_NETSURFP2		   HHHH   EEEEEEEEEEEE  EEEEEEEEEEEEHH  EEEEEEEE        HHHHHHH     HHH    HHHHH  HHH	
+DO_NETSURFPD2		DD                                                                                   	
+DO_DISOPRED		DDDD                                                                                 	
+DO_SPOTD		DDDDDD                                                                               	
+DO_IUPRED		                                                                                     	
+AA_QUERY	86	SAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHN   170
+SS_PSIPRED		HH    EEEEEEEEEE  EEEEEEEEEEEE  EEEEEEEEEEE             EE    EEEEEE      EEEEEEEEEEE	
+SS_SPIDER3		HH     EEEEEEEEE  EEEEEEEEEEEE  EEEEEEEEEEE            EEE     EEEEEE     EEEEEEEEEEE	
+SS_PSSPRED4		H       EEEEEEEE     EEEEEEEE     EEEEEE             EEEEE     EEEEEEE      EEEEEEEE 	
+SS_DEEPCNF		H      EEEEEEEE     EEEEEEEEEE  EEEEEEEEEEEE      E  EEEEEEE   EEEEEEE     EEEEEEEEEE	
+SS_NETSURFP2		HH    EEEEEEEEE    EEEEEEEEEEE  EEEEEEEEEEE            EEEEE  EEEEEEEEH   EEEEEEEEEEE	
+DO_NETSURFPD2		                                                                                     	
+DO_DISOPRED		                                                                                     	
+DO_SPOTD		                                                                                     	
+DO_IUPRED		                                                                                     	
+AA_QUERY	171	IEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK   238
+SS_PSIPRED		     EEEEEEEE EEE           EEEEEEEEEE        EEEEEEEEEE            	
+SS_SPIDER3		     EEEEEEEEE        E     EEEEEEEEEE        EEEEEEEEEEE           	
+SS_PSSPRED4		     EEHHHHHHH        EE     EE           HHH HHHHHHHHHHH   H HHHHH 	
+SS_DEEPCNF		    EEEEEEEEEE        EE     EEEE            HHHHHHHHHHHH           	
+SS_NETSURFP2		E    EEEEEEEEEEEE           EEEEEEEEEEE       EEEEEEEEEEE           	
+DO_NETSURFPD2		                                                             DD DDDD	
+DO_DISOPRED		                                                                   D	
+DO_SPOTD		                                                               DD  D	
+DO_IUPRED		     D DDDDD    DDD   DD      DD DDDDD  D                           	
+

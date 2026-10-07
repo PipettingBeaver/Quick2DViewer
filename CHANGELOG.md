@@ -12,6 +12,27 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.4] - 2026-10-06
+
+### Added
+- **Quick2D output as a `.txt` file.** The **Attach Structure(s) or JSON**
+  picker now accepts `.txt`; a file whose content is Quick2D output (a
+  `Protein ID:` header, `AA_QUERY` rows, or track-prefix lines) is parsed
+  through the same path as a paste, so it builds the full session (sequence +
+  SS/TM/disorder tracks) without pasting. A plain FASTA in a `.txt` is accepted
+  too. Detection is by content, not filename.
+
+### Fixed
+- **The guide no longer shows the evaluation views before the intake is
+  complete.** The guided recommendation card and the full step cards stay
+  hidden until Protein Background is answered and a view is chosen.
+- **Jensen-Shannon conservation now produces real scores.** The metric used an
+  unbounded `0.5*KL(P||Q) + 0.5*KL(Q||P)` with a 0.0001 pseudocount for absent
+  residues, which scored every column 0 and left presets such as *Conserved
+  buried residue* matching nothing when the metric was switched. It now uses the
+  bounded mixture JSD (0..1), so changing the metric no longer empties the
+  rules (the GFP save matches 38 residues).
+
 ## [0.67.3] - 2026-10-06
 
 ### Added
