@@ -398,6 +398,19 @@ assert(ctxRun(`jumpMatches('guide').length > 0 && jumpMatches('guide')[0].title 
 assert(ctxRun(`jumpMatches('').length === 0`), 'an empty query matches nothing (no dropdown clutter)');
 assert(HTML.indexOf('id="jumpInput"') !== -1 && HTML.indexOf('id="jumpResults"') !== -1, 'the header jump box exists in the markup');
 
+section('AA row protein name');
+assert(ctxRun(`typeof currentProteinShortName === 'function'`), 'the short-name helper exists');
+ctxRun(`currentProteinLabel = 'sp|P42212|GFP_AEQVI Green fluorescent protein OS=Aequorea victoria';`);
+assert(ctxRun(`currentProteinShortName()`) === 'GFP_AEQVI', 'the UniProt entry name is used');
+ctxRun(`currentProteinLabel = 'Protein ID: sp|P00698|LYSC_CHICK Lysozyme C OS=Gallus gallus';`);
+assert(ctxRun(`currentProteinShortName()`) === 'LYSC_CHICK', 'a Quick2D "Protein ID:" prefix is handled');
+ctxRun(`currentProteinLabel = '';`);
+assert(ctxRun(`currentProteinShortName()`) === '', 'no label yields no name');
+ctxRun(`currentProteinLabel = 'ThisIsAVeryLongProteinNameThatExceedsTheLimit';`);
+assert(ctxRun(`currentProteinShortName().length <= 24 && currentProteinShortName().indexOf('\\u2026') !== -1`), 'a long name is truncated');
+ctxRun(`currentProteinLabel = null;`);
+assert(HTML.indexOf('track-label-protein') !== -1, 'the AA row renders the protein-name span');
+
 section('UI categories + accessibility');
 
 assert(HTML.indexOf('data-tab="analyze"') !== -1 && HTML.indexOf('>Analyze</button>') !== -1, 'a dedicated Analyze tab exists');

@@ -12,6 +12,13 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.35] - 2026-10-06
+
+### Added
+- **Protein short name on the AA row.** The loaded protein's short name (UniProt
+  entry name, else protein/gene/accession) now appears right-aligned in the AA
+  row label, in the space between the **R** residue-type button and the sequence.
+
 ## [0.67.34] - 2026-10-06
 
 ### Changed

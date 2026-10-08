@@ -649,6 +649,12 @@
         .track-label.source-colored { border-left: 4px solid var(--source-color, #94a3b8); padding-left: 20px; }
         .track-label.source-colored.active-row { border-left-color: var(--source-color, #94a3b8); }
         .track-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .track-label-protein {
+            margin-left: auto; padding-left: 6px;
+            font-weight: 400; font-size: 0.68rem; color: #94a3b8;
+            max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .track-label.active-row .track-label-protein { color: rgba(255,255,255,0.8); }
         .type-badges { display: flex; gap: 3px; margin-left: 6px; flex-shrink: 0; }
         /* Type badges are selection affordances - reveal them on row hover
            (or when one is active) so they don't compete with the data. */
@@ -11709,7 +11715,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.34';
+const APP_VERSION = '0.67.35';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -12935,6 +12941,23 @@ function buildRBadge() {
         toggleResiduePopover(badge);
     });
     return badge;
+}
+
+// A short display name for the loaded protein, shown at the right of the AA
+// row label (between the "R" button and the residues). Prefers the UniProt
+// entry name (e.g. GFP_AEQVI), then the protein name / gene / accession, and
+// falls back to the raw label.
+function currentProteinShortName() {
+    let label = String(currentProteinLabel || '').trim();
+    if (!label) return '';
+    label = label.replace(/^Protein\s*ID\s*:\s*/i, '').replace(/^>/, '').trim();
+    let name = '';
+    try {
+        const p = parseProteinHeaderLine(label);
+        if (p) name = p.entryName || p.proteinName || p.gene || p.accession || '';
+    } catch (err) { name = ''; }
+    if (!name) name = label;
+    return name.length > 24 ? name.slice(0, 23) + '\u2026' : name;
 }
 
 function toggleResiduePopover(anchorEl) {
@@ -16520,6 +16543,14 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
 
     if (key === 'AA') {
         labelEl.appendChild(buildRBadge());
+        const pname = currentProteinShortName();
+        if (pname) {
+            const nameEl = document.createElement('span');
+            nameEl.className = 'track-label-protein';
+            nameEl.textContent = pname;
+            nameEl.title = currentProteinLabel || pname;
+            labelEl.appendChild(nameEl);
+        }
     } else if (typeof tracks[key] === 'string' && tracks[key].length && !key.startsWith('VAR_') && key !== 'CONSERVATION' && !key.startsWith('CONS_')) {
         const presentTypes = TYPE_ORDER.filter(t => tracks[key].includes(t));
         if (presentTypes.length) {

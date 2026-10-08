@@ -103,6 +103,26 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Protein short name on the AA row — 0.67.35
+
+**Surface.** The AA track row label (the gutter left of the sequence).
+
+**Should do.** The loaded protein's short name sits right-aligned between the
+**R** residue-type button and the residues; it updates when a new protein loads.
+
+**Try.**
+1. Load GFP: the AA row shows `▶ AA ⓘ R        GFP_AEQVI` (name at the right of
+   the label gutter). Load Lysozyme: it reads `LYSC_CHICK`.
+2. Hover the name for the full protein label.
+
+**Edge cases.**
+- *No label* - the space stays empty (nothing rendered).
+- *Long name* - truncated with an ellipsis to fit the label.
+- *Harness limit* - the row render is DOM-stubbed; the harness covers
+  `currentProteinShortName()` (entry name, `Protein ID:` prefix, empty, truncation).
+
+---
+
 ### Data Sources shared layout — 0.67.31 (Quick2D steps + UniProt log 0.67.32, steps-right 0.67.33)
 
 **Surface.** File → Data Sources… (all 12 views); the Quick2D dropzone and
