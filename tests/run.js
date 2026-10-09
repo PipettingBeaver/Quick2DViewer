@@ -284,15 +284,17 @@ assert(HTML.indexOf('Load example protein') !== -1 && HTML.indexOf('id="inputAcc
 assert(HTML.indexOf('onclick="clearInputData()"') !== -1 && HTML.indexOf('onclick="clearAllData()"') !== -1, 'the Storage cache controls offer both clear actions');
 assert(HTML.indexOf("menuBarAction('clearInput')") !== -1 && HTML.indexOf("menuBarAction('clearAll')") !== -1, 'the File menu exposes both clear actions');
 assert(ctxRun('TOUR_STEPS.length') >= 3, 'the tour has at least three steps');
-assert(ctxRun(`TOUR_STEPS.map(s => s.target).join(',')`) === 'menubar-file-btn,menubar-file-input,inputAccessionPreset,menubar-file-btn,tab-tracks,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
+assert(ctxRun(`TOUR_STEPS.map(s => (s.target || '')).join(',')`) === 'menubar-file-btn,menubar-file-input,inputAccessionPreset,,tab-tracks,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
 assert(ctxRun(`TOUR_STEPS[0].require === 'menu-open:file' && TOUR_STEPS[1].require === 'input-modal-open'`), 'opening File then Input Data are required steps');
 assert(ctxRun(`TOUR_STEPS[2].body.indexOf('Load example protein') !== -1 && TOUR_STEPS[2].body.indexOf('GFP') !== -1`), 'the Load example step tells the user about GFP');
-assert(ctxRun(`TOUR_STEPS[2].advanceOn === 'example-loaded' && !TOUR_STEPS[2].require`), 'picking an example auto-advances the Load example step (Next stays available)');
-assert(ctxRun(`TOUR_STEPS[3].body.indexOf('Data Sources') !== -1 && !TOUR_STEPS[3].require`), 'the Data Sources step is optional and points at File -> Data Sources');
-assert(ctxRun(`TOUR_STEPS[3].body.indexOf('UniProt') !== -1 && TOUR_STEPS[3].body.indexOf('import') !== -1`), 'the Data Sources step notes the auto UniProt fetch and that other data can be imported/called');
+assert(ctxRun(`TOUR_STEPS[2].advanceOn === 'example-loaded' && TOUR_STEPS[2].highlightAll === '#inputDataModal select'`), 'step 3 highlights the example dropdowns and auto-advances');
+assert(ctxRun(`Array.isArray(TOUR_STEPS[3].stages) && TOUR_STEPS[3].stages.length === 4`), 'step 4 is a staged File -> Data Sources -> Homolog search sequence');
+assert(ctxRun(`TOUR_STEPS[3].stages[0].require === 'menu-open:file' && TOUR_STEPS[3].stages[1].require === 'datasources-modal-open'`), 'stages 1-2 wait for File then Data Sources');
+assert(ctxRun(`TOUR_STEPS[3].stages[2].require === 'data-category:homologs' && TOUR_STEPS[3].stages[3].require === 'homologs-started'`), 'stages 3-4 wait for Homolog search then Find homologs');
 assert(ctxRun(`TOUR_STEPS[4].target === 'tab-tracks' && TOUR_STEPS[4].require === 'tab-open:tracks'`), 'the Tracks step is required (click the Tracks tab)');
+assert(ctxRun(`TOUR_STEPS[4].body.indexOf('While that loads') !== -1`), 'and explains it runs while the search loads');
 assert(ctxRun(`!TOUR_STEPS.some(function (s) { return s.require && s.target === 'menubar-export-btn'; })`), 'the Export step is optional (no requirement)');
-['menubar-file-btn', 'menubar-file-input', 'inputAccessionPreset', 'tab-tracks', 'tab-guide', 'menubar-export-btn'].forEach(id => {
+['menubar-file-btn', 'menubar-file-input', 'inputAccessionPreset', 'menubar-file-datasources', 'optDataCategory', 'btnHomologSearch', 'tab-tracks', 'tab-guide', 'menubar-export-btn'].forEach(id => {
     assert(HTML.indexOf('id="' + id + '"') !== -1, 'tour target id exists in the markup: ' + id);
 });
 sandbox.localStorage._s = {};
@@ -315,8 +317,17 @@ assert(ctxRun('tourIndex') === 2, 'opening Input Data advances the tour');
 assert(ctxRun(`document.getElementById('tourNextBtn').hidden === false`), 'the Load example step offers a Next button');
 ctxRun(`tourOnUiEvent('example-loaded');`);
 assert(ctxRun('tourIndex') === 3, 'picking an example protein continues to the Data Sources step');
+assert(ctxRun(`document.getElementById('tourNextBtn').hidden === true`), 'the staged Data Sources step starts with no Next');
 ctxRun(`tourNext();`);
-assert(ctxRun('tourIndex') === 4, 'Next advances to the Tracks step');
+assert(ctxRun('tourIndex') === 3 && ctxRun('tourStage') === 0, 'Next cannot skip the staged step');
+ctxRun(`tourOnUiEvent('menu-open:file');`);
+assert(ctxRun('tourStage') === 1, 'opening File advances to the Data Sources stage');
+ctxRun(`tourOnUiEvent('datasources-modal-open');`);
+assert(ctxRun('tourStage') === 2, 'opening Data Sources advances to the category stage');
+ctxRun(`tourOnUiEvent('data-category:homologs');`);
+assert(ctxRun('tourStage') === 3, 'choosing Homolog search advances to the Find homologs stage');
+ctxRun(`tourOnUiEvent('homologs-started');`);
+assert(ctxRun('tourIndex') === 4, 'clicking Find homologs advances to the Tracks step');
 assert(ctxRun(`document.getElementById('tourNextBtn').hidden === true`), 'the Tracks step hides Next until the tab is opened');
 ctxRun(`tourOnUiEvent('tab-open:guide');`);
 assert(ctxRun('tourIndex') === 4, 'an unrelated tab does not advance the tour');
@@ -410,6 +421,18 @@ ctxRun(`currentProteinLabel = 'ThisIsAVeryLongProteinNameThatExceedsTheLimit';`)
 assert(ctxRun(`currentProteinShortName().length <= 24 && currentProteinShortName().indexOf('\\u2026') !== -1`), 'a long name is truncated');
 ctxRun(`currentProteinLabel = null;`);
 assert(HTML.indexOf('track-label-protein') !== -1, 'the AA row renders the protein-name span');
+
+section('Selection Info box');
+assert(HTML.indexOf('id="selectionInfoSection"') !== -1 && HTML.indexOf('id="selectionInfoBox"') !== -1, 'the Selection tab has a Selection Info box');
+assert(/Paste Quick2D\s*<\/button>/.test(HTML) === false, 'the Input Data paste button is no longer labelled Paste Quick2D');
+assert(HTML.indexOf('Paste Clipboard') !== -1, 'and now reads Paste Clipboard');
+assert(ctxRun(`typeof updateSelectionInfo === 'function'`), 'the Selection Info updater exists');
+ctxRun(`uniprotFeatures = { accession: 'P', features: [{ type: 'Mutagenesis', start: 1, end: 1, description: 'A1B - test' }] }; selectStart = 0; selectEnd = 0; selectionMode = 'point'; activeRowKey = null; updateSelectionInfo();`);
+const siText = ctxRun(`document.getElementById('selectionInfoBox').textContent`);
+assert(/Mutagenesis/.test(siText) && /A1B - test/.test(siText), 'Selection Info lists the overlapping UniProt feature (got "' + siText + '")');
+ctxRun(`selectStart = null; selectEnd = null; updateSelectionInfo();`);
+assert(/Select a residue range/.test(ctxRun(`document.getElementById('selectionInfoBox').textContent`)), 'and prompts when nothing is selected');
+ctxRun(`uniprotFeatures = null;`);
 
 section('UI categories + accessibility');
 

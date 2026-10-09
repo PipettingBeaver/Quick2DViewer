@@ -103,6 +103,35 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Selection Info + tour steps + paste label — 0.67.36
+
+**Surface.** Selection tab (*Selection Info*); the tour (steps 3–5); Input Data's
+paste button.
+
+**Should do.** A selectable Selection Info box under Selected Range; the tour
+pulses the Input Data dropdowns at step 3 and walks File → Data Sources → Homolog
+search → Find homologs at step 4; the Input Data button reads Paste Clipboard.
+
+**Try.**
+1. Load a protein with UniProt features, select a residue covered by a feature:
+   open **Selection Info** and read the feature (e.g. `UniProt Mutagenesis (46): …`).
+   The text is selectable; the box scrolls after ~5 lines.
+2. Input Data: the paste button says **Paste Clipboard**.
+3. Run the tour: step 3 pulses the example dropdown; step 4 highlights File,
+   then Data Sources…, then the Data Source dropdown (set to Homolog search),
+   then Find homologs; step 5 says "While that loads, let's look at the Tracks
+   view" and waits for the Tracks tab.
+
+**Edge cases.**
+- *No selection* - Selection Info prompts to select a range.
+- *No UniProt features* - the box says no annotation found.
+- *Homolog search offline* - the tour advances when the search starts; a failed
+  search does not block step 5.
+- *Harness limit* - layout/rendering manual-only; the harness drives the staged
+  tour via `tourOnUiEvent` and covers the Selection Info text.
+
+---
+
 ### Protein short name on the AA row — 0.67.35
 
 **Surface.** The AA track row label (the gutter left of the sequence).

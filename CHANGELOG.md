@@ -12,6 +12,25 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.67.36] - 2026-10-06
+
+### Added
+- **Selection Info box.** Under *Selected Range* in the Selection tab, a
+  collapsible, selectable read-out lists the owning row and every UniProt feature
+  that covers the selected residue(s) (e.g. a Mutagenesis entry), reusing the
+  fetched features with no extra call. Capped at ~5 lines with scroll.
+
+### Changed
+- **Input Data paste button** is now labelled **Paste Clipboard** (it pastes any
+  clipboard text, not just Quick2D).
+- **Onboarding tour.** Step 3 now pulses every dropdown in the Input Data window.
+  Step 4 became a short interactive sequence - File → **Data Sources…** → set the
+  source to **Homolog search** → **Find homologs** - and step 5 then reads "While
+  that loads, let's look at the Tracks view".
+- **Fixed a misplacement**: the QA-highlight outlines were being switched off
+  when the Data Sources window opened instead of at startup; the call is back in
+  the init path.
+
 ## [0.67.35] - 2026-10-06
 
 ### Added

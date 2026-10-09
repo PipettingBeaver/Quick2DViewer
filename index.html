@@ -2264,7 +2264,7 @@
                     </button>
                     <span class="import-pair">
                         <button type="button" class="tb-btn tb-btn-primary" onclick="handlePasteFromClipboard()">
-                            Paste Quick2D
+                            Paste Clipboard
                         </button>
                         <button type="button" id="btnToggleDrawer" class="tb-btn tb-btn-text"
                             aria-expanded="false" aria-controls="rawInputDrawer" onclick="toggleRawInputDrawer()">
@@ -2482,6 +2482,10 @@
                     <button class="copy-btn" onclick="clearSelection()" title="Clear selection (Esc)">Clear (Esc)</button>
                     <button class="copy-btn" onclick="invertSelection()" title="Invert selection (Ctrl+I)">Invert (Ctrl+I)</button>
                 </div>
+                <details class="workflow-section" id="selectionInfoSection" style="margin-top:8px;">
+                    <summary>Selection Info</summary>
+                    <div id="selectionInfoBox" class="data-box" style="font-size:0.72rem; line-height:1.4; max-height:5.6em; overflow-y:auto; white-space:pre-wrap; user-select:text;">Select a residue range to see its annotations here.</div>
+                </details>
                 <div id="seqSearchPanel" style="display:none; margin-top:8px; padding-top:8px; border-top:1px solid #e2e8f0;">
                     <div style="display:flex; gap:4px; align-items:center;">
                         <label for="seqSearchInput" style="position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;">Sequence search query</label>
@@ -3803,9 +3807,18 @@ const EMPTY_STATE_HTML = '<div style="padding: 16px 24px 4px; color:#475569;">'
 const TOUR_STEPS = [
     { target: 'menubar-file-btn', title: 'Add your first protein', body: 'Click the highlighted File menu to begin.', require: 'menu-open:file' },
     { target: 'menubar-file-input', title: 'Open Input Data', body: 'Now click Input Data… to load a protein.', require: 'input-modal-open' },
-    { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Picking one continues the tour; otherwise click Next when ready.', leave: 'closeInputData', advanceOn: 'example-loaded' },
-    { target: 'menubar-file-btn', title: 'Fetch data from public sources', body: 'The example protein already tried to fetch its UniProt entry automatically. Open File ▸ Data Sources… to import or call other data too (topology, domains, homologs, structure, variants…); each source shows a ✓ once loaded. Try it, then click Next.', optional: true },
-    { target: 'tab-tracks', title: 'Look at the tracks', body: 'Click Tracks to show or hide rows and change their colours and filters.', require: 'tab-open:tracks' },
+    { target: 'inputAccessionPreset', title: 'Load an example protein', body: 'Pick a protein under "Load example protein" (GFP is a good one), or paste Quick2D output / attach a file. Picking one continues the tour; otherwise click Next when ready.', leave: 'closeInputData', advanceOn: 'example-loaded', highlightAll: '#inputDataModal select' },
+    {
+        title: 'Fetch data from public sources',
+        stages: [
+            { target: 'menubar-file-btn', body: 'Open the File menu.', require: 'menu-open:file' },
+            { target: 'menubar-file-datasources', body: 'Click Data Sources…', require: 'datasources-modal-open' },
+            { target: 'optDataCategory', body: 'Set the data source to Homolog search.', require: 'data-category:homologs' },
+            { target: 'btnHomologSearch', body: 'Click Find homologs to search Swiss-Prot.', require: 'homologs-started' }
+        ],
+        leave: 'closeDataSources'
+    },
+    { target: 'tab-tracks', title: 'Look at the tracks', body: "While that loads, let's look at the Tracks view. Click Tracks to show or hide rows and change their colours and filters.", require: 'tab-open:tracks' },
     { target: 'tab-guide', title: 'The Evaluation Guide', body: 'The Guide walks the characterization pipeline and reads your loaded evidence back to you.', optional: true },
     { target: 'menubar-export-btn', title: 'Export your work (optional)', body: 'Save sessions, figures, tables, a methods summary, or 3D commands for ChimeraX and PyMOL. This step is just for reference.', optional: true }
 ];
@@ -5149,6 +5162,7 @@ function setHomologProvider(id) {
 async function runHomologSearch() {
     const seq = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     if (!seq) { showToast('Nothing to search yet: the homolog search runs against the loaded sequence.', 'error'); return; }
+    if (typeof tourOnUiEvent === 'function') tourOnUiEvent('homologs-started');
     const sel = document.getElementById('homologProvider');
     const prefer = (sel && sel.value) ? sel.value : 'ebi_phmmer';
     macroCaptureStep({ type: 'homolog', provider: prefer });
@@ -9360,6 +9374,7 @@ function switchDataCategory(name) {
     if (state) state.textContent = 'External services are currently ' + (externalServicesEnabled ? 'ON' : 'OFF') + '.';
     renderTopologySourceList();
     updateQuick2dTutorial();
+    if (typeof tourOnUiEvent === 'function') tourOnUiEvent('data-category:' + name);
 }
 // Deep link from the guide / Input Data / File menu: open the Data Sources
 // window on a category. The category panel is moved out of the Options modal
@@ -9374,11 +9389,16 @@ function mountDataSourcesPanel() {
     host.appendChild(panel);
 }
 function openDataSourcesModal(name) {
-mountDataSourcesPanel();
-syncQaHighlights(); // fresh-visit default: the new-feature purple outlines are OFF
+    mountDataSourcesPanel();
     updateDataSourcesLoadedMarks();
     switchDataCategory(name || optDataCategory);
     openModalAsDialog('dataSourcesModal');
+    if (typeof tourOnUiEvent === 'function') {
+        tourOnUiEvent('datasources-modal-open');
+        // If the window happens to open already on Homolog search, that stage
+        // is satisfied without another change event.
+        if (optDataCategory === 'homologs') tourOnUiEvent('data-category:homologs');
+    }
 }
 function closeDataSourcesModal() { clearQuick2dTutorial(); closeModalAsDialog('dataSourcesModal'); }
 function openDataSources(name) { openDataSourcesModal(name); }
@@ -11087,53 +11107,74 @@ function dismissWelcome() {
     endTour();
 }
 let tourIndex = 0;
+let tourStage = 0;
 let tourActive = false;
 function startTour() {
     closeWelcomeModal();
     tourIndex = 0;
+    tourStage = 0;
     tourActive = true;
     renderTour();
+}
+// A step may carry `stages` (a short in-step sequence, each with its own target
+// and required UI event); otherwise the step itself is the one stage.
+function currentTourStage(step) {
+    if (step && step.stages) return step.stages[tourStage] || step.stages[step.stages.length - 1];
+    return step || {};
 }
 function renderTour() {
     const step = TOUR_STEPS[tourIndex];
     if (!step) { endTour(); return; }
+    const stage = currentTourStage(step);
     document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-    const target = document.getElementById(step.target);
+    const target = document.getElementById(stage.target || step.target);
     if (target && target.classList) target.classList.add('tour-highlight');
+    if (step.highlightAll) {
+        document.querySelectorAll(step.highlightAll).forEach(el => { if (el.classList) el.classList.add('tour-highlight'); });
+    }
     const text = document.getElementById('tourBarText');
-    if (text) text.innerHTML = '<strong>' + structureEscapeHtml(step.title) + '</strong><br>' + structureEscapeHtml(step.body);
+    if (text) text.innerHTML = '<strong>' + structureEscapeHtml(step.title) + '</strong><br>' + structureEscapeHtml(stage.body || step.body || '');
     const prog = document.getElementById('tourBarProgress');
     if (prog) prog.textContent = 'Step ' + (tourIndex + 1) + ' of ' + TOUR_STEPS.length;
+    const required = !!(stage.require || step.require);
+    const lastStage = !step.stages || tourStage === step.stages.length - 1;
     const next = document.getElementById('tourNextBtn');
     if (next) {
-        // A required step has no Next: it advances when the user does the action.
-        next.hidden = !!step.require;
-        next.textContent = (tourIndex === TOUR_STEPS.length - 1) ? 'Done' : 'Next';
+        // A required stage has no Next: it advances when the user does the action.
+        next.hidden = required;
+        next.textContent = (tourIndex === TOUR_STEPS.length - 1 && lastStage) ? 'Done' : 'Next';
     }
     const hint = document.getElementById('tourBarHint');
     if (hint) {
-        hint.textContent = step.require ? 'Waiting for you to click the highlighted control\u2026' : '';
-        hint.hidden = !step.require;
+        hint.textContent = required ? 'Waiting for you to click the highlighted control\u2026' : '';
+        hint.hidden = !required;
     }
     const bar = document.getElementById('tourBar');
     if (bar) bar.hidden = false;
 }
-// Advance one step. fromRequirement=true only when a required UI action fired,
-// so the Next button cannot skip a step that waits on the user.
+// Advance one stage (or step). fromRequirement=true only when a required UI
+// action fired, so Next cannot skip a stage that waits on the user.
 function tourNext(fromRequirement) {
     const step = TOUR_STEPS[tourIndex];
     if (!step) { endTour(); return; }
-    if (step.require && !fromRequirement) return;
+    const stage = currentTourStage(step);
+    if ((stage.require || step.require) && !fromRequirement) return;
+    if (step.stages && tourStage < step.stages.length - 1) { tourStage++; renderTour(); return; }
     if (step.leave === 'closeInputData' && typeof closeInputDataModal === 'function') closeInputDataModal();
+    if (step.leave === 'closeDataSources' && typeof closeDataSourcesModal === 'function') closeDataSourcesModal();
     if (tourIndex >= TOUR_STEPS.length - 1) { endTour(); return; }
     tourIndex++;
+    tourStage = 0;
     renderTour();
 }
 function tourPrev() {
-    if (tourIndex <= 0) return;
+    if (tourIndex <= 0 && tourStage <= 0) return;
+    if (tourStage > 0) { tourStage--; renderTour(); return; }
     const step = TOUR_STEPS[tourIndex];
     if (step && step.leave === 'closeInputData' && typeof closeInputDataModal === 'function') closeInputDataModal();
+    if (step && step.leave === 'closeDataSources' && typeof closeDataSourcesModal === 'function') closeDataSourcesModal();
     tourIndex--;
+    tourStage = 0;
     renderTour();
 }
 function endTour() {
@@ -11143,12 +11184,13 @@ function endTour() {
     if (bar) bar.hidden = true;
 }
 // The app calls this when a UI event the tour may be waiting on happens. A
-// step's `require` gates it (no Next); `advanceOn` only auto-advances, so the
-// Next button stays available.
+// stage's `require` gates it (no Next); `advanceOn` only auto-advances.
 function tourOnUiEvent(kind) {
     if (!tourActive) return;
     const step = TOUR_STEPS[tourIndex];
-    if (step && (step.require === kind || step.advanceOn === kind)) tourNext(true);
+    if (!step) return;
+    const stage = currentTourStage(step);
+    if ((stage.require || step.require) === kind || (stage.advanceOn || step.advanceOn) === kind) tourNext(true);
 }
 
 // --- Confirm dialog (headless-safe replacement for window.confirm) --------
@@ -11715,7 +11757,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.35';
+const APP_VERSION = '0.67.36';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -17750,6 +17792,35 @@ function updateSelectionUI() {
         });
     });
     updateGraphSelectionGuides(selectedIdxs, restrictToRow);
+    updateSelectionInfo();
+}
+
+// A selectable read-out of what the current selection overlaps: the owning row
+// (for a row/segment selection) and every UniProt feature that covers the
+// selected residue(s), e.g. a Mutagenesis entry at residue 46. Reuses the
+// fetched feature list, so it needs no extra network call.
+function updateSelectionInfo() {
+    const box = document.getElementById('selectionInfoBox');
+    if (!box) return;
+    const ranges = getCurrentSelectionRanges1Indexed();
+    if (!ranges || !ranges.length) {
+        box.textContent = 'Select a residue range to see its annotations here.';
+        return;
+    }
+    const lines = [];
+    if (activeRowKey && parsedTracks[activeRowKey]) lines.push('Row: ' + formatTrackLabel(activeRowKey));
+    if (uniprotFeatures && Array.isArray(uniprotFeatures.features)) {
+        const seen = new Set();
+        ranges.forEach(([s, e]) => {
+            uniprotFeatures.features.forEach(f => {
+                if (f.end < s || f.start > e) return;
+                const pos = f.start === f.end ? String(f.start) : (f.start + '-' + f.end);
+                const line = 'UniProt ' + f.type + ' (' + pos + '): ' + (f.description || '');
+                if (!seen.has(line)) { seen.add(line); lines.push(line); }
+            });
+        });
+    }
+    box.textContent = lines.length ? lines.join('\n') : 'No annotation found for the selected residue(s).';
 }
 
 // --- Saved selections (5 color-coded slots) --------------------------------
@@ -21913,6 +21984,7 @@ populateCommandEngineSelect();
 updateSidebarCommandLabels();
 syncExternalServicesMenu();
 mountDataSourcesPanel();
+syncQaHighlights(); // fresh-visit default: the new-feature purple outlines are OFF
 applyTypePalette('default'); // fresh-visit default; loadStateFromStorage() overrides it if a saved palette exists
 initSavedSelections();
 initSelectionScope();
