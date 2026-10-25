@@ -3249,11 +3249,19 @@
                     <button type="button" class="tb-btn tb-btn-secondary" onclick="openActionLog()" style="font-size:0.78rem; padding:4px 10px;">Open activity log</button>
                 </div>
                 <p id="optExternalState" style="font-size:0.78rem; color:#475569; margin:8px 0 0;"></p>
+                <div style="margin-top:14px;">
+                    <label for="ebiContactEmailInput" style="display:block; font-size:0.78rem; font-weight:600; color:#475569; margin-bottom:4px;">EBI contact email</label>
+                    <input type="email" id="ebiContactEmailInput" placeholder="you@example.org" autocomplete="email"
+                        onchange="onEbiContactEmailChange(this.value)"
+                        style="width:100%; box-sizing:border-box; padding:6px; font-size:0.85rem; border:1px solid #cbd5e1; border-radius:4px;">
+                    <div id="ebiContactEmailStatus" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+                    <p class="ds-desc" style="margin:6px 0 0;">Some public services (EBI's BLAST, HMMER and InterProScan) ask for a contact address so they can reach heavy users; see <a href="https://www.ebi.ac.uk/jdispatcher/docs/webservices/#fair-use-policy" target="_blank" rel="noopener">EBI's fair-use policy</a>. It is stored in this browser only and is sent only with those job submissions.</p>
+                </div>
             </div>
             <div class="ds-right">
                 <div class="ds-helper">
                     <div class="ds-helper-title">Privacy</div>
-                    <p class="ds-desc" style="margin:0;">Only the requested term, sequence or accession is sent to a public service; nothing is uploaded otherwise.</p>
+                    <p class="ds-desc" style="margin:0;">Only the requested term, sequence or accession - plus your contact email for EBI jobs - is sent to a public service; nothing else is uploaded.</p>
                 </div>
             </div>
         </div>
@@ -4230,7 +4238,14 @@ const SERVICE_ADAPTERS = {
     async ebiJob(provider, args, onProgress) {
         const base = provider.url;
         const tool = (String(base).match(/rest\/([^/]+)\//) || [])[1] || provider.label;
-        const body = new URLSearchParams(Object.assign({ email: 'q2dv@example.com' }, provider.params || {}, { sequence: args.sequence })).toString();
+        const email = String(ebiContactEmail || '').trim();
+        if (!ebiEmailLooksValid(email)) {
+            if (typeof openDataSources === 'function') openDataSources('services');
+            throw new Error(email
+                ? 'The EBI contact email is not valid. Correct it under Data Sources -> External services.'
+                : 'EBI needs a contact email. Enter one under Data Sources -> External services, then run the job again.');
+        }
+        const body = new URLSearchParams(Object.assign({ email }, provider.params || {}, { sequence: args.sequence })).toString();
         let jobId = '', runResp = null, runText = '';
         for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
             try {
@@ -4500,6 +4515,34 @@ function toggleExternalServices() {
     schedulePersist();
     showToast('External services ' + (externalServicesEnabled ? 'enabled.' : 'disabled.'), 'info');
 }
+// EBI's Job Dispatcher asks for a contact address with every submission. A
+// shared placeholder address can be blocked for everyone using it, so the
+// address is per browser and never hard-coded in the page.
+const EBI_CONTACT_EMAIL_KEY = 'q2dv_ebi_contact_email';
+let ebiContactEmail = '';
+try { ebiContactEmail = String(localStorage.getItem(EBI_CONTACT_EMAIL_KEY) || '').trim(); } catch (e) {}
+function ebiEmailLooksValid(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+}
+function ebiContactEmailStatusText() {
+    if (!ebiContactEmail) return '';
+    return ebiEmailLooksValid(ebiContactEmail) ? 'Saved in this browser.' : 'This does not look like an email address.';
+}
+function syncEbiContactEmailInput() {
+    const input = document.getElementById('ebiContactEmailInput');
+    if (input) input.value = ebiContactEmail;
+    const status = document.getElementById('ebiContactEmailStatus');
+    if (status) status.textContent = ebiContactEmailStatusText();
+}
+function setEbiContactEmail(value) {
+    ebiContactEmail = String(value || '').trim();
+    try {
+        if (ebiContactEmail) localStorage.setItem(EBI_CONTACT_EMAIL_KEY, ebiContactEmail);
+        else localStorage.removeItem(EBI_CONTACT_EMAIL_KEY);
+    } catch (e) { /* storage unavailable: the value still works for this page */ }
+    syncEbiContactEmailInput();
+}
+function onEbiContactEmailChange(value) { setEbiContactEmail(value); }
 
 // --- New-feature QA highlights (purple marker) -----------------------------
 // New UI is tagged with `.qa-new` (a purple dashed outline) so it is easy to
@@ -9393,6 +9436,7 @@ function switchDataCategory(name) {
     if (name === 'variants') { updateSpeciesUI(); detectSessionSpecies(); }
     const state = document.getElementById('optExternalState');
     if (state) state.textContent = 'External services are currently ' + (externalServicesEnabled ? 'ON' : 'OFF') + '.';
+    if (name === 'services') syncEbiContactEmailInput();
     renderTopologySourceList();
     updateQuick2dTutorial();
     if (typeof tourOnUiEvent === 'function') tourOnUiEvent('data-category:' + name);
@@ -11778,7 +11822,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.68.0';
+const APP_VERSION = '0.68.1';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -21936,6 +21980,7 @@ function resetPreferencesState() {
     syncGraphModeControls();
     externalServicesEnabled = externalServicesDefault();
     syncExternalServicesMenu();
+    setEbiContactEmail('');
     qaHighlightsEnabled = false;
     syncQaHighlights();
     trackManagerExpanded = {};

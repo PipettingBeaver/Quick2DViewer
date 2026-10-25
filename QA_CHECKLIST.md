@@ -624,6 +624,44 @@ twice, and a fair-use block stops the fallback to the next EBI tool.
 
 ---
 
+### EBI contact email — 0.68.1
+
+**Surface.** Options → Data Sources → **External services**; every EBI BLAST,
+HMMER and InterProScan submission.
+
+**Should do.** Ask for a per-browser contact address, save it locally, and send it
+with EBI job submissions. Never fall back to a shared placeholder address. If the
+address is missing or invalid, explain what to do before making a request.
+
+**Try.**
+1. Open **Options → Data Sources → External services**.
+   *Expect:* an **EBI contact email** box and a short explanation that some public
+   services ask for a contact address.
+2. Enter a valid address, switch to another category and back.
+   *Expect:* the address is still there and reads *Saved in this browser.*
+3. Run **Scan domains** or **Find homologs** with a valid address.
+   *Expect:* the job starts normally; the address is not printed in the activity
+   log.
+4. Clear the box and run the job again.
+   *Expect:* the External services panel opens and the status says EBI needs a
+   contact email; the activity log shows no submit request.
+5. Enter an invalid string and run again.
+   *Expect:* a "not valid" message before any request.
+
+**Edge cases.**
+- *`file://`* - external services still start OFF and the first call asks to enable
+  them; the email is independent of that switch.
+- *localStorage unavailable* - the address works for the current page but is not
+  remembered after reload.
+- *Clear data* - *Clear input data* keeps the address; *Clear all data* removes it.
+- *Exported save* - the address is local-only and is not written into the save.
+- *EBI blocks an address* - set a different contact address; the app must not be
+  the cause of a shared block again.
+- *Harness* - the box, local save, submit body, missing-email stop and invalid-email
+  stop are checked in `tests/run.js`.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

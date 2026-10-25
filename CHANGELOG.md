@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.1] - 2026-10-25
+
+### Fixed
+- **EBI contact email is now your own.** The app no longer sends the shared
+  `q2dv@example.com` address, which EBI blocked. Set a contact address under
+  **Options -> Data Sources -> External services**; it is stored in this browser
+  and sent only with EBI BLAST/HMMER/InterProScan submissions. Without one, the
+  app explains what to do before making a request.
+
 ## [0.68.0] - 2026-10-25
 
 ### Fixed

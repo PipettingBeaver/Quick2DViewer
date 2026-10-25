@@ -3926,6 +3926,9 @@ assert(ctxRun(`SERVICE_REGISTRY.capabilities.sequence_search.providers[0].adapte
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_search.providers[0].enabled`) === true, 'foldseek provider enabled');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_search.providers[0].adapter`) === 'foldseek', 'structure_search -> foldseek adapter');
 assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 'function'`), 'registry helpers present');
+assert(HTML.indexOf('id="ebiContactEmailInput"') !== -1, 'External services offers an EBI contact email box');
+assert(/Some public services .*ask for a contact address/.test(HTML), 'and explains why the address is needed');
+assert(HTML.indexOf('q2dv@example.com') === -1, 'the shared EBI address is not hard-coded');
 
 // A two-chain model whose CA residues spell the reference exactly, so the
 // alignment-based reference mapping is the identity and the assertions below
@@ -4308,9 +4311,12 @@ ctxRun(`
 assert(ctxRun(`Object.keys(parsedTracks).length`) === 0, 'clearing input data drops the loaded tracks');
 assert(ctxRun(`externalServicesEnabled === true`) === true, 'clearing input data keeps preferences (external-services flag)');
 assert(ctxRun(`analysisRules.length === 1`) === true, 'clearing input data keeps customization (rules)');
+ctxRun(`setEbiContactEmail('tester@example.org');`);
+assert(ctxRun(`localStorage.getItem('q2dv_ebi_contact_email')`) === 'tester@example.org', 'the EBI contact email is a saved preference');
 ctxRun(`resetPreferencesState();`);
 assert(ctxRun(`externalServicesEnabled === false`) === true, 'clearing all data resets the external-services preference');
 assert(ctxRun(`analysisRules.length === 0`) === true, 'clearing all data resets customization (rules)');
+assert(ctxRun(`ebiContactEmail === '' && localStorage.getItem('q2dv_ebi_contact_email') === null`) === true, 'clearing all data clears the EBI contact email');
 ctxRun(`parsedTracks = {}; cachedStructureTexts = {}; uploadedStructureFiles = [];`);
 
 section('homolog letter-style default (AA)');
@@ -4364,6 +4370,7 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
     // EBI refusals: the XML <description> is surfaced, a 4xx is not retried,
     // and a fair-use block stops the fallback chain (all tools share it).
     assert(ctxRun(`ebiErrorDetail('<error><description>Blocked &amp; waiting</description></error>')`) === 'Blocked & waiting', 'the EBI error detail is readable text');
+    ctxRun(`setEbiContactEmail('tester@example.org');`);
     const origFetch = sandbox.fetch;
     let ebiCalls = 0;
     sandbox.fetch = () => {
@@ -4402,6 +4409,41 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
     try { await ctxRun(`runCapability('__blk', {})`); }
     catch (e) { err = e; }
     assert(err && /temporarily blocked/.test(err.message) && ctxRun(`window.__afterRan`) === false, 'a fair-use block does not try the next EBI tool');
+
+    // The contact address is a per-browser preference: it is saved locally,
+    // carried in the submit body, and required before any request is sent.
+    ctxRun(`setEbiContactEmail('tester@example.org');`);
+    assert(ctxRun(`localStorage.getItem('q2dv_ebi_contact_email')`) === 'tester@example.org', 'the EBI contact email is saved in this browser');
+    assert(ctxRun(`ebiContactEmail`) === 'tester@example.org', 'and kept in the live setting');
+    let ebiBody = '';
+    ebiCalls = 0;
+    sandbox.fetch = (url, opts) => {
+        ebiCalls++;
+        ebiBody = (opts && opts.body) || '';
+        return Promise.resolve({ ok: false, status: 400, text: () => Promise.resolve('') });
+    };
+    err = null;
+    try { await ctxRun(`SERVICE_ADAPTERS.ebiJob({ url: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/', label: 'EBI NCBI-BLAST' }, { sequence: 'M' })`); }
+    catch (e) { err = e; }
+    assert(ebiBody.indexOf('email=tester%40example.org') !== -1, 'the submit body carries the saved contact email (got "' + ebiBody.slice(0, 80) + '")');
+    assert(ebiBody.indexOf('q2dv') === -1, 'and not the old shared address');
+    assert(ebiCalls === 1, 'the email is attached to a single submission (got ' + ebiCalls + ')');
+    ctxRun(`setEbiContactEmail('');`);
+    ebiCalls = 0;
+    sandbox.fetch = () => { ebiCalls++; return Promise.resolve({ ok: false, status: 400, text: () => Promise.resolve('') }); };
+    err = null;
+    try { await ctxRun(`SERVICE_ADAPTERS.ebiJob({ url: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/', label: 'EBI NCBI-BLAST' }, { sequence: 'M' })`); }
+    catch (e) { err = e; }
+    assert(err && /contact email/.test(err.message), 'a missing contact email is explained (got "' + (err && err.message) + '")');
+    assert(ebiCalls === 0, 'and nothing is sent without it');
+    ctxRun(`setEbiContactEmail('not-an-email');`);
+    ebiCalls = 0;
+    err = null;
+    try { await ctxRun(`SERVICE_ADAPTERS.ebiJob({ url: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/', label: 'EBI NCBI-BLAST' }, { sequence: 'M' })`); }
+    catch (e) { err = e; }
+    assert(err && /not valid/.test(err.message) && ebiCalls === 0, 'an invalid contact email is rejected before submission');
+    ctxRun(`setEbiContactEmail('');`);
+    sandbox.fetch = origFetch;
 
     // runTopologyPrediction end to end with the real InterProScan TSV (the
     // capability is stubbed, everything else is the app's own path).
