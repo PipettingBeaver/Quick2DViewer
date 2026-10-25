@@ -4361,6 +4361,48 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
     const result = await ctxRun(`runCapability('__test', {})`);
     assert(result === 'second-provider-result', 'runCapability falls through a failing provider to the next');
 
+    // EBI refusals: the XML <description> is surfaced, a 4xx is not retried,
+    // and a fair-use block stops the fallback chain (all tools share it).
+    assert(ctxRun(`ebiErrorDetail('<error><description>Blocked &amp; waiting</description></error>')`) === 'Blocked & waiting', 'the EBI error detail is readable text');
+    const origFetch = sandbox.fetch;
+    let ebiCalls = 0;
+    sandbox.fetch = () => {
+        ebiCalls++;
+        return Promise.resolve({
+            ok: false, status: 400,
+            text: () => Promise.resolve('<?xml version="1.0"?><error><description>You have been temporarily blocked from submitting new sequence analysis jobs.</description></error>')
+        });
+    };
+    err = null;
+    try { await ctxRun(`SERVICE_ADAPTERS.ebiJob({ url: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/', label: 'EBI NCBI-BLAST' }, { sequence: 'M' })`); }
+    catch (e) { err = e; }
+    assert(err && /temporarily blocked/.test(err.message), 'a 400 carries EBI\'s reason (got "' + (err && err.message) + '")');
+    assert(err && err.fairUseBlocked === true, 'and is marked as a fair-use block');
+    assert(ebiCalls === 1, 'a 400 is not submitted twice (got ' + ebiCalls + ' calls)');
+    ebiCalls = 0;
+    sandbox.fetch = () => {
+        ebiCalls++;
+        return Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('') });
+    };
+    err = null;
+    try { await ctxRun(`SERVICE_ADAPTERS.ebiJob({ url: 'https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/', label: 'EBI NCBI-BLAST' }, { sequence: 'M' })`); }
+    catch (e) { err = e; }
+    assert(err && /HTTP 500/.test(err.message) && ebiCalls === 2, 'a 5xx is retried once before failing (got ' + ebiCalls + ' calls)');
+    sandbox.fetch = origFetch;
+    ctxRun(`
+        window.__afterRan = false;
+        SERVICE_ADAPTERS.__block = async () => { const e = new Error('temporarily blocked'); e.fairUseBlocked = true; throw e; };
+        SERVICE_ADAPTERS.__after = async () => { window.__afterRan = true; return 'unexpected'; };
+        SERVICE_REGISTRY.capabilities.__blk = { label: 'Test', providers: [
+            { id: 'a', label: 'A', adapter: '__block' },
+            { id: 'b', label: 'B', adapter: '__after' }
+        ] };
+    `);
+    err = null;
+    try { await ctxRun(`runCapability('__blk', {})`); }
+    catch (e) { err = e; }
+    assert(err && /temporarily blocked/.test(err.message) && ctxRun(`window.__afterRan`) === false, 'a fair-use block does not try the next EBI tool');
+
     // runTopologyPrediction end to end with the real InterProScan TSV (the
     // capability is stubbed, everything else is the app's own path).
     sandbox.__iprTsv = IPR_TOPO_FIXTURE;

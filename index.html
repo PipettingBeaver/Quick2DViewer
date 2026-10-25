@@ -4148,6 +4148,14 @@ function fetchWithTimeout(url, opts, ms) {
     return fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})).finally(() => clearTimeout(timer));
 }
 
+// EBI Job Dispatcher answers a rejected submission with an XML <error> whose
+// <description> says why (bad parameter, fair-use block, ...). The status code
+// alone ("HTTP 400") does not tell the user anything actionable.
+function ebiErrorDetail(text) {
+    const m = String(text || '').match(/<description[^>]*>([\s\S]*?)<\/description>/i);
+    return m ? m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim() : '';
+}
+
 // --- Service adapters (wire protocols) ------------------------------------
 // Each returns a normalized value or throws (so runCapability can fall through).
 const SERVICE_ADAPTERS = {
@@ -4223,15 +4231,25 @@ const SERVICE_ADAPTERS = {
         const base = provider.url;
         const tool = (String(base).match(/rest\/([^/]+)\//) || [])[1] || provider.label;
         const body = new URLSearchParams(Object.assign({ email: 'q2dv@example.com' }, provider.params || {}, { sequence: args.sequence })).toString();
-        let jobId = '', runResp = null;
+        let jobId = '', runResp = null, runText = '';
         for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
             try {
                 runResp = await fetchWithTimeout(base + 'run', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, 90000);
-                if (runResp.ok) jobId = (await runResp.text()).trim();
+                runText = await runResp.text();
+                if (runResp.ok) jobId = runText.trim();
                 uniprotLog('submit ' + tool + ': HTTP ' + (runResp ? runResp.status : '?') + (jobId ? ' job=' + jobId : ''));
+                // A 4xx is a refusal, not a blip: the same body will be refused
+                // again, and a fair-use block only gets worse on retry.
+                if (!runResp.ok && runResp.status >= 400 && runResp.status < 500) break;
             } catch (e) { uniprotLog('submit ' + tool + ' attempt ' + (attempt + 1) + ' failed: ' + (e && e.message ? e.message : e)); }
         }
-        if (!runResp || !runResp.ok) throw new Error('submit failed' + (runResp ? ' (HTTP ' + runResp.status + ')' : ''));
+        if (!runResp || !runResp.ok) {
+            const detail = ebiErrorDetail(runText);
+            if (detail) uniprotLog('submit ' + tool + ' rejected: ' + detail);
+            const err = new Error('submit failed' + (runResp ? ' (HTTP ' + runResp.status + ')' : '') + (detail ? ': ' + detail : ''));
+            err.fairUseBlocked = /temporarily blocked/i.test(detail);
+            throw err;
+        }
         if (!jobId) throw new Error('no job id returned');
         const t0 = Date.now();
         const elapsed = () => Math.round((Date.now() - t0) / 1000);
@@ -4440,6 +4458,9 @@ async function runCapability(capName, args, onProgress, opts) {
         } catch (err) {
             lastErr = err;
             if (onProgress) onProgress(provider.label + ' failed (' + (err && err.message ? err.message : err) + '); trying next…');
+            // All Job Dispatcher tools share EBI's fair-use block, so falling
+            // through to the next EBI tool would just be refused again.
+            if (err && err.fairUseBlocked) break;
         }
     }
     throw lastErr || new Error('All providers failed for ' + cap.label);
@@ -11757,7 +11778,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.67.36';
+const APP_VERSION = '0.68.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

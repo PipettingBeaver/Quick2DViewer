@@ -592,6 +592,38 @@ call still asks.
 
 ---
 
+### EBI refusal messages — 0.68.0
+
+**Surface.** Input Data status lines, toasts and the activity log (Help → Debugging
+console) for BLAST, HMMER and InterProScan jobs.
+
+**Should do.** When an EBI Job Dispatcher submission is refused, the status and log
+quote EBI's own `<description>` instead of only `HTTP 400`. A 4xx is not submitted
+twice, and a fair-use block stops the fallback to the next EBI tool.
+
+**Try.**
+1. With external services ON, run **Scan domains** or **Find homologs** while EBI
+   is blocking new jobs (or point a provider at an endpoint that answers 400).
+   *Expect:* the status line reads `submit failed (HTTP 400): You have been
+   temporarily blocked from submitting new sequence analysis jobs. …`, not just
+   `HTTP 400`.
+2. Open **Help → Debugging console**.
+   *Expect:* one `submit <tool>: HTTP 400` line plus one `submit <tool> rejected: …`
+   line; there is no duplicate submit from an automatic retry.
+3. Run a domain scan whose first provider is blocked.
+   *Expect:* the next EBI provider is not tried for that action.
+
+**Edge cases.**
+- *A 5xx or network error* is still retried once, then reported.
+- *The block is shared* by every EBI Job Dispatcher tool; UniProt REST and EBI
+  Search are different services and keep working.
+- *The block expires on EBI's side*; no local setting can lift it, so wait before
+  retrying. Repeating the action only extends the block.
+- *Harness limit* - the parser, no-retry-on-4xx, retry-on-5xx and chain stop are
+  checked in `tests/run.js`; the live block itself cannot be reproduced headlessly.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

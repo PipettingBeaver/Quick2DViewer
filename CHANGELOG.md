@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.0] - 2026-10-25
+
+### Fixed
+- **EBI refusals now say why.** A rejected BLAST/HMMER/InterProScan submission
+  quotes EBI's `<description>` (for example a temporary fair-use block) in the
+  status line and activity log, instead of only `HTTP 400`.
+- **EBI jobs are no longer submitted twice on refusal.** A 4xx stops at the first
+  attempt, and a fair-use block stops the fallback to other EBI tools; 5xx and
+  network errors are still retried once.
+
 ## [0.67.36] - 2026-10-06
 
 ### Added
