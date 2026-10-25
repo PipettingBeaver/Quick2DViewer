@@ -147,6 +147,12 @@ assert(ctxRun(`getTrackGroup('HL_01_7MDF')`) === 'HL', 'homolog group resolves')
 assert(ctxRun(`getTrackGroup('UP_Sites')`) === 'UP', 'UniProt group');
 assert(ctxRun(`getTrackGroup('TP_Consensus')`) === 'TP', 'Topology group');
 assert(ctxRun(`getTrackCategoryOrder('UP_Sites') > 0`), 'category order resolves');
+assert(ctxRun(`TRACK_TYPES.every(t => t.id && t.label)`) === true, 'every track type has an id and a label');
+assert(ctxRun(`Object.keys(TRACK_GROUP_LABELS).length`) === ctxRun(`TRACK_TYPES.length`), 'labels are derived from the one taxonomy');
+assert(ctxRun(`Object.keys(TRACK_REMOVERS).every(g => !!TRACK_TYPE_BY_ID[g])`) === true, 'every remover is keyed by a known track type');
+assert(ctxRun(`TRACK_TYPES.every(t => Number.isFinite(t.order))`) === true, 'every track type has a row order');
+assert(ctxRun(`getTrackCategoryOrder('AA') === 0 && getTrackCategoryOrder('SS_PSIPRED') === 1 && getTrackCategoryOrder('TM_TMHMM') === 2 && getTrackCategoryOrder('TP_Consensus') === 3 && getTrackCategoryOrder('HL_01') === 5 && getTrackCategoryOrder('M_pLDDT') === 15`) === true, 'row order comes from the taxonomy table');
+assert(ctxRun(`getTrackGroup('VAL_1GFL_A')`) === 'VAL' && ctxRun(`trackGroupLabel('VAL')`) === 'Validation', 'validation rows form their own group');
 
 section('conservation engine');
 const cons = ctxRun(`(function(){ parsedTracks = { AA: 'X'.repeat(4) }; const a = computeConservationScores(['AAAA','AAAT','AAAG'], 'shannon'); return { n: a.length, first: a[0], last: a[3] }; })()`);
@@ -2216,9 +2222,18 @@ const valInfo = ctxRun(`buildValidationPredictorInfo('VAL_1GFL_A')`);
 assert(/PDBe/.test(valInfo.category) && /38 clashes/.test(valInfo.useCase) && /geometry 7.5/.test(valInfo.useCase), 'the tooltip reports the breakdown and the entry quality (got "' + valInfo.useCase + '")');
 assert(HTML.indexOf('id="btnValidation"') !== -1 && HTML.indexOf('id="validationStatus"') !== -1, 'Input Data has the fetch button and status');
 assert(ctxRun(`WORKFLOW_STEPS.find(s => s.id === 'structure').extraActions.some(a => a.run === 'runStructureValidation()')`), 'the guide structure step offers the fetch');
+assert(ctxRun(`getTrackSource('VAL_1GFL_A')`) === 'PDBe validation', 'validation rows report their provenance without relying on trackMeta');
 assert(ctxRun(`typeof TRACK_REMOVERS.VAL`) === 'function', 'removal unpicks the validation info map');
 assert(ctxRun(`Object.prototype.hasOwnProperty.call(gatherPersistableState(), 'validationHitsInfo')`), 'and the info travels in the session save');
-ctxRun(`parsedTracks = {}; validationHitsInfo = {};`);
+ctxRun(`
+    parsedTracks = { AA: 'M', VAL_1GFL_A: '!' };
+    validationHitsInfo = { VAL_1GFL_A: { pdbId: '1GFL', chain: 'A', flags: {}, summary: {} } };
+    trackMeta = {};
+    removeTracks(['VAL_1GFL_A'], { silent: true });
+`);
+assert(ctxRun(`parsedTracks.VAL_1GFL_A === undefined`) === true, 'removing a validation row drops the row');
+assert(ctxRun(`Object.keys(validationHitsInfo).length`) === 0, 'and its backing info (the VAL remover is reachable)');
+ctxRun(`parsedTracks = {}; validationHitsInfo = {}; trackMeta = {};`);
 const valCand = ctxRun(`
     (function () {
         cachedStructureTexts = { '1GFL.pdb': 'x', 'model.pdb': 'x', '7MDF_A.pdb': 'x' };
@@ -2906,7 +2921,7 @@ ctxRun(`parsedTracks = {}; cachedStructureTexts = {};`);
 section('experimental biological assemblies (RCSB)');
 assert(ctxRun(`isValidPdbId('1TNF')`) === true, 'a 4-character id starting with a digit is accepted');
 assert(ctxRun(`isValidPdbId('tnf')`) === false && ctxRun(`isValidPdbId('1TN')`) === false && ctxRun(`isValidPdbId('')`) === false, 'malformed ids are rejected');
-assert(ctxRun(`SERVICE_URLS.rcsbAssembly`) === 'https://files.rcsb.org/download/', 'the assembly base lives in the central URL table');
+assert(ctxRun(`ENDPOINTS.rcsbDownload`) === 'https://files.rcsb.org/download/', 'the assembly/download base lives in the central endpoint table');
 assert(HTML.indexOf('id="assemblyPdbId"') !== -1 && HTML.indexOf('id="assemblyNumber"') !== -1, 'the interface panel has the id and assembly inputs');
 assert(HTML.indexOf('Attach assembly') !== -1, 'and a button to fetch it');
 // the id can be pre-filled from the homolog hits
@@ -3926,6 +3941,11 @@ assert(ctxRun(`SERVICE_REGISTRY.capabilities.sequence_search.providers[0].adapte
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_search.providers[0].enabled`) === true, 'foldseek provider enabled');
 assert(ctxRun(`SERVICE_REGISTRY.capabilities.structure_search.providers[0].adapter`) === 'foldseek', 'structure_search -> foldseek adapter');
 assert(ctxRun(`typeof getTrackSource === 'function' && typeof runCapability === 'function'`), 'registry helpers present');
+assert(ctxRun(`ENDPOINTS.uniprot`) === ctxRun(`SERVICE_REGISTRY.capabilities.annotation.providers[0].url`), 'the UniProt provider reuses the shared endpoint');
+assert(ctxRun(`ENDPOINTS.uniprot`) === ctxRun(`SERVICE_REGISTRY.capabilities.protein_summary.providers[0].url`), 'and so does the summary provider');
+assert(ctxRun(`ENDPOINTS.alphafoldApi`).indexOf('alphafold.ebi.ac.uk/api/prediction/') !== -1 && ctxRun(`ENDPOINTS.ensemblRest`).indexOf('rest.ensembl.org') !== -1, 'AlphaFold and Ensembl bases are centralised');
+assert(!/fetchWithTimeout\(\s*['"`]https?:\/\//.test(app), 'no adapter hard-codes a fetchWithTimeout URL');
+assert(!/SERVICE_URLS/.test(app), 'the old duplicate SERVICE_URLS table is gone');
 assert(HTML.indexOf('id="ebiContactEmailInput"') !== -1, 'External services offers an EBI contact email box');
 assert(/Some public services .*ask for a contact address/.test(HTML), 'and explains why the address is needed');
 assert(HTML.indexOf('q2dv@example.com') === -1, 'the shared EBI address is not hard-coded');

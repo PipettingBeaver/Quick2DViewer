@@ -1707,6 +1707,34 @@ found nothing" rather than looking like data or a broken import.
 
 ---
 
+### Validation track group — 0.68.2
+
+**Surface.** Tracks tab, Track Control, and right-click remove for PDBe validation
+rows (`VAL_*`).
+
+**Should do.** Validation rows form their own **Validation** group (not *Other*),
+and removing one also deletes its `validationHitsInfo` entry so a re-render
+cannot bring it back.
+
+**Try.**
+1. Attach an experimental PDB (e.g. 1GFL), then **Fetch validation (PDBe)**.
+   *Expect:* the Validation group appears with one row per chain.
+2. Remove one validation row (right-click → *Remove this track…*, or the Tracks
+   tab ×).
+   *Expect:* the row disappears and does not return after a re-render or reload;
+   the activity log records the removal.
+3. Remove the last validation row.
+   *Expect:* the Validation group disappears from Track Control.
+
+**Edge cases.**
+- *Older saves* - `VAL_` rows still restore; the backing `validationHitsInfo` is
+  what the remover needs.
+- *Group controls* - hide, filter and *Remove type…* behave like every other group.
+- *Harness* - the group label/source, remover reachability and backing-map cleanup
+  are checked in `tests/run.js`; the visual grouping is manual-only.
+
+---
+
 ### Debugging console (action log) — 0.38.0
 
 **Should do.** Record the last 200 actions of the session (clicks, menu choices, task

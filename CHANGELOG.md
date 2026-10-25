@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.2] - 2026-10-25
+
+### Changed
+- **One endpoint table.** Adapters now read every base URL from
+  `SERVICE_REGISTRY` or the shared `ENDPOINTS` map; the old `SERVICE_URLS` alias
+  is gone. A moved service is a one-line change, and a test rejects literal URLs
+  in `fetchWithTimeout`.
+- **One track taxonomy.** Group matching, labels, default provenance and removal
+  cleanup now live in `TRACK_TYPES`; `TRACK_REMOVERS` is derived from it.
+
+### Fixed
+- **Validation rows are a real group.** `VAL_*` rows now report under
+  **Validation** (not *Other*), and removing one clears `validationHitsInfo`;
+  the remover was previously unreachable.
+
 ## [0.68.1] - 2026-10-25
 
 ### Fixed

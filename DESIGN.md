@@ -50,6 +50,11 @@ Q2DV behaves as a web viewer out of the box, and **off on a local `file://`
 page**; the choice is remembered. Every request still carries a per-action
 disclosure line in the activity log.
 
+**Endpoint ownership:** a capability's own base lives in `SERVICE_REGISTRY`;
+shared non-provider bases (UniProt FASTA, AlphaFold metadata, Ensembl, RCSB
+GraphQL) live in `ENDPOINTS`. Adapters never carry a URL literal, so a moved
+service is a one-line change and cannot leave a second stale copy behind.
+
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 
 Every track records provenance:
@@ -143,7 +148,7 @@ deposited entries).
 ## 9. Implementation order
 
 0. **Housekeeping (done, 0.10.1)** — test harness (`npm test`), non-blocking dialogs,
-   HTML escaping pass, centralized `SERVICE_URLS`, dead-code sweep.
+   HTML escaping pass, centralized `ENDPOINTS`, dead-code sweep.
 1. `trackMeta` + source tagging + `HH_`→`HL_` rename — **done (0.11.0)**
 2. ESMFold integration — **done (0.12.0)**; service registry + provider fallback
    + external-services opt-in shipped alongside
@@ -335,20 +340,22 @@ the card as a secondary button whenever an answer overrides it.
 **Hide vs remove.** `trackControlState.hidden/filtered` are view choices and are
 reversible; removal deletes the data. Because almost every track is *derived*, a
 raw `delete parsedTracks[key]` would be undone by the next re-parse, so removal
-runs a per-group cleanup first. `TRACK_REMOVERS` is keyed by **`getTrackGroup`
-result** (group names such as `UP`, not key prefixes):
+runs a per-group cleanup first. Each group declares its cleanup on the
+`TRACK_TYPES` table; `TRACK_REMOVERS` is derived from it and keyed by
+**`getTrackGroup` result** (group names such as `UP`, not key prefixes):
 
 | Group | Cleanup on removal |
 |---|---|
 | `HL` | `homologHitsInfo[key]` |
 | `DM` | `domainHitsInfo[key]` |
+| `VAL` | `validationHitsInfo[key]` |
 | `UP` | `uniprotFeatureTracks[key]`; removing the last row clears `uniprotFeatures` |
 | `RULE` | drops the matching `analysisRules` entry + its `trackMeta` |
 | `TP` | splices the matching `topologySources` entry, then `applyTopologySources()` rebuilds the rows (consensus included) |
 | `VAR` | `keyedVariantsInfo[name]`, then `recomputeConservationScores()` |
-| others | session-level row removal (a re-import can restore them — this is why the SCI/SS/pLDDT groups have no registry cleanup) |
+| others | session-level row removal (a re-import can restore them — this is why the SCI/SS/pLDDT groups have no table cleanup) |
 
-`removeTracks(keys, { silent })` also clears the per-track entries in all seven
+`removeTracks(keys, { silent })` also clears the per-track entries in all eight
 `trackControlState` bags (and a group's `hidden` flag once its last row is gone),
 then repaints viewer / cross-refs / Input Data / Tracks tab / guide and persists.
 `AA` is refused — that *is* the dataset, so it routes to `resetAllData()`.
