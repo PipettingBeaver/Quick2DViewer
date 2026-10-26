@@ -189,6 +189,9 @@ const escTip = ctxRun(`buildPredictorTooltipHTML({ name: '<img src=x>', descript
 assert(!/<img/.test(escTip) && /&lt;img/.test(escTip) && /&amp;/.test(escTip), 'buildPredictorTooltipHTML escapes untrusted name/description');
 const escStruct = ctxRun(`structureEscapeHtml('<script>')`);
 assert(escStruct === '&lt;script&gt;', 'structureEscapeHtml escapes angle brackets');
+ctxRun(`topologySources = [{ name: '<img src=x onerror=1>', state: 'M' }]; renderTopologySourceList();`);
+assert(ctxRun(`document.getElementById('topologySourceList').innerHTML`).indexOf('<img') === -1 && ctxRun(`document.getElementById('topologySourceList').innerHTML`).indexOf('&lt;img') !== -1, 'the topology source list escapes imported names');
+ctxRun(`topologySources = []; renderTopologySourceList();`);
 
 section('changelog markdown renderer');
 const mdHtml = ctxRun(`renderDocMarkdown('## [1.0.0] - x\\n\\n### Added\\n\\n- a **b**\\n')`);
@@ -390,6 +393,9 @@ assert(/Green fluorescent protein/.test(ctxRun(`document.getElementById('protein
 const psHtml = ctxRun(`document.getElementById('proteinSummaryBody').innerHTML`);
 assert(psHtml.indexOf('ps-name') !== -1 && psHtml.indexOf('ps-chip ps-chip-acc') !== -1 && psHtml.indexOf('ps-kw') !== -1 && psHtml.indexOf('ps-go ps-go-f') !== -1, 'the summary renders structured chips (name/accession/keyword/GO aspect)');
 assert(ctxRun(`buildMethodsReport()`).indexOf('## Protein summary') !== -1 && ctxRun(`buildMethodsReport()`).indexOf('Energy-transfer acceptor.') !== -1, 'the methods report includes the protein summary');
+ctxRun(`proteinSummary = { name: '<img src=x onerror=alert(1)>', function: '<script>bad</script>', keywords: ['<b>x</b>'], go: [{ aspect: 'F', id: 'GO:1', term: '<img onerror=1>' }] }; renderProteinSummary();`);
+const psXss = ctxRun(`document.getElementById('proteinSummaryBody').innerHTML`);
+assert(psXss.indexOf('<img') === -1 && psXss.indexOf('&lt;img') !== -1 && psXss.indexOf('<script>') === -1, 'the protein summary escapes remote HTML');
 ctxRun(`proteinSummary = null; renderProteinSummary();`);
 assert(ctxRun(`document.getElementById('proteinSummarySection').hidden`) === true, 'clearing the summary hides the panel');
 
@@ -942,6 +948,27 @@ assert(ctxRun(`suggestSaveFileName('sp|P42212|GFP_AEQVI Green fluorescent protei
 assert(ctxRun(`suggestSaveFileName('', 'MSKGEELFTGVVP')`) === 'q2dv-save-MSKGEELFTG.json', 'falls back to the first residues');
 assert(ctxRun(`suggestSaveFileName('', '')`) === 'q2dv-save-session.json', 'a nameless empty session still gets a safe name');
 assert(ctxRun(`/^q2dv-save-[A-Za-z0-9_]*\\.json$/.test(suggestSaveFileName('weird / name: *', ''))`), 'unsafe characters are slugged');
+
+section('import hardening');
+const maliciousJson = '{"parsedTracks":{"AA":"M","__proto__":{"polluted":true},"BAD<KEY>":"x","SS_PSIPRED":"H"},"homologHitsInfo":{"__proto__":{"polluted":true},"HL_01_x":{"source":"BLAST"}},"structureFiles":[{"name":"<img>.pdb"},{"name":"ok.pdb"}],"topologySources":[{"name":"<img>","state":"M"},{"name":"ok","state":"M"}],"preferences":{"trackControl":{"hidden":{"__proto__":true,"HL":true}}}}';
+ctxRun(`window.__clean = sanitizePersistedState(${JSON.stringify(JSON.parse(maliciousJson))});`);
+assert(ctxRun(`window.__clean && window.__clean.parsedTracks.AA === 'M'`), 'a valid sequence survives the sanitizer');
+assert(ctxRun(`Object.prototype.hasOwnProperty.call(window.__clean.parsedTracks, '__proto__')`) === false, 'the __proto__ track key is dropped');
+assert(ctxRun(`Object.prototype.hasOwnProperty.call(window.__clean.parsedTracks, 'BAD<KEY>')`) === false, 'an HTML-shaped track key is dropped');
+assert(ctxRun(`window.__clean.homologHitsInfo['HL_01_x'] && !Object.prototype.hasOwnProperty.call(window.__clean.homologHitsInfo, '__proto__')`), 'the info map keeps safe keys only');
+assert(ctxRun(`window.__clean.preferences.trackControl.hidden.HL === true && !Object.prototype.hasOwnProperty.call(window.__clean.preferences.trackControl.hidden, '__proto__')`), 'the Track Control bags keep safe keys only');
+assert(ctxRun(`window.__clean.structureFiles.length === 1 && window.__clean.structureFiles[0].name === 'ok.pdb'`) === true, 'unsafe structure file names are dropped');
+assert(ctxRun(`window.__clean.topologySources.length === 1 && window.__clean.topologySources[0].name === 'ok'`) === true, 'unsafe topology sources are dropped');
+assert(ctxRun(`({}).polluted === undefined`), 'no prototype pollution occurred');
+assert(ctxRun(`isSafeImportedKey('HL_01_x') && !isSafeImportedKey('__proto__') && !isSafeImportedKey('BAD<KEY>') && !isSafeImportedKey('x/y')`) === true, 'the import key guard allows track keys and rejects prototype/HTML/path keys');
+assert(ctxRun(`isSafeImportedKey('my model_pLDDT')`) === true, 'spaces in file-derived track keys still survive');
+assert(ctxRun(`IMPORT_LIMITS.sequenceLength`) === 100000 && ctxRun(`IMPORT_LIMITS.macroSteps`) === 100 && ctxRun(`IMPORT_LIMITS.saveBytes`) === 26214400, 'the import limits are named');
+assert(ctxRun(`sanitizePersistedState({ parsedTracks: { AA: 'M'.repeat(IMPORT_LIMITS.sequenceLength + 1) } })`) === null, 'an over-long sequence is rejected');
+assert(ctxRun(`sanitizePersistedState({ parsedTracks: {} })`) === null, 'a save without AA is rejected');
+ctxRun(`parsedTracks = { AA: 'M' }; window.__beforeImport = parsedTracks;`);
+assert(ctxRun(`applyPersistedState({ parsedTracks: {} })`) === false && ctxRun(`parsedTracks === window.__beforeImport`) === true, 'an invalid save is refused without touching the current session');
+ctxRun(`delete window.__clean; delete window.__beforeImport;`);
+assert(ctxRun(`macroFromJson(JSON.stringify({ steps: Array.from({ length: IMPORT_LIMITS.macroSteps + 1 }, () => ({ type: 'uniprot', accession: 'P42212' })) }))`) === false, 'a macro with too many steps is rejected');
 
 section('UniProt rows rebuild from a stored fetch on restore');
 ctxRun(`
@@ -3619,6 +3646,9 @@ assert(HTML.indexOf('openWorkflowDoc();"') !== -1 || HTML.indexOf('openWorkflowD
 // the renderer handles what WORKFLOW.md contains
 const mdOut = ctxRun(`renderDocMarkdown('# Title\\n\\n## Section\\n\\n### Sub\\n\\n- a **b** and [x](https://e.com)\\n\\nplain')`);
 assert(mdOut.indexOf('<h3') !== -1 && mdOut.indexOf('<h4') !== -1 && mdOut.indexOf('<strong>b</strong>') !== -1 && mdOut.indexOf('<a href="https://e.com"') !== -1, 'headings, bold and links render');
+const mdXss = ctxRun(`renderDocMarkdown('[x](javascript:alert(1)) <img src=x onerror=1>')`);
+assert(mdXss.indexOf('javascript:') === -1 && mdXss.indexOf('href="#"') !== -1 && mdXss.indexOf('<img') === -1, 'markdown link schemes are restricted and raw HTML is escaped');
+assert((ctxRun(`renderDocMarkdown('one paragraph')`).match(/<p>/g) || []).length === 1, 'a markdown paragraph is emitted once');
 
 section('short form hosts the current question');
 ctxRun(`guideProfile = {}; guideAnswers = {}; guideOverrides = {}; parsedTracks = { AA: 'MKV' }; guideIntakeOpen = null; renderWorkflowGuide();`);
@@ -3977,7 +4007,8 @@ assert(ctxRun(`SERVICE_USAGE.counts['UniProt REST']`) === 1, 'a request incremen
 assert(ctxRun(`SERVICE_USAGE.recent.some(r => r.endpoint === 'rest.uniprot.org/uniprotkb/P42212.json')`) === true, 'the recent log strips the query string');
 assert(ctxRun(`localStorage.getItem(STORAGE_KEYS.usage)`).indexOf('UniProt REST') !== -1, 'usage is persisted in this browser');
 assert(ctxRun(`actionLog.some(e => e.kind === 'api' && e.label === 'UniProt REST request')`) === true, 'the request is written to the activity log');
-ctxRun(`checkServicePolicyCompliance(); renderServiceUsage();`);
+ctxRun(`SERVICE_USAGE.recent = [{ t: '2026-10-25T12:00:00Z', service: '<img src=x onerror=1>', endpoint: '<script>bad</script>' }]; checkServicePolicyCompliance(); renderServiceUsage();`);
+assert(ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('<img') === -1 && ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('&lt;img') !== -1, 'the request log escapes tampered localStorage entries');
 assert(ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('EBI BLAST') !== -1 && ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('Download request log') !== -1 && ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('Reset counters') !== -1 && ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('EBI fair use') !== -1, 'the usage summary renders the caps, startup check, source links, export and reset controls');
 assert(ctxRun(`checkServicePolicyCompliance().ok`) === true && ctxRun(`servicePolicyCheck.ok`) === true, 'the default compliance check passes and is cached for the summary');
 ctxRun(`trackExternalRequest('https://rest.ensembl.org/sequence/id/ENST00000003084');`);

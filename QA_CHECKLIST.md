@@ -739,6 +739,42 @@ below the caps; an Ensembl hourly guard stops before 55,000 requests.
 
 ---
 
+### Import hardening + XSS guards — 0.68.5
+
+**Surface.** Attach files, save import, macro import, Changelog/Workflow viewer,
+structure export, and the rendered protein summary/topology/usage panels.
+
+**Should do.** Reject oversized or malformed imports before they reach the
+renderer, reject prototype keys, escape remote/user text, allow only safe
+Markdown link schemes, and sanitize generated filenames.
+
+**Try.**
+1. Attach a structure larger than 100 MB, a save larger than 25 MB, a text file
+   larger than 5 MB, or import a macro with more than 100 steps.
+   *Expect:* a clear error and no import.
+2. Import a save whose `parsedTracks` contains `__proto__` or `BAD<KEY>`.
+   *Expect:* those keys are dropped, the valid sequence still loads, and the
+   current session is untouched if the save has no `AA`.
+3. Load a save with `<img onerror=...>` in the protein summary or a topology
+   source name.
+   *Expect:* the text is shown escaped, never executed.
+4. Open **Help → Changelog** and **Workflow**.
+   *Expect:* paragraphs appear once, raw HTML is escaped, and links only use
+   http(s), relative paths or `#` anchors.
+5. Export a structure whose file name contains spaces or HTML characters.
+   *Expect:* the download name is slugged to `q2dv-...pdb`/`.cif`.
+
+**Edge cases.**
+- *Older saves* with normal track keys (letters, digits, spaces, dots) still load.
+- *Prototype keys* - `__proto__`, `constructor` and `prototype` are rejected at
+  every imported map; the sanitizer uses null-prototype objects.
+- *Macro step cap* - the limit is 100 steps; the JSON size limit is 2 MB.
+- *Harness* - malicious JSON, prototype keys, sequence cap, macro cap, XSS
+  strings, Markdown link schemes and double paragraph output are checked in
+  `tests/run.js`; the oversized-file picker paths are manual-only.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

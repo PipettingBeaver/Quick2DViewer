@@ -14,6 +14,12 @@ reference, with per-residue cross-track querying.
 
 **Invariants**
 - One HTML file, no build system, no backend.
+- **Packaging decision (2026-10):** keep `index.html` as the single deployable and
+  local artifact. Multi-file ES modules would break `file://` loading and the
+  "download one file" workflow unless a bundler emits the same `index.html`. If
+  the file grows past the point where sections are hard to navigate, add a build
+  step that keeps the single-file output and commit both source and built file;
+  do not switch to multi-file runtime delivery by default.
 - Outbound API calls run only through the external-services switch, which is on
   by default on the deployed site and off on local `file://`, and can be turned
   off at any time.
@@ -73,6 +79,13 @@ runs at startup; the Ensembl guard stops before the 55,000/hour cap.
 **Storage + filenames:** `STORAGE_KEYS` owns every `localStorage` key;
 `safeFileSlug()` and `q2dvFileName()` are the only filename builders for
 generated files.
+
+**Import boundary:** `sanitizePersistedState()` and `sanitizeImportedMap()`
+validate saves and nested maps, reject `__proto__` / `constructor` / `prototype`
+keys, and cap sequence/track sizes. Upload handlers enforce file caps before
+reading (25 MB save, 100 MB structure, 5 MB text, 2 MB macro, 100k aa).
+Markdown permits only http(s), relative and `#` links; generated structure
+filenames pass through `safeFileSlug()`.
 
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 

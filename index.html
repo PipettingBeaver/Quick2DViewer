@@ -3818,6 +3818,83 @@ function q2dvFileName(kind, detail, ext) {
     if (d) parts.push(d);
     return parts.join('-') + (ext ? '.' + ext : '');
 }
+// Hard limits for imported files and state. A save is a plain JSON document
+// shared between users, so it must not be able to exhaust memory, freeze the
+// renderer, or inject prototype keys.
+const IMPORT_LIMITS = Object.freeze({
+    saveBytes: 25 * 1024 * 1024,
+    structureBytes: 100 * 1024 * 1024,
+    rawInputBytes: 5 * 1024 * 1024,
+    macroBytes: 2 * 1024 * 1024,
+    macroSteps: 100,
+    sequenceLength: 100000,
+    trackCount: 1000,
+    trackKeyLength: 160
+});
+const UNSAFE_IMPORT_KEYS = Object.freeze(['__proto__', 'constructor', 'prototype']);
+function isSafeImportedKey(key) {
+    return typeof key === 'string' && key.length > 0 && key.length <= IMPORT_LIMITS.trackKeyLength &&
+        UNSAFE_IMPORT_KEYS.indexOf(key) === -1 &&
+        !/[\u0000-\u001F<>"'`\\/]/.test(key);
+}
+function sanitizeImportedMap(value, maxKeys) {
+    const out = Object.create(null);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+    Object.keys(value).slice(0, maxKeys || IMPORT_LIMITS.trackCount).forEach(k => {
+        if (isSafeImportedKey(k)) out[k] = value[k];
+    });
+    return out;
+}
+function sanitizePersistedState(state) {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
+    const clean = Object.assign({}, state);
+    const tracks = sanitizeImportedMap(state.parsedTracks);
+    const aa = tracks.AA;
+    if (typeof aa !== 'string' || !aa.length || aa.length > IMPORT_LIMITS.sequenceLength) return null;
+    Object.keys(tracks).forEach(k => {
+        const v = tracks[k];
+        if (k !== 'AA' && !(typeof v === 'string' || Array.isArray(v) || (v && typeof v === 'object'))) delete tracks[k];
+    });
+    clean.parsedTracks = tracks;
+    clean.homologHitsInfo = sanitizeImportedMap(state.homologHitsInfo);
+    clean.validationHitsInfo = sanitizeImportedMap(state.validationHitsInfo);
+    clean.experimentalTracksInfo = sanitizeImportedMap(state.experimentalTracksInfo);
+    clean.keyedVariantsInfo = sanitizeImportedMap(state.keyedVariantsInfo);
+    clean.domainHitsInfo = sanitizeImportedMap(state.domainHitsInfo);
+    clean.uniprotFeatureTracks = sanitizeImportedMap(state.uniprotFeatureTracks);
+    clean.graphHighlights = sanitizeImportedMap(state.graphHighlights);
+    clean.trackOffsets = sanitizeImportedMap(state.trackOffsets);
+    clean.structureReferences = sanitizeImportedMap(state.structureReferences || state.structureCacheIndex);
+    clean.structureFiles = Array.isArray(state.structureFiles) ? state.structureFiles.filter(f => f && typeof f === 'object' && typeof f.name === 'string' && isSafeImportedKey(f.name)).slice(0, 200) : [];
+    clean.topologySources = Array.isArray(state.topologySources) ? state.topologySources.filter(s => s && typeof s === 'object' && typeof s.name === 'string' && isSafeImportedKey(s.name) && typeof s.state === 'string' && s.state.length <= IMPORT_LIMITS.sequenceLength).slice(0, 200) : [];
+    clean.rawInput = typeof state.rawInput === 'string' ? state.rawInput.slice(0, IMPORT_LIMITS.rawInputBytes) : '';
+    clean.currentProteinLabel = typeof state.currentProteinLabel === 'string' ? state.currentProteinLabel.slice(0, 500) : null;
+    const sel = (state.selection && typeof state.selection === 'object' && !Array.isArray(state.selection)) ? Object.assign({}, state.selection) : {};
+    if (sel.activeRowKey && !isSafeImportedKey(sel.activeRowKey)) sel.activeRowKey = null;
+    if (sel.crossRefTrackKey && !isSafeImportedKey(sel.crossRefTrackKey)) sel.crossRefTrackKey = null;
+    if (sel.dragOriginTrackKey && !isSafeImportedKey(sel.dragOriginTrackKey)) sel.dragOriginTrackKey = null;
+    if (!Array.isArray(sel.rowRanges)) sel.rowRanges = [];
+    clean.selection = sel;
+    const prefs = (state.preferences && typeof state.preferences === 'object' && !Array.isArray(state.preferences)) ? Object.assign({}, state.preferences) : {};
+    const tc = (prefs.trackControl && typeof prefs.trackControl === 'object' && !Array.isArray(prefs.trackControl)) ? prefs.trackControl : {};
+    prefs.trackControl = {
+        hidden: sanitizeImportedMap(tc.hidden),
+        hideSymbols: sanitizeImportedMap(tc.hideSymbols),
+        fullBar: sanitizeImportedMap(tc.fullBar),
+        filtered: sanitizeImportedMap(tc.filtered),
+        aaSeq: sanitizeImportedMap(tc.aaSeq),
+        consColor: sanitizeImportedMap(tc.consColor),
+        colorMode: sanitizeImportedMap(tc.colorMode),
+        viewOverride: sanitizeImportedMap(tc.viewOverride),
+        sourceColor: !!tc.sourceColor
+    };
+    prefs.analysisRules = Array.isArray(prefs.analysisRules) ? prefs.analysisRules.filter(r => r && typeof r === 'object' && isSafeImportedKey(String(r.id || ''))).slice(0, 200) : [];
+    prefs.guideAnswers = sanitizeImportedMap(prefs.guideAnswers);
+    prefs.guideOverrides = sanitizeImportedMap(prefs.guideOverrides);
+    prefs.savedSelections = Array.isArray(prefs.savedSelections) ? prefs.savedSelections.slice(0, 5) : [];
+    clean.preferences = prefs;
+    return clean;
+}
 // Onboarding memory lives under its own key so it survives "Clear input data"
 // (which keeps preferences) but not "Clear all data" (which forgets the welcome
 // so a wiped install shows it again). Kept separate because the
@@ -8445,10 +8522,13 @@ function macroToJson() {
 }
 function macroFromJson(text) {
     try {
-        const data = JSON.parse(String(text || ''));
+        const raw = String(text || '');
+        if (raw.length > IMPORT_LIMITS.macroBytes) throw new Error('macro file is larger than the ' + Math.round(IMPORT_LIMITS.macroBytes / (1024 * 1024)) + ' MB limit');
+        const data = JSON.parse(raw);
         if (!data || !Array.isArray(data.steps)) throw new Error('no steps array');
-        macroName = (typeof data.name === 'string' && data.name) ? data.name : 'Imported macro';
-        macroSteps = data.steps.filter(st => st && typeof st.type === 'string');
+        if (data.steps.length > IMPORT_LIMITS.macroSteps) throw new Error('macro has more than ' + IMPORT_LIMITS.macroSteps + ' steps');
+        macroName = (typeof data.name === 'string' && data.name) ? data.name.slice(0, 120) : 'Imported macro';
+        macroSteps = data.steps.filter(st => st && typeof st.type === 'string').slice(0, IMPORT_LIMITS.macroSteps);
         renderMacroModalIfVisible();
         return true;
     } catch (err) {
@@ -11616,7 +11696,10 @@ function renderDocMarkdown(md) {
     const inline = (s) => structureEscapeHtml(s)
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/`(.+?)`/g, '<code>$1</code>')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, text, url) => {
+            const safe = /^(?:https?:\/\/|#|\/|\.\/|\.\.\/)/i.test(url) ? url : '#';
+            return '<a href="' + safe + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
+        });
     const lines = String(md || '').split('\n');
     let html = '', inList = false;
     const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
@@ -12101,7 +12184,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.68.4';
+const APP_VERSION = '0.68.5';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -13747,6 +13830,10 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
         // Quick2D output saved as .txt: parse it like a paste (it provides the
         // sequence, so it must bypass the "sequence already parsed" guard below).
         if (fileExt === 'txt') {
+            if (file.size > IMPORT_LIMITS.rawInputBytes) {
+                showToast('"' + file.name + '" is larger than the ' + Math.round(IMPORT_LIMITS.rawInputBytes / (1024 * 1024)) + ' MB text limit; skipped.', 'error');
+                continue;
+            }
             let text;
             try { text = await file.text(); } catch (err) { remainingFiles.push(file); continue; }
             if (looksLikePasteInput(text)) importQuick2DText(text, file.name);
@@ -13754,6 +13841,10 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
             continue;
         }
         if (fileExt !== 'json') { remainingFiles.push(file); continue; }
+        if (file.size > IMPORT_LIMITS.saveBytes) {
+            showToast('"' + file.name + '" is larger than the ' + Math.round(IMPORT_LIMITS.saveBytes / (1024 * 1024)) + ' MB save limit; skipped.', 'error');
+            continue;
+        }
         let text, maybeSave;
         try {
             text = await file.text();
@@ -13789,6 +13880,10 @@ document.getElementById('structureUpload').addEventListener('change', async (eve
 
     const cachePromises = []; // device structure-cache writes, awaited before persisting below
     for (const file of remainingFiles) {
+        if (file.size > IMPORT_LIMITS.structureBytes) {
+            showToast('"' + file.name + '" is larger than the ' + Math.round(IMPORT_LIMITS.structureBytes / (1024 * 1024)) + ' MB structure limit; skipped.', 'error');
+            continue;
+        }
         try {
             const text = await file.text();
             const ext = file.name.split('.').pop().toLowerCase();
@@ -15974,6 +16069,7 @@ async function computeRSA(fileText, residues) {
 function parseAndBuildViewer() {
     const rawText = document.getElementById('rawInput').value;
     if (!rawText.trim()) { showToast('Please paste some raw Quick2D data first.', 'error'); return; }
+    if (rawText.length > IMPORT_LIMITS.rawInputBytes) { showToast('Input is larger than the ' + Math.round(IMPORT_LIMITS.rawInputBytes / (1024 * 1024)) + ' MB text limit.', 'error'); return; }
 
     const lines = rawText.replace(/\r/g, '').split('\n');
 
@@ -16041,6 +16137,7 @@ function parseAndBuildViewer() {
         if (buildFromPlainFasta(rawText)) return; // sequence-only session
     }
     if (!fullAA) { showToast('Unable to parse AA_QUERY or FASTA sequences - check the pasted text.', 'error'); return; }
+    if (fullAA.length > IMPORT_LIMITS.sequenceLength) { showToast('Sequence is longer than the ' + IMPORT_LIMITS.sequenceLength.toLocaleString() + ' aa limit.', 'error'); return; }
 
     const newParsedTracks = { 'AA': fullAA };
     knownTracks.forEach(t => {
@@ -16076,8 +16173,10 @@ function parseAndBuildViewer() {
 // session: the reference row is enough to start, and predictions, homologs and
 // annotations can be layered on afterwards.
 function buildFromPlainFasta(rawText) {
+    if (String(rawText || '').length > IMPORT_LIMITS.rawInputBytes) { showToast('Sequence is larger than the ' + Math.round(IMPORT_LIMITS.rawInputBytes / (1024 * 1024)) + ' MB text limit.', 'error'); return false; }
     const parsed = parsePlainFasta(rawText);
     if (!parsed || !parsed.sequence) return false;
+    if (parsed.sequence.length > IMPORT_LIMITS.sequenceLength) { showToast('Sequence is longer than the ' + IMPORT_LIMITS.sequenceLength.toLocaleString() + ' aa limit.', 'error'); return false; }
     currentProteinLabel = parsed.label || null;
     applyDetectedOligomer(detectOligomerFromInput(rawText));
     parsedTracks = { AA: parsed.sequence };
@@ -19551,8 +19650,9 @@ async function exportStructureFile() {
     }
     const built = buildStructureExport(fileName);
     if (!built.ok) { showToast(built.message, 'error'); return null; }
-    const suffix = built.whole ? '' : '-selection';
-    const name = 'q2dv-' + (structBaseName(fileName) || 'structure') + suffix + '.' + built.ext;
+    const suffix = built.whole ? '' : 'selection';
+    const base = safeFileSlug(structBaseName(fileName) || 'structure', 40) || 'structure';
+    const name = q2dvFileName(base, suffix, built.ext);
     downloadTextFile(name, built.text, built.ext === 'cif' ? 'chemical/x-mmcif' : 'chemical/x-pdb');
     showToast('Exported ' + built.keptAtoms + ' of ' + built.totalAtoms + ' atoms' +
         (built.whole ? ' (whole model)' : ' (selection)') +
@@ -20946,6 +21046,10 @@ async function attachStructureFilesFromLocal(foundItems) {
         let file = item.file || null;
         if (!file && item.handle) { try { file = await item.handle.getFile(); } catch (err) { continue; } }
         if (!file) continue;
+        if (file.size > IMPORT_LIMITS.structureBytes) {
+            showToast('"' + file.name + '" is larger than the ' + Math.round(IMPORT_LIMITS.structureBytes / (1024 * 1024)) + ' MB structure limit; skipped.', 'error');
+            continue;
+        }
         let text;
         try { text = await file.text(); } catch (err) { showToast('Could not read "' + file.name + '".', 'error'); continue; }
         const ext = structExt(file.name);
@@ -21312,7 +21416,7 @@ async function importSaveFile(saveObj, fileLabel) {
         if (!proceed) return false;
     }
 
-    applyPersistedState(saveObj);
+    if (!applyPersistedState(saveObj)) return false;
     saveStateToStorage();
     showToast(`Imported save file "${fileLabel}".`, 'success');
     return true;
@@ -21374,6 +21478,10 @@ function loadStateFromStorage() {
         return false;
     }
     if (!raw) return false;
+    if (raw.length > IMPORT_LIMITS.saveBytes) {
+        console.error('Cached data is too large to restore safely, ignoring.');
+        return false;
+    }
 
     let state;
     try {
@@ -21384,8 +21492,7 @@ function loadStateFromStorage() {
     }
     if (!state || !state.parsedTracks || !state.parsedTracks.AA) return false;
 
-    applyPersistedState(state);
-    return true;
+    return applyPersistedState(state);
 }
 
 // Restores every piece of app state from a state object of the same shape
@@ -21394,6 +21501,11 @@ function loadStateFromStorage() {
 // attached .json export) below, so a page-load restore and a manual
 // save-file import behave identically.
 function applyPersistedState(state) {
+    state = sanitizePersistedState(state);
+    if (!state) {
+        showToast('This session has no valid sequence data; it was not loaded.', 'error');
+        return false;
+    }
     logAction('session', 'restored from storage');
     document.getElementById('rawInput').value = state.rawInput || '';
     parsedTracks = state.parsedTracks;
@@ -21589,6 +21701,7 @@ function applyPersistedState(state) {
     // is non-blocking - the session is fully usable while it resolves, and a
     // toast + Data-modal notice report anything it couldn't find.
     void rehydrateStructuresFromCache();
+    return true;
 }
 
 function renderCachedDataInfo() {

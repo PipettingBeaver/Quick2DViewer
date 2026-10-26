@@ -12,6 +12,23 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.5] - 2026-10-25
+
+### Security
+- **Import hardening.** Save, macro and structure imports now enforce file-size
+  caps (25 MB save, 100 MB structure, 5 MB text, 2 MB macro), a 100,000 aa
+  sequence cap and a 100-step macro cap. Imported maps reject `__proto__`,
+  `constructor` and `prototype` keys, use null-prototype maps, and invalid saves
+  leave the current session untouched.
+- **XSS regressions.** Remote/user strings in protein summaries, topology
+  sources, tooltips and the request log are escaped; Markdown links allow only
+  http(s), relative and `#` schemes; structure export filenames pass through
+  `safeFileSlug()`.
+
+### Fixed
+- **Changelog/Workflow rendering.** Each markdown paragraph is emitted once
+  instead of twice.
+
 ## [0.68.4] - 2026-10-25
 
 ### Added
