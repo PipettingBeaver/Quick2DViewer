@@ -3265,6 +3265,7 @@
                 </div>
             </div>
         </div>
+        <div id="serviceUsageBody" style="margin-top:12px;"></div>
         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:10px;">
             <details>
                 <summary style="cursor:pointer; font-size:0.8rem; font-weight:600; color:#475569;">Service policies and documented limits</summary>
@@ -3792,12 +3793,35 @@ document.addEventListener('keydown', (e) => {
 // Raw text of every uploaded structure file (name/ext/size/text), kept
 // alongside parsedTracks so the Options > Cached Data panel can list them
 // and so a page reload can show what's cached without re-deriving anything.
-const STORAGE_KEY = 'q2dViewer_state_v1';
+// Browser storage keys in one table, so a rename or schema bump is visible and
+// the session, welcome flag, contact email, 3D cache and request-usage log
+// cannot drift apart.
+const STORAGE_KEYS = Object.freeze({
+    state: 'q2dViewer_state_v1',
+    welcome: 'q2dViewer_welcome_v1',
+    ebiEmail: 'q2dv_ebi_contact_email',
+    p3d: '_q2dv_3dmol',
+    usage: 'q2dv_service_usage_v1'
+});
+// One filename convention for generated files. `kind` names the artifact and
+// `detail` the protein/region/timestamp; unsafe characters become underscores.
+const APP_FILE_PREFIX = 'q2dv';
+function safeFileSlug(value, maxLen) {
+    return String(value == null ? '' : value)
+        .replace(/[^A-Za-z0-9._-]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, maxLen || 40);
+}
+function q2dvFileName(kind, detail, ext) {
+    const parts = [APP_FILE_PREFIX, safeFileSlug(kind, 20)];
+    const d = safeFileSlug(detail, 40);
+    if (d) parts.push(d);
+    return parts.join('-') + (ext ? '.' + ext : '');
+}
 // Onboarding memory lives under its own key so it survives "Clear input data"
 // (which keeps preferences) but not "Clear all data" (which forgets the welcome
-// so a wiped install shows it again). Kept out of STORAGE_KEY because the
+// so a wiped install shows it again). Kept separate because the
 // session blob is only read back when a sequence is present.
-const WELCOME_KEY = 'q2dViewer_welcome_v1';
 let welcomeSeen = false;
 // The empty viewer's call to action. Used by the initial markup and by
 // resetInputDataState(), so the two cannot drift.
@@ -4015,6 +4039,17 @@ const SERVICE_POLICY = Object.freeze({
     ensembl: Object.freeze({ requestMs: 30000, vepMs: 90000, vepMaxVariants: 1000 }),
     homologs: Object.freeze({ realignLimit: 8 })
 });
+// Published provider caps used by the compliance check and the live usage
+// summary. These are server limits, not app preferences; SERVICE_POLICY is
+// configured to stay below them.
+const SERVICE_CAPS = Object.freeze({
+    ebiJobsPerBatch: 30,
+    ebiSearchPerRequest: 1000,
+    rcsbPerSearch: 10000,
+    ensemblPerHour: 55000,
+    vepPerPost: 1000,
+    esmfoldMaxLength: 400
+});
 // --- External service registry (EDIT HERE to fix/replace endpoints) --------
 // Capabilities map to an ORDERED provider list; when a capability runs, its
 // providers are tried in order until one succeeds. So if provider A is down or
@@ -4178,7 +4213,8 @@ const SERVICE_REGISTRY = {
     },
 };
 // fetch() with an AbortController timeout (shared by the adapters).
-function fetchWithTimeout(url, opts, ms) {
+function fetchWithTimeout(url, opts, ms, meta) {
+    if (!(meta && meta.silent)) trackExternalRequest(url);
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ms);
     return fetch(url, Object.assign({ signal: ctrl.signal }, opts || {})).finally(() => clearTimeout(timer));
@@ -4301,7 +4337,7 @@ const SERVICE_ADAPTERS = {
         while (Date.now() < deadline) {
             poll++;
             await new Promise(r => setTimeout(r, SERVICE_POLICY.ebiJob.pollMs));
-            try { status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, SERVICE_POLICY.ebiJob.statusMs)).text()).trim(); }
+            try { status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, SERVICE_POLICY.ebiJob.statusMs, { silent: true })).text()).trim(); }
             catch (e) { uniprotLog('poll ' + poll + ': status fetch failed, continuing'); continue; }
             if (status !== lastLogged) { uniprotLog(tool + ' poll: ' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
             if (status === 'FINISHED') break;
@@ -4458,7 +4494,7 @@ const SERVICE_ADAPTERS = {
         const deadline = Date.now() + SERVICE_POLICY.foldseek.deadlineMs;
         while (Date.now() < deadline && status !== 'COMPLETE') {
             await new Promise(r => setTimeout(r, SERVICE_POLICY.foldseek.pollMs));
-            try { const st = await (await fetchWithTimeout(provider.url + 'ticket/' + id, {}, SERVICE_POLICY.foldseek.statusMs)).json(); status = st && st.status; }
+            try { const st = await (await fetchWithTimeout(provider.url + 'ticket/' + id, {}, SERVICE_POLICY.foldseek.statusMs, { silent: true })).json(); status = st && st.status; }
             catch (e) { /* transient - keep polling */ }
             if (status === 'ERROR' || status === 'FAILURE' || status === 'FAILED') throw new Error('Foldseek job ' + status);
             if (onProgress) onProgress('Foldseek ' + db + ' running… ' + elapsed() + 's (' + (status || '?') + ')');
@@ -4543,7 +4579,7 @@ function policyDuration(ms) {
 const SERVICE_POLICY_DOCS = [
     { service: 'EBI BLAST / HMMER / InterProScan',
       app: policyDuration(SERVICE_POLICY.ebiJob.submitMs) + ' submit, ' + policyDuration(SERVICE_POLICY.ebiJob.pollMs) + ' poll, ' + policyDuration(SERVICE_POLICY.ebiJob.deadlineMs) + ' deadline, one job at a time',
-      limit: 'Fair use: no more than 30 jobs per batch; a valid contact email; EBI keeps results for up to 7 days.',
+      limit: 'Fair use: no more than ' + SERVICE_CAPS.ebiJobsPerBatch + ' jobs per batch; a valid contact email; EBI keeps results for up to 7 days.',
       href: 'https://www.ebi.ac.uk/jdispatcher/docs/webservices/#fair-use-policy', label: 'EBI fair use' },
     { service: 'UniProt REST',
       app: policyDuration(SERVICE_POLICY.uniProt.requestMs) + ' per request, ' + SERVICE_POLICY.uniProt.searchPageSize + ' search hits',
@@ -4551,11 +4587,11 @@ const SERVICE_POLICY_DOCS = [
       href: 'https://www.uniprot.org/help/programmatic_access', label: 'UniProt API' },
     { service: 'EBI Search',
       app: policyDuration(SERVICE_POLICY.ebiSearch.requestMs) + ', ' + SERVICE_POLICY.ebiSearch.pageSize + ' hits',
-      limit: 'At most 1,000 hits per request; the app asks for 20.',
+      limit: 'At most ' + SERVICE_CAPS.ebiSearchPerRequest.toLocaleString() + ' hits per request; the app asks for ' + SERVICE_POLICY.ebiSearch.pageSize + '.',
       href: 'https://www.ebi.ac.uk/ebisearch/documentation', label: 'EBI Search' },
     { service: 'RCSB PDB search / GraphQL',
       app: policyDuration(SERVICE_POLICY.rcsb.searchMs) + ' search, ' + policyDuration(SERVICE_POLICY.rcsb.metadataMs) + ' metadata, ' + SERVICE_POLICY.rcsb.sequenceRows + ' hits',
-      limit: 'At most 10,000 hits per pagination request (10 by default); the app asks for 8.',
+      limit: 'At most ' + SERVICE_CAPS.rcsbPerSearch.toLocaleString() + ' hits per pagination request (10 by default); the app asks for ' + SERVICE_POLICY.rcsb.sequenceRows + '.',
       href: 'https://search.rcsb.org/#pagination', label: 'RCSB search' },
     { service: 'PDBe API',
       app: policyDuration(SERVICE_POLICY.pdbe.lookupMs) + ' lookup, ' + policyDuration(SERVICE_POLICY.pdbe.validationMs) + ' validation, ' + SERVICE_POLICY.pdbe.bestStructures + ' best structures',
@@ -4567,7 +4603,7 @@ const SERVICE_POLICY_DOCS = [
       href: 'https://alphafold.ebi.ac.uk/api-docs', label: 'AlphaFold API' },
     { service: 'Ensembl REST / VEP',
       app: policyDuration(SERVICE_POLICY.ensembl.requestMs) + ' lookup, ' + policyDuration(SERVICE_POLICY.ensembl.vepMs) + ' VEP, batches of ' + SERVICE_POLICY.ensembl.vepMaxVariants + ' variants',
-      limit: '55,000 requests/hour per IP (X-RateLimit headers); VEP accepts at most 1,000 variants per POST.',
+      limit: SERVICE_CAPS.ensemblPerHour.toLocaleString() + ' requests/hour per IP (X-RateLimit headers); VEP accepts at most ' + SERVICE_CAPS.vepPerPost.toLocaleString() + ' variants per POST.',
       href: 'https://rest.ensembl.org/', label: 'Ensembl REST' },
     { service: 'Foldseek',
       app: policyDuration(SERVICE_POLICY.foldseek.pollMs) + ' poll, ' + policyDuration(SERVICE_POLICY.foldseek.deadlineMs) + ' deadline, ' + SERVICE_POLICY.foldseek.maxHits + ' hits',
@@ -4575,7 +4611,7 @@ const SERVICE_POLICY_DOCS = [
       href: 'https://search.foldseek.com/', label: 'Foldseek' },
     { service: 'ESMFold (ESM Atlas)',
       app: policyDuration(SERVICE_POLICY.esmfold.requestMs) + ', max ' + SERVICE_POLICY.esmfold.maxLength + ' aa',
-      limit: 'Maximum sequence length 400 aa.',
+      limit: 'Maximum sequence length ' + SERVICE_CAPS.esmfoldMaxLength + ' aa.',
       href: 'https://esmatlas.com/resources?action=fold', label: 'ESM Atlas' }
 ];
 function renderServicePolicyTable() {
@@ -4591,6 +4627,159 @@ function renderServicePolicyTable() {
     host.innerHTML = '<table style="width:100%; border-collapse:collapse; font-size:0.72rem; color:#475569;">' +
         '<thead><tr><th style="text-align:left; padding:5px 6px;">Service</th><th style="text-align:left; padding:5px 6px;">This app</th><th style="text-align:left; padding:5px 6px;">Published limit</th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table>';
+}
+
+// --- External request usage log -------------------------------------------
+// Every non-silent external request is written to the activity log and counted
+// here. Counters persist in this browser (STORAGE_KEYS.usage), so the External
+// services panel can show what was sent and whether the published caps are
+// respected. Job-status polls are silent: they would flood the log and count
+// against nothing.
+function emptyServiceUsage() { return { counts: {}, hours: {}, recent: [] }; }
+function loadServiceUsage() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.usage);
+        if (!raw) return emptyServiceUsage();
+        const d = JSON.parse(raw);
+        return {
+            counts: (d && typeof d.counts === 'object' && d.counts) ? d.counts : {},
+            hours: (d && typeof d.hours === 'object' && d.hours) ? d.hours : {},
+            recent: (d && Array.isArray(d.recent)) ? d.recent.slice(0, 50) : []
+        };
+    } catch (e) { return emptyServiceUsage(); }
+}
+const SERVICE_USAGE = loadServiceUsage();
+let servicePolicyCheck = null;
+function saveServiceUsage() {
+    try { localStorage.setItem(STORAGE_KEYS.usage, JSON.stringify(SERVICE_USAGE)); } catch (e) { /* storage unavailable */ }
+}
+function usageHourKey() { return new Date().toISOString().slice(0, 13); }
+function currentHourUsage(service) {
+    const hour = SERVICE_USAGE.hours[usageHourKey()];
+    return (hour && hour[service]) || 0;
+}
+function serviceFromUrl(url) {
+    const s = String(url || '');
+    if (/rest\.uniprot\.org/.test(s)) return 'UniProt REST';
+    if (/ebisearch\/ws\/rest/.test(s)) return 'EBI Search';
+    if (/proteins\/api/.test(s)) return 'EBI Proteins';
+    if (/Tools\/services\/rest\/(?:ncbiblast|hmmer3_|iprscan5)/.test(s)) return 'EBI Job Dispatcher';
+    if (/pdbe\/api/.test(s)) return 'PDBe';
+    if (/data\.rcsb\.org|search\.rcsb\.org|files\.rcsb\.org/.test(s)) return 'RCSB PDB';
+    if (/alphafold\.ebi\.ac\.uk/.test(s)) return 'AlphaFold DB';
+    if (/esmatlas\.com/.test(s)) return 'ESMFold';
+    if (/search\.foldseek\.com/.test(s)) return 'Foldseek';
+    if (/rest\.ensembl\.org/.test(s)) return 'Ensembl';
+    if (/jsdelivr|3dmol\.org/i.test(s)) return '3Dmol asset';
+    return 'Other external';
+}
+function safeEndpoint(url) {
+    return String(url || '').replace(/^https?:\/\//, '').replace(/[?#].*$/, '').slice(0, 120);
+}
+function trackExternalRequest(url) {
+    const service = serviceFromUrl(url);
+    if (!service || service === '3Dmol asset') return;
+    if (service === 'Ensembl' && currentHourUsage('Ensembl') >= SERVICE_CAPS.ensemblPerHour) {
+        logAction('system', 'Ensembl hourly budget reached', SERVICE_CAPS.ensemblPerHour.toLocaleString() + ' requests/hour');
+        throw new Error('Ensembl request budget reached (' + SERVICE_CAPS.ensemblPerHour.toLocaleString() + '/hour). Wait for the hour to reset.');
+    }
+    const endpoint = safeEndpoint(url);
+    // EBI's cap is on job submissions, not on status/result requests, so count
+    // only the /run call under the submissions key.
+    const countKey = (service === 'EBI Job Dispatcher' && /\/run(?:[?#]|$)/.test(String(url)))
+        ? 'EBI Job Dispatcher submissions'
+        : service;
+    SERVICE_USAGE.counts[countKey] = (SERVICE_USAGE.counts[countKey] || 0) + 1;
+    const hour = usageHourKey();
+    if (!SERVICE_USAGE.hours[hour]) SERVICE_USAGE.hours[hour] = {};
+    SERVICE_USAGE.hours[hour][service] = (SERVICE_USAGE.hours[hour][service] || 0) + 1;
+    const hourKeys = Object.keys(SERVICE_USAGE.hours).sort();
+    while (hourKeys.length > 2) delete SERVICE_USAGE.hours[hourKeys.shift()];
+    SERVICE_USAGE.recent.unshift({ t: new Date().toISOString(), service, endpoint });
+    SERVICE_USAGE.recent = SERVICE_USAGE.recent.slice(0, 50);
+    saveServiceUsage();
+    logAction('api', service + ' request', endpoint);
+    try { renderServiceUsageIfVisible(); } catch (e) { /* usage UI is best-effort */ }
+}
+function resetServiceUsage() {
+    SERVICE_USAGE.counts = {};
+    SERVICE_USAGE.hours = {};
+    SERVICE_USAGE.recent = [];
+    saveServiceUsage();
+    renderServiceUsage();
+}
+function renderServiceUsageIfVisible() {
+    const panel = document.getElementById('optCat-services');
+    if (panel && !panel.hidden) renderServiceUsage();
+}
+function renderServiceUsage() {
+    const host = document.getElementById('serviceUsageBody');
+    if (!host) return;
+    const esc = structureEscapeHtml;
+    const seqLen = (typeof parsedTracks === 'object' && parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
+    const ebiJobs = SERVICE_USAGE.counts['EBI Job Dispatcher submissions'] || 0;
+    const ensemblHour = currentHourUsage('Ensembl');
+    const rows = [
+        ['EBI BLAST / HMMER / InterProScan', ebiJobs + ' submission(s) recorded, one at a time', '\u226430 per batch', 'OK'],
+        ['EBI Search', SERVICE_POLICY.ebiSearch.pageSize + ' hits/request', '\u2264' + SERVICE_CAPS.ebiSearchPerRequest.toLocaleString() + '/request', 'OK'],
+        ['RCSB PDB', SERVICE_POLICY.rcsb.sequenceRows + ' hits/request', '\u2264' + SERVICE_CAPS.rcsbPerSearch.toLocaleString() + '/request', 'OK'],
+        ['Ensembl', ensemblHour + ' request(s) this hour', '\u2264' + SERVICE_CAPS.ensemblPerHour.toLocaleString() + '/hour', ensemblHour > SERVICE_CAPS.ensemblPerHour ? 'CHECK' : 'OK'],
+        ['Ensembl VEP', SERVICE_POLICY.ensembl.vepMaxVariants + ' variants/POST', '\u2264' + SERVICE_CAPS.vepPerPost.toLocaleString() + '/POST', 'OK'],
+        ['ESMFold', seqLen ? seqLen + ' aa loaded' : 'no sequence', '\u2264' + SERVICE_CAPS.esmfoldMaxLength + ' aa', seqLen > SERVICE_CAPS.esmfoldMaxLength ? 'CHECK' : 'OK']
+    ];
+    const table = '<table style="width:100%; border-collapse:collapse; font-size:0.72rem; color:#475569;">' +
+        '<thead><tr><th style="text-align:left; padding:5px 6px;">Service</th><th style="text-align:left; padding:5px 6px;">Used / configured</th><th style="text-align:left; padding:5px 6px;">Cap</th><th style="text-align:left; padding:5px 6px;">Check</th></tr></thead><tbody>' +
+        rows.map(r => '<tr><td style="padding:5px 6px; border-top:1px solid #e2e8f0;">' + esc(r[0]) + '</td><td style="padding:5px 6px; border-top:1px solid #e2e8f0;">' + esc(r[1]) + '</td><td style="padding:5px 6px; border-top:1px solid #e2e8f0;">' + esc(r[2]) + '</td><td style="padding:5px 6px; border-top:1px solid #e2e8f0; font-weight:600; color:' + (r[3] === 'OK' ? '#15803d' : '#b91c1c') + ';">' + r[3] + '</td></tr>').join('') +
+        '</tbody></table>';
+    const recent = SERVICE_USAGE.recent.slice(0, 8).map(r =>
+        '<div style="padding:3px 0; border-top:1px solid #f1f5f9; font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' +
+        esc(String(r.t || '').slice(11, 19)) + '  ' + esc(r.service || '') + '  ' + esc(r.endpoint || '') + '</div>').join('');
+    const sources = [
+        ['EBI fair use', 'https://www.ebi.ac.uk/jdispatcher/docs/webservices/#fair-use-policy'],
+        ['EBI Search', 'https://www.ebi.ac.uk/ebisearch/documentation'],
+        ['RCSB search', 'https://search.rcsb.org/#pagination'],
+        ['Ensembl REST', 'https://rest.ensembl.org/'],
+        ['ESM Atlas', 'https://esmatlas.com/resources?action=fold']
+    ].map(x => '<a href="' + x[1] + '" target="_blank" rel="noopener" style="color:#2563eb;">' + esc(x[0]) + '</a>').join(' \u00b7 ');
+    host.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">' +
+        '<strong style="font-size:0.78rem; color:#475569;">Request caps</strong>' +
+        '<button type="button" class="tb-btn tb-btn-secondary" onclick="downloadServiceUsage()" style="font-size:0.72rem; padding:3px 8px;">Download request log</button>' +
+        '<button type="button" class="tb-btn tb-btn-secondary" onclick="resetServiceUsage()" style="font-size:0.72rem; padding:3px 8px; margin-left:4px;">Reset counters</button>' +
+        '</div>' + table +
+        (servicePolicyCheck ? '<div style="font-size:0.7rem; margin-top:4px; color:' + (servicePolicyCheck.ok ? '#15803d' : '#b91c1c') + ';">Startup policy check: ' + (servicePolicyCheck.ok ? 'OK' : 'CHECK: ' + esc((servicePolicyCheck.problems || []).join('; '))) + '</div>' : '') +
+        '<div style="font-size:0.7rem; color:#94a3b8; margin-top:4px;">Sources: ' + sources + '</div>' +
+        '<div style="font-size:0.7rem; color:#94a3b8; margin-top:5px;">Request counters are browser-local and exclude silent job-status polls.</div>' +
+        (recent ? '<details style="margin-top:6px;"><summary style="cursor:pointer; font-size:0.72rem; color:#64748b;">Recent requests</summary><div style="font-size:0.68rem; color:#64748b;">' + recent + '</div></details>' : '');
+}
+function downloadServiceUsage() {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const payload = {
+        app: 'Quick2DViewer',
+        version: (typeof APP_VERSION === 'string') ? APP_VERSION : '?',
+        exportedAt: new Date().toISOString(),
+        policy: SERVICE_POLICY,
+        caps: SERVICE_CAPS,
+        usage: SERVICE_USAGE
+    };
+    const name = q2dvFileName('requests', stamp, 'json');
+    if (downloadTextFile(name, JSON.stringify(payload, null, 2), 'application/json')) {
+        logAction('export', 'request log', name);
+        showToast('Request log downloaded.', 'success');
+    }
+}
+// Startup guard: the configured request shapes must stay below the published
+// caps. A mismatch is logged (and shown in the usage summary) rather than
+// silently sending a request the provider will refuse.
+function checkServicePolicyCompliance() {
+    const problems = [];
+    if (SERVICE_POLICY.ebiSearch.pageSize > SERVICE_CAPS.ebiSearchPerRequest) problems.push('EBI Search page size');
+    if (SERVICE_POLICY.rcsb.sequenceRows > SERVICE_CAPS.rcsbPerSearch || SERVICE_POLICY.rcsb.textRows > SERVICE_CAPS.rcsbPerSearch) problems.push('RCSB row count');
+    if (SERVICE_POLICY.ensembl.vepMaxVariants > SERVICE_CAPS.vepPerPost) problems.push('VEP batch size');
+    if (SERVICE_POLICY.esmfold.maxLength > SERVICE_CAPS.esmfoldMaxLength) problems.push('ESMFold max length');
+    const ok = problems.length === 0;
+    servicePolicyCheck = { ok, problems, checkedAt: new Date().toISOString() };
+    logAction('system', 'service caps ' + (ok ? 'OK' : 'CHECK'), ok ? 'configured requests are within published limits' : problems.join('; '));
+    return servicePolicyCheck;
 }
 function syncExternalServicesMenu() {
     const el = document.getElementById('menuExternalServices');
@@ -4609,9 +4798,8 @@ function toggleExternalServices() {
 // EBI's Job Dispatcher asks for a contact address with every submission. A
 // shared placeholder address can be blocked for everyone using it, so the
 // address is per browser and never hard-coded in the page.
-const EBI_CONTACT_EMAIL_KEY = 'q2dv_ebi_contact_email';
 let ebiContactEmail = '';
-try { ebiContactEmail = String(localStorage.getItem(EBI_CONTACT_EMAIL_KEY) || '').trim(); } catch (e) {}
+try { ebiContactEmail = String(localStorage.getItem(STORAGE_KEYS.ebiEmail) || '').trim(); } catch (e) {}
 function ebiEmailLooksValid(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 }
@@ -4628,8 +4816,8 @@ function syncEbiContactEmailInput() {
 function setEbiContactEmail(value) {
     ebiContactEmail = String(value || '').trim();
     try {
-        if (ebiContactEmail) localStorage.setItem(EBI_CONTACT_EMAIL_KEY, ebiContactEmail);
-        else localStorage.removeItem(EBI_CONTACT_EMAIL_KEY);
+        if (ebiContactEmail) localStorage.setItem(STORAGE_KEYS.ebiEmail, ebiContactEmail);
+        else localStorage.removeItem(STORAGE_KEYS.ebiEmail);
     } catch (e) { /* storage unavailable: the value still works for this page */ }
     syncEbiContactEmailInput();
 }
@@ -8006,7 +8194,7 @@ function renderActionLog() {
     const body = document.getElementById('actionLogBody');
     if (!body) return;
     if (!actionLog.length) { body.textContent = '(no actions recorded yet this session)'; return; }
-    const kindWord = (k) => ({ click: 'Click', api: 'API', task: 'Task', import: 'Import', attach: 'Attach', render: 'Render', download: 'Fetch', error: 'Error', export: 'Export', analysis: 'Analysis' }[k] || k);
+    const kindWord = (k) => ({ click: 'Click', api: 'API', task: 'Task', system: 'System', import: 'Import', attach: 'Attach', render: 'Render', download: 'Fetch', error: 'Error', export: 'Export', analysis: 'Analysis' }[k] || k);
     body.textContent = actionLog.slice().reverse()
         .map(e => e.t + '  ' + (kindWord(e.kind) + '        ').slice(0, 9) + e.label + (e.detail ? '   [' + e.detail + ']' : ''))
         .join('\n');
@@ -8522,7 +8710,7 @@ function clearMacroSteps() {
     updateMacroControls();
 }
 function exportMacroJson() {
-    downloadTextFile('q2dv-macro-' + (macroName || 'macro').replace(/[^A-Za-z0-9]+/g, '_').slice(0, 30) + '.json', macroToJson(), 'application/json');
+    downloadTextFile(q2dvFileName('macro', macroName || 'macro', 'json'), macroToJson(), 'application/json');
 }
 function importMacroFromTextarea() {
     const el = document.getElementById('macroImportText');
@@ -9363,7 +9551,7 @@ function computeConstruct(opts) {
     };
 }
 function constructHeaderLine(res, label) {
-    const base = (label || currentProteinLabel || 'construct').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'construct';
+    const base = safeFileSlug(label || currentProteinLabel || 'construct', 40) || 'construct';
     return base + '_' + res.start + '-' + res.end + (res.mode === 'disorder' ? '_disorder-trimmed' : '_selection');
 }
 function constructFastaText(res, label) {
@@ -9490,7 +9678,7 @@ async function copySequenceFasta() {
 function downloadSequenceFasta() {
     const text = sequenceFastaText();
     if (!text) { showToast('A protein sequence is needed for this.', 'error'); return; }
-    const label = (currentProteinLabel || 'sequence').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'sequence';
+    const label = safeFileSlug(currentProteinLabel || 'sequence', 40) || 'sequence';
     downloadTextFile(label + '.fasta', text, 'text/plain');
     showToast('FASTA downloaded.', 'success');
 }
@@ -9527,7 +9715,7 @@ function switchDataCategory(name) {
     if (name === 'variants') { updateSpeciesUI(); detectSessionSpecies(); }
     const state = document.getElementById('optExternalState');
     if (state) state.textContent = 'External services are currently ' + (externalServicesEnabled ? 'ON' : 'OFF') + '.';
-    if (name === 'services') { syncEbiContactEmailInput(); renderServicePolicyTable(); }
+    if (name === 'services') { syncEbiContactEmailInput(); renderServiceUsage(); renderServicePolicyTable(); }
     renderTopologySourceList();
     updateQuick2dTutorial();
     if (typeof tourOnUiEvent === 'function') tourOnUiEvent('data-category:' + name);
@@ -10039,7 +10227,7 @@ function hypothesisTSV(rows) {
 function exportHypothesisTSV() {
     const rows = buildHypothesisCandidates();
     if (!rows.length) { showToast('No candidates yet: load conservation, a structure model or UniProt features first.', 'error'); return; }
-    downloadTextFile('q2dv-hypotheses-' + methodsReportDate() + '.tsv', hypothesisTSV(rows), 'text/tab-separated-values;charset=utf-8');
+    downloadTextFile(q2dvFileName('hypotheses', methodsReportDate(), 'tsv'), hypothesisTSV(rows), 'text/tab-separated-values;charset=utf-8');
 }
 function copyHypothesisTSV() {
     const rows = buildHypothesisCandidates();
@@ -10391,8 +10579,8 @@ function buildMethodsReport() {
 function exportMethodsReport() {
     if (!parsedTracks.AA) { showToast('Nothing to summarise yet: the methods summary reports what has been evaluated.', 'error'); return; }
     const text = buildMethodsReport();
-    const safe = (currentProteinLabel || 'session').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'session';
-    downloadTextFile('q2dv-methods-' + safe + '-' + methodsReportDate() + '.md', text, 'text/markdown');
+    const safe = safeFileSlug(currentProteinLabel || 'session', 40) || 'session';
+    downloadTextFile(q2dvFileName('methods', safe + '-' + methodsReportDate(), 'md'), text, 'text/markdown');
     schedulePersist();
     showToast('Methods summary exported.', 'success');
 }
@@ -11247,7 +11435,7 @@ function closeHelpModal() {
 }
 
 // --- First-run onboarding: welcome panel + coachmark tour ------------------
-// The welcome panel auto-opens once (WELCOME_KEY absent) and is remembered when
+// The welcome panel auto-opens once (STORAGE_KEYS.welcome absent) and is remembered when
 // dismissed; the tour pulses one control per step and captions it in the fixed
 // bottom bar. Both are reopenable from Help.
 function maybeShowWelcome() {
@@ -11258,7 +11446,7 @@ function openWelcomeModal() { openModalAsDialog('welcomeModal'); }
 function closeWelcomeModal() { closeModalAsDialog('welcomeModal'); }
 function dismissWelcome() {
     welcomeSeen = true;
-    try { localStorage.setItem(WELCOME_KEY, '1'); } catch (err) { console.error(err); }
+    try { localStorage.setItem(STORAGE_KEYS.welcome, '1'); } catch (err) { console.error(err); }
     closeWelcomeModal();
     endTour();
 }
@@ -11913,7 +12101,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.68.3';
+const APP_VERSION = '0.68.4';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -19144,9 +19332,9 @@ function openMetricsTable() {
 function exportMetricsTableTSV() {
     const data = buildMetricsDelimited('\t');
     if (!data) { showToast('Metrics need structural tracks (pLDDT/RSA) to export.', 'error'); return; }
-    const slug = data.region.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    const slug = safeFileSlug(data.region, 40) || 'region';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    if (downloadTextFile(`q2dv-metrics_${slug}_${stamp}.tsv`, data.text, 'text/tab-separated-values;charset=utf-8')) {
+    if (downloadTextFile(q2dvFileName('metrics', slug + '-' + stamp, 'tsv'), data.text, 'text/tab-separated-values;charset=utf-8')) {
         showToast('Metrics exported as TSV.', 'success');
     }
 }
@@ -19156,9 +19344,9 @@ function exportMetricsTableTSV() {
 function exportMetricsCSV() {
     const data = buildMetricsDelimited(',');
     if (!data) { showToast('Metrics need structural tracks (pLDDT/RSA) to export.', 'error'); return; }
-    const slug = data.region.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    const slug = safeFileSlug(data.region, 40) || 'region';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    if (downloadTextFile(`q2dv-metrics_${slug}_${stamp}.csv`, data.text, 'text/csv;charset=utf-8')) {
+    if (downloadTextFile(q2dvFileName('metrics', slug + '-' + stamp, 'csv'), data.text, 'text/csv;charset=utf-8')) {
         showToast('Metrics exported as CSV.', 'success');
     }
 }
@@ -19408,7 +19596,6 @@ const p3dModelSources = {};
 const P3D_RCSB_SIZE_CAP = 100 * 1024 * 1024;                   // don't cache multi-hundred-MB deposits
 const P3D_DB_NAME = 'q2dv-3dmol-cache';
 const P3D_DB_STORE = 'scripts';
-const P3D_LOCAL_CACHE_KEY = '_q2dv_3dmol';
 const P3D_BASE_SCHEMES = ['white', 'spectrum', 'chain', 'hydro', 'conservation'];
 const P3D_COLOR_HEX = {
     red: '0xff0000', cyan: '0x00ffff', blue: '0x0000ff', green: '0x00ff00',
@@ -19698,7 +19885,7 @@ async function ensureP3Dmol() {
     setP3DNotice('Loading 3D engine…');
     let cached = null;
     try { cached = await p3dDBGet('3dmol.js'); } catch (e) {}
-    if (!cached) { try { cached = localStorage.getItem(P3D_LOCAL_CACHE_KEY); } catch (e) {} }
+    if (!cached) { try { cached = localStorage.getItem(STORAGE_KEYS.p3d); } catch (e) {} }
     if (cached) {
         try { await load3DmolFromText(cached); if (window.$3Dmol) { p3dLoaded = true; return; } } catch (e) {}
     }
@@ -19708,7 +19895,7 @@ async function ensureP3Dmol() {
             if (!resp.ok) continue;
             const text = await resp.text();
             try { await p3dDBSet('3dmol.js', text); }
-            catch (e) { try { localStorage.setItem(P3D_LOCAL_CACHE_KEY, text); } catch (e2) {} }
+            catch (e) { try { localStorage.setItem(STORAGE_KEYS.p3d, text); } catch (e2) {} }
             await load3DmolFromText(text);
             if (window.$3Dmol) { p3dLoaded = true; return; }
         } catch (e) {}
@@ -20894,12 +21081,7 @@ const SAVE_FORMAT_VERSION = 1;
 // FASTA/Quick2D header (entry name, then protein name, then gene, then
 // accession); fall back to the first few residues when nothing is nameable,
 // so a save is identifiable at a glance instead of a timestamp.
-function slugifySaveName(s) {
-    return String(s == null ? '' : s)
-        .replace(/[^A-Za-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '')
-        .slice(0, 40);
-}
+function slugifySaveName(s) { return safeFileSlug(s, 40); }
 function suggestSaveFileName(label, sequence) {
     let name = '';
     if (label && typeof parseProteinHeaderLine === 'function') {
@@ -20912,7 +21094,7 @@ function suggestSaveFileName(label, sequence) {
         const seq = String(sequence || '').toUpperCase().replace(/[^A-Z]/g, '');
         slug = seq ? seq.slice(0, 10) : 'session';
     }
-    return 'q2dv-save-' + slug + '.json';
+    return q2dvFileName('save', slug, 'json');
 }
 
 function exportFullSave() {
@@ -21066,7 +21248,7 @@ function exportViewportSVG() {
     const svg = buildViewportSVG();
     if (!svg) { showToast('Nothing to export yet - load a sequence first.', 'error'); return; }
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    if (downloadTextFile(`q2dv-viewport_${stamp}.svg`, svg, 'image/svg+xml;charset=utf-8')) {
+    if (downloadTextFile(q2dvFileName('viewport', stamp, 'svg'), svg, 'image/svg+xml;charset=utf-8')) {
         showToast('Viewport exported as SVG.', 'success');
     }
 }
@@ -21095,7 +21277,7 @@ function exportViewportPNG() {
             const pngUrl = URL.createObjectURL(pngBlob);
             const a = document.createElement('a');
             a.href = pngUrl;
-            a.download = `q2dv-viewport_${stamp}.png`;
+            a.download = q2dvFileName('viewport', stamp, 'png');
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -21139,7 +21321,7 @@ async function importSaveFile(saveObj, fileLabel) {
 function saveStateToStorage() {
     if (!parsedTracks.AA) return; // nothing meaningful parsed yet
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(gatherPersistableState()));
+        localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(gatherPersistableState()));
         lastPersistError = null;
     } catch (err) {
         console.error('Failed to save cached data:', err);
@@ -21186,7 +21368,7 @@ function restoreSelectionVisuals() {
 function loadStateFromStorage() {
     let raw;
     try {
-        raw = localStorage.getItem(STORAGE_KEY);
+        raw = localStorage.getItem(STORAGE_KEYS.state);
     } catch (err) {
         console.error('Failed to read cached data:', err);
         return false;
@@ -21414,7 +21596,7 @@ function renderCachedDataInfo() {
     if (!el) return;
 
     let raw = null;
-    try { raw = localStorage.getItem(STORAGE_KEY); } catch (err) { /* storage unavailable */ }
+    try { raw = localStorage.getItem(STORAGE_KEYS.state); } catch (err) { /* storage unavailable */ }
 
     if (!raw) {
         el.textContent = 'No cached data yet - it will be saved automatically as you paste/parse data, attach structures, and make selections.';
@@ -22054,6 +22236,7 @@ function resetPreferencesState() {
     externalServicesEnabled = externalServicesDefault();
     syncExternalServicesMenu();
     setEbiContactEmail('');
+    resetServiceUsage();
     qaHighlightsEnabled = false;
     syncQaHighlights();
     trackManagerExpanded = {};
@@ -22086,7 +22269,7 @@ async function clearInputData() {
     // the key directly - otherwise a refresh would restore the cleared session.
     lastPersistError = null;
     clearTimeout(persistTimer);
-    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.error(err); }
+    try { localStorage.removeItem(STORAGE_KEYS.state); } catch (err) { console.error(err); }
     renderCachedDataInfo();
     logAction('session', 'cleared input data');
     showToast('Input data cleared. Preferences are kept.', 'success');
@@ -22101,8 +22284,8 @@ async function clearAllData() {
     welcomeSeen = false;
     lastPersistError = null;
     clearTimeout(persistTimer);
-    try { localStorage.removeItem(STORAGE_KEY); } catch (err) { console.error(err); }
-    try { localStorage.removeItem(WELCOME_KEY); } catch (err) { console.error(err); }
+    try { localStorage.removeItem(STORAGE_KEYS.state); } catch (err) { console.error(err); }
+    try { localStorage.removeItem(STORAGE_KEYS.welcome); } catch (err) { console.error(err); }
     renderCachedDataInfo();
     logAction('session', 'cleared all data');
     showToast('All data and preferences cleared.', 'success');
@@ -22123,6 +22306,8 @@ populateCommandEngineSelect();
 updateSidebarCommandLabels();
 syncExternalServicesMenu();
 syncServicePolicyLabels();
+checkServicePolicyCompliance();
+renderServiceUsage();
 mountDataSourcesPanel();
 syncQaHighlights(); // fresh-visit default: the new-feature purple outlines are OFF
 applyTypePalette('default'); // fresh-visit default; loadStateFromStorage() overrides it if a saved palette exists
@@ -22135,7 +22320,7 @@ initSeqSearch();
     if (el) el.textContent = 'v' + APP_VERSION;
 })();
 loadStateFromStorage();
-try { welcomeSeen = localStorage.getItem(WELCOME_KEY) === '1'; } catch (err) { welcomeSeen = false; }
+try { welcomeSeen = localStorage.getItem(STORAGE_KEYS.welcome) === '1'; } catch (err) { welcomeSeen = false; }
 maybeShowWelcome();
 </script>
 

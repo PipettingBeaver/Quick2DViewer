@@ -12,6 +12,19 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.4] - 2026-10-25
+
+### Added
+- **Request caps + usage log.** External services shows live counters against
+  the published caps, the recent requests, a JSON download and a reset control.
+  Every non-silent external request is written to the activity log and counted;
+  silent job-status polls are excluded. A startup check keeps the configured
+  request shapes below the caps, and an Ensembl hourly guard stops before
+  55,000 requests.
+- **Storage keys and filenames are centralised.** `STORAGE_KEYS` owns every
+  browser key; `safeFileSlug()` and `q2dvFileName()` are the single naming
+  convention for generated files.
+
 ## [0.68.3] - 2026-10-25
 
 ### Changed

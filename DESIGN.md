@@ -63,6 +63,17 @@ EBI Search (≤1,000 hits per request), RCSB search (≤10,000 per pagination
 request), Ensembl REST (55,000 requests/hour) and VEP (≤1,000 variants per
 POST, batched by the app).
 
+**Usage guard:** `fetchWithTimeout` logs every non-silent request to the
+activity log and increments `SERVICE_USAGE` (persisted under
+`STORAGE_KEYS.usage`). The External services panel shows live counters against
+`SERVICE_CAPS`, the recent requests and a JSON download. Job-status polls are
+silent so a long job cannot flood the log. `checkServicePolicyCompliance()`
+runs at startup; the Ensembl guard stops before the 55,000/hour cap.
+
+**Storage + filenames:** `STORAGE_KEYS` owns every `localStorage` key;
+`safeFileSlug()` and `q2dvFileName()` are the only filename builders for
+generated files.
+
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 
 Every track records provenance:

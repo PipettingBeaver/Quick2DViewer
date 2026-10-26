@@ -699,6 +699,46 @@ next to the provider's published limit, and keep every numeric value in
 
 ---
 
+### Request caps + usage log — 0.68.4
+
+**Surface.** Options → Data Sources → **External services**; activity log.
+
+**Should do.** Show live request counters against the published caps, write every
+non-silent external request to the activity log, and let the user download or
+reset the request log. A startup check confirms the configured request shapes stay
+below the caps; an Ensembl hourly guard stops before 55,000 requests.
+
+**Try.**
+1. Open **External services**.
+   *Expect:* a **Request caps** table with EBI, EBI Search, RCSB, Ensembl, VEP and
+   ESMFold rows, a **Startup policy check: OK** line, source links, plus
+   **Download request log** and **Reset counters**.
+2. Run **Scan domains** or **Find homologs**.
+   *Expect:* the activity log gains `EBI Job Dispatcher request …/run` and result
+   lines; the 3-second status polls do not add a line each time, and the counters
+   update while the panel is open.
+3. Download the request log and open it.
+   *Expect:* JSON with `policy`, `caps`, `usage.counts`, `usage.hours` and
+   `usage.recent`; query strings are stripped from the recent endpoints.
+4. Press **Reset counters**.
+   *Expect:* the table returns to zero and the recent list clears.
+5. Load a sequence longer than 400 aa and run ESMFold.
+   *Expect:* the existing "sequence too long" error, and the ESMFold row shows
+   **CHECK** for the loaded length.
+
+**Edge cases.**
+- *Counters are browser-local* and are not a provider quota; the published cap is
+  shown separately.
+- *Silent polls* are excluded so a long EBI job cannot flood the 200-entry log.
+- *Clear data* - **Clear input data** keeps the counters; **Clear all data** resets
+  them.
+- *Ensembl hourly guard* - a request is stopped before it is sent once the current
+  hour reaches 55,000.
+- *Harness* - caps, URL classification, persistence, activity-log lines, silent
+  polls, the Ensembl guard and the filename helper are checked in `tests/run.js`.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

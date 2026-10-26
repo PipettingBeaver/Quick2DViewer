@@ -278,7 +278,7 @@ assert(HTML.indexOf('mountDataSourcesPanel();\nsyncQaHighlights();') !== -1, 'th
 section('onboarding + clear-data split');
 assert(ctxRun(`typeof maybeShowWelcome === 'function' && typeof startTour === 'function' && typeof endTour === 'function'`), 'onboarding entry points are defined');
 assert(ctxRun(`typeof clearInputData === 'function' && typeof clearAllData === 'function' && typeof resetInputDataState === 'function' && typeof resetPreferencesState === 'function'`), 'clear-data split functions are defined');
-assert(ctxRun(`WELCOME_KEY === 'q2dViewer_welcome_v1'`), 'the welcome memory has its own storage key');
+assert(ctxRun(`STORAGE_KEYS.welcome === 'q2dViewer_welcome_v1'`), 'the welcome memory has its own storage key');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Open Input Data') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'the empty state points at Input Data and Attach files');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Get started') !== -1 && EMPTY_STATE_HTML.indexOf('Take the tour') !== -1 && EMPTY_STATE_HTML.indexOf("openDataSources('uniprot')") !== -1`), 'the empty state is a get-started checklist with a tour link');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Try GFP') === -1`), 'the empty state no longer has a direct Try GFP shortcut');
@@ -3960,6 +3960,34 @@ ctxRun(`renderServicePolicyTable();`);
 assert(ctxRun(`document.getElementById('servicePolicyBody').innerHTML`).indexOf('EBI BLAST') !== -1, 'the External services panel renders the policy table');
 ctxRun(`syncServicePolicyLabels();`);
 assert(ctxRun(`document.getElementById('esmfoldMaxLengthLabel').textContent`) === '400', 'the ESMFold limit label comes from the policy');
+
+section('service request caps + usage log');
+assert(ctxRun(`SERVICE_CAPS.ebiJobsPerBatch`) === 30 && ctxRun(`SERVICE_CAPS.ebiSearchPerRequest`) === 1000 && ctxRun(`SERVICE_CAPS.rcsbPerSearch`) === 10000 && ctxRun(`SERVICE_CAPS.ensemblPerHour`) === 55000 && ctxRun(`SERVICE_CAPS.vepPerPost`) === 1000 && ctxRun(`SERVICE_CAPS.esmfoldMaxLength`) === 400, 'every published cap is named');
+assert(ctxRun(`STORAGE_KEYS.usage`) === 'q2dv_service_usage_v1', 'request usage has its own storage key');
+assert(ctxRun(`q2dvFileName('save', 'GFP_AEQVI', 'json')`) === 'q2dv-save-GFP_AEQVI.json', 'generated filenames share one convention');
+assert(ctxRun(`safeFileSlug('weird / name: *', 40)`) === 'weird_name', 'unsafe filename characters are slugged');
+assert(ctxRun(`serviceFromUrl('https://rest.uniprot.org/uniprotkb/P42212.json')`) === 'UniProt REST', 'the URL classifier knows UniProt');
+assert(ctxRun(`serviceFromUrl('https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/run')`) === 'EBI Job Dispatcher', 'the URL classifier knows EBI jobs');
+assert(ctxRun(`serviceFromUrl('https://rest.ensembl.org/vep/human/hgvs')`) === 'Ensembl', 'the URL classifier knows Ensembl');
+assert(ctxRun(`serviceFromUrl('https://3Dmol.org/build/3Dmol-min.js')`) === '3Dmol asset', 'the URL classifier skips the 3Dmol CDN from API counts');
+ctxRun(`resetServiceUsage(); actionLog = []; trackExternalRequest('https://rest.uniprot.org/uniprotkb/P42212.json?fields=acc');`);
+ctxRun(`trackExternalRequest('https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/run'); trackExternalRequest('https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/result/abc/json');`);
+assert(ctxRun(`SERVICE_USAGE.counts['EBI Job Dispatcher submissions']`) === 1, 'only the EBI /run call counts as a submission');
+assert(ctxRun(`SERVICE_USAGE.counts['UniProt REST']`) === 1, 'a request increments its service count');
+assert(ctxRun(`SERVICE_USAGE.recent.some(r => r.endpoint === 'rest.uniprot.org/uniprotkb/P42212.json')`) === true, 'the recent log strips the query string');
+assert(ctxRun(`localStorage.getItem(STORAGE_KEYS.usage)`).indexOf('UniProt REST') !== -1, 'usage is persisted in this browser');
+assert(ctxRun(`actionLog.some(e => e.kind === 'api' && e.label === 'UniProt REST request')`) === true, 'the request is written to the activity log');
+ctxRun(`checkServicePolicyCompliance(); renderServiceUsage();`);
+assert(ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('EBI BLAST') !== -1 && ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('Download request log') !== -1 && ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('Reset counters') !== -1 && ctxRun(`document.getElementById('serviceUsageBody').innerHTML`).indexOf('EBI fair use') !== -1, 'the usage summary renders the caps, startup check, source links, export and reset controls');
+assert(ctxRun(`checkServicePolicyCompliance().ok`) === true && ctxRun(`servicePolicyCheck.ok`) === true, 'the default compliance check passes and is cached for the summary');
+ctxRun(`trackExternalRequest('https://rest.ensembl.org/sequence/id/ENST00000003084');`);
+assert(ctxRun(`currentHourUsage('Ensembl')`) === 1, 'Ensembl requests are counted in the current hour');
+ctxRun(`SERVICE_USAGE.hours[usageHourKey()] = { Ensembl: SERVICE_CAPS.ensemblPerHour };`);
+let capErr = null;
+try { ctxRun(`trackExternalRequest('https://rest.ensembl.org/sequence/id/ENST00000003084')`); } catch (e) { capErr = e; }
+assert(capErr && /budget reached/.test(capErr.message), 'the Ensembl hourly cap stops the request before it is sent');
+ctxRun(`resetServiceUsage(); actionLog = [];`);
+assert(ctxRun(`Object.keys(SERVICE_USAGE.counts).length === 0 && Object.keys(SERVICE_USAGE.hours).length === 0 && SERVICE_USAGE.recent.length === 0`) === true, 'reset clears the usage counters and recent list');
 assert(HTML.indexOf('id="ebiContactEmailInput"') !== -1, 'External services offers an EBI contact email box');
 assert(/Some public services .*ask for a contact address/.test(HTML), 'and explains why the address is needed');
 assert(HTML.indexOf('q2dv@example.com') === -1, 'the shared EBI address is not hard-coded');
@@ -4478,6 +4506,19 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
     assert(err && /not valid/.test(err.message) && ebiCalls === 0, 'an invalid contact email is rejected before submission');
     ctxRun(`setEbiContactEmail('');`);
     sandbox.fetch = origFetch;
+
+    // Silent job-status polls are excluded from the usage log; a real submit is
+    // counted.
+    section('service request tracking');
+    ctxRun(`resetServiceUsage(); actionLog = [];`);
+    const origFetchTrack = sandbox.fetch;
+    sandbox.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve('RUNNING'), json: () => Promise.resolve({}) });
+    await ctxRun(`fetchWithTimeout('https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/status/abc', {}, 1000, { silent: true })`);
+    assert(ctxRun(`(SERVICE_USAGE.counts['EBI Job Dispatcher submissions'] || 0) + (SERVICE_USAGE.counts['EBI Job Dispatcher'] || 0)`) === 0, 'silent status polls are not counted');
+    await ctxRun(`fetchWithTimeout('https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/run', {}, 1000)`);
+    assert(ctxRun(`SERVICE_USAGE.counts['EBI Job Dispatcher submissions']`) === 1, 'a job submission is counted');
+    sandbox.fetch = origFetchTrack;
+    ctxRun(`resetServiceUsage(); actionLog = [];`);
 
     // runTopologyPrediction end to end with the real InterProScan TSV (the
     // capability is stubbed, everything else is the app's own path).
