@@ -101,6 +101,58 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Evidence bundle loader + Claims/Relations - 0.69.0
+
+**Surface.** Data modal -> **Evidence Bundle**; the claims/relations/features tables;
+the `BND_` rows; the existing Selection, 3D viewer and ChimeraX/PyMOL command path.
+
+**Should do.** Load a Q2DV bundle folder (or a same-origin manifest URL), show its
+claims, relations and curated features with evidence links, and add annotation
+tracks. Selecting a mapped claim/relation/feature highlights the residues through
+the normal selection pipeline.
+
+**Try.**
+1. Open **Data -> Evidence Bundle**. Use **Load bundle folder...** and choose
+   `TerC/bundle` (local, gitignored). Expect a status line for Q52356 with the
+   bundle counts (36 claims, 16 relations, 90 features) and no network request.
+2. Filter claims to **Proposed** and search `DN`; press **Select** on
+   `PUB-METAL-DN-01`. Expect residues 85-86 highlighted, the range read-out
+   updated, the 3D model recolored, and the command panel able to emit the
+   selection/color command.
+3. Press **Add curated annotation tracks (15)**. Expect `BND_` rows in the
+   Evidence bundle group; their labels come from the feature labels; source
+   colouring uses **Bundle**. Click a row label and expect its marked residues
+   selected.
+4. Press **Add legacy Q2DV tracks (75)** then **Remove bundle tracks**. Expect all
+   `BND_` rows gone and the rest of the session unchanged.
+5. Check a relation row (TerC-TerB has `interface unknown`), open its DOI
+   evidence link, and confirm a claim without residue mapping shows an
+   informative toast rather than a wrong selection.
+6. Under `python3 -m http.server`, load the URL
+   `TerC/bundle/manifest.json`. On the deployed GitHub Pages site this URL is
+   expected to 404 because `TerC/` is gitignored; use the folder picker there.
+
+**Edge cases.**
+- Current sequence not Q52356: loading the bundle must refuse with a sequence
+  length/content mismatch and leave the current session untouched.
+- Missing `manifest.json`, `protein.json`, or a required entrypoint: clear error
+  in the bundle status; no partial tracks.
+- Browser without folder selection (`webkitdirectory`): use the URL loader or
+  serve the bundle beside the app.
+- Folder-loaded evidence paths are labels (with the path in the tooltip), not
+  links; URL-loaded paths become links only when the file is actually served.
+- A claim for another protein (e.g. Alx) must not highlight Q52356 residues.
+- Duplicate `BND_` keys are skipped on re-add; **Remove bundle tracks** clears
+  all bundle rows and their `trackMeta`.
+- Claim/relation text is escaped; a `<script>` or quote in a bundle field must
+  render as text, never execute.
+
+**Note.** The harness covers the pure conversions, the folder loader (with a
+synthetic bundle), and BND add/remove; the real file picker, URL loading, table
+filters, link opening and visual selection are manual-only until driven here.
+
+---
+
 ---
 
 ### Selection Info + tour steps + paste label — 0.67.36

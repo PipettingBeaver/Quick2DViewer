@@ -12,6 +12,29 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.69.0] - 2026-10-26
+
+### Added
+- **Evidence bundle loader and Claims/Relations panel.** The Data modal can load
+  a Q2DV bundle from a folder or a same-origin manifest URL. It shows the bundle
+  status, claims (with status/confidence/evidence links), relations (with
+  interface status and selectable interfaces) and curated features. Mapping a
+  claim, relation or feature highlights its residues through the existing
+  selection, 3D-coloring and ChimeraX/PyMOL command path.
+- **`BND_` track family.** Curated bundle features can be added as annotation
+  rows; dense numeric features render as a heatmap, string/sparse/range features
+  render as marked rows. Legacy Q2DV tracks can be added separately and removed
+  as a group.
+- **Bundle tests** cover feature-to-track conversion, residue ranges, evidence
+  links, BND add/remove, and the BND track type.
+
+### Notes
+- The bundle is local data: loading a folder sends nothing; the URL loader is
+  opt-in. The deployed page has no bundle; use the folder picker for local work.
+- Homolog profiles in the bundle carry full query/target alignments, so their
+  target residue numbering survives import. Legacy `HL_` tracks from the old save
+  are preserved but marked as lacking target numbering.
+
 ## [0.68.9] - 2026-10-25
 
 ### Security

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AVrWUfT1yyt+5ozJQ4YdviHLHfhKNaI2wKRdsk7SqdU=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-giLczTAhZYyZWyJIbyd8l8GsVIvIFg5gAYl2hkKcacE=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -3337,6 +3337,41 @@
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Evidence Bundle</h4>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
+                Load a Q2DV bundle folder or manifest URL. The bundle is a manifest plus small JSON files:
+                protein, features, legacy tracks, claims, relations and evidence. Loading is local;
+                the app sends nothing unless you use the URL box. Claims are evidence records, not
+                database facts - their status and confidence travel with them.
+            </p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+                <label for="bundleFolderInput" class="copy-btn" style="display:inline-block; cursor:pointer;" title="Choose the folder that contains manifest.json">Load bundle folder…</label>
+                <input type="file" id="bundleFolderInput" webkitdirectory multiple data-action="loadBundleFolder" style="position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;">
+                <input type="text" id="bundleUrlInput" placeholder="TerC/bundle/manifest.json" aria-label="Bundle manifest URL" style="font-size:0.75rem; padding:3px 6px; border:1px solid #cbd5e1; border-radius:4px; min-width:240px;">
+                <button type="button" class="copy-btn" data-action="loadBundleUrl">Load URL</button>
+            </div>
+            <div id="bundleStatus" class="data-box" style="font-size:0.78rem; line-height:1.5;">No bundle loaded.</div>
+            <div id="bundleSummary"></div>
+            <div id="bundleFilters" style="display:none; gap:6px; flex-wrap:wrap; align-items:center; margin:8px 0;">
+                <label for="bundleClaimFilter" style="font-size:0.72rem; color:#475569; font-weight:600;">Claims</label>
+                <select id="bundleClaimFilter" class="q2dv-select" data-action="renderBundleClaims" style="font-size:0.72rem; padding:2px 4px;">
+                    <option value="all">All statuses</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="proposed">Proposed</option>
+                    <option value="conflicting">Conflicting</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <input type="text" id="bundleClaimSearch" data-action="renderBundleClaims" placeholder="Filter claims…" aria-label="Filter claims" style="font-size:0.72rem; padding:2px 6px; border:1px solid #cbd5e1; border-radius:4px; min-width:180px;">
+            </div>
+            <h5 style="margin:10px 0 4px; color:#334155; font-size:0.82rem;">Claims</h5>
+            <div id="bundleClaimsWrap" style="overflow-x:auto;"></div>
+            <h5 style="margin:14px 0 4px; color:#334155; font-size:0.82rem;">Relations</h5>
+            <div id="bundleRelationsWrap" style="overflow-x:auto;"></div>
+            <h5 style="margin:14px 0 4px; color:#334155; font-size:0.82rem;">Curated features</h5>
+            <div id="bundleFeaturesWrap" style="overflow-x:auto;"></div>
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
             <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Structure Files</h4>
             <p style="font-size: 0.8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4;">
                 Each PDB/CIF file is scanned on upload for a rough protein classification, apo/holo ligand state, and oligomeric state (chain count). This is best-effort: many files - especially computational models like AlphaFold predictions - simply don't record this information, in which case it's reported as such rather than guessed.
@@ -4135,6 +4170,7 @@ const SERVICE_POLICY = Object.freeze({
     rcsb: Object.freeze({ metadataMs: 40000, searchMs: 60000, downloadMs: 60000, sequenceRows: 8, textRows: 8 }),
     alphafold: Object.freeze({ metadataMs: 30000, downloadMs: 60000 }),
     ensembl: Object.freeze({ requestMs: 30000, vepMs: 90000, vepMaxVariants: 1000 }),
+    bundle: Object.freeze({ requestMs: 30000 }),
     homologs: Object.freeze({ realignLimit: 8 })
 });
 // Published provider caps used by the compliance check and the live usage
@@ -12208,7 +12244,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.68.9';
+const APP_VERSION = '0.69.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -13619,6 +13655,10 @@ function formatTrackLabel(fullKey) {
         return m ? `Homolog #${parseInt(m[1], 10)}: ${m[2]}` : fullKey;
     }
     if (type === 'CONSERVATION') return 'Conservation';
+    if (type === 'BND') {
+        const meta = trackMeta[fullKey];
+        return (meta && meta.label) ? meta.label : fullKey.slice(4).replace(/_/g, ' ');
+    }
     if (type === 'VAR') return 'Variant ' + fullKey.slice(4);
     if (type === 'UP') return 'UniProt ' + fullKey.slice(3).replace(/_/g, ' ');
     if (type === 'DM') {
@@ -16280,6 +16320,7 @@ const TRACK_TYPES = [
     { id: 'pLDDT', label: 'pLDDT', suffix: '_pLDDT', source: 'Structure', order: 15 },
     { id: 'RSA', label: 'RSA', suffix: '_RSA', source: 'Structure', order: 15 },
     { id: 'Cofactors', label: 'Cofactors', suffix: '_Cofactors', source: 'Structure', order: 14 },
+    { id: 'BND', label: 'Evidence bundle', prefix: 'BND_', source: 'Bundle', order: 17 },
     { id: 'other', label: 'Other', source: 'Other', order: 16 }
 ];
 const TRACK_TYPE_BY_ID = {};
@@ -16355,6 +16396,7 @@ const SOURCE_COLORS = {
     'AlphaFold': '#15803d',
     'PDBe': '#0891b2',
     'Homolog': '#0f766e',
+    'Bundle': '#0f766e',
     'Custom': '#475569',
     'Other': '#94a3b8'
 };
@@ -17081,6 +17123,16 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
     const cellsContainer = document.createElement('div');
     cellsContainer.className = 'track-cells';
 
+    let bundleNumMin = null, bundleNumMax = null;
+    if (Array.isArray(tracks[key]) && key.startsWith('BND_')) {
+        tracks[key].forEach(x => {
+            if (x && typeof x.val === 'number') {
+                if (bundleNumMin === null || x.val < bundleNumMin) bundleNumMin = x.val;
+                if (bundleNumMax === null || x.val > bundleNumMax) bundleNumMax = x.val;
+            }
+        });
+    }
+
     const hideSym = viewOvr ? (viewOvr === 'noletters') : isTrackGroupSymbolsHidden(group);
     const fullBar = viewOvr ? (viewOvr === 'bar') : isTrackGroupFullBar(group);
     const showGlyphs = !hideSym && !fullBar;
@@ -17168,6 +17220,20 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                     span.style.color = color;
                 }
                 cellEl.title = `Residue ${i+1} RSA: ${dataVal.val.toFixed(2)}`;
+            } else if (dataVal.type === 'value') {
+                const v = dataVal.val;
+                if (v == null || typeof v !== 'number' || !isFinite(v)) {
+                    cellEl.title = `Residue ${i + 1}: no bundle value`;
+                } else {
+                    const color = bundleValueColor(v, bundleNumMin, bundleNumMax);
+                    if (hideSym || fullBar || needsHeatmapBg) cellEl.style.backgroundColor = color;
+                    if (showGlyphs) {
+                        const span = setGlyph(cellEl, '\u2588', gridCellW);
+                        span.style.color = color;
+                    }
+                    const label = formatTrackLabel(key);
+                    cellEl.title = `Residue ${i + 1} ${label}: ${v}`;
+                }
             }
         } else {
             const char = dataVal || ' ';
@@ -17257,6 +17323,13 @@ function buildTrackRow(key, tracks, totalLength, isGroupFirst) {
                 } else {
                     cellEl.title = `Residue ${i + 1}: (no UniProt feature)`;
                 }
+            }
+            else if (key.startsWith('BND_')) {
+                const meta = trackMeta[key];
+                const label = (meta && meta.label) || formatTrackLabel(key);
+                cellEl.title = char.trim()
+                    ? `Residue ${i + 1}: ${label}` + (char.trim() === '*' ? '' : ` (${char.trim()})`)
+                    : `Residue ${i + 1}: (no bundle annotation)`;
             }
             else if (key.startsWith('TP_')) {
                 // Topology track: per-residue inside/outside/TM-helix state.
@@ -22232,6 +22305,504 @@ function syncColocSourceOptions() {
     sel.value = prev;
 }
 
+// --- Evidence bundle (Q2DV JSON) -----------------------------------------
+// A bundle is a folder/URL with manifest.json + small JSON files. Loading is
+// deliberately local: the app never fetches a bundle unless the user picks one.
+const BUNDLE_SCHEMA = 'q2dv.bundle/1';
+let q2dvBundle = null;
+let q2dvBundleBaseUrl = '';
+
+function bundleValueColor(v, min, max) {
+    if (v == null || !isFinite(v)) return '#e2e8f0';
+    if (min == null || max == null || max === min) return '#0e7490';
+    const t = Math.max(0, Math.min(1, (v - min) / (max - min)));
+    const r = Math.round(239 - 224 * t);
+    const g = Math.round(246 - 128 * t);
+    const b = Math.round(255 - 145 * t);
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+function bundleSanitizeKey(value) {
+    return String(value == null ? '' : value).replace(/[^A-Za-z0-9_.-]/g, '_');
+}
+
+// Convert one bundle Feature into a Q2DV track. Returns null if the feature
+// cannot be represented at the current sequence length.
+function bundleFeatureToTrack(feature, length) {
+    if (!feature || !feature.encoding) return null;
+    const len = Number(length) || (parsedTracks.AA ? parsedTracks.AA.length : 0);
+    if (!len) return null;
+    const key = 'BND_' + bundleSanitizeKey(feature.id || feature.label || 'feature');
+    const meta = {
+        source: 'Bundle',
+        label: feature.label || feature.id || 'Bundle feature',
+        bundleFeatureId: feature.id || '',
+        confidence: feature.confidence || '',
+        evidenceRefs: feature.evidence_refs || [],
+        kind: feature.type || ''
+    };
+    if (feature.encoding === 'string') {
+        const values = String(feature.values == null ? '' : feature.values);
+        if (values.length !== len) return null;
+        return { key, track: values, meta };
+    }
+    if (feature.encoding === 'dense_array') {
+        const vals = Array.isArray(feature.values) ? feature.values : [];
+        if (vals.length !== len) return null;
+        const track = vals.map(v => ({ type: 'value', val: (v == null || !isFinite(Number(v))) ? null : Number(v) }));
+        return { key, track, meta };
+    }
+    const chars = new Array(len).fill(' ');
+    if (feature.encoding === 'sparse') {
+        const residues = Array.isArray(feature.residues) ? feature.residues : [];
+        residues.forEach(r => {
+            const n = Number(r);
+            if (Number.isInteger(n) && n >= 1 && n <= len) chars[n - 1] = '*';
+        });
+    } else if (feature.encoding === 'residues') {
+        const residues = Array.isArray(feature.residues) ? feature.residues : [];
+        residues.forEach(r => {
+            const n = Number(r);
+            if (Number.isInteger(n) && n >= 1 && n <= len) chars[n - 1] = '*';
+        });
+    } else if (feature.encoding === 'range') {
+        const start = Number(feature.start), end = Number(feature.end);
+        for (let n = start; n <= end; n++) {
+            if (Number.isInteger(n) && n >= 1 && n <= len) chars[n - 1] = '*';
+        }
+    } else {
+        return null;
+    }
+    return { key, track: chars.join(''), meta };
+}
+
+function bundleRangesFromResidues(residues) {
+    const nums = Array.from(new Set((residues || []).map(Number).filter(n => Number.isInteger(n) && n >= 1))).sort((a, b) => a - b);
+    const ranges = [];
+    let start = null, prev = null;
+    nums.forEach(n => {
+        if (start === null) { start = n; prev = n; return; }
+        if (n === prev + 1) { prev = n; return; }
+        ranges.push([start, prev]); start = n; prev = n;
+    });
+    if (start !== null) ranges.push([start, prev]);
+    return ranges;
+}
+
+function bundleClaimResidues(claim) {
+    if (!claim) return [];
+    const details = claim.details || {};
+    if (Array.isArray(details.residues)) return details.residues.map(Number).filter(Number.isInteger);
+    if (Array.isArray(claim.residues)) return claim.residues.map(Number).filter(Number.isInteger);
+    return [];
+}
+
+function bundleRelationResidues(relation, targetId) {
+    if (!relation) return [];
+    const target = targetId || (q2dvBundle && q2dvBundle.protein && q2dvBundle.protein.id) || 'Q52356';
+    if (relation.a === target) return Array.isArray(relation.interface_a) ? relation.interface_a : [];
+    if (relation.b === target) return Array.isArray(relation.interface_b) ? relation.interface_b : [];
+    return [];
+}
+
+function bundleEvidenceById(ref) {
+    if (!ref || !q2dvBundle) return null;
+    const base = String(ref).split('#')[0];
+    return (q2dvBundle.evidence || []).find(e => e.id === base) || null;
+}
+
+function bundleEvidenceHref(evidence) {
+    if (!evidence) return null;
+    if (evidence.doi) return 'https://doi.org/' + evidence.doi;
+    if (evidence.url) return evidence.url;
+    if (evidence.local_path && q2dvBundleBaseUrl) {
+        try { return new URL(evidence.local_path, q2dvBundleBaseUrl).href; } catch (err) {}
+    }
+    return null;
+}
+
+function bundleEvidenceLabel(evidence, fallback) {
+    if (!evidence) return fallback || 'source';
+    if (evidence.doi) return 'DOI ' + evidence.doi;
+    if (evidence.type === 'thesis') return 'Thesis ' + ((evidence.authors || [])[0] || '') + (evidence.year ? ' ' + evidence.year : '');
+    if (evidence.type === 'structure') return 'Structure';
+    if (evidence.local_path && !evidence.doi) return 'local file';
+    return evidence.title || evidence.id || fallback || 'source';
+}
+
+function bundleEvidenceLinkHtml(ref) {
+    const evidence = bundleEvidenceById(ref);
+    const href = bundleEvidenceHref(evidence);
+    const label = bundleEvidenceLabel(evidence, ref);
+    const title = structureEscapeHtml((evidence && (evidence.title || evidence.local_path)) || ref || '');
+    if (href) {
+        return '<a href="' + structureEscapeHtml(href) + '" target="_blank" rel="noopener noreferrer" title="' + title + '">' + structureEscapeHtml(label) + '</a>';
+    }
+    return '<span title="' + title + '" style="color:#64748b;">' + structureEscapeHtml(label) + '</span>';
+}
+
+function bundleStatusSet(text, kind) {
+    const el = document.getElementById('bundleStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = kind === 'error' ? '#b91c1c' : (kind === 'success' ? '#15803d' : '');
+}
+
+function bundleEnsureSequence(protein) {
+    if (!protein || !protein.sequence) throw new Error('Bundle has no protein sequence.');
+    const seq = String(protein.sequence).replace(/\s+/g, '');
+    if (!/^[A-Z]+$/.test(seq)) throw new Error('Bundle sequence contains non-amino-acid characters.');
+    const current = parsedTracks && typeof parsedTracks.AA === 'string' ? parsedTracks.AA : '';
+    if (current && current !== seq) {
+        throw new Error('Bundle sequence does not match the loaded sequence (' + seq.length + ' vs ' + current.length + ' aa).');
+    }
+    if (!current) {
+        parsedTracks.AA = seq;
+        currentProteinLabel = protein.id || protein.name || 'Bundle protein';
+        if (typeof renderViewer === 'function') renderViewer(parsedTracks);
+        if (typeof schedulePersist === 'function') schedulePersist();
+    }
+}
+
+function bundleFinalize(bundle, baseUrl, sourceLabel) {
+    bundleEnsureSequence(bundle.protein);
+    q2dvBundle = bundle;
+    q2dvBundleBaseUrl = baseUrl || '';
+    renderBundlePanel();
+    const counts = bundle.manifest && bundle.manifest.counts ? bundle.manifest.counts : {};
+    logAction('import', 'Q2DV bundle loaded', (bundle.protein.id || '') + ' via ' + sourceLabel + ' - ' +
+        (counts.claims || (bundle.claims || []).length) + ' claims, ' +
+        (counts.relations || (bundle.relations || []).length) + ' relations, ' +
+        (counts.features_total || (bundle.features || []).length) + ' features');
+    showToast('Bundle loaded: ' + (bundle.protein.id || 'protein') + ' (' + sourceLabel + ').', 'success');
+}
+
+async function loadBundleFromFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) throw new Error('No bundle files selected.');
+    const manifestFile = files.find(f => (f.webkitRelativePath || f.name || '').split('/').pop() === 'manifest.json') ||
+                         files.find(f => f.name === 'manifest.json');
+    if (!manifestFile) throw new Error('No manifest.json in the selected folder.');
+    const manifest = JSON.parse(await manifestFile.text());
+    if (manifest.schema_version !== BUNDLE_SCHEMA) throw new Error('Unsupported bundle schema: ' + (manifest.schema_version || 'missing'));
+    const byPath = new Map();
+    files.forEach(f => {
+        const p = String(f.webkitRelativePath || f.name || '').replace(/\\/g, '/');
+        byPath.set(p, f);
+        byPath.set(p.split('/').pop(), f);
+    });
+    const read = async (path) => {
+        const f = byPath.get(path) || byPath.get(String(path).split('/').pop());
+        if (!f) throw new Error('Missing bundle file: ' + path);
+        return JSON.parse(await f.text());
+    };
+    const ep = manifest.entrypoints || {};
+    const bundle = {
+        manifest,
+        protein: await read(ep.protein || 'protein.json'),
+        features: await read(ep.features || 'features.json'),
+        claims: await read(ep.claims || 'claims.json'),
+        relations: await read(ep.relations || 'relations.json'),
+        evidence: await read(ep.evidence || 'evidence.json'),
+        indexes: await read(ep.indexes || 'indexes.json'),
+        legacyFeatures: [],
+        profiles: {}
+    };
+    if (ep.legacy_features) { try { bundle.legacyFeatures = await read(ep.legacy_features); } catch (err) {} }
+    for (const [key, path] of Object.entries({ homologs: 'profiles/homologs.json', lab_theses: 'profiles/lab_theses.json', structures: 'profiles/structures.json' })) {
+        try { bundle.profiles[key] = await read(path); } catch (err) {}
+    }
+    bundleFinalize(bundle, '', 'folder');
+}
+
+async function loadBundleFromUrl(url) {
+    if (!url) throw new Error('Enter a manifest URL first.');
+    const manifestUrl = new URL(url, location.href).href;
+    const manifestResp = await fetchWithTimeout(manifestUrl, { cache: 'no-store' }, SERVICE_POLICY.bundle.requestMs, { silent: true });
+    if (!manifestResp.ok) throw new Error('manifest.json HTTP ' + manifestResp.status);
+    const manifest = await manifestResp.json();
+    if (manifest.schema_version !== BUNDLE_SCHEMA) throw new Error('Unsupported bundle schema: ' + (manifest.schema_version || 'missing'));
+    const base = new URL('.', manifestUrl).href;
+    const read = async (path) => {
+        const resp = await fetchWithTimeout(new URL(path, base).href, { cache: 'no-store' }, SERVICE_POLICY.bundle.requestMs, { silent: true });
+        if (!resp.ok) throw new Error(path + ' HTTP ' + resp.status);
+        return resp.json();
+    };
+    const ep = manifest.entrypoints || {};
+    const bundle = {
+        manifest,
+        protein: await read(ep.protein || 'protein.json'),
+        features: await read(ep.features || 'features.json'),
+        claims: await read(ep.claims || 'claims.json'),
+        relations: await read(ep.relations || 'relations.json'),
+        evidence: await read(ep.evidence || 'evidence.json'),
+        indexes: await read(ep.indexes || 'indexes.json'),
+        legacyFeatures: [],
+        profiles: {}
+    };
+    if (ep.legacy_features) { try { bundle.legacyFeatures = await read(ep.legacy_features); } catch (err) {} }
+    for (const [key, path] of Object.entries({ homologs: 'profiles/homologs.json', lab_theses: 'profiles/lab_theses.json', structures: 'profiles/structures.json' })) {
+        try { bundle.profiles[key] = await read(path); } catch (err) {}
+    }
+    bundleFinalize(bundle, base, 'URL');
+}
+
+async function loadBundleFolder(el) {
+    try {
+        bundleStatusSet('Reading bundle folder…');
+        await loadBundleFromFiles(el && el.files);
+        if (el) el.value = '';
+    } catch (err) {
+        bundleStatusSet('Bundle load failed: ' + (err && err.message ? err.message : err), 'error');
+        showToast('Bundle load failed: ' + (err && err.message ? err.message : err), 'error');
+    }
+}
+
+async function loadBundleUrl() {
+    const el = document.getElementById('bundleUrlInput');
+    try {
+        bundleStatusSet('Fetching bundle…');
+        await loadBundleFromUrl(el ? el.value.trim() : '');
+    } catch (err) {
+        bundleStatusSet('Bundle load failed: ' + (err && err.message ? err.message : err), 'error');
+        showToast('Bundle load failed: ' + (err && err.message ? err.message : err), 'error');
+    }
+}
+
+function bundleStatusBadge(status) {
+    const s = String(status || 'proposed');
+    const color = s === 'accepted' ? '#15803d' : (s === 'rejected' ? '#b91c1c' : (s === 'conflicting' ? '#b45309' : '#6d28d9'));
+    return '<span style="font-size:0.68rem;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.03em;">' + structureEscapeHtml(s) + '</span>';
+}
+
+function renderBundlePanel() {
+    const statusEl = document.getElementById('bundleStatus');
+    const summaryEl = document.getElementById('bundleSummary');
+    const filtersEl = document.getElementById('bundleFilters');
+    const wraps = ['bundleClaimsWrap', 'bundleRelationsWrap', 'bundleFeaturesWrap'];
+    if (!statusEl) return;
+    if (!q2dvBundle) {
+        statusEl.textContent = 'No bundle loaded. Choose a bundle folder, or enter a manifest URL.';
+        statusEl.style.color = '';
+        if (summaryEl) summaryEl.innerHTML = '';
+        if (filtersEl) filtersEl.style.display = 'none';
+        wraps.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+        return;
+    }
+    const b = q2dvBundle;
+    const counts = (b.manifest && b.manifest.counts) || {};
+    statusEl.textContent = 'Loaded ' + (b.protein.id || 'protein') + ' - ' + (b.protein.name || '') +
+        ' (' + (b.protein.length || (b.protein.sequence || '').length) + ' aa) · ' +
+        (counts.claims || (b.claims || []).length) + ' claims · ' +
+        (counts.relations || (b.relations || []).length) + ' relations · ' +
+        (counts.features_total || ((b.features || []).length + (b.legacyFeatures || []).length)) + ' features';
+    statusEl.style.color = '#15803d';
+    if (summaryEl) {
+        summaryEl.innerHTML =
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">' +
+            '<button type="button" class="copy-btn" data-action="addBundleTracks" data-arg="curated">Add curated annotation tracks (' + (b.features || []).length + ')</button>' +
+            '<button type="button" class="copy-btn" data-action="addBundleTracks" data-arg="legacy">Add legacy Q2DV tracks (' + (b.legacyFeatures || []).length + ')</button>' +
+            '<button type="button" class="copy-btn" data-action="clearBundleTracks">Remove bundle tracks</button>' +
+            '</div>' +
+            '<div class="data-box" style="font-size:0.76rem;line-height:1.5;">Schema <code>' + structureEscapeHtml(b.manifest.schema_version || '') + '</code>' +
+            (b.manifest.bundle_version ? ' · version ' + structureEscapeHtml(b.manifest.bundle_version) : '') +
+            (q2dvBundleBaseUrl ? '<br>Base URL: <code>' + structureEscapeHtml(q2dvBundleBaseUrl) + '</code>' : '<br>Loaded from local files; evidence paths are labels, not links.') +
+            '</div>';
+    }
+    if (filtersEl) filtersEl.style.display = '';
+    renderBundleClaims();
+    renderBundleRelations();
+    renderBundleFeatures();
+}
+
+function renderBundleClaims() {
+    const wrap = document.getElementById('bundleClaimsWrap');
+    if (!wrap) return;
+    if (!q2dvBundle) { wrap.innerHTML = ''; return; }
+    const statusEl = document.getElementById('bundleClaimFilter');
+    const searchEl = document.getElementById('bundleClaimSearch');
+    const status = statusEl ? statusEl.value : 'all';
+    const q = searchEl ? String(searchEl.value || '').toLowerCase().trim() : '';
+    const rows = (q2dvBundle.claims || []).filter(c => {
+        if (status !== 'all' && c.status !== status) return false;
+        if (!q) return true;
+        return [c.id, c.subject, c.predicate, c.value, c.statement, c.confidence, c.source_type].join(' ').toLowerCase().includes(q);
+    });
+    if (!rows.length) { wrap.innerHTML = '<p style="color:#94a3b8;font-size:0.82rem;">No claims match this filter.</p>'; return; }
+    let html = '<table class="metrics-table" style="width:100%;font-size:0.74rem;"><thead><tr><th>Status</th><th>Subject</th><th>Predicate</th><th>Value</th><th>Confidence</th><th>Evidence</th><th></th></tr></thead><tbody>';
+    rows.forEach(c => {
+        const residues = bundleClaimResidues(c);
+        const ev = (c.evidence_refs || [])[0];
+        html += '<tr>' +
+            '<td>' + bundleStatusBadge(c.status) + '</td>' +
+            '<td>' + structureEscapeHtml(c.subject || '') + '</td>' +
+            '<td>' + structureEscapeHtml(c.predicate || '') + '</td>' +
+            '<td title="' + structureEscapeHtml(c.statement || c.value || '') + '">' + structureEscapeHtml(String(c.value || '').slice(0, 110)) + '</td>' +
+            '<td>' + structureEscapeHtml(c.confidence || '') + '</td>' +
+            '<td>' + bundleEvidenceLinkHtml(ev) + '</td>' +
+            '<td>' + (residues.length ? '<button type="button" class="copy-btn" data-action="selectBundleClaim" data-arg="' + structureEscapeHtml(c.id) + '" title="Highlight mapped residues">Select</button>' : '') + '</td>' +
+            '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+function renderBundleRelations() {
+    const wrap = document.getElementById('bundleRelationsWrap');
+    if (!wrap) return;
+    if (!q2dvBundle) { wrap.innerHTML = ''; return; }
+    const rows = q2dvBundle.relations || [];
+    if (!rows.length) { wrap.innerHTML = '<p style="color:#94a3b8;font-size:0.82rem;">No relations in this bundle.</p>'; return; }
+    const target = q2dvBundle.protein && q2dvBundle.protein.id ? q2dvBundle.protein.id : 'Q52356';
+    let html = '<table class="metrics-table" style="width:100%;font-size:0.74rem;"><thead><tr><th>A</th><th>B</th><th>Type</th><th>Method</th><th>Interface</th><th>Confidence</th><th>Evidence</th><th></th></tr></thead><tbody>';
+    rows.forEach(r => {
+        const residues = bundleRelationResidues(r, target);
+        const ev = (r.evidence_refs || [])[0];
+        html += '<tr>' +
+            '<td>' + structureEscapeHtml(r.a || '') + '</td>' +
+            '<td>' + structureEscapeHtml(r.b || '') + '</td>' +
+            '<td>' + structureEscapeHtml(r.type || '') + '</td>' +
+            '<td>' + structureEscapeHtml(r.method || '') + '</td>' +
+            '<td>' + structureEscapeHtml(r.interface_status || (residues.length ? residues.length + ' residues' : 'unknown')) + '</td>' +
+            '<td>' + structureEscapeHtml(r.confidence || '') + '</td>' +
+            '<td>' + bundleEvidenceLinkHtml(ev) + '</td>' +
+            '<td>' + (residues.length ? '<button type="button" class="copy-btn" data-action="selectBundleRelation" data-arg="' + structureEscapeHtml(r.id) + '" title="Highlight mapped interface residues">Select</button>' : '') + '</td>' +
+            '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+function bundleFeatureResidueText(f) {
+    if (f.encoding === 'dense_array') return (f.values || []).length + ' values';
+    if (f.encoding === 'string') return 'categorical (' + String(f.values || '').length + ' cols)';
+    if (f.encoding === 'range') return 'res ' + f.start + '-' + f.end;
+    if (f.encoding === 'sparse' || f.encoding === 'residues') return (f.residues || []).length + ' residues';
+    return f.encoding || '';
+}
+
+function renderBundleFeatures() {
+    const wrap = document.getElementById('bundleFeaturesWrap');
+    if (!wrap) return;
+    if (!q2dvBundle) { wrap.innerHTML = ''; return; }
+    const rows = q2dvBundle.features || [];
+    if (!rows.length) { wrap.innerHTML = '<p style="color:#94a3b8;font-size:0.82rem;">No curated features in this bundle.</p>'; return; }
+    let html = '<table class="metrics-table" style="width:100%;font-size:0.74rem;"><thead><tr><th>Feature</th><th>Type</th><th>Coverage</th><th>Confidence</th><th>Evidence</th><th></th></tr></thead><tbody>';
+    rows.forEach(f => {
+        const selectable = ['residues', 'sparse', 'range'].includes(f.encoding);
+        const ev = (f.evidence_refs || [])[0];
+        html += '<tr>' +
+            '<td title="' + structureEscapeHtml(f.id || '') + '"><strong>' + structureEscapeHtml(f.label || f.id || '') + '</strong></td>' +
+            '<td>' + structureEscapeHtml(f.type || '') + '</td>' +
+            '<td>' + structureEscapeHtml(bundleFeatureResidueText(f)) + '</td>' +
+            '<td>' + structureEscapeHtml(f.confidence || '') + '</td>' +
+            '<td>' + bundleEvidenceLinkHtml(ev) + '</td>' +
+            '<td><button type="button" class="copy-btn" data-action="addBundleFeatureTrack" data-arg="' + structureEscapeHtml(f.id) + '" title="Add as a BND_ track">Add</button>' +
+            (selectable ? ' <button type="button" class="copy-btn" data-action="selectBundleFeature" data-arg="' + structureEscapeHtml(f.id) + '" title="Highlight this feature">Select</button>' : '') + '</td>' +
+            '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+}
+
+function selectBundleResidues(residues, label) {
+    const len = parsedTracks.AA ? parsedTracks.AA.length : 0;
+    const ranges = bundleRangesFromResidues(residues).filter(([s, e]) => s <= len && e >= 1);
+    if (!ranges.length) { showToast('No mapped residues in this bundle record.', 'info'); return; }
+    selectionMode = 'row'; activeRowKey = null; activeRowType = null;
+    rowRanges = ranges.map(([s, e]) => [Math.max(0, s - 1), Math.min(len - 1, e - 1)]);
+    selectStart = null; selectEnd = null;
+    document.querySelectorAll('.track-label').forEach(l => l.classList.remove('active-row'));
+    document.querySelectorAll('.type-badge').forEach(b => b.classList.remove('active-badge'));
+    document.querySelectorAll('.s-badge').forEach(b => b.classList.remove('active-badge'));
+    updateSelectionUI();
+    const rangeText = ranges.map(([s, e]) => s === e ? String(s) : s + '-' + e).join(', ');
+    const rangeEl = document.getElementById('rangeDisplay');
+    if (rangeEl) rangeEl.innerHTML = structureEscapeHtml(label || 'Bundle selection') + ': <strong>' + rangeText + '</strong>';
+    const fastaEl = document.getElementById('fastaDisplay');
+    if (fastaEl) fastaEl.textContent = ranges.map(([s, e]) => parsedTracks.AA.slice(s - 1, e)).join(',');
+    if (typeof updateHomologFastaSection === 'function') updateHomologFastaSection();
+    if (typeof setMetricsBase === 'function') setMetricsBase((label || 'Bundle selection') + '<br>Segments: ' + ranges.length + ' | Span: ' + ranges.reduce((n, [s, e]) => n + e - s + 1, 0) + ' residues');
+    lastRanges = ranges;
+    refreshChimeraxDisplay();
+    schedulePersist();
+}
+
+function selectBundleClaim(el, event, args) {
+    if (!q2dvBundle) return;
+    const id = args && args[0];
+    const claim = (q2dvBundle.claims || []).find(c => c.id === id);
+    if (!claim) { showToast('Claim not found.', 'error'); return; }
+    const target = q2dvBundle.protein && q2dvBundle.protein.id;
+    if (target && claim.subject !== target) { showToast('This claim is for ' + claim.subject + ', not the loaded protein.', 'info'); return; }
+    const residues = bundleClaimResidues(claim);
+    if (!residues.length) { showToast('This claim has no residue mapping; use its evidence link.', 'info'); return; }
+    selectBundleResidues(residues, claim.id + ': ' + String(claim.value || '').slice(0, 80));
+}
+
+function selectBundleRelation(el, event, args) {
+    if (!q2dvBundle) return;
+    const id = args && args[0];
+    const rel = (q2dvBundle.relations || []).find(r => r.id === id);
+    if (!rel) { showToast('Relation not found.', 'error'); return; }
+    const residues = bundleRelationResidues(rel);
+    if (!residues.length) { showToast('This relation has no mapped interface residues.', 'info'); return; }
+    selectBundleResidues(residues, rel.id + ': ' + rel.a + '–' + rel.b);
+}
+
+function selectBundleFeature(el, event, args) {
+    if (!q2dvBundle) return;
+    const id = args && args[0];
+    const f = (q2dvBundle.features || []).find(x => x.id === id);
+    if (!f) { showToast('Feature not found.', 'error'); return; }
+    let residues = [];
+    if (f.encoding === 'range') { for (let r = f.start; r <= f.end; r++) residues.push(r); }
+    else residues = Array.isArray(f.residues) ? f.residues : [];
+    if (!residues.length) { showToast('This feature has no residue mapping.', 'info'); return; }
+    selectBundleResidues(residues, f.label || f.id);
+}
+
+function addBundleFeatureTrack(el, event, args) {
+    if (!q2dvBundle) return;
+    const id = args && args[0];
+    const f = (q2dvBundle.features || []).find(x => x.id === id);
+    if (!f) { showToast('Feature not found.', 'error'); return; }
+    const built = bundleFeatureToTrack(f);
+    if (!built) { showToast('Feature could not be represented at this sequence length.', 'error'); return; }
+    parsedTracks[built.key] = built.track;
+    setTrackMeta(built.key, built.meta);
+    renderViewer(parsedTracks);
+    renderBundleFeatures();
+    showToast('Added ' + built.meta.label + ' as ' + built.key + '.', 'success');
+}
+
+function addBundleTracksToViewer(kind) {
+    if (!q2dvBundle) { showToast('Load a bundle first.', 'error'); return; }
+    const source = kind === 'legacy' ? (q2dvBundle.legacyFeatures || []) : (q2dvBundle.features || []);
+    if (!source.length) { showToast('No tracks of that kind in this bundle.', 'info'); return; }
+    let added = 0, skipped = 0;
+    source.forEach(f => {
+        const built = bundleFeatureToTrack(f);
+        if (!built) { skipped++; return; }
+        if (parsedTracks[built.key]) { skipped++; return; }
+        parsedTracks[built.key] = built.track;
+        setTrackMeta(built.key, built.meta);
+        added++;
+    });
+    renderViewer(parsedTracks);
+    renderBundleFeatures();
+    showToast('Added ' + added + ' bundle track' + (added === 1 ? '' : 's') + (skipped ? ' (' + skipped + ' skipped)' : '') + '.', added ? 'success' : 'info');
+}
+
+function clearBundleTracks() {
+    const keys = Object.keys(parsedTracks).filter(k => k.startsWith('BND_'));
+    keys.forEach(k => { delete parsedTracks[k]; delete trackMeta[k]; });
+    if (keys.length) renderViewer(parsedTracks);
+    renderBundleFeatures();
+    showToast(keys.length ? 'Removed ' + keys.length + ' bundle track' + (keys.length === 1 ? '' : 's') + '.' : 'No bundle tracks to remove.', 'info');
+}
+
+
 function renderDataModal() {
     const data = buildStructureDataJSON();
 
@@ -22310,6 +22881,7 @@ function renderDataModal() {
     renderHomologTable();
     syncColocSourceOptions();
     renderColocalizationTable();
+    renderBundlePanel();
 }
 
 function openDataModal() {
@@ -22556,6 +23128,8 @@ function runWhitelistedAction(expr, el) {
     return true;
 }
 const ACTION_HANDLERS = {
+    addBundleFeatureTrack: delegateAction(addBundleFeatureTrack),
+    addBundleTracks: delegateAction(addBundleTracksToViewer),
     addDdgTrack: delegateAction(addDdgTrack),
     addExperimentalTrack: delegateAction(addExperimentalTrack),
     addRuleCondition: delegateAction(addRuleCondition),
@@ -22565,6 +23139,7 @@ const ACTION_HANDLERS = {
     autoLookupAccession: delegateAction(autoLookupAccession),
     cancelRawInputDrawer: delegateAction(cancelRawInputDrawer),
     clearActionLog: delegateAction(clearActionLog),
+    clearBundleTracks: delegateAction(clearBundleTracks),
     clearAllData: delegateAction(clearAllData),
     clearInputData: delegateAction(clearInputData),
     clearMacroSteps: delegateAction(clearMacroSteps),
@@ -22613,6 +23188,8 @@ const ACTION_HANDLERS = {
     findPdbEntries: delegateAction(findPdbEntries),
     handlePasteFromClipboard: delegateAction(handlePasteFromClipboard),
     importMacroFromTextarea: delegateAction(importMacroFromTextarea),
+    loadBundleFolder: delegateAction(loadBundleFolder),
+    loadBundleUrl: delegateAction(loadBundleUrl),
     invertSelection: delegateAction(invertSelection),
     macroCheckinDecision: delegateAction(macroCheckinDecision),
     macroReplay: delegateAction(macroReplay),
@@ -22644,6 +23221,7 @@ const ACTION_HANDLERS = {
     pasteQuick2DHere: delegateAction(pasteQuick2DHere),
     predictStructureESMFold: delegateAction(predictStructureESMFold),
     refreshChimeraxDisplay: delegateAction(refreshChimeraxDisplay),
+    renderBundleClaims: delegateAction(renderBundleClaims),
     renderColocalizationTable: delegateAction(renderColocalizationTable),
     renderConstructPreview: delegateAction(renderConstructPreview),
     renderHypothesisModal: delegateAction(renderHypothesisModal),
@@ -22658,6 +23236,9 @@ const ACTION_HANDLERS = {
     runTmCrossCheck: delegateAction(runTmCrossCheck),
     runTopologyPrediction: delegateAction(runTopologyPrediction),
     saveRuleEditor: delegateAction(saveRuleEditor),
+    selectBundleClaim: delegateAction(selectBundleClaim),
+    selectBundleFeature: delegateAction(selectBundleFeature),
+    selectBundleRelation: delegateAction(selectBundleRelation),
     selectEnsembleMobile: delegateAction(selectEnsembleMobile),
     setReferenceOffset: delegateAction(setReferenceOffset),
     setTrackOffset: delegateAction(setTrackOffset),

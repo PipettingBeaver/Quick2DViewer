@@ -5062,6 +5062,70 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(ctxRun(`actionLog.some(e => e.label === 'q2dv-model-selection.pdb')`) === true, 'and the filename says it was narrowed');
     ctxRun(`cachedStructureTexts = {}; parsedTracks = {}; selectStart = null; selectEnd = null;`);
 
+    // The bundle loader is deliberately local and schema-driven: these checks
+    // cover the pure conversions and the BND_ track family, not the file picker.
+    section('evidence bundle helpers');
+    assert(ctxRun(`TRACK_TYPES.some(t => t.id === 'BND')`), 'BND is a track type');
+    assert(ctxRun(`getTrackGroup('BND_test')`) === 'BND', 'BND_ keys join the bundle group');
+    const bResidues = ctxRun(`bundleFeatureToTrack({ id: 'F:test', label: 'Test', type: 'motif', encoding: 'residues', residues: [2, 4] }, 6)`);
+    assert(bResidues.key === 'BND_F_test', 'feature id becomes a BND_ key');
+    assert(bResidues.track === ' * *  ', 'residue feature becomes a marked string (got "' + bResidues.track + '")');
+    const bNumeric = ctxRun(`bundleFeatureToTrack({ id: 'F:num', label: 'Num', type: 'numeric', encoding: 'dense_array', values: [0, 2, null] }, 3)`);
+    assert(bNumeric.track[1].type === 'value' && bNumeric.track[1].val === 2, 'dense feature becomes value objects');
+    assert(bNumeric.track[2].val === null, 'missing dense values stay null');
+    const bString = ctxRun(`bundleFeatureToTrack({ id: 'F:str', label: 'Str', type: 'topology', encoding: 'string', values: ' MM ' }, 4)`);
+    assert(bString.track === ' MM ', 'string feature stays a string');
+    assert(ctxRun(`JSON.stringify(bundleRangesFromResidues([1, 2, 4, 5, 6]))`) === '[[1,2],[4,6]]', 'residues become contiguous ranges');
+    assert(ctxRun(`bundleClaimResidues({ details: { residues: [85, 86] } }).join(',')`) === '85,86', 'claim residues are read from details');
+    assert(ctxRun(`bundleRelationResidues({ a: 'Q52356', b: 'TerB', interface_a: [1, 2], interface_b: [3] }).length`) === 2, 'relation interface residues resolve to the target side');
+    assert(ctxRun(`bundleEvidenceHref({ doi: '10.1234/example' })`) === 'https://doi.org/10.1234/example', 'DOI evidence becomes a link');
+    ctxRun(`trackMeta = { BND_F_test: { label: 'Test' } };`);
+    assert(ctxRun(`formatTrackLabel('BND_F_test')`) === 'Test', 'trackMeta label drives the BND row label');
+    ctxRun(`q2dvBundle = { features: [{ id: 'F:add', label: 'Add', type: 'motif', encoding: 'residues', residues: [2, 4] }], legacyFeatures: [] }; parsedTracks = { AA: 'M'.repeat(6) }; trackMeta = {};`);
+    ctxRun(`addBundleTracksToViewer('curated')`);
+    assert(ctxRun(`parsedTracks['BND_F_add']`) === ' * *  ', 'curated bundle tracks are added as BND_ rows');
+    assert(ctxRun(`trackMeta['BND_F_add'].source`) === 'Bundle', 'bundle tracks carry Bundle provenance');
+    ctxRun(`clearBundleTracks()`);
+    assert(ctxRun(`Object.keys(parsedTracks).filter(k => k.startsWith('BND_')).length`) === 0, 'bundle tracks can be removed again');
+    ctxRun(`q2dvBundle = null; parsedTracks = {}; trackMeta = {};`);
+
+    const fixtureProtein = { id: 'P1', name: 'Test bundle', length: 6, sequence: 'MAMMAM' };
+    const fixtureManifest = {
+        schema_version: 'q2dv.bundle/1', bundle_version: '0.0.1',
+        counts: { claims: 0, relations: 0, features_total: 1 },
+        entrypoints: {
+            protein: 'protein.json', features: 'features.json',
+            legacy_features: 'features_q2dv.json', claims: 'claims.json',
+            relations: 'relations.json', evidence: 'evidence.json', indexes: 'indexes.json'
+        }
+    };
+    const fixtureFiles = {
+        'manifest.json': fixtureManifest,
+        'protein.json': fixtureProtein,
+        'features.json': [{ id: 'F:test', label: 'Test', type: 'motif', encoding: 'residues', residues: [2, 4] }],
+        'features_q2dv.json': [],
+        'claims.json': [], 'relations.json': [], 'evidence.json': [], 'indexes.json': {},
+        'profiles/homologs.json': [], 'profiles/lab_theses.json': [], 'profiles/structures.json': []
+    };
+    sandbox.__bundleFixtureFiles = Object.entries(fixtureFiles).map(([p, body]) => ({
+        name: p.split('/').pop(), webkitRelativePath: 'bundle/' + p,
+        text: async () => JSON.stringify(body)
+    }));
+    ctxRun(`parsedTracks = { AA: 'MAMMAM' }; trackMeta = {}; q2dvBundle = null; q2dvBundleBaseUrl = '';`);
+    await ctxRun(`loadBundleFromFiles(__bundleFixtureFiles)`);
+    assert(ctxRun(`q2dvBundle && q2dvBundle.protein.id`) === 'P1', 'folder loader builds a bundle');
+    assert(ctxRun(`q2dvBundle.features.length`) === 1, 'folder loader reads the feature list');
+    assert(ctxRun(`q2dvBundle.profiles.homologs.length`) === 0, 'folder loader reads optional profile files');
+    ctxRun(`addBundleTracksToViewer('curated')`);
+    assert(ctxRun(`parsedTracks['BND_F_test']`) === ' * *  ', 'loaded bundle adds a BND_ track');
+    ctxRun(`clearBundleTracks(); q2dvBundle = null; parsedTracks = {}; trackMeta = {};`);
+    ctxRun(`parsedTracks = { AA: 'AAAA' }; q2dvBundle = null;`);
+    let bundleMismatch = '';
+    try { await ctxRun(`loadBundleFromFiles(__bundleFixtureFiles)`); }
+    catch (err) { bundleMismatch = err.message; }
+    assert(/does not match/.test(bundleMismatch), 'a bundle for another sequence is refused');
+    assert(ctxRun(`q2dvBundle`) === null, 'and leaves no half-loaded bundle');
+
     // attachStructureText is async, so the attach-time coordination store has to
     // be checked here rather than in the synchronous section above.
     section('coordination is computed at attach time');
