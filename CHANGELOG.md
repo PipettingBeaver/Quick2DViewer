@@ -12,6 +12,18 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.6] - 2026-10-25
+
+### Changed
+- **Schema versions are explicit.** `STATE_SCHEMA_VERSION`, `SAVE_FORMAT_VERSION`,
+  `MACRO_FORMAT_VERSION` and `SERVICE_REGISTRY_VERSION` replace four loose `1`s.
+  `migratePersistedState()` is the migration hook; newer state and macro versions
+  are refused with a clear message.
+- **Track taxonomy is one table.** Row labels, predictor tooltips and numeric
+  bands now read `TRACK_TYPES` instead of repeating prefix/suffix checks.
+- **Named limits.** The action-log label/detail caps and `COFACTOR_LIMIT` are
+  named, and the unused `uniprotApiBase()` helper is gone.
+
 ## [0.68.5] - 2026-10-25
 
 ### Security

@@ -775,6 +775,36 @@ Markdown link schemes, and sanitize generated filenames.
 
 ---
 
+### Schema versions + taxonomy — 0.68.6
+
+**Surface.** Save restore, macro import, row labels, tooltips and graph bands.
+
+**Should do.** Old saves/macros still load; newer schema versions are refused
+with a clear message; labels, predictor tooltips and numeric bands are unchanged
+after moving to the `TRACK_TYPES` taxonomy.
+
+**Try.**
+1. Restore an older save (no `v` or `v: 1`).
+   *Expect:* it loads normally.
+2. Import a save whose `v` (or `formatVersion`) is above the current version.
+   *Expect:* a clear refusal and the current session stays intact.
+3. Import a macro with a newer `v`.
+   *Expect:* a clear error, no partial macro.
+4. Inspect SS/TM/DO/HL/CC/SP, pLDDT/RSA/cofactor, EV/RMSF and experimental row
+   labels, tooltips and graph bands.
+   *Expect:* the same text and colours as before.
+5. Check the cofactor labels stop at the palette length.
+
+**Edge cases.**
+- *Pre-versioning saves* are treated as v1.
+- *Older macros* without `v` are treated as v1.
+- *No visual change* is expected from the taxonomy move; report any label/tooltip
+  difference.
+- *Harness* - version constants, migration refusal, labels, predictor info, bands
+  and cofactor cap are checked in `tests/run.js`.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

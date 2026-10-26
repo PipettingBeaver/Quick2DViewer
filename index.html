@@ -3832,6 +3832,12 @@ const IMPORT_LIMITS = Object.freeze({
     trackKeyLength: 160
 });
 const UNSAFE_IMPORT_KEYS = Object.freeze(['__proto__', 'constructor', 'prototype']);
+// Schema versions. Bump one only with a migration in migratePersistedState()
+// or the corresponding loader; keep the four independent formats explicit.
+const STATE_SCHEMA_VERSION = 1;
+const SAVE_FORMAT_VERSION = 1;
+const MACRO_FORMAT_VERSION = 1;
+const SERVICE_REGISTRY_VERSION = 1;
 function isSafeImportedKey(key) {
     return typeof key === 'string' && key.length > 0 && key.length <= IMPORT_LIMITS.trackKeyLength &&
         UNSAFE_IMPORT_KEYS.indexOf(key) === -1 &&
@@ -3845,7 +3851,15 @@ function sanitizeImportedMap(value, maxKeys) {
     });
     return out;
 }
+function migratePersistedState(state) {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
+    const version = Number(state.v) || 1; // pre-versioning saves behave as v1
+    if (version > STATE_SCHEMA_VERSION) return null;
+    // Future migrations go here in order, e.g. if (version < 2) { ... }
+    return state;
+}
 function sanitizePersistedState(state) {
+    state = migratePersistedState(state);
     if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
     const clean = Object.assign({}, state);
     const tracks = sanitizeImportedMap(state.parsedTracks);
@@ -4135,7 +4149,7 @@ const SERVICE_CAPS = Object.freeze({
 // `enabled: false` skips a provider. All listed providers are CORS-callable
 // (verified 2026-09); MPI Toolkit is not (needs the clipboard wizard).
 const SERVICE_REGISTRY = {
-    version: 1,
+    version: SERVICE_REGISTRY_VERSION,
     capabilities: {
         annotation: {
             label: 'Curated annotations',
@@ -4622,7 +4636,6 @@ async function runCapability(capName, args, onProgress, opts) {
     throw lastErr || new Error('All providers failed for ' + cap.label);
 }
 
-function uniprotApiBase() { return SERVICE_REGISTRY.capabilities.annotation.providers[0].url; }
 
 // --- External-services opt-in ---------------------------------------------
 // Gates every outbound API call (UniProt, BLAST, ESMFold, Foldseek). It is ON
@@ -8234,13 +8247,15 @@ const STEP_TASK_RUNS = {
 // copied as JSON. Deliberately session-only - it is a debugging aid, not part of
 // the saved session, and nothing is ever sent anywhere.
 const ACTION_LOG_MAX = 200;
+const ACTION_LOG_LABEL_MAX = 120;
+const ACTION_LOG_DETAIL_MAX = 200;
 let actionLog = [];
 function logAction(kind, label, detail) {
     actionLog.push({
         t: new Date().toISOString().slice(11, 19),
         kind: String(kind || 'action').slice(0, 12),
-        label: String(label == null ? '' : label).slice(0, 120),
-        detail: detail == null ? '' : String(detail).slice(0, 200)
+        label: String(label == null ? '' : label).slice(0, ACTION_LOG_LABEL_MAX),
+        detail: detail == null ? '' : String(detail).slice(0, ACTION_LOG_DETAIL_MAX)
     });
     if (actionLog.length > ACTION_LOG_MAX) actionLog.splice(0, actionLog.length - ACTION_LOG_MAX);
     // If the log is on screen, keep it current: the point is watching a run.
@@ -8518,7 +8533,7 @@ function macroStepDescription(step) {
     }
 }
 function macroToJson() {
-    return JSON.stringify({ v: 1, name: macroName, steps: macroSteps }, null, 2);
+    return JSON.stringify({ v: MACRO_FORMAT_VERSION, name: macroName, steps: macroSteps }, null, 2);
 }
 function macroFromJson(text) {
     try {
@@ -8526,6 +8541,7 @@ function macroFromJson(text) {
         if (raw.length > IMPORT_LIMITS.macroBytes) throw new Error('macro file is larger than the ' + Math.round(IMPORT_LIMITS.macroBytes / (1024 * 1024)) + ' MB limit');
         const data = JSON.parse(raw);
         if (!data || !Array.isArray(data.steps)) throw new Error('no steps array');
+        if ((Number(data.v) || 1) > MACRO_FORMAT_VERSION) throw new Error('macro was saved by a newer version');
         if (data.steps.length > IMPORT_LIMITS.macroSteps) throw new Error('macro has more than ' + IMPORT_LIMITS.macroSteps + ' steps');
         macroName = (typeof data.name === 'string' && data.name) ? data.name.slice(0, 120) : 'Imported macro';
         macroSteps = data.steps.filter(st => st && typeof st.type === 'string').slice(0, IMPORT_LIMITS.macroSteps);
@@ -11832,15 +11848,16 @@ function getPredictorCategoryFromPrefix(trackKey) {
 // row still gets an info icon with a sensible category label.
 function getPredictorInfo(trackKey) {
     if (PREDICTOR_INFO[trackKey]) return PREDICTOR_INFO[trackKey];
-    if (trackKey.endsWith('_pLDDT')) return PREDICTOR_INFO.PLDDT;
-    if (trackKey.endsWith('_RSA')) return PREDICTOR_INFO.RSA;
-    if (trackKey.endsWith('_Cofactors')) return PREDICTOR_INFO.COFACTOR;
-    if (trackKey.startsWith('HL_')) return buildHomologPredictorInfo(trackKey);
-    if (trackKey.startsWith('DM_')) return buildDomainPredictorInfo(trackKey);
-    if (trackKey.startsWith('TP_')) return buildTopologyPredictorInfo(trackKey);
-    if (trackKey.startsWith('VAL_')) return buildValidationPredictorInfo(trackKey);
-    if (trackKey.startsWith('UP_')) return buildUniProtPredictorInfo(trackKey);
-    if (trackKey.endsWith('_EXP')) {
+    const type = trackTypeFor(trackKey).id;
+    if (type === 'pLDDT') return PREDICTOR_INFO.PLDDT;
+    if (type === 'RSA') return PREDICTOR_INFO.RSA;
+    if (type === 'Cofactors') return PREDICTOR_INFO.COFACTOR;
+    if (type === 'HL') return buildHomologPredictorInfo(trackKey);
+    if (type === 'DM') return buildDomainPredictorInfo(trackKey);
+    if (type === 'TP') return buildTopologyPredictorInfo(trackKey);
+    if (type === 'VAL') return buildValidationPredictorInfo(trackKey);
+    if (type === 'UP') return buildUniProtPredictorInfo(trackKey);
+    if (type === 'EXP') {
         const info = experimentalTracksInfo[trackKey] || {};
         const kind = EXPERIMENTAL_KINDS[info.kind] || EXPERIMENTAL_KINDS.other;
         const vals = ((parsedTracks[trackKey] || [])).filter(x => x && x.val != null).map(x => x.val);
@@ -11856,7 +11873,7 @@ function getPredictorInfo(trackKey) {
             citation: 'Imported experimental data'
         };
     }
-    if (trackKey.endsWith('_RMSF')) return {
+    if (type === 'EV') return {
         name: 'Ensemble variance (RMSF)',
         category: 'Structure ensemble',
         description: 'Per-residue fluctuation across the selected models, in angstroms, measured after superposing each model onto the first over the residues they share.',
@@ -11866,7 +11883,7 @@ function getPredictorInfo(trackKey) {
     // Variant and conservation rows are not structure predictors: suppress the
     // synthesized fallback so their "Structural Prediction" ℹ tooltip is never
     // shown - those rows build their own tooltips (FASTA header/conservation).
-    if (trackKey.startsWith('VAR_') || trackKey === 'CONSERVATION' || trackKey.startsWith('CONS_')) return null;
+    if (type === 'VAR' || type === 'CONSERVATION') return null;
     // Fallback: synthesise a minimal entry so the info icon still appears.
     const name = trackKey.replace(/^[A-Z]+_/, '').replace(/_/g, ' ');
     return { name, category: getPredictorCategoryFromPrefix(trackKey), description: '', useCase: '', citation: '' };
@@ -12184,13 +12201,14 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.68.5';
+const APP_VERSION = '0.68.6';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
 // "_Cofactors" row and the graph-mode dot highlighting so the same cofactor
 // reads as the same color in both views.
 const COFACTOR_DOT_COLORS = ['#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#22c55e', '#ec4899', '#eab308', '#14b8a6', '#6366f1'];
+const COFACTOR_LIMIT = COFACTOR_DOT_COLORS.length;
 let graphHighlights = {}; // Track key -> boolean (true if highlighted/active)
 
 // --- Annotation type color palettes (T-A16) -------------------------------
@@ -12415,9 +12433,10 @@ function blosum62Score(a, b) {
 }
 
 function getBandsForTrackKey(trackKey) {
-    if (trackKey.endsWith('_pLDDT')) return PLDDT_BANDS;
-    if (trackKey.endsWith('_RSA')) return RSA_BANDS;
-    if (trackKey === 'CONSERVATION' || trackKey.startsWith('CONS_')) return CONSERVATION_BANDS;
+    const type = trackTypeFor(trackKey).id;
+    if (type === 'pLDDT') return PLDDT_BANDS;
+    if (type === 'RSA') return RSA_BANDS;
+    if (type === 'CONSERVATION') return CONSERVATION_BANDS;
     return null;
 }
 
@@ -13580,10 +13599,11 @@ function selectVariantMismatches(key) {
 
 // Format Track Labels to: [Prefix]_[State/Model]_[Metric]
 function formatTrackLabel(fullKey) {
-    if (fullKey === 'AA' || fullKey.startsWith('SS_') || fullKey.startsWith('TM_') || fullKey.startsWith('DO_')) {
+    const type = trackTypeFor(fullKey).id;
+    if (type === 'AA' || type === 'SS' || type === 'TM' || type === 'DO') {
         return fullKey;
     }
-    if (fullKey.startsWith('HL_')) {
+    if (type === 'HL') {
         // Prefer the recorded hit id: the key is sanitized for DOM safety (a
         // phmmer id like sp|P42212|GFP_AEQVI keeps its pipes only in the info).
         const info = homologHitsInfo[fullKey];
@@ -13591,34 +13611,31 @@ function formatTrackLabel(fullKey) {
         const m = fullKey.match(/^HL_(\d+)_(.+)$/);
         return m ? `Homolog #${parseInt(m[1], 10)}: ${m[2]}` : fullKey;
     }
-    if (fullKey === 'CONSERVATION' || fullKey.startsWith('CONS_')) return 'Conservation';
-    if (fullKey.startsWith('VAR_')) return 'Variant ' + fullKey.slice(4);
-    if (fullKey.startsWith('UP_')) return 'UniProt ' + fullKey.slice(3).replace(/_/g, ' ');
-    if (fullKey.startsWith('DM_')) {
+    if (type === 'CONSERVATION') return 'Conservation';
+    if (type === 'VAR') return 'Variant ' + fullKey.slice(4);
+    if (type === 'UP') return 'UniProt ' + fullKey.slice(3).replace(/_/g, ' ');
+    if (type === 'DM') {
         const d = domainHitsInfo[fullKey];
         return (d && d.model) ? d.model : fullKey.slice(3).replace(/_/g, ' ');
     }
-    if (fullKey.startsWith('VAL_')) {
+    if (type === 'VAL') {
         const v = validationHitsInfo[fullKey];
         const id = (v && v.pdbId) || fullKey.slice(4).replace(/_/g, ' ');
         return 'Validation ' + id + (v && v.chain ? ' (chain ' + v.chain + ')' : '');
     }
-    if (fullKey.startsWith('TP_')) {
+    if (type === 'TP') {
         const label = fullKey.slice(3).replace(/_/g, ' ');
         return /^topology\b/i.test(label) ? label : 'Topology ' + label;
     }
-    if (fullKey.endsWith('_RMSF')) {
+    if (type === 'EV') {
         const base = fullKey.replace(/_RMSF$/, '');
         return (base && base !== 'EV') ? (base + ' RMSF') : 'Ensemble RMSF';
     }
-    if (fullKey.endsWith('_EXP')) {
+    if (type === 'EXP') {
         const info = experimentalTracksInfo[fullKey];
         return (info && info.label) ? (info.label + ' (experimental)') : fullKey.replace(/_EXP$/, '') + ' (experimental)';
     }
-    const isPlddt = fullKey.endsWith('_pLDDT');
-    const isRsa = fullKey.endsWith('_RSA');
-    const isCofactors = fullKey.endsWith('_Cofactors');
-    const metric = isPlddt ? 'pLDDT' : (isRsa ? 'RSA' : (isCofactors ? 'Cofactors' : ''));
+    const metric = type === 'pLDDT' ? 'pLDDT' : (type === 'RSA' ? 'RSA' : (type === 'Cofactors' ? 'Cofactors' : ''));
     const base = fullKey.replace(/_pLDDT$|_RSA$|_Cofactors$/, '');
     
     let modelId = '';
@@ -14190,7 +14207,7 @@ function extractCofactorNeighborhoods(text, ext) {
     }
 
     for (const group of cofactorCandidates) {
-        if (cofactorIndex >= 9) break; // labels only go up to 9
+        if (cofactorIndex >= COFACTOR_LIMIT) break; // labels follow the palette length
         cofactorIndex++;
         const cls = classifyCofactor(group.resName);
 
@@ -21101,7 +21118,7 @@ function schedulePersist() {
 
 function gatherPersistableState() {
     return {
-        v: 1,
+        v: STATE_SCHEMA_VERSION,
         savedAt: Date.now(),
         rawInput: document.getElementById('rawInput').value,
         parsedTracks: parsedTracks,
@@ -21179,8 +21196,6 @@ function gatherPersistableState() {
 // no filename convention or separate "Import" control needed. See the
 // `ext === 'json'` branch in the structure-upload handler for the
 // recognition/routing side of this.
-const SAVE_FORMAT_VERSION = 1;
-
 // Filename for a full save. Prefer the protein's short name from its
 // FASTA/Quick2D header (entry name, then protein name, then gene, then
 // accession); fall back to the first few residues when nothing is nameable,
@@ -21501,6 +21516,11 @@ function loadStateFromStorage() {
 // attached .json export) below, so a page-load restore and a manual
 // save-file import behave identically.
 function applyPersistedState(state) {
+    const incomingVersion = Number(state && state.v) || 1;
+    if (incomingVersion > STATE_SCHEMA_VERSION) {
+        showToast('This session was saved by a newer version of Q2DV - update the app to open it.', 'error');
+        return false;
+    }
     state = sanitizePersistedState(state);
     if (!state) {
         showToast('This session has no valid sequence data; it was not loaded.', 'error');

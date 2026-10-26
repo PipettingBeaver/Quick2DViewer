@@ -87,6 +87,11 @@ reading (25 MB save, 100 MB structure, 5 MB text, 2 MB macro, 100k aa).
 Markdown permits only http(s), relative and `#` links; generated structure
 filenames pass through `safeFileSlug()`.
 
+**Schema versions:** `STATE_SCHEMA_VERSION`, `SAVE_FORMAT_VERSION`,
+`MACRO_FORMAT_VERSION` and `SERVICE_REGISTRY_VERSION` are named constants.
+`migratePersistedState()` is the single state-migration hook; a newer state or
+macro is refused rather than half-loaded.
+
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 
 Every track records provenance:

@@ -970,6 +970,28 @@ assert(ctxRun(`applyPersistedState({ parsedTracks: {} })`) === false && ctxRun(`
 ctxRun(`delete window.__clean; delete window.__beforeImport;`);
 assert(ctxRun(`macroFromJson(JSON.stringify({ steps: Array.from({ length: IMPORT_LIMITS.macroSteps + 1 }, () => ({ type: 'uniprot', accession: 'P42212' })) }))`) === false, 'a macro with too many steps is rejected');
 
+section('schema versions');
+assert(ctxRun(`STATE_SCHEMA_VERSION`) === 1 && ctxRun(`SAVE_FORMAT_VERSION`) === 1 && ctxRun(`MACRO_FORMAT_VERSION`) === 1 && ctxRun(`SERVICE_REGISTRY_VERSION`) === 1, 'all four schema versions are named');
+assert(ctxRun(`gatherPersistableState().v`) === ctxRun(`STATE_SCHEMA_VERSION`), 'the session state carries its schema version');
+assert(ctxRun(`JSON.parse(macroToJson()).v`) === ctxRun(`MACRO_FORMAT_VERSION`), 'macros carry their schema version');
+assert(ctxRun(`SERVICE_REGISTRY.version`) === ctxRun(`SERVICE_REGISTRY_VERSION`), 'the service registry carries its version');
+assert(ctxRun(`migratePersistedState({ v: 0, parsedTracks: { AA: 'M' } }).parsedTracks.AA`) === 'M', 'a legacy state is treated as v1');
+assert(ctxRun(`migratePersistedState({ v: STATE_SCHEMA_VERSION + 1 })`) === null, 'a newer state is refused');
+ctxRun(`parsedTracks = { AA: 'M' }; window.__beforeVersion = parsedTracks;`);
+assert(ctxRun(`applyPersistedState({ v: STATE_SCHEMA_VERSION + 1, parsedTracks: { AA: 'M' } })`) === false && ctxRun(`parsedTracks === window.__beforeVersion`) === true, 'a newer session is refused without touching the current one');
+assert(ctxRun(`macroFromJson(JSON.stringify({ v: MACRO_FORMAT_VERSION + 1, steps: [] }))`) === false, 'a newer macro is refused');
+ctxRun(`delete window.__beforeVersion;`);
+
+section('schema versions + taxonomy constants');
+assert(ctxRun(`COFACTOR_LIMIT`) === ctxRun(`COFACTOR_DOT_COLORS.length`), 'the cofactor cap follows the palette');
+assert(ctxRun(`ACTION_LOG_LABEL_MAX`) === 120 && ctxRun(`ACTION_LOG_DETAIL_MAX`) === 200, 'action-log caps are named');
+assert(ctxRun(`typeof uniprotApiBase === 'undefined'`), 'the unused UniProt base helper is gone');
+assert(ctxRun(`getPredictorInfo('M_pLDDT') === PREDICTOR_INFO.PLDDT`) === true, 'predictor info still resolves pLDDT by type');
+assert(ctxRun(`getBandsForTrackKey('M_RSA') === RSA_BANDS`) === true, 'bands still resolve RSA by type');
+assert(ctxRun(`getBandsForTrackKey('CONSERVATION') === CONSERVATION_BANDS`) === true, 'bands still resolve conservation by type');
+assert(ctxRun(`formatTrackLabel('HL_01_x').indexOf('Homolog #1')`) === 0, 'homolog labels still resolve through the taxonomy');
+assert(ctxRun(`formatTrackLabel('DMS_tolerance_EXP').indexOf('experimental')`) !== -1, 'experimental labels still resolve through the taxonomy');
+
 section('UniProt rows rebuild from a stored fetch on restore');
 ctxRun(`
     parsedTracks = { AA: 'MSKGEELFTG' };
