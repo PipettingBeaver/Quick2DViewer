@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.8] - 2026-10-25
+
+### Changed
+- **App identity strings are central.** `APP_NAME`, `APP_TAGLINE`, `APP_TITLE`,
+  `APP_SHORT` and `APP_FASTA_FALLBACK` drive the document title, header,
+  save/request-log metadata, console prefixes and fallback FASTA header. The
+  static HTML title/header remain fallbacks and are checked against the
+  constants.
+
 ## [0.68.7] - 2026-10-25
 
 ### Security

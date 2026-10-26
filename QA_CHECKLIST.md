@@ -838,6 +838,34 @@ new-tab link `rel="noopener noreferrer"`.
 
 ---
 
+### App identity — 0.68.8
+
+**Surface.** Browser tab, header title, full-save JSON, request-log JSON and the
+FASTA fallback header.
+
+**Should do.** One set of identity constants drives the title, header, export
+metadata, console prefixes and fallback FASTA header. The static title/header
+remain fallbacks and must match the constants.
+
+**Try.**
+1. Open Q2DV.
+   *Expect:* the tab and header read `Quick2DViewer - 1D Protein Viewer`.
+2. Export a full save and open the JSON.
+   *Expect:* `appName` is `Quick2DViewer - 1D Protein Viewer`.
+3. Download the request log.
+   *Expect:* `app` is `Quick2DViewer`.
+4. Copy the sequence as FASTA when no protein label is loaded.
+   *Expect:* the header starts `>Q2DV_sequence`.
+
+**Edge cases.**
+- *No visual change* is expected; this is a naming refactor.
+- *Static fallbacks* - the HTML title/header are overwritten from the constants
+  on load; a test keeps them in sync.
+- *Harness* - constants, static title/header, load-time assignment, save payload
+  and generated metadata are checked in `tests/run.js`.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

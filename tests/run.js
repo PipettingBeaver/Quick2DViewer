@@ -994,6 +994,17 @@ assert(ctxRun(`getBandsForTrackKey('CONSERVATION') === CONSERVATION_BANDS`) === 
 assert(ctxRun(`formatTrackLabel('HL_01_x').indexOf('Homolog #1')`) === 0, 'homolog labels still resolve through the taxonomy');
 assert(ctxRun(`formatTrackLabel('DMS_tolerance_EXP').indexOf('experimental')`) !== -1, 'experimental labels still resolve through the taxonomy');
 
+section('app identity');
+assert(ctxRun(`APP_NAME`) === 'Quick2DViewer' && ctxRun(`APP_TAGLINE`) === '1D Protein Viewer' && ctxRun(`APP_TITLE`) === 'Quick2DViewer - 1D Protein Viewer' && ctxRun(`APP_SHORT`) === 'Q2DV' && ctxRun(`APP_FASTA_FALLBACK`) === 'Q2DV_sequence', 'app identity constants are defined');
+assert(HTML.indexOf('<title>' + ctxRun('APP_TITLE') + '</title>') !== -1, 'the static title matches the identity constant');
+assert(HTML.indexOf('id="appTitle">' + ctxRun('APP_TITLE') + '<') !== -1, 'the header fallback matches the identity constant');
+assert(ctxRun(`document.title`) === ctxRun(`APP_TITLE`) && ctxRun(`document.getElementById('appTitle').textContent`) === ctxRun(`APP_TITLE`), 'the title and header are set from the constant on load');
+ctxRun(`parsedTracks = { AA: 'M' };`);
+assert(ctxRun(`buildFullSavePayload().appName`) === ctxRun(`APP_TITLE`), 'the full save uses the app title');
+ctxRun(`parsedTracks = {};`);
+assert(app.indexOf('app: APP_NAME') !== -1 && app.indexOf('appName: APP_TITLE') !== -1, 'generated metadata uses the identity constants');
+assert(app.indexOf('Q2DV_sequence') === -1, 'the FASTA fallback is no longer a loose literal');
+
 section('UniProt rows rebuild from a stored fetch on restore');
 ctxRun(`
     parsedTracks = { AA: 'MSKGEELFTG' };

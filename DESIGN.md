@@ -80,6 +80,11 @@ runs at startup; the Ensembl guard stops before the 55,000/hour cap.
 `safeFileSlug()` and `q2dvFileName()` are the only filename builders for
 generated files.
 
+**App identity:** `APP_NAME`, `APP_TAGLINE`, `APP_TITLE`, `APP_SHORT` and
+`APP_FASTA_FALLBACK` drive the tab title, header, save/request-log metadata,
+console prefixes and fallback FASTA header. The static title/header are only
+no-JS fallbacks and are tested against the constants.
+
 **Import boundary:** `sanitizePersistedState()` and `sanitizeImportedMap()`
 validate saves and nested maps, reject `__proto__` / `constructor` / `prototype`
 keys, and cap sequence/track sizes. Upload handlers enforce file caps before
