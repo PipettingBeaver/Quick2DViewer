@@ -98,6 +98,9 @@ function assert(cond, msg) {
   else { failed++; console.error('FAIL  ' + msg); }
 }
 function section(name) { console.log('\n# ' + name); }
+function hasAction(name, arg) {
+  return HTML.indexOf('data-action="' + name + '"' + (arg === undefined ? '' : ' data-arg="' + arg + '"')) !== -1;
+}
 
 // ---------- tests ----------
 section('load + version invariant');
@@ -285,15 +288,15 @@ assert(ctxRun(`typeof maybeShowWelcome === 'function' && typeof startTour === 'f
 assert(ctxRun(`typeof clearInputData === 'function' && typeof clearAllData === 'function' && typeof resetInputDataState === 'function' && typeof resetPreferencesState === 'function'`), 'clear-data split functions are defined');
 assert(ctxRun(`STORAGE_KEYS.welcome === 'q2dViewer_welcome_v1'`), 'the welcome memory has its own storage key');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Open Input Data') !== -1 && EMPTY_STATE_HTML.indexOf('Attach files') !== -1`), 'the empty state points at Input Data and Attach files');
-assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Get started') !== -1 && EMPTY_STATE_HTML.indexOf('Take the tour') !== -1 && EMPTY_STATE_HTML.indexOf("openDataSources('uniprot')") !== -1`), 'the empty state is a get-started checklist with a tour link');
+assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Get started') !== -1 && EMPTY_STATE_HTML.indexOf('Take the tour') !== -1 && EMPTY_STATE_HTML.indexOf('data-action="openDataSources" data-arg="uniprot"') !== -1`), 'the empty state is a get-started checklist with a tour link');
 assert(ctxRun(`EMPTY_STATE_HTML.indexOf('Try GFP') === -1`), 'the empty state no longer has a direct Try GFP shortcut');
 assert(HTML.indexOf('>Quick start</h4>') !== -1 && HTML.indexOf('<strong>File ▸ Data Sources…</strong> opens every source') !== -1, 'the Help modal carries a quick start naming File -> Data Sources');
 assert(HTML.indexOf('id="welcomeModal"') !== -1 && HTML.indexOf('id="tourBar"') !== -1, 'the welcome modal and tour bar exist in the markup');
 assert(HTML.indexOf('recommended to click <strong>Show me around</strong>') !== -1, 'the welcome modal recommends the tour');
 assert(HTML.indexOf('id="tryGfpBtn"') === -1 && ctxRun(`typeof tryGfpExample === 'undefined'`), 'there is no header Try GFP button or helper');
 assert(HTML.indexOf('Load example protein') !== -1 && HTML.indexOf('id="inputAccessionPreset"') !== -1, 'Input Data exposes a Load example protein control');
-assert(HTML.indexOf('onclick="clearInputData()"') !== -1 && HTML.indexOf('onclick="clearAllData()"') !== -1, 'the Storage cache controls offer both clear actions');
-assert(HTML.indexOf("menuBarAction('clearInput')") !== -1 && HTML.indexOf("menuBarAction('clearAll')") !== -1, 'the File menu exposes both clear actions');
+assert(hasAction('clearInputData') && hasAction('clearAllData'), 'the Storage cache controls offer both clear actions');
+assert(hasAction('menuBarAction', 'clearInput') && hasAction('menuBarAction', 'clearAll'), 'the File menu exposes both clear actions');
 assert(ctxRun('TOUR_STEPS.length') >= 3, 'the tour has at least three steps');
 assert(ctxRun(`TOUR_STEPS.map(s => (s.target || '')).join(',')`) === 'menubar-file-btn,menubar-file-input,inputAccessionPreset,,tab-tracks,tab-guide,menubar-export-btn', 'the tour targets the documented controls');
 assert(ctxRun(`TOUR_STEPS[0].require === 'menu-open:file' && TOUR_STEPS[1].require === 'input-modal-open'`), 'opening File then Input Data are required steps');
@@ -468,15 +471,15 @@ assert(HTML.indexOf('window.setTimeout(settle, 240);') !== -1, 'the 3D viewer re
 // Data Sources is its own window, linked from File, with loaded-checkmarks
 assert(HTML.indexOf('id="dataSourcesModal"') !== -1 && HTML.indexOf('id="dataSourcesBody"') !== -1, 'Data Sources has its own window');
 assert(HTML.indexOf('id="dataSourcesBody" style="margin-top: 12px; min-height: 460px;"') !== -1, 'the Data Sources window has a stable minimum height');
-assert(HTML.indexOf('onclick="openDataSourcesModal()">Data Sources…</button>') !== -1, 'the File menu links to the Data Sources window');
+assert(hasAction('openDataSourcesModal') && HTML.indexOf('>Data Sources…</button>') !== -1, 'the File menu links to the Data Sources window');
 assert(HTML.indexOf('id="menubar-datasources"') === -1, 'the temporary top-level Data menu is gone');
 assert(ctxRun(`typeof openDataSourcesModal === 'function' && typeof closeDataSourcesModal === 'function' && typeof updateDataSourcesLoadedMarks === 'function' && typeof dataSourceLoaded === 'function'`), 'the Data Sources window and checkmark helpers exist');
 assert(HTML.indexOf('id="opt-tab-data"') !== -1 && HTML.indexOf('id="optab-data"') === -1, 'the category panel stays in the markup but its Options tab is gone');
 const setMenu = HTML.slice(HTML.indexOf('id="menubar-settings"'), HTML.indexOf('id="menubar-session"'));
 ['appearance', 'workflow', 'storage'].forEach(t => {
-    assert(setMenu.indexOf("openOptionsModal('" + t + "')") !== -1, 'the Settings menu links to ' + t);
+    assert(hasAction('openOptionsModal', t), 'the Settings menu links to ' + t);
 });
-assert(setMenu.indexOf("openOptionsModal('data')") === -1, 'Settings no longer duplicates Data Sources');
+assert(!hasAction('openOptionsModal', 'data'), 'Settings no longer duplicates Data Sources');
 assert(ctxRun(`JUMP_MENUS.some(function (m) { return m.key === 'settings'; }) && !JUMP_MENUS.some(function (m) { return m.key === 'datasources'; })`), 'the jump box indexes Settings but not the removed Data menu');
 // checkmark predicates
 ctxRun(`parsedTracks = { AA: 'M'.repeat(10), UP_Sites: 'x', DM_Pfam: 'x', HL_01: 'x', TP_Consensus: 'x', VAR_01: 'x', 'foo_EXP': [1], 'm_pLDDT': [1] };`);
@@ -1004,6 +1007,46 @@ assert(ctxRun(`buildFullSavePayload().appName`) === ctxRun(`APP_TITLE`), 'the fu
 ctxRun(`parsedTracks = {};`);
 assert(app.indexOf('app: APP_NAME') !== -1 && app.indexOf('appName: APP_TITLE') !== -1, 'generated metadata uses the identity constants');
 assert(app.indexOf('Q2DV_sequence') === -1, 'the FASTA fallback is no longer a loose literal');
+
+section('event delegation (static HTML)');
+const staticHtml = HTML.slice(0, HTML.indexOf('<script>'));
+assert(!/\son(click|change|input|keydown|focus|dragover|drop)=/.test(staticHtml), 'static HTML has no inline event handlers');
+const staticActions = [...new Set((staticHtml.match(/data-action="([^"]+)"/g) || []).map(x => x.slice(13, -1)))];
+assert(staticActions.length > 100, 'the static UI is wired through data-action (got ' + staticActions.length + ')');
+assert(ctxRun(`(${JSON.stringify(staticActions)}).every(a => typeof ACTION_HANDLERS[a] === 'function')`) === true, 'every static data-action has a handler');
+assert(ctxRun(`typeof runDelegatedAction === 'function' && typeof delegateAction === 'function'`) === true, 'the delegated dispatcher is defined');
+assert(ctxRun(`resolveActionArg('true', {}, {})`) === true && ctxRun(`resolveActionArg('$value', { value: 'x' }, {})`) === 'x' && ctxRun(`resolveActionArg('$valueOf:nope', { value: 'x' }, {})`) === '', 'data-arg tokens resolve safely');
+assert(app.indexOf("['click', 'change', 'input', 'keydown', 'dragover', 'drop'].forEach") !== -1 && app.indexOf("jumpInputEl.addEventListener('focus'") !== -1, 'focus is scoped to the jump box, not the generic dispatcher');
+
+section('event delegation (generated HTML)');
+assert(!/\son(click|change|input|keydown|focus|dragover|drop)=/.test(app), 'the whole app has no inline event handlers');
+const allActions = [...new Set((app.match(/data-action="([^"]+)"/g) || []).map(x => x.slice(13, -1)))];
+assert(allActions.length > 30, 'generated HTML uses data-action too (got ' + allActions.length + ')');
+assert(ctxRun(`(${JSON.stringify(allActions)}).every(a => typeof ACTION_HANDLERS[a] === 'function')`) === true, 'every data-action in the app has a handler');
+const runFns = [...new Set((app.match(/run:\s*['"]([A-Za-z_$][\w$]*)\(/g) || []).map(x => x.match(/['"]([A-Za-z_$][\w$]*)\(/)[1]))];
+assert(runFns.length > 10 && ctxRun(`(${JSON.stringify(runFns)}).every(a => typeof ACTION_HANDLERS[a] === 'function')`) === true, 'every run string resolves to a handler');
+assert(JSON.stringify(ctxRun(`parseSimpleActionArgs("'a', 'b'")`)) === '["a","b"]', 'the run-string argument parser handles quoted literals');
+ctxRun(`window.__runArgs = null; ACTION_HANDLERS.__testRun = (el, event, args) => { window.__runArgs = args; };`);
+assert(ctxRun(`runWhitelistedAction("__testRun(1, 'x', true)", {})`) === true && JSON.stringify(ctxRun(`window.__runArgs`)) === '[1,"x",true]', 'a whitelisted run string resolves numbers, strings and booleans');
+assert(ctxRun(`runWhitelistedAction("__notWhitelisted()", {})`) === false, 'an unknown run string is refused');
+ctxRun(`delete ACTION_HANDLERS.__testRun;`);
+
+section('CSP');
+const cspMeta = (HTML.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+const scriptText = HTML.slice(HTML.indexOf('<script>') + 8, HTML.indexOf('</script>'));
+const appHash = nodeCrypto.createHash('sha256').update(scriptText, 'utf8').digest('base64');
+assert(cspMeta.indexOf("default-src 'none'") === 0, 'CSP starts from default-src none');
+assert(HTML.indexOf('Content-Security-Policy') < HTML.indexOf('<script>'), 'the CSP meta appears before the app script');
+assert(cspMeta.indexOf("'sha256-" + appHash + "'") !== -1, 'the CSP app-script hash matches (run npm run csp after edits)');
+const d3molB64 = Buffer.from(ctxRun(`P3D_LIB_SHA256`), 'hex').toString('base64');
+assert(cspMeta.indexOf("'sha256-" + d3molB64 + "'") !== -1, 'CSP pins the 3Dmol script hash');
+assert(cspMeta.indexOf("'nonce-" + ctxRun(`CSP_TUTORIAL_NONCE`) + "'") !== -1 && ctxRun(`QUICK2D_TUT_DOC`).indexOf('nonce="' + ctxRun(`CSP_TUTORIAL_NONCE`) + '"') !== -1, 'the tutorial script and CSP share a nonce');
+assert(/worker-src blob:/.test(cspMeta) && /frame-src 'self' about: blob:/.test(cspMeta) && /object-src 'none'/.test(cspMeta) && /base-uri 'none'/.test(cspMeta), 'CSP includes worker/frame/base/object rules');
+const connect = (cspMeta.match(/connect-src ([^;]+);/) || [])[1] || '';
+const endpointUrls = JSON.parse(ctxRun(`JSON.stringify(Object.keys(ENDPOINTS).map(k => ENDPOINTS[k]).concat(Object.keys(SERVICE_REGISTRY.capabilities).flatMap(c => SERVICE_REGISTRY.capabilities[c].providers.map(p => p.url))))`));
+const endpointHosts = [...new Set(endpointUrls.map(u => (String(u).match(/^https:\/\/([^/]+)/) || [])[1]).filter(Boolean))];
+assert(endpointHosts.length > 5 && endpointHosts.every(h => connect.indexOf('https://' + h) !== -1), 'CSP connect-src covers every API host');
+assert(connect.indexOf('https://cdn.jsdelivr.net') !== -1, 'CSP allows the pinned 3Dmol CDN');
 
 section('UniProt rows rebuild from a stored fetch on restore');
 ctxRun(`
@@ -2178,7 +2221,7 @@ assert(catPanels.every(n => HTML.indexOf('id="optCat-' + n + '"') !== -1), 'and 
 assert(HTML.indexOf('<option value="quick2d">Quick2D Annotations</option>') !== -1, 'the Data Sources dropdown lists Quick2D Annotations');
 assert(HTML.indexOf('href="https://toolkit.tuebingen.mpg.de/tools/quick2d"') !== -1, 'the Quick2D panel links to MPI Quick2D');
 assert(HTML.indexOf('last line of the segmented protein annotation split') !== -1 && HTML.indexOf('Protein ID: XXX') !== -1, 'and explains the full-header highlight-and-paste');
-assert(HTML.indexOf('onclick="pasteQuick2DHere()">Paste Clipboard</button>') !== -1, 'the Quick2D panel has a Paste Clipboard action');
+assert(hasAction('pasteQuick2DHere') && HTML.indexOf('>Paste Clipboard</button>') !== -1, 'the Quick2D panel has a Paste Clipboard action');
 assert(ctxRun(`typeof pasteQuick2DHere === 'function' && typeof pasteQuick2DFromClipboard === 'function'`), 'and the window-agnostic clipboard helpers exist');
 assert(HTML.indexOf('onclick="closeDataSourcesModal(); openInputDataModal();"') === -1, 'the Quick2D panel no longer switches to Input Data');
 assert(HTML.indexOf('id="quick2dTutWrap"') !== -1 && HTML.indexOf('id="quick2dTutFrame"') !== -1, 'the Quick2D panel has a visual-tutorial iframe');
@@ -2194,12 +2237,12 @@ assert(HTML.indexOf('class="ds-dropzone"') !== -1 && HTML.indexOf('Drag &amp; dr
 assert(HTML.indexOf('>Selection Guide</div>') !== -1, 'the animation sits in a Selection Guide container');
 assert(ctxRun(`typeof onQuick2dDrop === 'function'`), 'the dropzone accepts dropped files');
 assert(HTML.indexOf('class="ds-steps"') !== -1 && HTML.indexOf('Select and <em>Copy</em> the Results') !== -1 && HTML.indexOf('<em>Paste</em> results on this page') !== -1, 'Quick2D has the numbered import steps');
-assert(HTML.indexOf('onclick="copySequenceFasta()"') !== -1, 'and a Copy FASTA action in step 1');
+assert(hasAction('copySequenceFasta'), 'and a Copy FASTA action in step 1');
 assert(HTML.indexOf('id="uniprotAnnotationLog"') === -1, 'the UniProt debug log is removed');
 const q2dRegion = HTML.slice(HTML.indexOf('id="optCat-quick2d"'), HTML.indexOf('id="optCat-topology"'));
 assert(q2dRegion.indexOf('Open MPI Quick2D &#8599;</a>') > q2dRegion.indexOf('class="ds-right"'), 'the MPI link sits in the right column');
 assert(q2dRegion.indexOf('class="ds-steps"') > q2dRegion.indexOf('>Selection Guide</div>'), 'the numbered steps sit in the right column, below the animation');
-assert(ctxRun(`QUICK2D_TUT_DOC.indexOf('<scr' + 'ipt>') !== -1 && QUICK2D_TUT_DOC.indexOf('AA_QUERY') !== -1 && QUICK2D_TUT_DOC.indexOf('How to import') === -1`), 'the embedded tutorial document carries the demo table and its script, without the old sub-card');
+assert(ctxRun(`QUICK2D_TUT_DOC.indexOf('<script nonce="' + CSP_TUTORIAL_NONCE + '">') !== -1 && QUICK2D_TUT_DOC.indexOf('AA_QUERY') !== -1 && QUICK2D_TUT_DOC.indexOf('How to import') === -1`), 'the embedded tutorial document carries the demo table and its nonce script, without the old sub-card');
 ctxRun(`parsedTracks = {}; document.getElementById('optCat-quick2d').hidden = false; updateQuick2dTutorial();`);
 assert(ctxRun(`document.getElementById('quick2dTutWrap').hidden === false`), 'the tutorial shows while no Q2D data is loaded');
 ctxRun(`parsedTracks = { AA: 'MKV', SS_PSIPRED: 'HHH' }; updateQuick2dTutorial();`);
@@ -2309,7 +2352,7 @@ ctxRun(`cachedStructureTexts = {};`);
 
 section('activity log + 3D guards');
 assert(HTML.indexOf('>Log</button>') !== -1, 'the menu bar has a top-level Log button');
-assert(HTML.indexOf('openActionLog()" title="Everything this session') !== -1, 'which opens the activity log');
+assert(hasAction('openActionLog') && HTML.indexOf('title="Everything this session') !== -1, 'which opens the activity log');
 assert(HTML.indexOf('>Activity log</h3>') !== -1, 'the modal is named for users, not as a debugging console');
 const logProbe = ctxRun(`
     (function () {
@@ -2660,7 +2703,7 @@ assert(ctxRun(`
         return v;
     })()
 `) === 'ebi_blast', 'the menu provider helper sets the picker (so the two controls agree)');
-assert(HTML.indexOf("menuBarAction('homologs_phmmer')") !== -1 && HTML.indexOf("menuBarAction('homologs_blast')") !== -1, 'the Analyze menu offers the homolog search per provider');
+assert(hasAction('menuBarAction', 'homologs_phmmer') && hasAction('menuBarAction', 'homologs_blast'), 'the Analyze menu offers the homolog search per provider');
 assert(HTML.indexOf('id="homologSearchStatus"') !== -1, 'the Input Data modal has a status line for it');
 assert(HTML.indexOf('id="btnHomologSearch"') !== -1, 'and a button');
 ctxRun(`parsedTracks = {}; homologHitsInfo = {}; graphHighlights = {};`);
@@ -3406,7 +3449,7 @@ assert(evAxisTitle === 'RMSF (A)', 'the axis title is taken from the EV scale');
 ctxRun(`selectStart = null; selectEnd = null;`);
 const metricRows = ctxRun(`computeMetricsRows()`);
 assert(metricRows.hasData === true && metricRows.rows.some(r => String(r.key).indexOf('RMSF') !== -1 || String(r.metric).indexOf('RMSF') !== -1), 'the metrics export includes the RMSF row');
-assert(HTML.indexOf("menuBarAction('graphEns')") !== -1, 'the View menu has the RMSF graph toggle');
+assert(hasAction('menuBarAction', 'graphEns'), 'the View menu has the RMSF graph toggle');
 assert(ctxRun(`formatTrackLabel('EV_RMSF')`) === 'Ensemble RMSF', 'the graph pill and metrics row read as "Ensemble RMSF"');
 assert(ctxRun(`formatTrackLabel('model_1_RMSF')`) === 'model_1 RMSF', 'a per-model RMSF key still reads sensibly');
 ctxRun(`parsedTracks = {}; graphMode = { pLDDT: false, RSA: false, EV: false };`);
@@ -4096,7 +4139,7 @@ ctxRun(`
     selectionMode = 'point'; rowRanges = []; selectStart = null; selectEnd = null;
     referenceOffset = 0; trackOffsets = {};
 `);
-assert(HTML.indexOf(`menuBarAction('structure')`) !== -1 && HTML.indexOf('Structure file (PDB/CIF)') !== -1, 'the Export menu carries the structure export');
+assert(hasAction('menuBarAction', 'structure') && HTML.indexOf('Structure file (PDB/CIF)') !== -1, 'the Export menu carries the structure export');
 
 const expWhole = ctxRun(`buildStructureExport('model.pdb')`);
 assert(expWhole.ok === true && expWhole.whole === true, 'with no selection the export is the whole model');
@@ -4704,7 +4747,7 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
 
     section('macro v1: record, parameterise, JSON, dry run, replay');
     assert(HTML.indexOf('id="macroModal"') !== -1 && HTML.indexOf('id="macroBanner"') !== -1, 'the macro modal and replay banner exist');
-    assert(HTML.indexOf('onclick="openMacroModal()"') !== -1 && HTML.indexOf('>Macro</button>') !== -1, 'and the menu bar has the Macro button');
+    assert(hasAction('openMacroModal') && HTML.indexOf('>Macro</button>') !== -1, 'and the menu bar has the Macro button');
     assert(HTML.indexOf('id="macroRecordBtn"') !== -1 && HTML.indexOf('id="macroAccessionOverride"') !== -1 && HTML.indexOf('id="macroImportText"') !== -1, 'record, override and import controls are present');
     ctxRun(`uniprotAccession = 'P42212'; macroAccessionOverride = ''; macroRecording = true; macroSteps = []; macroReplaying = false;`);
     ctxRun(`macroCaptureStep({ type: 'uniprot', accession: macroParam('P42212') });`);

@@ -6,9 +6,12 @@ No build step, no backend. Deployed to GitHub Pages from `main` (root `index.htm
 
 ## Commands
 
-- `npm test` (`node tests/run.js`) — headless regression harness, ~1350 checks, ~1s.
+- `npm test` (`node tests/run.js`) — headless regression harness, ~1,900 checks, ~1s.
   Extracts the single `<script>` from `index.html` and runs it in a stubbed-DOM VM
   against fixtures in `tests/fixtures/`. Add checks here for every feature.
+- `npm run csp` (`node tools/update-csp.js`) — recomputes the inline app-script
+  SHA-256 in the CSP meta tag. Run it after any edit to the `<script>` block;
+  `npm test` fails if the CSP hash is stale.
 - `npm run doc:workflow` (`node tools/build-workflow-doc.js`) — regenerates
   `WORKFLOW.md` from literals in `index.html`. Never edit `WORKFLOW.md` by hand.
 
@@ -25,7 +28,8 @@ No lint, typecheck, formatter, or CI is configured.
 ## Editing quirks
 
 - Keep exactly one `<script>` block in `index.html`; the test regex grabs the
-  first `<script>...</script>`, and the doc tool parses literals out of it.
+  first `<script>...</script>`, and the doc tool parses literals out of it. Run
+  `npm run csp` after editing it so the CSP hash stays valid.
 - `tools/build-workflow-doc.js` extracts `const WORKFLOW_STEPS / GUIDE_QUESTIONS /
   STEP_QUESTIONS / RULE_PRESETS / RULE_SOURCE_LABELS = [...]` by regex — keep those
   literals in that exact `= [` … `\n];` shape. After touching steps, questions, or
@@ -61,7 +65,9 @@ No lint, typecheck, formatter, or CI is configured.
   `WORKFLOW.md` behave differently under `file://` (a fallback link is shown).
 
 ## Definition of done
-- `npm test` passes, including the release invariant (`APP_VERSION` == top `CHANGELOG.md` heading).
+- `npm run csp` has been run after the last script edit, and `npm test` passes,
+  including the CSP hash check and the release invariant (`APP_VERSION` == top
+  `CHANGELOG.md` heading).
 - New feature: a check in `tests/run.js` plus a feature test card in `QA_CHECKLIST.md`; surfaces the harness cannot verify are checked manually and that is stated.
 - After touching `WORKFLOW_STEPS`/questions/presets, run `npm run doc:workflow`; never hand-edit `WORKFLOW.md`.
 - Commit message `x.y.z: summary` with the day-based version bump.

@@ -866,6 +866,46 @@ remain fallbacks and must match the constants.
 
 ---
 
+### CSP + event delegation — 0.68.9
+
+**Surface.** Every button, menu item, select, input, dropzone and generated
+control; the browser console's CSP messages.
+
+**Should do.** No inline event handlers remain. Clicks, changes, inputs, drag and
+drop, and the jump box work through `data-action`. The CSP blocks unknown
+scripts and connections while allowing the app, 3Dmol and the tutorial.
+
+**Try.**
+1. Open the app from `http://` or GitHub Pages.
+   *Expect:* it renders and the title/header are correct.
+2. Use File/View/Analyze/Settings/Session/Export menus, open Input Data,
+   Options, Data Sources, the Guide, Tracks, macros, rules, the tutorial and the
+   action log.
+   *Expect:* every control acts once, with no double-toggle.
+3. Click into the **Jump to…** box and type.
+   *Expect:* results appear; focusing the box does not trigger any other control.
+4. Drag a file onto the Quick2D dropzone and press Enter/Space on it.
+   *Expect:* the dropzone actions work and the tutorial iframe animates.
+5. Open the 3D viewer.
+   *Expect:* 3Dmol loads; the browser console shows no CSP refusal for the
+   pinned jsDelivr script.
+6. Open DevTools Console and look for `Content-Security-Policy` errors.
+   *Expect:* none during normal use.
+
+**Edge cases.**
+- *CSP hash stale* - after editing the `<script>`, `npm test` fails until
+  `npm run csp` is run; never hand-edit the hash.
+- *New provider* - add its host to `connect-src` and the endpoint test will
+  catch a missing host.
+- *Inline styles* - `style-src 'unsafe-inline'` is intentional for now; the 617
+  style attributes were not refactored.
+- *`file://`* - test the app locally too; external services start OFF.
+- *Harness* - no inline handlers, every `data-action`/run string has a handler,
+  the CSP hashes/nonce/connect-src, and the focus-scoping rule are checked in
+  `tests/run.js`; live menu/modal/dropzone/3D/tutorial behaviour is manual-only.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

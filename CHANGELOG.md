@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.9] - 2026-10-25
+
+### Security
+- **Strict Content-Security-Policy.** The page now sends `default-src 'none'`,
+  hash-pinned main and 3Dmol scripts, a nonce for the sandboxed Quick2D tutorial,
+  a `connect-src` allowlist for every API/CDN host, `worker-src blob:` for
+  3Dmol, and `base-uri`/`object-src`/`form-action` restrictions.
+- **Event delegation.** All inline event handlers were replaced with
+  `data-action` delegation and a whitelisted run-string resolver. Focus handling
+  is scoped to the jump box so opening a modal cannot fire its first button.
+
+### Added
+- `npm run csp` (`tools/update-csp.js`) refreshes the inline app-script hash;
+  `npm test` fails if the CSP hash is stale.
+
 ## [0.68.8] - 2026-10-25
 
 ### Changed

@@ -101,6 +101,15 @@ macro is refused rather than half-loaded.
 and verifies `P3D_LIB_SHA256` before executing either a fetched or cached copy.
 There is no unpinned fallback; update the URL and hash together.
 
+**CSP + event delegation:** all inline event handlers are gone. Controls use
+`data-action` and `data-arg`/`data-arg2` tokens through one delegated dispatcher;
+dynamic action strings resolve through a whitelist, not `eval`. The meta CSP
+uses `default-src 'none'`, hash-pinned main and 3Dmol scripts, a tutorial nonce,
+a `connect-src` allowlist for every API/CDN host, `worker-src blob:` for 3Dmol,
+and `frame-src` for the sandboxed tutorial. `npm run csp` refreshes the
+main-script hash. Inline styles remain allowed via `style-src 'unsafe-inline'`;
+refactoring the 617 style attributes is deferred.
+
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 
 Every track records provenance:
