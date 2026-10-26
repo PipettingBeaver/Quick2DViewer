@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const nodeCrypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf-8');
@@ -73,7 +74,8 @@ const sandbox = {
   FormData: class FormData { append() {} },
   Event: class Event { constructor(t) { this.type = t; } },
   CustomEvent: class CustomEvent { constructor(t) { this.type = t; } },
-  crypto: { randomUUID: () => 'uid-' + Date.now(), getRandomValues() {} },
+  crypto: (nodeCrypto.webcrypto || { randomUUID: () => 'uid-' + Date.now(), getRandomValues() {} }),
+  TextEncoder,
   confirm: () => true,
 };
 sandbox.window = sandbox; sandbox.self = sandbox; sandbox.globalThis = sandbox;
@@ -4465,6 +4467,16 @@ ctxRun(`parsedTracks = {}; trackControlState = getDefaultTrackControlState();`);
     try { await ctxRun(`runCapability('fold', { sequence: 'X'.repeat(500) })`); }
     catch (e) { err = e; }
     assert(err && /too long/.test(err.message), 'fold rejects >400 aa before any network call');
+
+    section('3Dmol integrity');
+assert(app.indexOf('rel="noopener"') === -1, 'no new-tab link uses the short rel="noopener" form');
+assert(app.indexOf("'noopener'") === -1, 'no window.open uses the short noopener feature list');
+assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 'the outbound window open keeps noopener and noreferrer');
+    assert(ctxRun(`P3D_CDN_URLS.length`) === 1 && ctxRun(`P3D_CDN_URLS[0]`).indexOf('3dmol@2.4.0') !== -1, 'only the version-pinned 3Dmol URL is used');
+    assert(/^[0-9a-f]{64}$/.test(ctxRun(`P3D_LIB_SHA256`)), 'the pinned 3Dmol hash is a SHA-256 digest');
+    assert((await ctxRun(`sha256Hex('abc')`)) === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', 'SHA-256 matches the standard test vector');
+    assert((await ctxRun(`verify3DmolText('abc')`)) === false, 'a mismatched 3Dmol script is rejected');
+    assert((await ctxRun(`verify3DmolText('')`)) === false, 'an empty 3Dmol script is rejected');
 
     err = null;
     try { await ctxRun(`runCapability('no_such_capability', {})`); }

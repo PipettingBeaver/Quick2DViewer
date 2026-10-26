@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.7] - 2026-10-25
+
+### Security
+- **3Dmol is integrity-checked.** Only the pinned 3Dmol 2.4.0 build is loaded;
+  its SHA-256 is verified before executing freshly fetched or cached text. The
+  unpinned 3Dmol.org fallback is gone.
+- **New-tab links** now use `rel="noopener noreferrer"`, and the outbound
+  `window.open` includes `noreferrer`. The PolyPhen-2 link was upgraded to HTTPS.
+
 ## [0.68.6] - 2026-10-25
 
 ### Changed

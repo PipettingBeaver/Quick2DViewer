@@ -805,6 +805,39 @@ after moving to the `TRACK_TYPES` taxonomy.
 
 ---
 
+### 3Dmol integrity + link hygiene — 0.68.7
+
+**Surface.** 3D viewer engine loading; every outbound new-tab link.
+
+**Should do.** Load only the pinned 3Dmol 2.4.0 build whose SHA-256 matches,
+re-verify cached copies, ignore tampered/unverified scripts, and give every
+new-tab link `rel="noopener noreferrer"`.
+
+**Try.**
+1. Open the **3D** viewer online.
+   *Expect:* the model loads; DevTools shows the jsDelivr `3dmol@2.4.0` script,
+   not an unpinned `3Dmol.org` copy.
+2. Set an old/tampered value in `localStorage['_q2dv_3dmol']`, then toggle 3D.
+   *Expect:* the bad cache is ignored and the pinned script is fetched and
+   verified.
+3. Go offline with a valid cached copy.
+   *Expect:* 3D still loads. Go offline with no valid copy:
+   *Expect:* `3D engine unavailable (offline or script integrity check failed)`.
+4. Right-click an outbound link and open it in a new tab.
+   *Expect:* the new tab cannot reach back through `window.opener`.
+
+**Edge cases.**
+- *`crypto.subtle` unavailable* - the 3D viewer refuses the script with a clear
+  message; the rest of the app still works.
+- *CDN outage* - there is deliberately no unpinned fallback. Update the pinned
+  URL and `P3D_LIB_SHA256` together.
+- *Cached older 3Dmol* - fails the hash check and is replaced by the pinned copy.
+- *Harness* - the standard SHA-256 vector, pinned URL/hash, mismatched/empty
+  scripts, and `noopener noreferrer` presence are checked in `tests/run.js`;
+  the live CDN load and offline cache behaviour are manual-only.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.

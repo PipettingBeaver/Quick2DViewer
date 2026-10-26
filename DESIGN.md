@@ -92,6 +92,10 @@ filenames pass through `safeFileSlug()`.
 `migratePersistedState()` is the single state-migration hook; a newer state or
 macro is refused rather than half-loaded.
 
+**Third-party script:** the 3D viewer loads a pinned 3Dmol build from jsDelivr
+and verifies `P3D_LIB_SHA256` before executing either a fetched or cached copy.
+There is no unpinned fallback; update the URL and hash together.
+
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 
 Every track records provenance:
