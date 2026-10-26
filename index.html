@@ -3088,7 +3088,7 @@
         <div class="ds-panel">
             <div class="ds-left">
                 <h4 class="ds-title">Structure models &amp; validation</h4>
-                <p class="ds-desc">AlphaFold is fetched automatically with a UniProt accession (Input Data -> Find UniProt accession, or the guide's structure step). ESMFold folds the sequence directly (max 400 aa). Validation reads the wwPDB quality data for an attached experimental entry.</p>
+                <p class="ds-desc">AlphaFold is fetched automatically with a UniProt accession (Input Data -> Find UniProt accession, or the guide's structure step). ESMFold folds the sequence directly (max <span id="esmfoldMaxLengthLabel">400</span> aa). Validation reads the wwPDB quality data for an attached experimental entry.</p>
                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                     <button type="button" id="btnEsmfold" data-task-step="structure" class="tb-btn tb-btn-secondary" onclick="predictStructureESMFold()"
                         style="font-size:0.78rem; padding:4px 10px;" title="Predict a 3D structure with ESMFold and attach it">Predict structure (ESMFold)</button>
@@ -3264,6 +3264,13 @@
                     <p class="ds-desc" style="margin:0;">Only the requested term, sequence or accession - plus your contact email for EBI jobs - is sent to a public service; nothing else is uploaded.</p>
                 </div>
             </div>
+        </div>
+        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:10px;">
+            <details>
+                <summary style="cursor:pointer; font-size:0.8rem; font-weight:600; color:#475569;">Service policies and documented limits</summary>
+                <p class="ds-desc" style="margin:8px 0;">Timeouts and result caps are conservative browser-side limits, not server quotas. Published provider limits are listed where they exist; expand a row's link for the source.</p>
+                <div id="servicePolicyBody"></div>
+            </details>
         </div>
         </div>
         </div>
@@ -3991,6 +3998,23 @@ const ENDPOINTS = Object.freeze({
     alphafoldEntry: 'https://alphafold.ebi.ac.uk/entry/',
     ensemblRest: 'https://rest.ensembl.org/'
 });
+// Client-side service policy: browser timeouts, retry/poll cadence and result
+// caps. These are conservative app limits, not server quotas; documented
+// provider limits are shown in Options -> Data Sources -> External services.
+const SERVICE_POLICY = Object.freeze({
+    uniProt: Object.freeze({ requestMs: 30000, organismMs: 20000, xrefMs: 30000, searchPageSize: 20 }),
+    ebiSearch: Object.freeze({ requestMs: 30000, pageSize: 20 }),
+    ebiProteins: Object.freeze({ requestMs: 30000 }),
+    assets: Object.freeze({ requestMs: 60000 }),
+    ebiJob: Object.freeze({ submitAttempts: 2, submitMs: 90000, pollMs: 3000, statusMs: 60000, resultMs: 60000, deadlineMs: 15 * 60 * 1000 }),
+    esmfold: Object.freeze({ requestMs: 90000, maxLength: 400 }),
+    foldseek: Object.freeze({ submitMs: 60000, statusMs: 60000, resultMs: 60000, pollMs: 3000, deadlineMs: 5 * 60 * 1000, maxHits: 20 }),
+    pdbe: Object.freeze({ lookupMs: 30000, validationMs: 60000, bestStructures: 8 }),
+    rcsb: Object.freeze({ metadataMs: 40000, searchMs: 60000, downloadMs: 60000, sequenceRows: 8, textRows: 8 }),
+    alphafold: Object.freeze({ metadataMs: 30000, downloadMs: 60000 }),
+    ensembl: Object.freeze({ requestMs: 30000, vepMs: 90000, vepMaxVariants: 1000 }),
+    homologs: Object.freeze({ realignLimit: 8 })
+});
 // --- External service registry (EDIT HERE to fix/replace endpoints) --------
 // Capabilities map to an ORDERED provider list; when a capability runs, its
 // providers are tried in order until one succeeds. So if provider A is down or
@@ -4046,7 +4070,7 @@ const SERVICE_REGISTRY = {
             label: 'Structure prediction',
             providers: [
                 { id: 'esmfold', label: 'ESMFold (ESM Atlas)', adapter: 'esmfold',
-                  url: 'https://api.esmatlas.com/foldSequence/v1/pdb/', maxLength: 400, enabled: true },
+                  url: 'https://api.esmatlas.com/foldSequence/v1/pdb/', maxLength: SERVICE_POLICY.esmfold.maxLength, enabled: true },
             ],
         },
         structure_search: {
@@ -4173,7 +4197,7 @@ function ebiErrorDetail(text) {
 const SERVICE_ADAPTERS = {
     // GET {acc}.json -> UniProtKB features
     async uniprotRest(provider, args) {
-        const resp = await fetch(provider.url + encodeURIComponent(args.accession) + '.json');
+        const resp = await fetchWithTimeout(provider.url + encodeURIComponent(args.accession) + '.json', {}, SERVICE_POLICY.uniProt.requestMs);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const features = parseUniProtFeatures(await resp.json());
         if (!features.length) throw new Error('no residue-level features');
@@ -4181,7 +4205,7 @@ const SERVICE_ADAPTERS = {
     },
     // GET {acc}.json -> compact protein summary (function, keywords, GO, location)
     async uniprotSummary(provider, args) {
-        const resp = await fetch(provider.url + encodeURIComponent(args.accession) + '.json');
+        const resp = await fetchWithTimeout(provider.url + encodeURIComponent(args.accession) + '.json', {}, SERVICE_POLICY.uniProt.requestMs);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const summary = parseUniProtSummary(await resp.json());
         if (!summary) throw new Error('no summary fields');
@@ -4189,7 +4213,7 @@ const SERVICE_ADAPTERS = {
     },
     // GET {acc}.json -> EBI Proteins features
     async ebiFeatures(provider, args) {
-        const resp = await fetch(provider.url + encodeURIComponent(args.accession) + '.json');
+        const resp = await fetchWithTimeout(provider.url + encodeURIComponent(args.accession) + '.json', {}, SERVICE_POLICY.ebiProteins.requestMs);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const features = parseUniProtFeaturesEBI(await resp.json());
         if (!features.length) throw new Error('no residue-level features');
@@ -4197,8 +4221,8 @@ const SERVICE_ADAPTERS = {
     },
     // GET ?size&field=query -> normalized [{accession,name,gene,organism,protein}]
     async ebiSearch(provider, args) {
-        const url = provider.url + '?' + new URLSearchParams({ size: '20', [args.field]: args.query }).toString();
-        const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const url = provider.url + '?' + new URLSearchParams({ size: String(SERVICE_POLICY.ebiSearch.pageSize), [args.field]: args.query }).toString();
+        const resp = await fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } }, SERVICE_POLICY.ebiProteins.requestMs);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const list = await resp.json();
         if (!Array.isArray(list)) throw new Error('unexpected payload');
@@ -4218,10 +4242,10 @@ const SERVICE_ADAPTERS = {
         const url = provider.url + '?' + new URLSearchParams({
             query: prefix ? (prefix + ':' + term) : term,
             format: 'json',
-            size: '20',
+            size: String(SERVICE_POLICY.ebiSearch.pageSize),
             fields: 'acc,id,gene_primary_name,organism_scientific_name'
         }).toString();
-        const resp = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 30000);
+        const resp = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, SERVICE_POLICY.ebiSearch.requestMs);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();
         const entries = (data && data.entries) || [];
@@ -4251,9 +4275,9 @@ const SERVICE_ADAPTERS = {
         }
         const body = new URLSearchParams(Object.assign({ email }, provider.params || {}, { sequence: args.sequence })).toString();
         let jobId = '', runResp = null, runText = '';
-        for (let attempt = 0; attempt < 2 && !jobId; attempt++) {
+        for (let attempt = 0; attempt < SERVICE_POLICY.ebiJob.submitAttempts && !jobId; attempt++) {
             try {
-                runResp = await fetchWithTimeout(base + 'run', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, 90000);
+                runResp = await fetchWithTimeout(base + 'run', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }, SERVICE_POLICY.ebiJob.submitMs);
                 runText = await runResp.text();
                 if (runResp.ok) jobId = runText.trim();
                 uniprotLog('submit ' + tool + ': HTTP ' + (runResp ? runResp.status : '?') + (jobId ? ' job=' + jobId : ''));
@@ -4273,11 +4297,11 @@ const SERVICE_ADAPTERS = {
         const t0 = Date.now();
         const elapsed = () => Math.round((Date.now() - t0) / 1000);
         let status = '', lastLogged = '', poll = 0;
-        const deadline = Date.now() + 15 * 60 * 1000;
+        const deadline = Date.now() + SERVICE_POLICY.ebiJob.deadlineMs;
         while (Date.now() < deadline) {
             poll++;
-            await new Promise(r => setTimeout(r, 3000));
-            try { status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, 60000)).text()).trim(); }
+            await new Promise(r => setTimeout(r, SERVICE_POLICY.ebiJob.pollMs));
+            try { status = (await (await fetchWithTimeout(base + 'status/' + jobId, {}, SERVICE_POLICY.ebiJob.statusMs)).text()).trim(); }
             catch (e) { uniprotLog('poll ' + poll + ': status fetch failed, continuing'); continue; }
             if (status !== lastLogged) { uniprotLog(tool + ' poll: ' + status + ' (' + elapsed() + 's)'); lastLogged = status; }
             if (status === 'FINISHED') break;
@@ -4288,7 +4312,7 @@ const SERVICE_ADAPTERS = {
         // Job Dispatcher tools expose different renderers (most have `json`;
         // hmmer3 only ships the raw text `out`), so the provider declares one.
         const ext = provider.resultExt || 'json';
-        const resultResp = await fetchWithTimeout(base + 'result/' + jobId + '/' + ext, {}, 60000);
+        const resultResp = await fetchWithTimeout(base + 'result/' + jobId + '/' + ext, {}, SERVICE_POLICY.ebiJob.resultMs);
         if (!resultResp.ok) throw new Error('result HTTP ' + resultResp.status);
         const out = ext === 'json' ? await resultResp.json() : await resultResp.text();
         const size = (typeof out === 'string') ? out.length + ' bytes' : (out && typeof out === 'object' ? Object.keys(out).length + ' key(s)' : '?');
@@ -4300,12 +4324,12 @@ const SERVICE_ADAPTERS = {
     async pdbeBestStructures(provider, args) {
         const acc = String(args.accession || '').trim().toUpperCase();
         if (!acc) throw new Error('needs a UniProt accession');
-        const resp = await fetchWithTimeout(provider.url + encodeURIComponent(acc), {}, 30000);
+        const resp = await fetchWithTimeout(provider.url + encodeURIComponent(acc), {}, SERVICE_POLICY.pdbe.lookupMs);
         if (!resp.ok) throw new Error('PDBe HTTP ' + resp.status);
         const data = await resp.json();
         const rows = (data && data[acc]) || [];
         if (!rows.length) throw new Error('no structures for ' + acc);
-        const top = rows.slice(0, 8);
+        const top = rows.slice(0, SERVICE_POLICY.pdbe.bestStructures);
         const meta = await SERVICE_ADAPTERS.rcsbEntryMeta(top.map(r => String(r.pdb_id || '').toUpperCase()).filter(Boolean));
         return {
             source: 'PDBe best structures',
@@ -4327,7 +4351,7 @@ const SERVICE_ADAPTERS = {
         if (!ids || !ids.length) return meta;
         try {
             const gq = JSON.stringify({ query: '{ entries(entry_ids: [' + ids.map(id => '"' + id + '"').join(',') + ']) { rcsb_id struct { title } rcsb_entry_info { resolution_combined } } }' });
-            const resp = await fetchWithTimeout(ENDPOINTS.rcsbGraphql, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: gq }, 40000);
+            const resp = await fetchWithTimeout(ENDPOINTS.rcsbGraphql, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: gq }, SERVICE_POLICY.rcsb.metadataMs);
             if (resp.ok) {
                 const data = await resp.json();
                 ((data.data && data.data.entries) || []).forEach(e => {
@@ -4346,9 +4370,9 @@ const SERVICE_ADAPTERS = {
             const body = JSON.stringify({
                 query: { type: 'terminal', service: 'sequence', parameters: { evalue_cutoff: 1, identity_cutoff: identity, sequence_type: 'protein', value: seq } },
                 return_type: 'entry',
-                request_options: { paginate: { start: 0, rows: 8 }, results_content_type: ['experimental'] }
+                request_options: { paginate: { start: 0, rows: SERVICE_POLICY.rcsb.sequenceRows }, results_content_type: ['experimental'] }
             });
-            const resp = await fetchWithTimeout(provider.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, 60000);
+            const resp = await fetchWithTimeout(provider.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, SERVICE_POLICY.rcsb.searchMs);
             if (!resp.ok) throw new Error('RCSB search HTTP ' + resp.status);
             const data = await resp.json();
             return (data.result_set || []).map(r => r.identifier);
@@ -4372,9 +4396,9 @@ const SERVICE_ADAPTERS = {
         const body = JSON.stringify({
             query: { type: 'terminal', service: 'full_text', parameters: { value: term } },
             return_type: 'entry',
-            request_options: { paginate: { start: 0, rows: 8 }, results_content_type: ['experimental'] }
+            request_options: { paginate: { start: 0, rows: SERVICE_POLICY.rcsb.textRows }, results_content_type: ['experimental'] }
         });
-        const resp = await fetchWithTimeout(provider.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, 60000);
+        const resp = await fetchWithTimeout(provider.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, SERVICE_POLICY.rcsb.searchMs);
         if (!resp.ok) throw new Error('RCSB text search HTTP ' + resp.status);
         const data = await resp.json();
         const ids = (data.result_set || []).map(r => r.identifier);
@@ -4391,10 +4415,10 @@ const SERVICE_ADAPTERS = {
         const id = String(args.pdbId || '').toLowerCase();
         if (!/^[0-9][a-z0-9]{3}$/.test(id)) throw new Error('not a PDB id: ' + args.pdbId);
         const base = provider.url;
-        const summaryResp = await fetchWithTimeout(base + 'summary_quality_scores/entry/' + id, {}, 30000);
+        const summaryResp = await fetchWithTimeout(base + 'summary_quality_scores/entry/' + id, {}, SERVICE_POLICY.pdbe.lookupMs);
         if (!summaryResp.ok) throw new Error('quality summary HTTP ' + summaryResp.status);
         const summary = await summaryResp.json();
-        const outlierResp = await fetchWithTimeout(base + 'residuewise_outlier_summary/entry/' + id, {}, 60000);
+        const outlierResp = await fetchWithTimeout(base + 'residuewise_outlier_summary/entry/' + id, {}, SERVICE_POLICY.pdbe.validationMs);
         if (!outlierResp.ok) throw new Error('outlier summary HTTP ' + outlierResp.status);
         const outliers = await outlierResp.json();
         const o = outliers[id] || outliers;
@@ -4408,7 +4432,7 @@ const SERVICE_ADAPTERS = {
         // No explicit Content-Type: a string body is sent as text/plain, which
         // is CORS-safelisted, so the request stays "simple" and can never be
         // blocked by a failed preflight (the API answers OPTIONS with 403).
-        const resp = await fetchWithTimeout(provider.url, { method: 'POST', body: seq }, 90000);
+        const resp = await fetchWithTimeout(provider.url, { method: 'POST', body: seq }, SERVICE_POLICY.esmfold.requestMs);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const text = await resp.text();
         if (!text || text.length < 60 || !/^(ATOM|HEADER|MODEL)/m.test(text)) throw new Error('empty/invalid prediction');
@@ -4423,7 +4447,7 @@ const SERVICE_ADAPTERS = {
         body.set('q', args.pdbText || '');
         body.append('database[]', db);
         body.set('mode', provider.mode || '3diaa');
-        const resp = await fetch(provider.url + 'ticket', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
+        const resp = await fetchWithTimeout(provider.url + 'ticket', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() }, SERVICE_POLICY.foldseek.submitMs);
         if (!resp.ok) throw new Error('submit HTTP ' + resp.status);
         const job = await resp.json();
         const id = job && job.id;
@@ -4431,16 +4455,16 @@ const SERVICE_ADAPTERS = {
         const t0 = Date.now();
         const elapsed = () => Math.round((Date.now() - t0) / 1000);
         let status = job.status || 'PENDING';
-        const deadline = Date.now() + 5 * 60 * 1000;
+        const deadline = Date.now() + SERVICE_POLICY.foldseek.deadlineMs;
         while (Date.now() < deadline && status !== 'COMPLETE') {
-            await new Promise(r => setTimeout(r, 3000));
-            try { const st = await (await fetch(provider.url + 'ticket/' + id)).json(); status = st && st.status; }
+            await new Promise(r => setTimeout(r, SERVICE_POLICY.foldseek.pollMs));
+            try { const st = await (await fetchWithTimeout(provider.url + 'ticket/' + id, {}, SERVICE_POLICY.foldseek.statusMs)).json(); status = st && st.status; }
             catch (e) { /* transient - keep polling */ }
             if (status === 'ERROR' || status === 'FAILURE' || status === 'FAILED') throw new Error('Foldseek job ' + status);
             if (onProgress) onProgress('Foldseek ' + db + ' running… ' + elapsed() + 's (' + (status || '?') + ')');
         }
         if (status !== 'COMPLETE') throw new Error('Foldseek timed out after ' + elapsed() + 's');
-        const res = await fetch(provider.url + 'result/' + id + '/0');
+        const res = await fetchWithTimeout(provider.url + 'result/' + id + '/0', {}, SERVICE_POLICY.foldseek.resultMs);
         if (!res.ok) throw new Error('result HTTP ' + res.status);
         return await res.json();
     },
@@ -4504,6 +4528,69 @@ async function ensureExternalServices() {
     );
     if (ok) { externalServicesEnabled = true; syncExternalServicesMenu(); schedulePersist(); }
     return ok;
+}
+function syncServicePolicyLabels() {
+    const el = document.getElementById('esmfoldMaxLengthLabel');
+    if (el) el.textContent = String(SERVICE_POLICY.esmfold.maxLength);
+}
+function policyDuration(ms) {
+    const n = Number(ms) || 0;
+    if (n >= 60000 && n % 60000 === 0) return (n / 60000) + ' min';
+    return Math.round(n / 1000) + ' s';
+}
+// What the External services tab shows next to the app's own policy. Every
+// numeric app value comes from SERVICE_POLICY, so the table cannot drift.
+const SERVICE_POLICY_DOCS = [
+    { service: 'EBI BLAST / HMMER / InterProScan',
+      app: policyDuration(SERVICE_POLICY.ebiJob.submitMs) + ' submit, ' + policyDuration(SERVICE_POLICY.ebiJob.pollMs) + ' poll, ' + policyDuration(SERVICE_POLICY.ebiJob.deadlineMs) + ' deadline, one job at a time',
+      limit: 'Fair use: no more than 30 jobs per batch; a valid contact email; EBI keeps results for up to 7 days.',
+      href: 'https://www.ebi.ac.uk/jdispatcher/docs/webservices/#fair-use-policy', label: 'EBI fair use' },
+    { service: 'UniProt REST',
+      app: policyDuration(SERVICE_POLICY.uniProt.requestMs) + ' per request, ' + SERVICE_POLICY.uniProt.searchPageSize + ' search hits',
+      limit: 'No numeric quota published in the API docs or response headers; the app sends only the requests for the action you start.',
+      href: 'https://www.uniprot.org/help/programmatic_access', label: 'UniProt API' },
+    { service: 'EBI Search',
+      app: policyDuration(SERVICE_POLICY.ebiSearch.requestMs) + ', ' + SERVICE_POLICY.ebiSearch.pageSize + ' hits',
+      limit: 'At most 1,000 hits per request; the app asks for 20.',
+      href: 'https://www.ebi.ac.uk/ebisearch/documentation', label: 'EBI Search' },
+    { service: 'RCSB PDB search / GraphQL',
+      app: policyDuration(SERVICE_POLICY.rcsb.searchMs) + ' search, ' + policyDuration(SERVICE_POLICY.rcsb.metadataMs) + ' metadata, ' + SERVICE_POLICY.rcsb.sequenceRows + ' hits',
+      limit: 'At most 10,000 hits per pagination request (10 by default); the app asks for 8.',
+      href: 'https://search.rcsb.org/#pagination', label: 'RCSB search' },
+    { service: 'PDBe API',
+      app: policyDuration(SERVICE_POLICY.pdbe.lookupMs) + ' lookup, ' + policyDuration(SERVICE_POLICY.pdbe.validationMs) + ' validation, ' + SERVICE_POLICY.pdbe.bestStructures + ' best structures',
+      limit: 'No numeric quota published in the PDBe API docs; one request per action.',
+      href: 'https://www.ebi.ac.uk/pdbe/api/doc/', label: 'PDBe API' },
+    { service: 'AlphaFold DB',
+      app: policyDuration(SERVICE_POLICY.alphafold.metadataMs) + ' metadata, ' + policyDuration(SERVICE_POLICY.alphafold.downloadMs) + ' model download',
+      limit: 'No numeric quota published; one model is downloaded per action.',
+      href: 'https://alphafold.ebi.ac.uk/api-docs', label: 'AlphaFold API' },
+    { service: 'Ensembl REST / VEP',
+      app: policyDuration(SERVICE_POLICY.ensembl.requestMs) + ' lookup, ' + policyDuration(SERVICE_POLICY.ensembl.vepMs) + ' VEP, batches of ' + SERVICE_POLICY.ensembl.vepMaxVariants + ' variants',
+      limit: '55,000 requests/hour per IP (X-RateLimit headers); VEP accepts at most 1,000 variants per POST.',
+      href: 'https://rest.ensembl.org/', label: 'Ensembl REST' },
+    { service: 'Foldseek',
+      app: policyDuration(SERVICE_POLICY.foldseek.pollMs) + ' poll, ' + policyDuration(SERVICE_POLICY.foldseek.deadlineMs) + ' deadline, ' + SERVICE_POLICY.foldseek.maxHits + ' hits',
+      limit: 'No numeric quota published; one structure query at a time.',
+      href: 'https://search.foldseek.com/', label: 'Foldseek' },
+    { service: 'ESMFold (ESM Atlas)',
+      app: policyDuration(SERVICE_POLICY.esmfold.requestMs) + ', max ' + SERVICE_POLICY.esmfold.maxLength + ' aa',
+      limit: 'Maximum sequence length 400 aa.',
+      href: 'https://esmatlas.com/resources?action=fold', label: 'ESM Atlas' }
+];
+function renderServicePolicyTable() {
+    const host = document.getElementById('servicePolicyBody');
+    if (!host) return;
+    const esc = structureEscapeHtml;
+    const rows = SERVICE_POLICY_DOCS.map(r =>
+        '<tr>' +
+        '<td style="padding:5px 6px; border-top:1px solid #e2e8f0; vertical-align:top;"><strong>' + esc(r.service) + '</strong></td>' +
+        '<td style="padding:5px 6px; border-top:1px solid #e2e8f0; vertical-align:top;">' + esc(r.app) + '</td>' +
+        '<td style="padding:5px 6px; border-top:1px solid #e2e8f0; vertical-align:top;">' + esc(r.limit) + ' <a href="' + r.href + '" target="_blank" rel="noopener">' + esc(r.label) + ' ↗</a></td>' +
+        '</tr>').join('');
+    host.innerHTML = '<table style="width:100%; border-collapse:collapse; font-size:0.72rem; color:#475569;">' +
+        '<thead><tr><th style="text-align:left; padding:5px 6px;">Service</th><th style="text-align:left; padding:5px 6px;">This app</th><th style="text-align:left; padding:5px 6px;">Published limit</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table>';
 }
 function syncExternalServicesMenu() {
     const el = document.getElementById('menuExternalServices');
@@ -4608,14 +4695,14 @@ async function predictStructureESMFold() {
 // Shared by the current-sequence fetch and the Homolog Templates 3D action
 // (accession hits have no PDB id to fetch from RCSB).
 async function fetchAlphaFoldModelText(acc) {
-    const metaResp = await fetchWithTimeout(ENDPOINTS.alphafoldApi + encodeURIComponent(acc), { headers: { Accept: 'application/json' } }, 30000);
+    const metaResp = await fetchWithTimeout(ENDPOINTS.alphafoldApi + encodeURIComponent(acc), { headers: { Accept: 'application/json' } }, SERVICE_POLICY.alphafold.metadataMs);
     if (!metaResp.ok) throw new Error('AlphaFold DB lookup HTTP ' + metaResp.status);
     const meta = await metaResp.json();
     const entry = Array.isArray(meta) ? meta[0] : meta;
     const url = entry && (entry.pdbUrl || entry.cifUrl);
     if (!url) throw new Error('no model URL for ' + acc);
     const file = url.split('/').pop();
-    const fileResp = await fetchWithTimeout(url, {}, 60000);
+    const fileResp = await fetchWithTimeout(url, {}, SERVICE_POLICY.alphafold.downloadMs);
     if (!fileResp.ok) throw new Error('model download HTTP ' + fileResp.status);
     const text = await fileResp.text();
     const ext = /\.cif$/i.test(url) ? 'cif' : 'pdb';
@@ -4698,7 +4785,7 @@ function applyFoldseekHits(hits) {
     let startRank = 0;
     Object.keys(parsedTracks).forEach(k => { const m = k.match(/^HL_(\d+)_/); if (m) startRank = Math.max(startRank, parseInt(m[1], 10)); });
     let added = 0;
-    hits.slice(0, 20).forEach(hit => {
+    hits.slice(0, SERVICE_POLICY.foldseek.maxHits).forEach(hit => {
         if (hit.qStart == null || hit.qEnd == null || !hit.qAln) return;
         const rank = startRank + added + 1;
         const idPart = hit.pdbId || ((hit.target.split(/\s+/)[0] || 'hit').slice(0, 20));
@@ -5317,7 +5404,7 @@ async function realignPartialHomologs(keys, setStatus) {
     const partial = (keys || []).filter(k => {
         const c = homologCoverageRange(k);
         return c && c.pct < 95;
-    }).slice(0, 8);
+    }).slice(0, SERVICE_POLICY.homologs.realignLimit);
     let realigned = 0, failed = 0, filled = 0;
     for (let n = 0; n < partial.length; n++) {
         const key = partial[n];
@@ -5326,7 +5413,7 @@ async function realignPartialHomologs(keys, setStatus) {
         if (!acc) { failed++; continue; }
         try {
             if (setStatus) setStatus('Realigning ' + acc + ' onto the reference (' + (n + 1) + '/' + partial.length + ')\u2026');
-            const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(acc) + '.fasta', {}, 30000);
+            const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(acc) + '.fasta', {}, SERVICE_POLICY.uniProt.requestMs);
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             const fasta = await resp.text();
             const seq = fasta.split(/\r?\n/).filter(l => l && l[0] !== '>').join('').replace(/[^A-Za-z]/g, '');
@@ -5611,7 +5698,7 @@ async function resolveAccessionFromSequence(seq) {
 // The entry's FASTA sequence: an accession-only session has none, and every
 // sequence-based tool needs one.
 async function fetchUniProtFastaSequence(acc) {
-    const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(acc) + '.fasta', {}, 30000);
+    const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(acc) + '.fasta', {}, SERVICE_POLICY.uniProt.requestMs);
     if (!resp.ok) throw new Error('FASTA HTTP ' + resp.status);
     const text = await resp.text();
     const lines = String(text).split(/\r?\n/);
@@ -7609,12 +7696,12 @@ async function fetchPdbEntry(rawId) {
         if (!(await ensureExternalServices())) { endGuideTask('structure'); return false; }
         setStatus('Fetching ' + id + ' from RCSB PDB\u2026');
         let text = '', ext = 'pdb';
-        const pdbResp = await fetchWithTimeout(ENDPOINTS.rcsbDownload + id + '.pdb', {}, 60000);
+        const pdbResp = await fetchWithTimeout(ENDPOINTS.rcsbDownload + id + '.pdb', {}, SERVICE_POLICY.rcsb.downloadMs);
         if (pdbResp.ok) {
             text = await pdbResp.text();
         } else {
             setStatus('PDB format unavailable (' + pdbResp.status + '), trying CIF\u2026');
-            const cifResp = await fetchWithTimeout(ENDPOINTS.rcsbDownload + id + '.cif', {}, 60000);
+            const cifResp = await fetchWithTimeout(ENDPOINTS.rcsbDownload + id + '.cif', {}, SERVICE_POLICY.rcsb.downloadMs);
             if (!cifResp.ok) throw new Error('HTTP ' + pdbResp.status + '/' + cifResp.status);
             text = await cifResp.text();
             ext = 'cif';
@@ -8975,7 +9062,7 @@ const STEP_ACTION_RESOLVERS = {
         const model = a.model || (guideProfile.structure === 'experimental' ? 'pdb'
             : (guideProfile.structure === 'predicted' ? 'afdb'
             : (guideProfile.structure === 'none' ? 'esmfold' : '')));
-        if (model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (max 400 aa) and attaches the model.' + (singleChainGeneratorNote() ? ' ' + singleChainGeneratorNote() : '') };
+        if (model === 'esmfold') return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'Folds the current sequence via ESM Atlas (max ' + SERVICE_POLICY.esmfold.maxLength + ' aa) and attaches the model.' + (singleChainGeneratorNote() ? ' ' + singleChainGeneratorNote() : '') };
         if (model === 'afdb') {
             if (acc) return { label: 'Fetch AlphaFold model (' + acc + ')', run: 'fetchAlphaFoldModel()', hint: 'Downloads the AlphaFold DB model for ' + acc + ' and attaches it.' + (singleChainGeneratorNote() ? ' ' + singleChainGeneratorNote() : '') };
             return { label: 'Predict with ESMFold', run: 'predictStructureESMFold()', hint: 'AlphaFold DB needs an accession; without one, ESMFold folds the sequence directly instead.' };
@@ -9172,7 +9259,7 @@ async function fetchBiologicalAssembly(pdbId, assemblyN) {
         if (!(await ensureExternalServices())) { endGuideTask('structure'); return null; }
         setStatus('Fetching the biological assembly for ' + id + '…');
         const url = ENDPOINTS.rcsbDownload + id + '.pdb' + n;
-        const resp = await fetchWithTimeout(url, {}, 60000);
+        const resp = await fetchWithTimeout(url, {}, SERVICE_POLICY.rcsb.downloadMs);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const text = await resp.text();
         if (!/^(ATOM|HEADER|MODEL)/m.test(text)) throw new Error('not a coordinate file');
@@ -9440,7 +9527,7 @@ function switchDataCategory(name) {
     if (name === 'variants') { updateSpeciesUI(); detectSessionSpecies(); }
     const state = document.getElementById('optExternalState');
     if (state) state.textContent = 'External services are currently ' + (externalServicesEnabled ? 'ON' : 'OFF') + '.';
-    if (name === 'services') syncEbiContactEmailInput();
+    if (name === 'services') { syncEbiContactEmailInput(); renderServicePolicyTable(); }
     renderTopologySourceList();
     updateQuick2dTutorial();
     if (typeof tourOnUiEvent === 'function') tourOnUiEvent('data-category:' + name);
@@ -11826,7 +11913,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.68.2';
+const APP_VERSION = '0.68.3';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -15151,7 +15238,7 @@ async function detectSessionSpecies(force) {
     const acc = uniprotAccession || '';
     if (acc) {
         try {
-            const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(acc) + '.json?fields=organism_name', {}, 20000);
+            const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(acc) + '.json?fields=organism_name', {}, SERVICE_POLICY.uniProt.organismMs);
             if (resp.ok) {
                 const data = await resp.json();
                 const name = data && data.organism && data.organism.scientificName;
@@ -15207,7 +15294,7 @@ function pickEnsemblXref(data) {
 }
 async function resolveEnsemblTranscript(accession) {
     if (ensemblTranscriptCache[accession]) return ensemblTranscriptCache[accession];
-    const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(accession) + '.json?fields=xref_ensembl', {}, 30000);
+    const resp = await fetchWithTimeout(ENDPOINTS.uniprot + encodeURIComponent(accession) + '.json?fields=xref_ensembl', {}, SERVICE_POLICY.uniProt.xrefMs);
     if (!resp.ok) throw new Error('UniProt xref lookup HTTP ' + resp.status);
     const out = pickEnsemblXref(await resp.json());
     if (out) ensemblTranscriptCache[accession] = out;
@@ -15290,6 +15377,14 @@ function parseVepSiftResults(data, items) {
     });
     return { results, count: Object.keys(results).length, deleterious, tolerated };
 }
+// Split a list into fixed-size batches. Used where an API documents a per-POST
+// maximum (Ensembl VEP accepts at most 1,000 variants per request).
+function chunkValues(list, size) {
+    const out = [];
+    const n = Math.max(1, Number(size) || 1);
+    for (let i = 0; i < (list || []).length; i += n) out.push(list.slice(i, i + n));
+    return out;
+}
 let variantEffectResults = {}; // { 'R175H': { providerId: { label, detail, level } } }
 let variantEffectRan = {};     // providerId -> { ok, count, message }
 const VARIANT_EFFECT_PROVIDERS = {
@@ -15300,13 +15395,13 @@ const VARIANT_EFFECT_PROVIDERS = {
         needs: 'a UniProt accession',
         available: (ctx) => !!ctx.accession,
         run: async (ctx) => {
-            const metaResp = await fetchWithTimeout(ENDPOINTS.alphafoldApi + encodeURIComponent(ctx.accession), { headers: { Accept: 'application/json' } }, 30000);
+            const metaResp = await fetchWithTimeout(ENDPOINTS.alphafoldApi + encodeURIComponent(ctx.accession), { headers: { Accept: 'application/json' } }, SERVICE_POLICY.alphafold.metadataMs);
             if (!metaResp.ok) throw new Error('AlphaFold DB lookup HTTP ' + metaResp.status);
             const meta = await metaResp.json();
             const entry = Array.isArray(meta) ? meta[0] : meta;
             const url = entry && entry.amAnnotationsUrl;
             if (!url) throw new Error('no AlphaMissense annotations for ' + ctx.accession + ' (they exist for human proteins)');
-            const csvResp = await fetchWithTimeout(url, {}, 60000);
+            const csvResp = await fetchWithTimeout(url, {}, SERVICE_POLICY.alphafold.downloadMs);
             if (!csvResp.ok) throw new Error('annotation download HTTP ' + csvResp.status);
             alphaMissenseScores = parseAlphaMissenseCsv(await csvResp.text(), ctx.substitutions.map(x => x.key));
             alphaMissenseAccession = ctx.accession;
@@ -15339,23 +15434,31 @@ const VARIANT_EFFECT_PROVIDERS = {
         run: async (ctx) => {
             const map = await resolveEnsemblTranscript(ctx.accession);
             if (!map) throw new Error('no Ensembl transcript cross-reference for ' + ctx.accession);
-            const protResp = await fetchWithTimeout(ENDPOINTS.ensemblRest + 'sequence/id/' + encodeURIComponent(map.protein) + '?content-type=text/x-fasta', {}, 30000);
+            const protResp = await fetchWithTimeout(ENDPOINTS.ensemblRest + 'sequence/id/' + encodeURIComponent(map.protein) + '?content-type=text/x-fasta', {}, SERVICE_POLICY.ensembl.requestMs);
             if (!protResp.ok) throw new Error('Ensembl protein lookup HTTP ' + protResp.status);
             const ensProtein = String(await protResp.text()).split('\n').filter(l => l && l.charAt(0) !== '>').join('').trim();
             if (!ensProtein) throw new Error('empty Ensembl protein for ' + map.protein);
             const mapped = ensemblHgvsForSubstitutions(ensProtein, map.transcript, map.version, ctx.substitutions);
             if (!mapped.items.length) throw new Error('none of the substitutions map onto the Ensembl protein (' + map.protein + ')');
-            const resp = await fetchWithTimeout(ENDPOINTS.ensemblRest + 'vep/' + encodeURIComponent(ctx.species) + '/hgvs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                body: JSON.stringify({ hgvs_notations: mapped.items.map(x => x.hgvs) })
-            }, 90000);
-            if (!resp.ok) throw new Error('VEP HTTP ' + resp.status);
-            const out = parseVepSiftResults(await resp.json(), mapped.items);
-            const summary = out.count + ' of ' + ctx.substitutions.length + ' substitution(s) scored by SIFT' +
-                (out.count ? ' (' + out.deleterious + ' deleterious, ' + out.tolerated + ' tolerated)' : '') +
+            const batches = chunkValues(mapped.items, SERVICE_POLICY.ensembl.vepMaxVariants);
+            const results = {};
+            let count = 0, deleterious = 0, tolerated = 0;
+            for (let i = 0; i < batches.length; i++) {
+                const batch = batches[i];
+                const resp = await fetchWithTimeout(ENDPOINTS.ensemblRest + 'vep/' + encodeURIComponent(ctx.species) + '/hgvs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ hgvs_notations: batch.map(x => x.hgvs) })
+                }, SERVICE_POLICY.ensembl.vepMs);
+                if (!resp.ok) throw new Error('VEP HTTP ' + resp.status + (batches.length > 1 ? ' (batch ' + (i + 1) + '/' + batches.length + ')' : ''));
+                const out = parseVepSiftResults(await resp.json(), batch);
+                Object.assign(results, out.results);
+                count += out.count; deleterious += out.deleterious; tolerated += out.tolerated;
+            }
+            const summary = count + ' of ' + ctx.substitutions.length + ' substitution(s) scored by SIFT' +
+                (count ? ' (' + deleterious + ' deleterious, ' + tolerated + ' tolerated)' : '') +
                 (mapped.failed ? '; ' + mapped.failed + ' could not be mapped onto the Ensembl protein' : '');
-            return { results: out.results, summary };
+            return { results, summary };
         }
     },
     conservation: {
@@ -19601,7 +19704,7 @@ async function ensureP3Dmol() {
     }
     for (const url of P3D_CDN_URLS) {
         try {
-            const resp = await fetch(url);
+            const resp = await fetchWithTimeout(url, {}, SERVICE_POLICY.assets.requestMs);
             if (!resp.ok) continue;
             const text = await resp.text();
             try { await p3dDBSet('3dmol.js', text); }
@@ -19712,7 +19815,7 @@ function p3dPdbIdFromHitId(hitId) {
 async function fetchP3DStructureFromRCSB(pdbId) {
     for (const ext of ['pdb', 'cif']) {
         try {
-            const resp = await fetch(P3D_RCSB_BASE_URL + pdbId + '.' + ext);
+            const resp = await fetchWithTimeout(P3D_RCSB_BASE_URL + pdbId + '.' + ext, {}, SERVICE_POLICY.rcsb.downloadMs);
             if (!resp.ok) continue;
             const text = await resp.text();
             if (!text || text.trim().length < 60 || text.length > P3D_RCSB_SIZE_CAP) continue;
@@ -22019,6 +22122,7 @@ function copyText(elementId) {
 populateCommandEngineSelect();
 updateSidebarCommandLabels();
 syncExternalServicesMenu();
+syncServicePolicyLabels();
 mountDataSourcesPanel();
 syncQaHighlights(); // fresh-visit default: the new-feature purple outlines are OFF
 applyTypePalette('default'); // fresh-visit default; loadStateFromStorage() overrides it if a saved palette exists

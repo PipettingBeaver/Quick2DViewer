@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.68.3] - 2026-10-25
+
+### Changed
+- **Named service policy.** Request timeouts, submit attempts, poll cadence, job
+  deadlines and result caps now live in `SERVICE_POLICY`. Foldseek requests now
+  have timeouts, the ESMFold 400 aa limit is read from the policy, and every
+  network call goes through `fetchWithTimeout`.
+- **External services tab** now lists the app policy and the documented limit
+  for each service, with links to the provider docs.
+
+### Fixed
+- **Ensembl VEP batching.** VEP accepts at most 1,000 variants per POST; larger
+  substitution sets are split into batches and merged instead of failing the
+  whole request.
+
 ## [0.68.2] - 2026-10-25
 
 ### Changed

@@ -55,6 +55,14 @@ shared non-provider bases (UniProt FASTA, AlphaFold metadata, Ensembl, RCSB
 GraphQL) live in `ENDPOINTS`. Adapters never carry a URL literal, so a moved
 service is a one-line change and cannot leave a second stale copy behind.
 
+**Client policy:** `SERVICE_POLICY` owns request timeouts, submit attempts, poll
+cadence, job deadlines and result caps. `SERVICE_POLICY_DOCS` feeds the External
+services panel; tests check it covers every service family. Published limits sit
+beside the app policy: EBI fair use (≤30 jobs per batch, valid contact email),
+EBI Search (≤1,000 hits per request), RCSB search (≤10,000 per pagination
+request), Ensembl REST (55,000 requests/hour) and VEP (≤1,000 variants per
+POST, batched by the app).
+
 ## 4. Architecture change #1 — `trackMeta` + source tagging (enabling refactor)
 
 Every track records provenance:

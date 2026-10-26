@@ -662,6 +662,43 @@ address is missing or invalid, explain what to do before making a request.
 
 ---
 
+### Service policies — 0.68.3
+
+**Surface.** Options → Data Sources → **External services**; every network action.
+
+**Should do.** Show the app's timeouts, poll cadence, deadlines and result caps
+next to the provider's published limit, and keep every numeric value in
+`SERVICE_POLICY` so the table, the ESMFold limit and the adapters cannot drift.
+
+**Try.**
+1. Open **Options → Data Sources → External services**, then expand
+   **Service policies and documented limits**.
+   *Expect:* one row per service family (EBI Job Dispatcher, UniProt, EBI Search,
+   RCSB, PDBe, AlphaFold DB, Ensembl, Foldseek, ESMFold) with *This app*,
+   *Published limit* and a documentation link.
+2. Open **Options → Data Sources → Structure models**.
+   *Expect:* ESMFold still reads "max 400 aa", sourced from the policy.
+3. Run **Scan domains** or **Find homologs**.
+   *Expect:* the job behaves as before; no timeout or retry value is duplicated
+   in the adapter.
+4. With a variant FASTA that yields more than 1,000 substitutions, run
+   **Assess variant effects**.
+   *Expect:* VEP is called in batches of 1,000 and the results are merged. This
+   is a manual check; the batch split itself is harness-tested.
+
+**Edge cases.**
+- *Client vs server* - the timeouts and result caps are app policy, not provider
+  quotas; the published column says "no numeric quota" where none is documented.
+- *A slow service* - raise the matching `SERVICE_POLICY` value; the table text
+  updates from it automatically.
+- *One VEP batch fails* - the error names the batch and the other variant-effect
+  providers still report their own results.
+- *Harness* - the policy values, table coverage, VEP split, ESMFold label and the
+  "every awaited request uses `SERVICE_POLICY`" invariant are checked in
+  `tests/run.js`; the live multi-batch VEP path is manual.
+
+---
+
 ### Protein summary panel — 0.67.9 (structured rendering 0.67.24)
 
 **Surface.** Selection workspace → **Protein Summary** section; methods report.
