@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-giLczTAhZYyZWyJIbyd8l8GsVIvIFg5gAYl2hkKcacE=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-8UbzkXxdEiXmiTnrrYBxIosBHA65JuxOoUPxac/N4lk=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -513,6 +513,24 @@
             cursor: pointer;
         }
         .app-version:hover { background: #e2e8f0; color: #334155; }
+        .app-host {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 1px 7px;
+            border: 1px solid #a5f3fc;
+            border-radius: 999px;
+            background: #ecfeff;
+            color: #0e7490;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            vertical-align: middle;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .app-host:hover { background: #cffafe; color: #155e75; }
+        .app-host.chimerax { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+        .app-host.chimerax:hover { background: #dcfce7; color: #166534; }
         /* Changelog modal rendering. */
         #changelogBody h3.cl-ver, .doc-body h3.cl-ver { font-size: 0.95rem; color: #0f172a; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
         #changelogBody h3.cl-ver:first-child, .doc-body h3.cl-ver:first-child { margin-top: 0; padding-top: 0; border-top: none; }
@@ -2144,7 +2162,7 @@
 <div class="container">
     <div class="app-header">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <h2><span id="appTitle">Quick2DViewer - 1D Protein Viewer</span> <button type="button" class="app-version" id="appVersion" title="View the changelog" data-action="openChangelogModal"></button></h2>
+            <h2><span id="appTitle">Quick2DViewer - 1D Protein Viewer</span> <button type="button" class="app-version" id="appVersion" title="View the changelog" data-action="openChangelogModal"></button><button type="button" class="app-host" id="appHost" title="Detect the Q2DV host" data-action="showHostInfo"></button></h2>
             <span class="jump-box">
                 <input id="jumpInput" type="search" placeholder="Jump to…" autocomplete="off"
                     aria-label="Jump to a menu, tab, guide step, data source or loaded track"
@@ -3848,6 +3866,34 @@ const APP_FASTA_FALLBACK = APP_SHORT + '_sequence';
 const CSP_TUTORIAL_NONCE = '9f3a7c1e5b2d8064a1c9e7f30b5d2468';
 // Lowercase brand used by generated file names and storage keys.
 const APP_FILE_PREFIX = 'q2dv';
+// Host detection: browser is the default; the ChimeraX bundle serves the page
+// with ?host=chimerax or exposes window.Q2DVHost.kind === 'chimerax'.
+function detectQ2DVHostMode() {
+    if (typeof window !== 'undefined' && window.Q2DVHost && window.Q2DVHost.kind === 'chimerax') return 'chimerax';
+    if (typeof window !== 'undefined' && window.__Q2DV_HOST__ === 'chimerax') return 'chimerax';
+    try {
+        if (new URLSearchParams((window.location && window.location.search) || '').get('host') === 'chimerax') return 'chimerax';
+    } catch (e) { /* no URLSearchParams */ }
+    return 'standalone';
+}
+function syncQ2DVHostBadge() {
+    const el = document.getElementById('appHost');
+    if (!el) return;
+    const mode = detectQ2DVHostMode();
+    el.textContent = mode === 'chimerax' ? 'ChimeraX' : 'Standalone';
+    el.classList.toggle('chimerax', mode === 'chimerax');
+    el.title = mode === 'chimerax'
+        ? 'ChimeraX host detected - click for details'
+        : 'Browser host detected - click for details';
+    el.setAttribute('aria-label', el.title);
+}
+function showHostInfo() {
+    const chimerax = detectQ2DVHostMode() === 'chimerax';
+    showToast(chimerax
+        ? 'ChimeraX detected. Functions are linked to ChimeraX.'
+        : 'Browser detected. Functions and data are standalone, and not linked to ChimeraX.',
+        chimerax ? 'success' : 'info', { dismissible: true });
+}
 function safeFileSlug(value, maxLen) {
     return String(value == null ? '' : value)
         .replace(/[^A-Za-z0-9._-]+/g, '_')
@@ -12244,7 +12290,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.69.0';
+const APP_VERSION = '0.70.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -23067,6 +23113,7 @@ initSeqSearch();
     if (titleEl) titleEl.textContent = APP_TITLE;
     const el = document.getElementById('appVersion');
     if (el) el.textContent = 'v' + APP_VERSION;
+    syncQ2DVHostBadge();
 })();
 // --- Delegated event handlers ---------------------------------------------
 // The static HTML no longer carries inline handlers, so a strict CSP can be
@@ -23221,6 +23268,7 @@ const ACTION_HANDLERS = {
     pasteQuick2DHere: delegateAction(pasteQuick2DHere),
     predictStructureESMFold: delegateAction(predictStructureESMFold),
     refreshChimeraxDisplay: delegateAction(refreshChimeraxDisplay),
+    showHostInfo: delegateAction(showHostInfo),
     renderBundleClaims: delegateAction(renderBundleClaims),
     renderColocalizationTable: delegateAction(renderColocalizationTable),
     renderConstructPreview: delegateAction(renderConstructPreview),

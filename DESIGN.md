@@ -1219,3 +1219,12 @@ right), with the per-view `<details>` accordions and the repeated dropdown hint
 removed and a neutral `✕` close. Quick2D additionally uses the shared dashed
 `.ds-dropzone` and keeps its animation in a single "Selection Guide" helper
 (0.67.30). New views should follow this shell rather than the old accordion.
+
+
+## 29. ChimeraX plugin (planning, 2026-10)
+
+Q2DV remains one core with two hosts: the public browser and an optional
+ChimeraX panel. The ChimeraX-first UI, host adapter, full-page embed, membrane
+recipes, add-on review and phased plan are in `CHIMERAX_PLUGIN_PLAN.md`. Do not
+fork the browser app; the browser host is the reference implementation when the
+ChimeraX adapter is absent.

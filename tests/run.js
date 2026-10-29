@@ -1002,6 +1002,29 @@ assert(ctxRun(`APP_NAME`) === 'Quick2DViewer' && ctxRun(`APP_TAGLINE`) === '1D P
 assert(HTML.indexOf('<title>' + ctxRun('APP_TITLE') + '</title>') !== -1, 'the static title matches the identity constant');
 assert(HTML.indexOf('id="appTitle">' + ctxRun('APP_TITLE') + '<') !== -1, 'the header fallback matches the identity constant');
 assert(ctxRun(`document.title`) === ctxRun(`APP_TITLE`) && ctxRun(`document.getElementById('appTitle').textContent`) === ctxRun(`APP_TITLE`), 'the title and header are set from the constant on load');
+assert(ctxRun(`typeof detectQ2DVHostMode === 'function' && typeof showHostInfo === 'function'`), 'host detection and host info handlers exist');
+assert(ctxRun(`detectQ2DVHostMode()`) === 'standalone', 'the test host is detected as standalone');
+assert(ctxRun(`document.getElementById('appHost').textContent`) === 'Standalone', 'the host badge starts as Standalone');
+ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+assert(ctxRun(`detectQ2DVHostMode()`) === 'chimerax' && ctxRun(`document.getElementById('appHost').textContent`) === 'ChimeraX', 'the ChimeraX marker updates the host badge');
+ctxRun(`
+    window.__hostToastCx = null;
+    const __origToastCx = showToast;
+    showToast = (m, t, o) => { window.__hostToastCx = { m, t, o }; };
+    showHostInfo();
+    showToast = __origToastCx;
+`);
+assert(ctxRun(`window.__hostToastCx.m`) === 'ChimeraX detected. Functions are linked to ChimeraX.' && ctxRun(`window.__hostToastCx.t`) === 'success', 'the ChimeraX click message is explicit');
+ctxRun(`delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
+assert(ctxRun(`detectQ2DVHostMode()`) === 'standalone' && ctxRun(`document.getElementById('appHost').textContent`) === 'Standalone', 'removing the marker returns the badge to Standalone');
+ctxRun(`
+    window.__hostToastBrowser = null;
+    const __origToastBrowser = showToast;
+    showToast = (m, t, o) => { window.__hostToastBrowser = { m, t, o }; };
+    showHostInfo();
+    showToast = __origToastBrowser;
+`);
+assert(ctxRun(`window.__hostToastBrowser.m`) === 'Browser detected. Functions and data are standalone, and not linked to ChimeraX.' && ctxRun(`window.__hostToastBrowser.t`) === 'info', 'the browser click message is explicit');
 ctxRun(`parsedTracks = { AA: 'M' };`);
 assert(ctxRun(`buildFullSavePayload().appName`) === ctxRun(`APP_TITLE`), 'the full save uses the app title');
 ctxRun(`parsedTracks = {};`);

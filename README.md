@@ -10,5 +10,7 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
   DOI-verified citations. **Generated** from the app by
   `npm run doc:workflow` (`node tools/build-workflow-doc.js`); do not edit by hand.
 - `DESIGN.md` — architecture decisions, roadmap and open items.
+- `CHIMERAX_PLUGIN_PLAN.md` — ChimeraX-first plugin plan, host architecture, add-on review and phased roadmap.
+- `CHIMERAX_STARTUP.md` — CliX + Q2DV startup configuration for ChimeraX.
 - `UX_GUIDELINES.md` — the design-pass checklist and UI conventions.
 - `CHANGELOG.md` — release notes (also readable in-app via the version badge).

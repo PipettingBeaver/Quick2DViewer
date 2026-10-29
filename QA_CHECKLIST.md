@@ -101,6 +101,30 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Host badge - 0.70.0
+
+**Surface.** Header title, immediately beside the version badge.
+
+**Should do.** Show `Standalone` in a normal browser and `ChimeraX` in the
+embedded host. Clicking the bubble explains which host was detected and whether
+functions are linked to ChimeraX.
+
+**Try.**
+1. Open the page in a browser. Expect the bubble to read **Standalone**; click it
+   and expect the browser-specific message.
+2. Open it through `Q2DV Full` or append `?host=chimerax`. Expect **ChimeraX**;
+   click it and expect the ChimeraX-specific message.
+3. Confirm the header still fits at narrow width and the version bubble still
+   opens the changelog.
+
+**Edge cases.**
+- No host marker: must default to Standalone, never ChimeraX.
+- Marker removed after load: `syncQ2DVHostBadge()` must return to Standalone.
+- Header wraps: the host bubble must stay next to the version and not overlap the
+  menu.
+- A spoofed `?host=chimerax` is informational only; it must not enable or imply a
+  working ChimeraX bridge.
+
 ### Evidence bundle loader + Claims/Relations - 0.69.0
 
 **Surface.** Data modal -> **Evidence Bundle**; the claims/relations/features tables;

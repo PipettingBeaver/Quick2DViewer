@@ -12,6 +12,20 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.70.0] - 2026-10-28
+
+### Added
+- **Host badge in the header.** A small `Standalone` / `ChimeraX` bubble now sits
+  next to the version. It is set from `window.Q2DVHost`, `window.__Q2DV_HOST__`,
+  or `?host=chimerax`, and clicking it explains whether functions are linked to
+  ChimeraX or remain standalone.
+- **Full ChimeraX host sets the marker.** `Q2DV Full` serves the pinned page with
+  `?host=chimerax`, so the embedded panel reports the ChimeraX host.
+
+### Tests
+- Host detection, badge synchronization, and the two click messages are covered
+  in the headless harness.
+
 ## [0.69.0] - 2026-10-26
 
 ### Added
