@@ -101,6 +101,25 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Native toggle listeners - 0.71.4
+
+**Surface.** Guide, rules, interface, ensemble and construct `<details>` sections,
+in the browser and ChimeraX hosts.
+
+**Should do.** Opening the rules section renders presets; opening/closing the
+guide clears its coachmark; interface and ensemble sections refresh; the
+construct preview updates. No inline handlers or CSP errors.
+
+**Try.**
+1. Open each section in the browser build.
+2. Repeat in Q2DV Full.
+3. Confirm the expected refresh/clear action each time.
+
+**Edge cases.**
+- A section without `data-toggle-action` must be ignored.
+- A missing action key must not throw.
+- Do not revert to inline `ontoggle` handlers.
+
 ### CSP-safe collapsible sections - 0.71.3
 
 **Surface.** Guide, rules, interface, ensemble and construct `<details>` sections.

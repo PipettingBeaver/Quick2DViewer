@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.71.4] - 2026-10-29
+
+### Fixed
+- **Collapsible sections in both hosts.** The guide, rules, interface, ensemble
+  and construct `<details>` elements now receive native `toggle` listeners after
+  DOM load instead of relying on capture-phase delegation. This restores the
+  browser refresh/clear behaviour while keeping the CSP-safe `data-toggle-action`
+  attributes.
+
 ## [0.71.3] - 2026-10-29
 
 ### Fixed
