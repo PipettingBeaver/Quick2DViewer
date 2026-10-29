@@ -101,6 +101,29 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### ChimeraX host selection + P3D guard - 0.71.0
+
+**Surface.** Q2DV header host badge; View menu; full ChimeraX toolbar.
+
+**Should do.** In the ChimeraX host, hide the browser 3D viewer, mark the page
+with `data-q2dv-host="chimerax"`, and send the current 1-indexed selection ranges
+to ChimeraX through the QWebChannel `Send selection` action.
+
+**Try.**
+1. Open `Q2DV Full`. The host badge reads **ChimeraX**.
+2. Use **View -> Toggle 3D Viewer**; expect the informational message that
+   ChimeraX provides 3D, not a Py3Dmol panel.
+3. Select a residue range, click **Send selection**, and check the ChimeraX
+   selection.
+4. Open the same page in a browser; the host badge reads **Standalone** and the
+   browser 3D viewer remains available.
+
+**Edge cases.**
+- Empty selection: the toolbar must say to make a selection and send nothing.
+- A range containing zero or reversed endpoints must not be sent.
+- Selection ranges are 1-indexed and inclusive.
+- The browser host must not set `data-q2dv-host="chimerax"`.
+
 ### Host badge - 0.70.0
 
 **Surface.** Header title, immediately beside the version badge.

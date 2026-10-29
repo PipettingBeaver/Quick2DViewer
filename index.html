@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-8UbzkXxdEiXmiTnrrYBxIosBHA65JuxOoUPxac/N4lk=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-q8X0EdXqh+4BRxjFJcbrVNxvMWMz8RxFU3QWIiQPMEw=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -531,6 +531,8 @@
         .app-host:hover { background: #cffafe; color: #155e75; }
         .app-host.chimerax { border-color: #86efac; background: #f0fdf4; color: #15803d; }
         .app-host.chimerax:hover { background: #dcfce7; color: #166534; }
+        [data-q2dv-host="chimerax"] [data-action="menuBarAction"][data-arg="p3d"] { display: none !important; }
+        [data-q2dv-host="chimerax"] #p3dViewer { display: none !important; }
         /* Changelog modal rendering. */
         #changelogBody h3.cl-ver, .doc-body h3.cl-ver { font-size: 0.95rem; color: #0f172a; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
         #changelogBody h3.cl-ver:first-child, .doc-body h3.cl-ver:first-child { margin-top: 0; padding-top: 0; border-top: none; }
@@ -3886,6 +3888,8 @@ function syncQ2DVHostBadge() {
         ? 'ChimeraX host detected - click for details'
         : 'Browser host detected - click for details';
     el.setAttribute('aria-label', el.title);
+    document.documentElement.setAttribute('data-q2dv-host', mode);
+    document.documentElement.classList.toggle('host-chimerax', mode === 'chimerax');
 }
 function showHostInfo() {
     const chimerax = detectQ2DVHostMode() === 'chimerax';
@@ -12290,7 +12294,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.70.0';
+const APP_VERSION = '0.71.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -18025,6 +18029,15 @@ function getCurrentRangesZeroBased() {
     }
     return mergeRanges(ranges);
 }
+function getQ2DVSelectionContext() {
+    const ranges = getCurrentRangesZeroBased().map(([s, e]) => [s + 1, e + 1]);
+    if (!ranges.length) return null;
+    return {
+        source: 'q2dv',
+        ranges,
+        length: parsedTracks.AA ? parsedTracks.AA.length : null
+    };
+}
 
 // Renders the sidebar for a manual, possibly-piecewise selection carried in
 // rowRanges (0-based) - mirrors calculateRowSelectionMetadata but without an
@@ -19946,6 +19959,10 @@ function placeP3DViewer() {
 }
 
 function toggleP3DViewer() {
+    if (detectQ2DVHostMode() === 'chimerax') {
+        showToast('3D view is provided by ChimeraX in this host.', 'info');
+        return;
+    }
     if (p3dViewerOpen) closeP3DViewer();
     else openP3DViewer();
 }

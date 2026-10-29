@@ -1025,6 +1025,24 @@ ctxRun(`
     showToast = __origToastBrowser;
 `);
 assert(ctxRun(`window.__hostToastBrowser.m`) === 'Browser detected. Functions and data are standalone, and not linked to ChimeraX.' && ctxRun(`window.__hostToastBrowser.t`) === 'info', 'the browser click message is explicit');
+
+ctxRun(`parsedTracks = { AA: 'MAMMAM' }; selectionMode = 'point'; rowRanges = []; selectStart = 1; selectEnd = 3;`);
+const selectionContext = ctxRun(`getQ2DVSelectionContext()`);
+assert(selectionContext && JSON.stringify(selectionContext.ranges) === '[[2,4]]' && selectionContext.length === 6, 'the selection context is 1-indexed and carries the sequence length');
+ctxRun(`selectStart = null; selectEnd = null; rowRanges = []; lastRanges = null;`);
+assert(ctxRun(`getQ2DVSelectionContext()`) === null, 'an empty selection has no context');
+ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+assert(ctxRun(`document.documentElement.getAttribute('data-q2dv-host')`) === 'chimerax', 'the ChimeraX host attribute is applied');
+ctxRun(`
+    window.__hostP3DToast = null;
+    const __origP3DToast = showToast;
+    showToast = (m, t, o) => { window.__hostP3DToast = { m, t, o }; };
+    toggleP3DViewer();
+    showToast = __origP3DToast;
+`);
+assert(ctxRun(`window.__hostP3DToast.m`) === '3D view is provided by ChimeraX in this host.' && ctxRun(`window.__hostP3DToast.t`) === 'info', 'the ChimeraX host refuses the browser 3D viewer');
+ctxRun(`delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
+assert(ctxRun(`document.documentElement.getAttribute('data-q2dv-host')`) === 'standalone', 'the host attribute is removed for the browser');
 ctxRun(`parsedTracks = { AA: 'M' };`);
 assert(ctxRun(`buildFullSavePayload().appName`) === ctxRun(`APP_TITLE`), 'the full save uses the app title');
 ctxRun(`parsedTracks = {};`);

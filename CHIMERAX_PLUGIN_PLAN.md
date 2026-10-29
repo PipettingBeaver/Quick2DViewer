@@ -1,6 +1,6 @@
 # Quick2DViewer + ChimeraX plugin plan
 
-**Status:** Phase 1 in progress; 2026-10-28. The loopback server and bundle endpoints are verified; full visual QA and QWebChannel are pending.  
+**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.0. The full page loads, the bundle auto-loads as Q52356, the QWebChannel ping returns, selection context is wired, and Py3Dmol is disabled in the host. Full recipe/UI QA and membrane recipes remain.  
 **Scope:** general Q2DV program, not lab-specific TerC data  
 **Decision:** keep one Q2DV core with two hosts: browser and ChimeraX. Do not fork.
 
@@ -65,7 +65,7 @@ implementation.
 |---|---|---|---|
 | Load local bundle | folder picker / URL | loopback `/bundle/manifest.json` | prototyped |
 | Claims/relations/features | yes | same UI | existing core |
-| Residue selection | yes | sends context to ChimeraX | in progress |
+| Residue selection | yes | sends context to ChimeraX | implemented via Send selection |
 | Recipe execution | copy `.cxc` | allowlisted QWebChannel command | in progress |
 | Save image | browser download | ChimeraX save | existing prototype |
 | Public app unaffected | yes | optional host | requirement |

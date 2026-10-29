@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.71.0] - 2026-10-29
+
+### Added
+- **Selection context for the ChimeraX host.** Q2DV now exposes the current
+  1-indexed selection ranges through `getQ2DVSelectionContext()`; the full host
+  has a `Send selection` action that forwards them over QWebChannel.
+- **ChimeraX host attribute.** The page marks itself with
+  `data-q2dv-host="chimerax"` when the host is detected.
+
+### Changed
+- **Py3Dmol is disabled in the ChimeraX host.** The browser 3D viewer menu item
+  and floating panel are hidden; attempting to open the viewer explains that
+  ChimeraX provides the 3D view.
+- **Full-host toolbar** now includes `Send selection` ahead of the fixed recipes.
+
 ## [0.70.0] - 2026-10-28
 
 ### Added
