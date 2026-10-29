@@ -12,6 +12,22 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.71.3] - 2026-10-29
+
+### Fixed
+- **CSP-safe collapsible sections.** The remaining inline `ontoggle` handlers
+  were replaced with delegated `data-toggle-action` handling. This removes the
+  `script-src` violation when a guide, rules, interface, ensemble or construct
+  section is expanded.
+
+## [0.71.2] - 2026-10-29
+
+### Changed
+- **Clipboard paste controls are hidden in the ChimeraX host.** The Input Data
+  paste button, the Quick2D panel paste button, and the click-to-paste dropzone
+  are hidden because Qt WebEngine does not reliably expose the system clipboard.
+  Raw text entry and file attachment remain available.
+
 ## [0.71.1] - 2026-10-29
 
 ### Changed

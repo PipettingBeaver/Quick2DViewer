@@ -1066,7 +1066,7 @@ assert(app.indexOf('Q2DV_sequence') === -1, 'the FASTA fallback is no longer a l
 
 section('event delegation (static HTML)');
 const staticHtml = HTML.slice(0, HTML.indexOf('<script>'));
-assert(!/\son(click|change|input|keydown|focus|dragover|drop)=/.test(staticHtml), 'static HTML has no inline event handlers');
+assert(!/\son(click|change|input|keydown|focus|dragover|drop|toggle)=/.test(staticHtml), 'static HTML has no inline event handlers');
 const staticActions = [...new Set((staticHtml.match(/data-action="([^"]+)"/g) || []).map(x => x.slice(13, -1)))];
 assert(staticActions.length > 100, 'the static UI is wired through data-action (got ' + staticActions.length + ')');
 assert(ctxRun(`(${JSON.stringify(staticActions)}).every(a => typeof ACTION_HANDLERS[a] === 'function')`) === true, 'every static data-action has a handler');
@@ -1391,7 +1391,7 @@ assert(ctxRun(`actionLog.some(e => e.kind === 'render' && String(e.detail).index
 assert(ctxRun(`String(actionLog.filter(e => e.kind === 'render').pop().detail)`) === '8 card(s)', 'and the count is the real one');
 // robustness wiring
 assert(HTML.indexOf("section.appendChild(wrap)") !== -1, 'a missing preset container is recreated rather than silently skipped');
-assert(HTML.indexOf("ontoggle=\"if (this.open) renderRulePresets();\"") !== -1, 'opening the presets section refreshes them');
+assert(HTML.indexOf('data-toggle-action="renderRulePresets"') !== -1, 'opening the presets section refreshes them');
 assert(HTML.indexOf("window.addEventListener('error'") !== -1 && HTML.indexOf("window.addEventListener('unhandledrejection'") !== -1, 'uncaught errors are recorded in the action log');
 ctxRun(`actionLog = [];`);
 

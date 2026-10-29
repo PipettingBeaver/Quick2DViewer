@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/Pp/PbMDcKb9/YPMJswTf8vRtEUTJH4h3OhJBcdokIw=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MXwCjz2pW80ur/1/z6T50voSBHnBb7s63adaPmOC04E=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -533,6 +533,9 @@
         .app-host.chimerax:hover { background: #dcfce7; color: #166534; }
         [data-q2dv-host="chimerax"] [data-action="menuBarAction"][data-arg="p3d"] { display: none !important; }
         [data-q2dv-host="chimerax"] #p3dViewer { display: none !important; }
+        [data-q2dv-host="chimerax"] [data-action="handlePasteFromClipboard"],
+        [data-q2dv-host="chimerax"] [data-action="pasteQuick2DHere"],
+        [data-q2dv-host="chimerax"] .ds-dropzone { display: none !important; }
         /* Changelog modal rendering. */
         #changelogBody h3.cl-ver, .doc-body h3.cl-ver { font-size: 0.95rem; color: #0f172a; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
         #changelogBody h3.cl-ver:first-child, .doc-body h3.cl-ver:first-child { margin-top: 0; padding-top: 0; border-top: none; }
@@ -2627,7 +2630,7 @@
 
             <div class="sidebar-panel" id="side-panel-analyze" role="tabpanel" aria-labelledby="tab-analyze" tabindex="0" hidden>
                 <details class="workflow-section qa-new" id="rulesSection" open style="margin-top: 0;"
-                    ontoggle="if (!this.open) clearGuideCoachmark();">
+                    data-toggle-action="clearGuideOnClose">
                     <summary>Rules (contradiction / co-localization)</summary>
                     <div id="guideCoachmarkRules" class="guide-coachmark" hidden></div>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
@@ -2636,7 +2639,7 @@
                     <button type="button" class="tb-btn tb-btn-secondary" data-action="openRuleEditor" style="font-size:0.72rem; padding:3px 8px;">+ New rule</button>
                     <div id="rulesList" style="margin-top:8px;"></div>
                     <details id="rulePresetsSection" style="margin-top:10px;"
-                        ontoggle="if (this.open) renderRulePresets();">
+                        data-toggle-action="renderRulePresets">
                         <summary style="font-size:0.75rem; font-weight:600; color:#334155; cursor:pointer;">Presets (curated rules)</summary>
                         <p style="font-size:0.72rem; color:#64748b; margin:6px 0 8px; line-height:1.4;">
                             Literature-backed rules, suggested from your guide answers and loaded data. Add one and tweak it in the editor.
@@ -2646,7 +2649,7 @@
                 </details>
 
                 <details class="workflow-section qa-new" id="interfaceSection" style="margin-top: 10px;"
-                    ontoggle="if (this.open) syncInterfaceDeclared(); else clearGuideCoachmark();">
+                    data-toggle-action="syncInterfaceDeclared">
                     <summary>Interfaces (oligomer contacts)</summary>
                     <div id="guideCoachmarkInterfaces" class="guide-coachmark" hidden></div>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
@@ -2674,7 +2677,7 @@
                 </details>
 
                 <details class="workflow-section qa-new" id="ensembleSection" style="margin-top: 10px;"
-                    ontoggle="if (this.open) renderEnsembleModelList();">
+                    data-toggle-action="renderEnsembleModelList">
                     <summary>Ensemble variance (RMSF)</summary>
                     <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                         Per-residue fluctuation across the attached models, in angstroms, after superposing each
@@ -2766,7 +2769,7 @@
             </details>
 
             <details class="workflow-section qa-new" id="constructSection" style="margin-top: 10px;"
-                ontoggle="if (this.open) renderConstructPreview();">
+                data-toggle-action="renderConstructPreview">
                 <summary>Construct designer (truncated FASTA)</summary>
                 <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
                     Turns the annotations into a wet-lab construct: strip the disordered termini, or keep the
@@ -12226,6 +12229,23 @@ document.addEventListener('mouseover', (e) => {
     const icon = e.target.closest('.info-icon');
     if (icon) showTooltipFor(icon);
 });
+const TOGGLE_ACTIONS = {
+    clearGuideOnClose: el => { if (!el.open) clearGuideCoachmark(); },
+    renderRulePresets: el => { if (el.open) renderRulePresets(); },
+    syncInterfaceDeclared: el => {
+        if (el.open) syncInterfaceDeclared();
+        else clearGuideCoachmark();
+    },
+    renderEnsembleModelList: el => { if (el.open) renderEnsembleModelList(); },
+    renderConstructPreview: el => { if (el.open) renderConstructPreview(); }
+};
+document.addEventListener('toggle', (e) => {
+    const el = e.target;
+    if (!el || el.tagName !== 'DETAILS') return;
+    const action = TOGGLE_ACTIONS[el.dataset && el.dataset.toggleAction];
+    if (action) action(el);
+}, true);
+
 document.addEventListener('mouseout', (e) => {
     if (pinnedIcon) return;
     if (e.target.closest('.info-icon')) hideTooltip();
@@ -12324,7 +12344,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.71.1';
+const APP_VERSION = '0.71.3';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

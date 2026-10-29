@@ -101,6 +101,43 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### CSP-safe collapsible sections - 0.71.3
+
+**Surface.** Guide, rules, interface, ensemble and construct `<details>` sections.
+
+**Should do.** Expanding or collapsing any of these sections must run its
+refresh/clear action without a CSP console error.
+
+**Try.**
+1. Open each section in turn.
+2. Watch the browser console or the ChimeraX WebEngine log.
+3. Confirm the guide coachmark clears, rule presets render, interface state
+   syncs, ensemble models render, and the construct preview updates.
+
+**Edge cases.**
+- Toggle events do not bubble; the delegated listener must use capture.
+- A missing `data-toggle-action` must be ignored.
+- Do not restore inline `ontoggle` attributes.
+
+### ChimeraX clipboard controls - 0.71.2
+
+**Surface.** Input Data toolbar, Quick2D Annotations panel and the dropzone.
+
+**Should do.** In the ChimeraX host, hide the three clipboard-paste surfaces
+because Qt WebEngine clipboard access is unreliable. Keep raw text entry and
+attach-file controls available.
+
+**Try.**
+1. Open Q2DV Full. Confirm the two Paste Clipboard buttons and the click-to-paste
+   dropzone are absent.
+2. Open the raw text drawer and confirm manual text entry still works.
+3. Open the browser build and confirm the paste controls are still visible.
+
+**Edge cases.**
+- The host class/attribute must be set before the controls are used.
+- Hiding the dropzone must not remove the raw text drawer.
+- Do not hide file attachment or drag/drop of files globally.
+
 ### Contextual ChimeraX command bridge - 0.71.1
 
 **Surface.** Sidebar command panel (`ChimeraX Command`), beside `Copy Command`.

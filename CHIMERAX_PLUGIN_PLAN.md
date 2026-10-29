@@ -1,6 +1,6 @@
 # Quick2DViewer + ChimeraX plugin plan
 
-**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.1. The full page loads, the bundle auto-loads as Q52356, the QWebChannel ping returns, the contextual command panel is wired, and Py3Dmol is disabled in the host. Full recipe/UI QA and membrane recipes remain.
+**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.3. The full page loads at a fixed origin, the bundle auto-loads as Q52356, the QWebChannel ping returns, the contextual command panel is wired, Py3Dmol is disabled, clipboard paste controls are hidden, and a persistent WebEngine profile stores localStorage. Full recipe/UI QA and membrane recipes remain.
 **Scope:** general Q2DV program, not lab-specific TerC data  
 **Decision:** keep one Q2DV core with two hosts: browser and ChimeraX. Do not fork.
 
