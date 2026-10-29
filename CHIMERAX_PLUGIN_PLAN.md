@@ -1,6 +1,6 @@
 # Quick2DViewer + ChimeraX plugin plan
 
-**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.0. The full page loads, the bundle auto-loads as Q52356, the QWebChannel ping returns, selection context is wired, and Py3Dmol is disabled in the host. Full recipe/UI QA and membrane recipes remain.  
+**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.1. The full page loads, the bundle auto-loads as Q52356, the QWebChannel ping returns, the contextual command panel is wired, and Py3Dmol is disabled in the host. Full recipe/UI QA and membrane recipes remain.
 **Scope:** general Q2DV program, not lab-specific TerC data  
 **Decision:** keep one Q2DV core with two hosts: browser and ChimeraX. Do not fork.
 
@@ -132,7 +132,14 @@ Key sources:
 A custom-scheme-only bridge is possible, but loopback plus QWebChannel avoids
 file URL, CORS and folder-picker edge cases.
 
-## 5. Add-on review
+## 5. Recipe model
+
+A recipe is a versioned, host-neutral analysis protocol, not a command list.
+See `RECIPE_MODEL.md` for the schema, categories, context contract, aliases and
+migration order. The temporary fixed toolbar was removed; the current
+contextual path is the existing command panel with `Run in ChimeraX`.
+
+## 6. Add-on review
 
 | Add-on / surface | Status checked | Why it matters for Q2DV | Integration stance |
 |---|---|---|---|
@@ -162,7 +169,7 @@ terms.
 - Third-party MCP servers: GitHub projects; verify maintenance, license and
   security before installation.
 
-## 6. ChimeraX-first UX
+## 7. ChimeraX-first UX
 
 The ChimeraX panel should prioritize:
 
@@ -185,7 +192,7 @@ Hide browser-only controls in the ChimeraX panel:
 Keep them available in the browser host. Do not remove browser features just
 because the ChimeraX host does not use them.
 
-## 7. Implementation phases
+## 8. Implementation phases
 
 ### Phase 0 - fallback panel (done)
 
@@ -230,7 +237,7 @@ integration and remains the fallback.
 - `coordset` for trajectories.
 - Acceptance: each add-on has a public-data demo and a fallback.
 
-## 8. Testing and acceptance
+## 9. Testing and acceptance
 
 - Core: existing `npm test`.
 - Host contract: browser stub and ChimeraX stub.
@@ -241,7 +248,7 @@ integration and remains the fallback.
 - Security: unknown recipe rejected; no arbitrary Python/shell.
 - Regression: standalone browser unaffected.
 
-## 9. Risks
+## 10. Risks
 
 | Risk | Mitigation |
 |---|---|
@@ -254,7 +261,7 @@ integration and remains the fallback.
 | Two-host drift | one core; host adapter; shared tests |
 | Plugin displaces science | keep the MD/triage work as the primary task |
 
-## 10. Startup configuration
+## 11. Startup configuration
 
 Install CliX and set these under **Favorites -> Settings -> Startup -> Execute
 these commands at startup**:
@@ -269,7 +276,7 @@ For the fallback panel, replace the last line with `ui tool show "Q2DV Bridge"`.
 See `CHIMERAX_STARTUP.md` for laptop and recovery notes. Do not load both Q2DV
 hosts at once.
 
-## 11. Decision summary
+## 12. Decision summary
 
 **ChimeraX-first product direction, browser-compatible core, one codebase, two
 thin hosts.**

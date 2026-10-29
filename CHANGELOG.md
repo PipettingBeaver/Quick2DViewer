@@ -12,6 +12,20 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.71.1] - 2026-10-29
+
+### Changed
+- **Contextual ChimeraX action.** The command panel now has a `Run in ChimeraX`
+  button beside `Copy Command`. It is visible only in the ChimeraX host, checks
+  the selected command engine, and sends the generated `select`/`color`/`label`
+  command through QWebChannel.
+- **Removed the fixed ChimeraX toolbar.** The temporary Open/Metal/L5/Heme/Save
+  toolbar duplicated existing Q2DV controls. The existing selection, claim,
+  feature and command-panel controls are the integration surface.
+
+### Tests
+- The contextual runner, host visibility, and command forwarding are covered.
+
 ## [0.71.0] - 2026-10-29
 
 ### Added

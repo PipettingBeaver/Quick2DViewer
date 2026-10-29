@@ -1043,6 +1043,21 @@ ctxRun(`
 assert(ctxRun(`window.__hostP3DToast.m`) === '3D view is provided by ChimeraX in this host.' && ctxRun(`window.__hostP3DToast.t`) === 'info', 'the ChimeraX host refuses the browser 3D viewer');
 ctxRun(`delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
 assert(ctxRun(`document.documentElement.getAttribute('data-q2dv-host')`) === 'standalone', 'the host attribute is removed for the browser');
+
+ctxRun(`
+    parsedTracks = { AA: 'MAMMAM' }; selectionMode = 'point'; rowRanges = [];
+    selectStart = 1; selectEnd = 2; commandEngineId = 'chimerax';
+    window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();
+    document.getElementById('chimeraxDisplay').textContent = 'select :2-3';
+    window.__sentQ2DVCommand = null;
+    window.Q2DVHost = { runCommand: c => { window.__sentQ2DVCommand = c; } };
+    runInChimerax();
+`);
+assert(ctxRun(`window.__sentQ2DVCommand`) === 'select :2-3', 'Run in ChimeraX forwards the generated command');
+assert(ctxRun(`document.getElementById('runInChimeraxBtn').hidden`) === false, 'the run button is shown in the ChimeraX host');
+ctxRun(`delete window.Q2DVHost; delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
+assert(ctxRun(`document.getElementById('runInChimeraxBtn').hidden`) === true, 'the run button is hidden in the browser');
+ctxRun(`parsedTracks = {}; selectionMode = 'point'; rowRanges = []; selectStart = null; selectEnd = null;`);
 ctxRun(`parsedTracks = { AA: 'M' };`);
 assert(ctxRun(`buildFullSavePayload().appName`) === ctxRun(`APP_TITLE`), 'the full save uses the app title');
 ctxRun(`parsedTracks = {};`);

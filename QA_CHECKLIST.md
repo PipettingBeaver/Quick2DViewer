@@ -101,6 +101,28 @@ Cards stay until the feature has been driven by hand at least once.
 
 ---
 
+### Contextual ChimeraX command bridge - 0.71.1
+
+**Surface.** Sidebar command panel (`ChimeraX Command`), beside `Copy Command`.
+
+**Should do.** In the ChimeraX host, show **Run in ChimeraX** only when a
+selection and a generated command exist. Switch the command engine to ChimeraX
+first; send the generated `select`, `color`, or `label` command through
+QWebChannel. Hide the button in the browser and leave `Copy Command` unchanged.
+
+**Try.**
+1. Open Q2DV Full, select a region or row, and confirm `Run in ChimeraX` appears.
+2. Generate a command, click Run, and check the ChimeraX Log and 3D selection.
+3. Switch the command engine to PyMOL; expect a warning and no send.
+4. Open the browser build; the button is hidden.
+5. Confirm the temporary fixed ChimeraX toolbar is gone.
+
+**Edge cases.**
+- No selection: no send.
+- Empty/`-` command: no send.
+- Malformed or non-allowlisted command: the Python bridge rejects it.
+- Browser host: button hidden even if a bridge object is accidentally present.
+
 ### ChimeraX host selection + P3D guard - 0.71.0
 
 **Surface.** Q2DV header host badge; View menu; full ChimeraX toolbar.
