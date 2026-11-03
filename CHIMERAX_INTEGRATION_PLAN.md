@@ -1,7 +1,7 @@
 # ChimeraX integration plan: storage, layout, offload, presets
 
 **Status:** Phase A implemented 2026-10-29; remaining phases planned.  
-**Baseline:** Q2DV 0.71.14, ChimeraX host 0.6.34, ChimeraX 1.12.  
+**Baseline:** Q2DV 0.71.15, ChimeraX host 0.6.35, ChimeraX 1.12.  
 **Related:** `DEMO_ROADMAP.md`, `CHIMERAX_ECOSYSTEM.md`,
 `CHIMERAX_PLUGIN_PLAN.md`, `RECIPE_MODEL.md`.
 
@@ -69,8 +69,8 @@ Start with a versioned envelope; the payload can reuse the existing
 {
   "schema": "q2dv.workspace/1",
   "saved_at": "2026-10-29T16:05:00Z",
-  "app_version": "0.71.14",
-  "host_version": "0.6.34",
+  "app_version": "0.71.15",
+  "host_version": "0.6.35",
   "sequence_hash": "sha256:...",
   "bundle_id": "gfp-p42212-public",
   "layout": {

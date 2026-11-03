@@ -68,6 +68,7 @@ Format for new features:
 - [ ] Dark empty state, sidebar, cards and modals have readable contrast.
 - [ ] Changelog headings/body, host badge and version pill are readable in dark mode.
 - [ ] Protein Summary name, function text, accession/reviewed chips, keywords and GO terms are readable in dark mode.
+- [ ] The ⓘ buttons beside all sidebar sections use dark surfaces and readable hover/focus states.
 - [ ] Saved slots 1-5 use dark fills/accents; overlays/rings still distinguish slots.
 
 **Edge cases**

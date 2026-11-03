@@ -12,6 +12,13 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.71.15] - 2026-10-29
+
+### Fixed
+- **Dark info-icon controls.** The ⓘ buttons beside Protein Summary, Scope,
+  Scale, Selected Range, FASTA Segment, Protein constants and Quantitative
+  Metrics now use dark surfaces and accessible hover/focus colours.
+
 ## [0.71.14] - 2026-10-29
 
 ### Fixed

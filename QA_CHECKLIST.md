@@ -205,7 +205,9 @@ readable on generated cards, empty states and the Selection workspace.
 5. Repeat in ChimeraX at 1640x740 and 1280x720.
 6. In dark mode, inspect the empty state, Selection Workspace, changelog,
    host badge, version pill, modals, cards, saved-selection slots and the
-   Protein Summary name/function/chips/keywords/GO terms.
+   Protein Summary name/function/chips/keywords/GO terms and the ⓘ buttons
+   beside Protein Summary, Scope, Scale, Selected Range, FASTA Segment,
+   Protein constants and Quantitative Metrics.
 
 **Edge cases.**
 - `prefers-reduced-motion` and theme switching must not reset the layout.
