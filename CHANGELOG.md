@@ -12,6 +12,93 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.71.13] - 2026-10-29
+
+### Fixed
+- **Dark-mode remaining light-theme surfaces.** Changelog headings and body,
+  the Standalone/ChimeraX host badge, version pill and the five saved-selection
+  slots now use dark-appropriate contrast. Saved slots have separate dark fill
+  and accent colours; overlays and graph rings follow the same accents.
+
+## [0.71.12] - 2026-10-29
+
+### Added
+- **First real ChimeraX offload: RSA from SASA.** Analyze -> ChimeraX analysis
+  computes solvent-accessible area with ChimeraX `measure sasa`, normalizes it
+  with the Tien et al. max-ASA table, maps the model chain to the Q2DV reference
+  sequence, and adds a separate `CX_RSA` track with model/method provenance.
+  The browser RSA path remains the fallback.
+
+## [0.71.11] - 2026-10-29
+
+### Added
+- **Host capability flags and offload adapter skeleton.** `Q2DVHost.capabilities`
+  now advertises command, selection, file-vault, workspace and per-analysis
+  offload support. Offloaded analyses use a versioned call path with a browser
+  fallback; no analysis is enabled yet.
+
+## [0.71.10] - 2026-10-29
+
+### Added
+- **Workspace layout presets.** Demo, Analysis, Compact and Wide presets are
+  available in both browser and ChimeraX hosts. They control sidebar width,
+  section collapse state and legend visibility only; manual section or legend
+  changes switch the selector to Custom.
+- **Dark-mode contrast fixes.** Inline muted/headline colours in generated
+  cards and the empty state are lifted to accessible contrast on dark panels.
+
+## [0.71.9] - 2026-10-29
+
+### Fixed
+- **Q2DV host origin.** The ChimeraX host now loads the pinned page from a
+  local `file://` URL instead of installing a custom `q2dvfull://` scheme.
+  Qt requires custom schemes to be registered before the QApplication exists,
+  which a ChimeraX bundle cannot do; the late registration warning is gone.
+  The host workspace remains the durable store, and local-content remote access
+  is enabled for the existing API features.
+
+## [0.71.8] - 2026-10-29
+
+### Added
+- **Host-owned workspace.** In ChimeraX, state is now saved to
+  `~/Q2DV_files/workspace/current.json` with atomic writes and five rotating
+  backups. The host loads it before the normal browser cache, so a deleted or
+  changed WebEngine profile no longer means the Q2DV session is lost.
+- **Host settings.** Window geometry defaults to 1640 x 740 and is remembered
+  in `workspace/settings.json`; theme changes are also recorded there.
+- The browser build keeps localStorage/IndexedDB as its standalone fallback.
+
+## [0.71.7] - 2026-10-29
+
+### Added
+- **Light and dark themes.** A header toggle persists the browser choice.
+  In the ChimeraX host, the initial theme is inferred from the Qt window
+  palette/color scheme so Q2DV starts aligned with ChimeraX. The theme can be
+  changed afterward; the host query supplies the initial value only.
+
+## [0.71.6] - 2026-10-29
+
+### Added
+- **Compact ChimeraX Selection Workspace.** In the Q2DV host, the Scope,
+  Scale, Selected Range and related controls use tighter spacing and smaller
+  type; the browser layout is unchanged.
+- **Automatic 3D selection.** A Q2DV residue-range selection now sends a
+  debounced selection request to ChimeraX. The host matches the active model
+  chain by sequence, maps Q2DV reference positions onto its residue numbering,
+  and selects the mapped residues. A missing or ambiguous model returns a
+  visible warning instead of selecting the wrong chain.
+
+## [0.71.5] - 2026-10-29
+
+### Added
+- **ChimeraX file handoff.** In the ChimeraX host, attached/fetched PDB, CIF,
+  and AF3 JSON files, imported HHpred `.hhr` files, and in-app homolog search
+  snapshots are copied to `Q2DV_files/structures` and `Q2DV_files/homologs`
+  (override with
+  `Q2DV_FILES_DIR`). The Options -> Local Structure Cache list gains an
+  **Open in ChimeraX** button per saved structure. Files are written by the
+  host through QWebChannel; the browser build is unchanged.
+
 ## [0.71.4] - 2026-10-29
 
 ### Fixed

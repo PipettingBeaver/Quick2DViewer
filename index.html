@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1vwWBbiSNIopgc7WhJpb3o4ks4lXiDpJCe8dc83DgeM=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ngLdKtqySbxq8c9A7tvjVsTIxGMz8+ZMvXvfXEtSAxA=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
+            --q2dv-sidebar-w: 380px;
             --q2dv-H-bg: #eea3a3; --q2dv-H-fg: #991b1b;
             --q2dv-P-bg: #8bffec; --q2dv-P-fg: #155e75;
             --q2dv-E-bg: #9da1e8; --q2dv-E-fg: #1e3a8a;
@@ -32,7 +33,7 @@
         h2 { margin-top: 0; margin-bottom: 0; color: #0f172a; }
         .grid-layout {
             display: grid;
-            grid-template-columns: 1fr 380px;
+            grid-template-columns: 1fr var(--q2dv-sidebar-w, 380px);
             gap: 20px;
             margin-top: 20px;
         }
@@ -2131,7 +2132,7 @@
                 flex: 1 1 auto;
                 min-height: 0;
                 margin-top: 14px;
-                grid-template-columns: minmax(0, 1fr) 380px;
+                grid-template-columns: minmax(0, 1fr) var(--q2dv-sidebar-w, 380px);
                 grid-template-rows: minmax(0, 1fr);
             }
             .alignment-grid {
@@ -2149,6 +2150,401 @@
                 overscroll-behavior: contain;
             }
             .sidebar > * { flex-shrink: 0; }
+        }
+
+        /* --- Compact Selection Workspace in the ChimeraX host ----------- */
+        html[data-q2dv-host="chimerax"] .sidebar {
+            padding: 10px;
+            gap: 8px;
+        }
+        html[data-q2dv-host="chimerax"] .sidebar-tabs { gap: 2px; margin-bottom: 6px; }
+        html[data-q2dv-host="chimerax"] .sidebar-tab { padding: 4px 2px; font-size: 0.66rem; }
+        html[data-q2dv-host="chimerax"] #side-panel-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        html[data-q2dv-host="chimerax"] #side-panel-selection[hidden] { display: none; }
+        html[data-q2dv-host="chimerax"] .sel-workspace-header { gap: 4px; margin-bottom: 2px; }
+        html[data-q2dv-host="chimerax"] .sidebar-title { font-size: 0.9rem !important; }
+        html[data-q2dv-host="chimerax"] .saved-selections-label { font-size: 0.62rem; }
+        html[data-q2dv-host="chimerax"] .save-sel-btn {
+            width: 18px;
+            height: 18px;
+            font-size: 0.6rem;
+            border-width: 1px;
+        }
+        html[data-q2dv-host="chimerax"] .selection-control-row {
+            gap: 3px !important;
+            margin-bottom: 2px !important;
+            flex-wrap: wrap;
+        }
+        html[data-q2dv-host="chimerax"] .selection-control-row strong {
+            font-size: 0.64rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        html[data-q2dv-host="chimerax"] .selection-control-row .info-icon { font-size: 0.62rem; }
+        html[data-q2dv-host="chimerax"] .scope-toggle button {
+            font-size: 0.6rem;
+            padding: 1px 7px;
+        }
+        html[data-q2dv-host="chimerax"] .scale-control button {
+            font-size: 0.8rem;
+            padding: 0 6px 2px;
+        }
+        html[data-q2dv-host="chimerax"] .scale-value {
+            min-width: 34px;
+            font-size: 0.6rem;
+            padding: 1px 3px;
+        }
+        html[data-q2dv-host="chimerax"] .selection-range-heading { gap: 3px !important; }
+        html[data-q2dv-host="chimerax"] .selection-range-heading strong {
+            font-size: 0.64rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        html[data-q2dv-host="chimerax"] .selection-range-heading .info-icon { font-size: 0.62rem; }
+        html[data-q2dv-host="chimerax"] #rangeDisplay {
+            padding: 4px 6px;
+            font-size: 0.68rem;
+            line-height: 1.35;
+            min-height: 0;
+            word-break: normal;
+            overflow-wrap: anywhere;
+        }
+        html[data-q2dv-host="chimerax"] .selection-range-block .copy-btn {
+            font-size: 0.62rem;
+            padding: 3px 7px;
+            margin-top: 4px;
+        }
+        html[data-q2dv-host="chimerax"] #selectionInfoSection {
+            margin-top: 4px !important;
+            padding: 5px 7px;
+        }
+        html[data-q2dv-host="chimerax"] #selectionInfoSection summary { font-size: 0.68rem; }
+        html[data-q2dv-host="chimerax"] #selectionInfoSection[open] summary { margin-bottom: 4px; }
+        html[data-q2dv-host="chimerax"] #selectionInfoBox {
+            font-size: 0.66rem;
+            max-height: 4.5em;
+            padding: 5px;
+        }
+        html[data-q2dv-host="chimerax"] #fastaSection,
+        html[data-q2dv-host="chimerax"] #constantsSection {
+            margin-top: 6px !important;
+            padding: 5px 7px;
+        }
+        html[data-q2dv-host="chimerax"] #side-panel-selection .workflow-section summary { font-size: 0.69rem; }
+        html[data-q2dv-host="chimerax"] #side-panel-selection .data-box { font-size: 0.68rem; padding: 5px 6px; }
+        html[data-q2dv-host="chimerax"] #side-panel-selection .tb-btn { font-size: 0.64rem; padding: 2px 6px; }
+
+        /* --- Light / dark themes ------------------------------------------ */
+        html[data-theme="dark"] {
+            color-scheme: dark;
+            --q2dv-bg: #18181b;
+            --q2dv-panel: #1f1f23;
+            --q2dv-panel-2: #27272d;
+            --q2dv-panel-3: #303038;
+            --q2dv-border: #3f3f46;
+            --q2dv-text: #e4e4e7;
+            --q2dv-muted: #a1a1aa;
+            --q2dv-accent: #60a5fa;
+        }
+        html[data-theme="dark"] body {
+            background: var(--q2dv-bg);
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] .container {
+            background: var(--q2dv-panel);
+            color: var(--q2dv-text);
+            box-shadow: none;
+        }
+        html[data-theme="dark"] h2,
+        html[data-theme="dark"] h3,
+        html[data-theme="dark"] h4,
+        html[data-theme="dark"] h5,
+        html[data-theme="dark"] .sidebar-title,
+        html[data-theme="dark"] .workflow-section summary,
+        html[data-theme="dark"] .options-accordion > summary {
+            color: var(--q2dv-text);
+        }
+        /* Inline dark text colors are common in generated cards and empty
+           states. Keep the same semantic tiers but lift them to accessible
+           contrast on dark panels. */
+        html[data-theme="dark"] [style*="color:#0f172a"],
+        html[data-theme="dark"] [style*="color: #0f172a"] { color: #f4f4f5 !important; }
+        html[data-theme="dark"] [style*="color:#1e293b"],
+        html[data-theme="dark"] [style*="color: #1e293b"],
+        html[data-theme="dark"] [style*="color:#334155"],
+        html[data-theme="dark"] [style*="color: #334155"],
+        html[data-theme="dark"] [style*="color:#475569"],
+        html[data-theme="dark"] [style*="color: #475569"] { color: #e4e4e7 !important; }
+        html[data-theme="dark"] [style*="color:#64748b"],
+        html[data-theme="dark"] [style*="color: #64748b"],
+        html[data-theme="dark"] [style*="color:#94a3b8"],
+        html[data-theme="dark"] [style*="color: #94a3b8"] { color: #c4c4cb !important; }
+        html[data-theme="dark"] [style*="color:#2563eb"],
+        html[data-theme="dark"] [style*="color: #2563eb"],
+        html[data-theme="dark"] [style*="color:#1d4ed8"],
+        html[data-theme="dark"] [style*="color: #1d4ed8"] { color: #93c5fd !important; }
+        html[data-theme="dark"] .app-header p,
+        html[data-theme="dark"] .ds-desc,
+        html[data-theme="dark"] .ds-helper-title,
+        html[data-theme="dark"] .saved-selections-label,
+        html[data-theme="dark"] .selection-control-row strong,
+        html[data-theme="dark"] .selection-range-heading strong,
+        html[data-theme="dark"] .guide-count,
+        html[data-theme="dark"] #refOffsetSummary {
+            color: var(--q2dv-muted);
+        }
+        html[data-theme="dark"] .sidebar,
+        html[data-theme="dark"] .sidebar-toolbar,
+        html[data-theme="dark"] .workflow-section,
+        html[data-theme="dark"] .data-box,
+        html[data-theme="dark"] .options-tab-panel,
+        html[data-theme="dark"] .ds-helper,
+        html[data-theme="dark"] .guide-intake,
+        html[data-theme="dark"] .guide-step,
+        html[data-theme="dark"] .guide-insight,
+        html[data-theme="dark"] .jump-results,
+        html[data-theme="dark"] .menubar-menu,
+        html[data-theme="dark"] .legend,
+        html[data-theme="dark"] #p3dViewer,
+        html[data-theme="dark"] .p3d-stage,
+        html[data-theme="dark"] .p3d-modelinfo {
+            background: var(--q2dv-panel-2);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .modal-content {
+            background: var(--q2dv-panel);
+            color: var(--q2dv-text);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.55);
+        }
+        html[data-theme="dark"] .sidebar-tabs,
+        html[data-theme="dark"] .options-tabs,
+        html[data-theme="dark"] .ds-panel,
+        html[data-theme="dark"] .guide-view-toggle {
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .sidebar-tab,
+        html[data-theme="dark"] .options-tab,
+        html[data-theme="dark"] .menubar-btn,
+        html[data-theme="dark"] .modal-close-x,
+        html[data-theme="dark"] .ds-desc,
+        html[data-theme="dark"] .guide-body,
+        html[data-theme="dark"] .guide-next-or,
+        html[data-theme="dark"] .guide-refs,
+        html[data-theme="dark"] .guide-state {
+            color: var(--q2dv-muted);
+        }
+        html[data-theme="dark"] .sidebar-tab:hover,
+        html[data-theme="dark"] .options-tab:hover,
+        html[data-theme="dark"] .menubar-btn:hover,
+        html[data-theme="dark"] .modal-close-x:hover,
+        html[data-theme="dark"] .tb-btn-secondary:hover,
+        html[data-theme="dark"] .scale-control button:hover:not(:disabled),
+        html[data-theme="dark"] .guide-mini:hover {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] .sidebar-tab.active,
+        html[data-theme="dark"] .options-tab.active {
+            color: var(--q2dv-accent);
+            border-bottom-color: var(--q2dv-accent);
+        }
+        html[data-theme="dark"] input:not([type="range"]),
+        html[data-theme="dark"] textarea,
+        html[data-theme="dark"] select,
+        html[data-theme="dark"] .q2dv-select,
+        html[data-theme="dark"] .tb-select {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] input::placeholder,
+        html[data-theme="dark"] textarea::placeholder {
+            color: var(--q2dv-muted);
+        }
+        html[data-theme="dark"] .tb-btn-secondary,
+        html[data-theme="dark"] .save-sel-btn,
+        html[data-theme="dark"] .scope-toggle button,
+        html[data-theme="dark"] .scale-control button,
+        html[data-theme="dark"] .guide-opt,
+        html[data-theme="dark"] .guide-view-tab,
+        html[data-theme="dark"] .guide-mini,
+        html[data-theme="dark"] .jump-result {
+            background: var(--q2dv-panel-2);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .tb-btn-secondary:hover,
+        html[data-theme="dark"] .guide-opt:hover,
+        html[data-theme="dark"] .guide-view-tab:hover,
+        html[data-theme="dark"] .jump-result:hover,
+        html[data-theme="dark"] .jump-result.active {
+            background: var(--q2dv-panel-3);
+            border-color: #52525b;
+        }
+        html[data-theme="dark"] .jump-result-title,
+        html[data-theme="dark"] .guide-title,
+        html[data-theme="dark"] .guide-q-label,
+        html[data-theme="dark"] .guide-insights-head,
+        html[data-theme="dark"] .tctl-marker-btn,
+        html[data-theme="dark"] .copy-btn {
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] .alignment-grid,
+        html[data-theme="dark"] .sticky-top {
+            background: var(--q2dv-bg);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .track-row:hover {
+            background: #292930;
+        }
+        html[data-theme="dark"] .track-row:has(.track-label.active-row) {
+            background: #1e2a3d;
+        }
+        html[data-theme="dark"] .track-row.track-group-first {
+            box-shadow: inset 0 1px 0 var(--q2dv-border);
+        }
+        html[data-theme="dark"] .track-label,
+        html[data-theme="dark"] .track-position-label {
+            background: var(--q2dv-panel-2);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .track-label:hover {
+            background: var(--q2dv-panel-3);
+        }
+        html[data-theme="dark"] .track-label.active-row {
+            background: #2563eb;
+            color: #fff;
+        }
+        html[data-theme="dark"] .cell-AA {
+            background: #2a2a31;
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .column-selected-dim {
+            background-color: rgba(96, 165, 250, 0.12);
+        }
+        html[data-theme="dark"] .legend .box {
+            border-color: #52525b;
+        }
+        html[data-theme="dark"] .raw-input-drawer,
+        html[data-theme="dark"] .ds-dropzone {
+            background: var(--q2dv-panel-2);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .ds-dropzone:hover {
+            background: var(--q2dv-panel-3);
+            border-color: var(--q2dv-accent);
+        }
+        html[data-theme="dark"] .guide-next-action,
+        html[data-theme="dark"] .guide-view-prompt {
+            background: #1e2a3d;
+            color: var(--q2dv-text);
+            border-color: #334155;
+        }
+        html[data-theme="dark"] .guide-step-current > summary {
+            background: #1e2a3d;
+        }
+        html[data-theme="dark"] .guide-step-current .guide-title {
+            color: var(--q2dv-accent);
+        }
+        html[data-theme="dark"] .guide-num,
+        html[data-theme="dark"] .guide-chip,
+        html[data-theme="dark"] .guide-chip-rel {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-muted);
+        }
+        html[data-theme="dark"] .tctl-marker-btn {
+            background: var(--q2dv-panel-3);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .copy-btn {
+            background: #3f3f46;
+        }
+        html[data-theme="dark"] .copy-btn:hover {
+            background: #52525b;
+        }
+
+        /* --- Layout presets ---------------------------------------------- */
+        html[data-layout-preset="demo"] { --q2dv-sidebar-w: 380px; }
+        html[data-layout-preset="analysis"] { --q2dv-sidebar-w: 340px; }
+        html[data-layout-preset="compact"] { --q2dv-sidebar-w: 300px; }
+        html[data-layout-preset="wide"] { --q2dv-sidebar-w: 320px; }
+        .layout-picker {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.68rem;
+            color: #64748b;
+        }
+        .layout-picker select {
+            font-size: 0.68rem;
+            padding: 4px 6px;
+            max-width: 92px;
+        }
+        html[data-theme="dark"] .layout-picker { color: #c4c4cb; }
+        html[data-theme="dark"] .layout-picker select {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+
+        html[data-theme="dark"] .app-version {
+            background: var(--q2dv-panel-3);
+            border-color: var(--q2dv-border);
+            color: var(--q2dv-muted);
+        }
+        html[data-theme="dark"] .app-version:hover {
+            background: #3f3f46;
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] .app-host {
+            background: #0b2b33;
+            border-color: #155e75;
+            color: #67e8f9;
+        }
+        html[data-theme="dark"] .app-host:hover {
+            background: #103b46;
+            color: #a5f3fc;
+        }
+        html[data-theme="dark"] .app-host.chimerax {
+            background: #10291b;
+            border-color: #166534;
+            color: #86efac;
+        }
+        html[data-theme="dark"] .app-host.chimerax:hover {
+            background: #163722;
+            color: #bbf7d0;
+        }
+        html[data-theme="dark"] #changelogBody h3.cl-ver,
+        html[data-theme="dark"] .doc-body h3.cl-ver {
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] #changelogBody h4.cl-cat,
+        html[data-theme="dark"] .doc-body h4.cl-cat {
+            color: var(--q2dv-muted);
+        }
+        html[data-theme="dark"] #changelogBody li,
+        html[data-theme="dark"] #changelogBody p,
+        html[data-theme="dark"] .doc-body li,
+        html[data-theme="dark"] .doc-body p {
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] #changelogBody code,
+        html[data-theme="dark"] .doc-body code {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] .doc-body a,
+        html[data-theme="dark"] #changelogBody a {
+            color: var(--q2dv-accent);
         }
 
         /* --- Responsive: single-column on narrower screens ----------------- */
@@ -2241,6 +2637,16 @@
             <div class="menubar-item">
                 <button type="button" id="menubar-help-btn" class="menubar-btn" role="menuitem" data-action="menuBarAction" data-arg="help">Help</button>
             </div>
+            <button type="button" id="themeToggle" class="tb-btn tb-btn-secondary" data-action="toggleTheme" title="Switch to dark mode">Dark</button>
+            <label class="layout-picker" title="Workspace layout preset"><span>Layout</span>
+                <select id="layoutPreset" class="tb-select" data-action="onLayoutPresetChange" aria-label="Workspace layout preset">
+                    <option value="demo">Demo</option>
+                    <option value="analysis">Analysis</option>
+                    <option value="compact">Compact</option>
+                    <option value="wide">Wide</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </label>
         </div>
     </div>
 
@@ -2461,7 +2867,7 @@
                 <div id="proteinSummaryBody" class="data-box" style="font-size:0.74rem; line-height:1.55;"></div>
             </details>
 
-            <div style="display:flex; align-items:center; gap:4px; margin-bottom:6px;">
+            <div class="selection-control-row" style="display:flex; align-items:center; gap:4px; margin-bottom:6px;">
                 <strong>Scope:</strong>
                 <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
                     <strong>Selection Scope</strong><br>
@@ -2490,8 +2896,8 @@
                 </div>
             </div>
 
-            <div>
-                <div style="display:flex; align-items:center; gap:4px;">
+            <div class="selection-range-block">
+                <div class="selection-range-heading" style="display:flex; align-items:center; gap:4px;">
                     <strong>Selected Range:</strong><span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
                         <strong>Selected Range</strong><br>
                         The residue range(s) currently selected - from a manual click-and-drag, or from clicking a track label / type badge to select every matching residue.<br>
@@ -2674,6 +3080,15 @@
                     </div>
                     <div id="interfaceStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                     <div id="interfaceResults" style="margin-top:8px; overflow-x:auto;"></div>
+                </details>
+
+                <details class="workflow-section" id="chimeraXAnalysisSection" style="margin-top:10px;">
+                    <summary>ChimeraX analysis</summary>
+                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                        Run the first host-side analysis on the active ChimeraX model. SASA values are normalized to relative solvent accessibility (RSA) and returned as a separate track with ChimeraX provenance. The browser RSA path remains available.
+                    </p>
+                    <button type="button" class="tb-btn tb-btn-secondary" data-action="runChimeraXRSA" style="font-size:0.72rem; padding:3px 8px;">Compute RSA in ChimeraX</button>
+                    <div id="chimeraXRsaStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
                 </details>
 
                 <details class="workflow-section qa-new" id="ensembleSection" style="margin-top: 10px;"
@@ -3859,7 +4274,9 @@ const STORAGE_KEYS = Object.freeze({
     welcome: 'q2dViewer_welcome_v1',
     ebiEmail: 'q2dv_ebi_contact_email',
     p3d: '_q2dv_3dmol',
-    usage: 'q2dv_service_usage_v1'
+    usage: 'q2dv_service_usage_v1',
+    theme: 'q2dv_theme_v1',
+    layout: 'q2dv_layout_v1'
 });
 // App identity in one place. The HTML title/header keep a static fallback and
 // are overwritten from these constants on load.
@@ -3874,6 +4291,151 @@ const CSP_TUTORIAL_NONCE = '9f3a7c1e5b2d8064a1c9e7f30b5d2468';
 const APP_FILE_PREFIX = 'q2dv';
 // Host detection: browser is the default; the ChimeraX bundle serves the page
 // with ?host=chimerax or exposes window.Q2DVHost.kind === 'chimerax'.
+let currentTheme = 'light';
+let layoutPreset = 'analysis';
+let layoutApplying = false;
+let hostSettingsLoaded = false;
+let hostWorkspaceLoaded = false;
+let hostWorkspaceSaveTimer = null;
+let hostFilesDir = '';
+let hostSavedFilePaths = {};
+let selectionSyncTimer = null;
+let lastSelectionSyncKey = '';
+function queryTheme() {
+    const m = String((window.location && window.location.search) || '').match(/[?&]theme=(dark|light)(?:&|$)/i);
+    return m ? m[1].toLowerCase() : null;
+}
+
+function applyTheme(mode, persist) {
+    currentTheme = mode === 'dark' ? 'dark' : 'light';
+    const root = document.documentElement;
+    root.setAttribute('data-theme', currentTheme);
+    root.style.colorScheme = currentTheme;
+    const btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.textContent = currentTheme === 'dark' ? 'Light' : 'Dark';
+        btn.title = currentTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        btn.setAttribute('aria-label', btn.title);
+    }
+    if (typeof renderSavedSelectionsBar === 'function') renderSavedSelectionsBar();
+    if (persist) {
+        try { localStorage.setItem(STORAGE_KEYS.theme, currentTheme); } catch (err) {}
+        saveHostSettings({ theme: currentTheme });
+    }
+}
+
+function initTheme() {
+    let mode = queryTheme();
+    if (!mode) {
+        try { mode = localStorage.getItem(STORAGE_KEYS.theme); } catch (err) {}
+    }
+    if (mode !== 'dark' && mode !== 'light') {
+        mode = (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    applyTheme(mode, false);
+}
+
+function toggleTheme() {
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark', true);
+}
+
+const LAYOUT_PRESETS = {
+    demo: {
+        width: '380px', legend: true,
+        open: ['fastaSection'],
+        close: ['selectionInfoSection', 'constantsSection']
+    },
+    analysis: {
+        width: '340px', legend: true,
+        open: ['selectionInfoSection', 'fastaSection', 'constantsSection'],
+        close: []
+    },
+    compact: {
+        width: '300px', legend: false,
+        open: [],
+        close: ['selectionInfoSection', 'fastaSection', 'constantsSection']
+    },
+    wide: {
+        width: '320px', legend: true,
+        open: ['selectionInfoSection', 'fastaSection', 'constantsSection'],
+        close: []
+    }
+};
+
+function persistLayoutPreset(name) {
+    try { localStorage.setItem(STORAGE_KEYS.layout, name); } catch (err) {}
+    saveHostSettings({ layout_preset: name });
+}
+
+function applyLayoutPreset(name, persist) {
+    const preset = LAYOUT_PRESETS[name];
+    if (!preset) {
+        layoutPreset = 'custom';
+        document.documentElement.setAttribute('data-layout-preset', 'custom');
+        const sel = document.getElementById('layoutPreset');
+        if (sel) sel.value = 'custom';
+        if (persist) persistLayoutPreset('custom');
+        return;
+    }
+    layoutApplying = true;
+    layoutPreset = name;
+    document.documentElement.setAttribute('data-layout-preset', name);
+    document.documentElement.style.setProperty('--q2dv-sidebar-w', preset.width);
+    const sel = document.getElementById('layoutPreset');
+    if (sel) sel.value = name;
+    const legend = document.getElementById('mainLegend');
+    if (legend) legend.hidden = !preset.legend;
+    const legendBtn = document.getElementById('btnToggleLegend');
+    if (legendBtn) legendBtn.textContent = preset.legend ? 'Hide Legend ▾' : 'Show Legend ▸';
+    preset.open.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.tagName === 'DETAILS') el.open = true;
+    });
+    preset.close.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.tagName === 'DETAILS') el.open = false;
+    });
+    if (persist) persistLayoutPreset(name);
+    setTimeout(() => { layoutApplying = false; }, 120);
+}
+
+function markLayoutCustom() {
+    if (layoutApplying || layoutPreset === 'custom') return;
+    layoutPreset = 'custom';
+    document.documentElement.setAttribute('data-layout-preset', 'custom');
+    const sel = document.getElementById('layoutPreset');
+    if (sel) sel.value = 'custom';
+    persistLayoutPreset('custom');
+}
+
+function onLayoutPresetChange(el) {
+    const value = el && el.value ? el.value : (document.getElementById('layoutPreset') || {}).value;
+    applyLayoutPreset(value, true);
+}
+
+function initLayoutPreset() {
+    let saved = '';
+    try { saved = localStorage.getItem(STORAGE_KEYS.layout) || ''; } catch (err) {}
+    if (!LAYOUT_PRESETS[saved] && saved !== 'custom') {
+        saved = detectQ2DVHostMode() === 'chimerax' ? 'demo' : 'analysis';
+    }
+    applyLayoutPreset(saved, false);
+}
+
+function loadHostSettings() {
+    if (hostSettingsLoaded || detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.getHostSettings !== 'function') return;
+    hostSettingsLoaded = true;
+    try {
+        Promise.resolve(window.Q2DVHost.getHostSettings()).then(raw => {
+            let settings = {};
+            try { settings = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {}); } catch (err) { return; }
+            if (settings && LAYOUT_PRESETS[settings.layout_preset]) applyLayoutPreset(settings.layout_preset, false);
+        }).catch(err => console.error('Q2DV host settings load failed:', err));
+    } catch (err) {
+        console.error('Q2DV host settings load failed:', err);
+    }
+}
+
 function detectQ2DVHostMode() {
     if (typeof window !== 'undefined' && window.Q2DVHost && window.Q2DVHost.kind === 'chimerax') return 'chimerax';
     if (typeof window !== 'undefined' && window.__Q2DV_HOST__ === 'chimerax') return 'chimerax';
@@ -3896,7 +4458,242 @@ function syncQ2DVHostBadge() {
     document.documentElement.classList.toggle('host-chimerax', mode === 'chimerax');
     const runEl = document.getElementById('runInChimeraxBtn');
     if (runEl) runEl.hidden = mode !== 'chimerax';
+    refreshQ2DVHostFilesDir();
+    loadHostWorkspace();
+    loadHostSettings();
 }
+
+function hostFilePath(fileName) {
+    const known = hostSavedFilePaths[fileName];
+    if (known) return known;
+    const dir = String(hostFilesDir || '').replace(/[\\/]+$/, '');
+    return dir ? dir + '/structures/' + fileName : '';
+}
+
+function refreshQ2DVHostFilesDir() {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.filesDir !== 'function') return;
+    try {
+        Promise.resolve(window.Q2DVHost.filesDir()).then(dir => {
+            if (!dir) return;
+            hostFilesDir = String(dir);
+            if (typeof renderStructureCacheInfo === 'function') {
+                const optsModal = document.getElementById('optionsModal');
+                if (optsModal && optsModal.style.display === 'flex') renderStructureCacheInfo();
+            }
+        }).catch(err => console.error('Q2DV host filesDir failed:', err));
+    } catch (err) {
+        console.error('Q2DV host filesDir failed:', err);
+    }
+}
+
+function syncQ2DVHostFile(kind, name, text) {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.saveFile !== 'function') return;
+    try {
+        return Promise.resolve(window.Q2DVHost.saveFile(kind, String(name || 'file'), String(text || ''))).then(path => {
+            if (!path || String(path).startsWith('error:')) {
+                console.error('Q2DV host file save failed:', path);
+                return path;
+            }
+            hostSavedFilePaths[name] = String(path);
+            logAction('export', 'ChimeraX file', String(path));
+            refreshQ2DVHostFilesDir();
+            return path;
+        }).catch(err => { console.error('Q2DV host file save failed:', err); return 'error: ' + err; });
+    } catch (err) {
+        console.error('Q2DV host file save failed:', err);
+        return 'error: ' + err;
+    }
+}
+
+function syncQ2DVHostHomologs(source, parsed) {
+    if (!parsed || !Array.isArray(parsed.hits) || !parsed.hits.length) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const name = q2dvFileName('homologs', String(source || 'search') + '-' + stamp, 'json');
+    const payload = {
+        schema: 'q2dv.homologs/1',
+        source: String(source || 'search'),
+        queryLength: parsed.queryLength || 0,
+        hits: parsed.hits
+    };
+    return syncQ2DVHostFile('homologs', name, JSON.stringify(payload, null, 2));
+}
+
+function syncSelectionToChimerax() {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.selectResidues !== 'function') return;
+    const ranges = getCurrentRangesZeroBased().map(([s, e]) => [s + 1, e + 1]);
+    if (!ranges.length || !parsedTracks || typeof parsedTracks.AA !== 'string' || !parsedTracks.AA.length) return;
+    const key = ranges.map(([s, e]) => s + '-' + e).join(',') + '|' + parsedTracks.AA.length;
+    if (key === lastSelectionSyncKey) return;
+    lastSelectionSyncKey = key;
+    if (selectionSyncTimer) clearTimeout(selectionSyncTimer);
+    selectionSyncTimer = setTimeout(() => {
+        try {
+            Promise.resolve(window.Q2DVHost.selectResidues(ranges, parsedTracks.AA)).then(result => {
+                if (result && String(result).startsWith('error')) {
+                    showToast('ChimeraX selection: ' + result, 'warn');
+                }
+            }).catch(err => console.error('Q2DV ChimeraX selection failed:', err));
+        } catch (err) {
+            console.error('Q2DV ChimeraX selection failed:', err);
+        }
+    }, 160);
+}
+
+function openQ2DVHostFile(fileName) {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.openFile !== 'function') {
+        showToast('ChimeraX is not the active host.', 'info');
+        return;
+    }
+    const path = hostFilePath(fileName);
+    if (!path) {
+        showToast('No ChimeraX copy is known for ' + fileName + '. Re-attach it first.', 'warn');
+        return;
+    }
+    try {
+        return Promise.resolve(window.Q2DVHost.openFile(path)).then(result => {
+            if (result === 'ok') showToast('Opened ' + fileName + ' in ChimeraX.', 'success');
+            else showToast('Could not open ' + fileName + ' in ChimeraX: ' + result, 'error');
+            return result;
+        }).catch(err => { showToast('Could not open ' + fileName + ' in ChimeraX: ' + err, 'error'); return 'error: ' + err; });
+    } catch (err) {
+        showToast('Could not open ' + fileName + ' in ChimeraX: ' + err, 'error');
+        return 'error: ' + err;
+    }
+}
+function q2dvHostCapabilities() {
+    return (window.Q2DVHost && window.Q2DVHost.capabilities) ? window.Q2DVHost.capabilities : {};
+}
+
+function hostSupports(name) {
+    const caps = q2dvHostCapabilities();
+    if (name === 'workspace' || name === 'selectResidues' || name === 'runCommand' ||
+        name === 'saveFile' || name === 'openFile') return !!caps[name];
+    const offload = caps.offload || {};
+    return !!offload[name];
+}
+
+function offloadToChimeraX(name, payload) {
+    if (detectQ2DVHostMode() !== 'chimerax' || !hostSupports(name) ||
+        !window.Q2DVHost || typeof window.Q2DVHost.offload !== 'function') {
+        return null;
+    }
+    try {
+        return Promise.resolve(window.Q2DVHost.offload(name, JSON.stringify(payload || {})));
+    } catch (err) {
+        console.error('Q2DV offload failed:', err);
+        return null;
+    }
+}
+
+function applyChimeraXRsaResult(result) {
+    if (!result || result.ok !== true || !Array.isArray(result.values)) return false;
+    const values = result.values.map(v => (v == null || !isFinite(Number(v))) ? null : { type: 'rsa', val: Number(v) });
+    if (!values.some(v => v !== null)) return false;
+    parsedTracks.CX_RSA = values;
+    graphHighlights.CX_RSA = true;
+    setTrackMeta('CX_RSA', {
+        source: 'ChimeraX',
+        label: 'RSA (ChimeraX SASA)',
+        method: result.method || 'ChimeraX measure sasa',
+        model: result.model || ''
+    });
+    renderViewer(parsedTracks);
+    refreshTrackManagerIfVisible();
+    refreshInputDataModalIfVisible();
+    schedulePersist();
+    return true;
+}
+
+function runChimeraXRSA() {
+    const status = document.getElementById('chimeraXRsaStatus');
+    const setStatus = (text, kind) => {
+        if (!status) return;
+        status.textContent = text || '';
+        status.style.color = kind === 'error' ? '#f87171' : (kind === 'success' ? '#4ade80' : '');
+    };
+    if (detectQ2DVHostMode() !== 'chimerax') { setStatus('ChimeraX is not the active host.', 'error'); return; }
+    if (!hostSupports('rsa')) { setStatus('This host does not advertise the RSA offload.', 'error'); return; }
+    if (!parsedTracks || typeof parsedTracks.AA !== 'string' || !parsedTracks.AA.length) { setStatus('Load a sequence first.', 'error'); return; }
+    setStatus('Computing SASA in ChimeraX…');
+    const pending = offloadToChimeraX('rsa', { sequence: parsedTracks.AA });
+    if (!pending) { setStatus('ChimeraX RSA offload is unavailable.', 'error'); return; }
+    Promise.resolve(pending).then(raw => {
+        let result = raw;
+        try { if (typeof raw === 'string') result = JSON.parse(raw); } catch (err) { setStatus('ChimeraX RSA returned invalid data.', 'error'); return; }
+        if (!result || result.ok !== true) { setStatus('ChimeraX RSA failed: ' + (result && result.error ? result.error : (typeof result === 'string' ? result : 'unknown error')), 'error'); return; }
+        if (!applyChimeraXRsaResult(result)) { setStatus('ChimeraX RSA returned no usable residues.', 'error'); return; }
+        setStatus('Added CX_RSA from ' + (result.model || 'ChimeraX') + ' (' + (result.method || 'measure sasa') + ', ' + (result.coverage != null ? Math.round(result.coverage * 100) + '% coverage' : 'coverage unknown') + ').', 'success');
+    }).catch(err => setStatus('ChimeraX RSA failed: ' + err, 'error'));
+}
+
+function saveHostSettings(patch) {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.saveHostSettings !== 'function') return;
+    try {
+        return Promise.resolve(window.Q2DVHost.saveHostSettings(JSON.stringify(patch || {}))).catch(err => { console.error('Q2DV host settings failed:', err); return 'error: ' + err; });
+    } catch (err) {
+        console.error('Q2DV host settings failed:', err);
+        return 'error: ' + err;
+    }
+}
+
+function hostWorkspacePayload() {
+    return {
+        schema: 'q2dv.workspace/1',
+        saved_at: new Date().toISOString(),
+        app_version: APP_VERSION,
+        state: gatherPersistableState(),
+        host: {
+            theme: currentTheme,
+            layout_preset: document.documentElement.getAttribute('data-layout-preset') || 'demo'
+        }
+    };
+}
+
+function saveHostWorkspaceNow() {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.saveWorkspace !== 'function') return;
+    if (!parsedTracks || typeof parsedTracks.AA !== 'string' || !parsedTracks.AA.length) return;
+    try {
+        return Promise.resolve(window.Q2DVHost.saveWorkspace(JSON.stringify(hostWorkspacePayload()))).then(path => {
+            if (path && String(path).startsWith('error')) console.error('Q2DV workspace save failed:', path);
+            return path;
+        }).catch(err => console.error('Q2DV workspace save failed:', err));
+    } catch (err) {
+        console.error('Q2DV workspace save failed:', err);
+    }
+}
+
+function scheduleHostWorkspaceSave() {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.saveWorkspace !== 'function') return;
+    if (hostWorkspaceSaveTimer) clearTimeout(hostWorkspaceSaveTimer);
+    hostWorkspaceSaveTimer = setTimeout(() => {
+        hostWorkspaceSaveTimer = null;
+        saveHostWorkspaceNow();
+    }, 900);
+}
+
+function loadHostWorkspace() {
+    if (hostWorkspaceLoaded || detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.loadWorkspace !== 'function') return;
+    hostWorkspaceLoaded = true;
+    try {
+        Promise.resolve(window.Q2DVHost.loadWorkspace()).then(raw => {
+            if (!raw) return false;
+            let envelope;
+            try { envelope = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (err) { return false; }
+            const state = envelope && envelope.state ? envelope.state : envelope;
+            if (!state || !state.parsedTracks || !state.parsedTracks.AA) return false;
+            const applied = applyPersistedState(state);
+            if (applied) {
+                if (layoutPreset !== 'custom') applyLayoutPreset(layoutPreset, false);
+                showToast('Workspace restored from ChimeraX.', 'success');
+                scheduleHostWorkspaceSave();
+            }
+            return applied;
+        }).catch(err => console.error('Q2DV workspace load failed:', err));
+    } catch (err) {
+        console.error('Q2DV workspace load failed:', err);
+    }
+}
+
 function showHostInfo() {
     const chimerax = detectQ2DVHostMode() === 'chimerax';
     showToast(chimerax
@@ -4769,6 +5566,7 @@ async function runCapability(capName, args, onProgress, opts) {
 // viewer out of the box, and OFF on a local file:// page; the toggle under
 // Options -> Data Sources turns it off (or on) and the choice is remembered.
 function externalServicesDefault() {
+    if (detectQ2DVHostMode() === 'chimerax') return true;
     return !(typeof location !== 'undefined' && location.protocol === 'file:');
 }
 let externalServicesEnabled = externalServicesDefault();
@@ -5245,6 +6043,7 @@ async function runFoldseekSearch() {
         setStatus('Searching Foldseek (' + db + ') with ' + file + '…');
         const result = await runCapability('structure_search', { pdbText: cachedStructureTexts[file], database: db }, (m) => setStatus(m));
         const hits = parseFoldseekResults(result);
+        syncQ2DVHostHomologs('Foldseek', { queryLength: parsedTracks.AA.length, hits });
         const added = applyFoldseekHits(hits);
         renderViewer(parsedTracks);
         populateCrossRefDropdown();
@@ -5745,6 +6544,7 @@ async function runHomologSearch() {
         if (parsed.queryLength && parsed.queryLength !== seq.length) {
             showToast(source + ' searched a sequence of length ' + parsed.queryLength + ' but the loaded sequence is ' + seq.length + ' - importing anyway, but residue numbering may not line up.', 'error');
         }
+        syncQ2DVHostHomologs(source, parsed);
         const added = applyHomologHits(parsed, source);
         logAction('api', source + ': ' + parsed.hits.length + ' hit(s) parsed -> ' + added + ' track(s)');
         // Partial HSPs: realign the hit's full UniProt sequence where possible,
@@ -11563,6 +12363,7 @@ document.addEventListener('click', (e) => {
 // the Top-UI collapse above (which hides the whole legend + toggle row).
 // State is persisted.
 function toggleLegend() {
+    markLayoutCustom();
     const legend = document.getElementById('mainLegend');
     const btn = document.getElementById('btnToggleLegend');
     if (!legend) return;
@@ -12345,7 +13146,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.71.4';
+const APP_VERSION = '0.71.13';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -13948,6 +14749,7 @@ async function attachStructureText(fileName, text, ext, opts) {
     // raw text lives in the IndexedDB structure cache, never in localStorage.
     uploadedStructureFiles = uploadedStructureFiles.filter(f => f.name !== fileName);
     uploadedStructureFiles.push({ name: fileName, ext, size: text.length, ...scanStructureMetadata(text, ext), cofactors: cofactorResult.cofactors });
+    syncQ2DVHostFile('structures', fileName, text);
     return cachePromise;
 }
 
@@ -16132,6 +16934,7 @@ function importHHpredFile(text, fileName) {
         showToast(`"${fileName}" doesn't look like a valid HHpred .hhr file (no hits found).`, 'error');
         return;
     }
+    syncQ2DVHostFile('homologs', fileName, text);
     if (parsed.queryLength !== parsedTracks.AA.length) {
         showToast(
             `"${fileName}"'s query length (${parsed.queryLength}) doesn't match the current sequence (${parsedTracks.AA.length}) - importing anyway, but residue numbering may not line up.`,
@@ -17606,8 +18409,8 @@ cellsContainer.appendChild(overlay);
             ov.className = 'saved-sel-overlay' + (onOwningRow ? ' saved-sel-overlay-row' : '');
             ov.style.left = ((rs - 1) * gridCellW) + 'px';
             ov.style.width = ((re - rs + 1) * gridCellW) + 'px';
-            ov.style.background = SAVE_SLOT_COLORS[s] + '26';
-            if (onOwningRow) ov.style.borderColor = SAVE_SLOT_COLORS[s];
+            ov.style.background = saveSlotAccent(s) + '26';
+            if (onOwningRow) ov.style.borderColor = saveSlotAccent(s);
             ov.title = `Saved selection ${s + 1}: ` + (rs === re ? `res ${rs}` : `res ${rs}-${re}`);
             cellsContainer.appendChild(ov);
             // The slot's name label sits over the range like a Bar-mode row
@@ -17894,7 +18697,7 @@ function createOverlayGraphSection(titleText, trackKeys, totalLength, graphGroup
     // so the rings never steal clicks from the underlying points.
     savedSelections.forEach((slot, s) => {
         if (!slot) return;
-        const ringColor = SAVE_SLOT_COLORS[s];
+        const ringColor = saveSlotAccent(s);
         slot.ranges.forEach(([rs, re]) => {
             for (let r = rs - 1; r <= re - 1; r++) {
                 trackKeys.forEach(key => {
@@ -18425,6 +19228,7 @@ function updateSelectionUI() {
     });
     updateGraphSelectionGuides(selectedIdxs, restrictToRow);
     updateSelectionInfo();
+    syncSelectionToChimerax();
 }
 
 // A selectable read-out of what the current selection overlaps: the owning row
@@ -18461,6 +19265,10 @@ function updateSelectionInfo() {
 // faint colored overlays on the alignment grid; right-click gives a menu to
 // clear a slot.
 const SAVE_SLOT_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
+const DARK_SAVE_SLOT_ACCENTS = ['#60a5fa', '#fbbf24', '#34d399', '#f87171', '#c4b5fd'];
+const DARK_SAVE_SLOT_FILLS = ['#1e3a8a', '#78350f', '#064e3b', '#7f1d1d', '#4c1d95'];
+function saveSlotAccent(slot) { return (currentTheme === 'dark' ? DARK_SAVE_SLOT_ACCENTS : SAVE_SLOT_COLORS)[slot] || SAVE_SLOT_COLORS[slot]; }
+function saveSlotFill(slot) { return (currentTheme === 'dark' ? DARK_SAVE_SLOT_FILLS : SAVE_SLOT_COLORS)[slot] || SAVE_SLOT_COLORS[slot]; }
 let savedSelections = [null, null, null, null, null]; // each: { ranges: [[start,end],...] } or null
 
 function getCurrentSelectionRanges1Indexed() {
@@ -18487,16 +19295,18 @@ function renderSavedSelectionsBar() {
         const btn = document.getElementById('saveSel' + (s + 1));
         if (!btn) continue;
         const slot = savedSelections[s];
-        const color = SAVE_SLOT_COLORS[s];
+        const color = saveSlotAccent(s);
+        const fill = saveSlotFill(s);
         btn.classList.toggle('saved', !!slot);
         if (slot) {
-            btn.style.background = color;
+            btn.style.background = fill;
             btn.style.borderColor = color;
+            btn.style.color = currentTheme === 'dark' ? '#f4f4f5' : '#fff';
             const which = slot.row ? ` row <${formatTrackLabel(slot.row)}>` : ' all rows';
             const labelTxt = slot.label ? `\nLabel: "${slot.label}"` : '';
             btn.title = `Saved selection ${s + 1} (${which}): ${formatSavedRanges(slot.ranges)}.${labelTxt}\nLeft-click to re-highlight this saved selection.\nRight-click for label/clear.`;
         } else {
-            btn.style.background = '#fff';
+            btn.style.background = currentTheme === 'dark' ? '#303038' : '#fff';
             btn.style.borderColor = color;
             btn.style.color = color;
             btn.title = `Save slot ${s + 1} is empty.\nLeft-click to save the current selection here.`;
@@ -21143,11 +21953,18 @@ async function renderStructureCacheInfo() {
         (over ? ' · <span style="color:#b45309;">over the ' + capStr + ' soft cap</span>' : '') + '</div>';
     all.slice().sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0)).forEach((e, i) => {
         const usedStr = e.lastUsed ? new Date(e.lastUsed).toLocaleString() : 'unknown time';
+        const hostButton = detectQ2DVHostMode() === 'chimerax'
+            ? '<button type="button" data-action="openHostStructure" data-arg="' + structureEscapeHtml(e.name) + '" style="flex-shrink:0; padding:1px 8px; font-size:0.72rem; margin-left:4px;">ChimeraX</button>'
+            : '';
         html += '<div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:4px;">' +
             '<span style="overflow-wrap:anywhere;">' + structureEscapeHtml(e.name) +
             ' <span style="color:#64748b;">(' + structureFmtBytes(e.size) + ', last used ' + structureEscapeHtml(usedStr) + ')</span></span>' +
-            '<button type="button" data-action="deleteStructureCacheEntry" data-arg="' + structureEscapeHtml(e.hash) + '" style="flex-shrink:0; padding:1px 8px; font-size:0.72rem;">forget</button></div>';
+            '<span style="flex-shrink:0;"><button type="button" data-action="deleteStructureCacheEntry" data-arg="' + structureEscapeHtml(e.hash) + '" style="padding:1px 8px; font-size:0.72rem;">forget</button>' + hostButton + '</span></div>';
     });
+    if (detectQ2DVHostMode() === 'chimerax') {
+        html = '<div style="margin-bottom:6px; color:#475569;">ChimeraX file copies: ' + structureEscapeHtml(hostFilesDir || 'resolving…') + ' (structures/ and homologs/)</div>' + html;
+        refreshQ2DVHostFilesDir();
+    }
     el.innerHTML = html;
 }
 async function deleteStructureCacheEntry(hash) {
@@ -21189,6 +22006,7 @@ async function rehydrateStructuresFromCache() {
         if (entry && entry.text) {
             cachedStructureTexts[p.fileName] = entry.text;
             p3dStructureMeta[p.fileName] = buildP3DStructureMeta(p.fileName);
+            syncQ2DVHostFile('structures', p.fileName, entry.text);
             found.push(p.fileName);
             try {
                 await structureCachePut({ hash: p.ref.hash, name: p.fileName, ext: p.ext, text: entry.text, size: p.ref.size || entry.size });
@@ -21304,6 +22122,7 @@ async function attachStructureFilesFromLocal(foundItems) {
         cachedStructureTexts[fileName] = text;
         p3dStructureMeta[fileName] = buildP3DStructureMeta(fileName);
         cachedStructureIndex[fileName] = { hash, ext, size: text.length };
+        syncQ2DVHostFile('structures', fileName, text);
         missingStructureRefs = missingStructureRefs.filter(m => m.fileName !== fileName);
         try {
             await structureCachePut({ hash, name: fileName, ext, text, size: text.length });
@@ -21339,6 +22158,7 @@ async function attachStructureFilesFromLocal(foundItems) {
 function schedulePersist() {
     clearTimeout(persistTimer);
     persistTimer = setTimeout(saveStateToStorage, 400);
+    scheduleHostWorkspaceSave();
 }
 
 function gatherPersistableState() {
@@ -23367,6 +24187,9 @@ const ACTION_HANDLERS = {
     toggleExternalServices: delegateAction(toggleExternalServices),
     toggleMacroRecording: delegateAction(toggleMacroRecording),
     toggleMenuBarMenu: delegateAction(toggleMenuBarMenu),
+    toggleTheme: delegateAction(toggleTheme),
+    onLayoutPresetChange: delegateAction(onLayoutPresetChange),
+    runChimeraXRSA: delegateAction(runChimeraXRSA),
     toggleP3DHomologFlat: delegateAction(toggleP3DHomologFlat),
     toggleP3DLock: delegateAction(toggleP3DLock),
     toggleP3DSize: delegateAction(toggleP3DSize),
@@ -23420,6 +24243,7 @@ const ACTION_HANDLERS = {
     toggleTrackManagerSource: delegateAction(toggleTrackManagerSource),
     jumpSelect: delegateAction(jumpSelect),
     deleteStructureCacheEntry: delegateAction(deleteStructureCacheEntry),
+    openHostStructure: delegateAction(openQ2DVHostFile),
     loadHomologIn3D: delegateAction(loadHomologIn3D),
     findMissingStructuresLocally: delegateAction(findMissingStructuresLocally),
     trackGuideDetailsToggle: (el) => {
@@ -23475,7 +24299,15 @@ function runDelegatedAction(event) {
 const jumpInputEl = document.getElementById('jumpInput');
 if (jumpInputEl) jumpInputEl.addEventListener('focus', () => onJumpInput(jumpInputEl.value));
 
+initTheme();
+initLayoutPreset();
+document.addEventListener('toggle', (event) => {
+    const el = event.target;
+    if (el && el.tagName === 'DETAILS' && el.closest && el.closest('.sidebar')) markLayoutCustom();
+}, true);
 loadStateFromStorage();
+if (layoutPreset !== 'custom') applyLayoutPreset(layoutPreset, false);
+window.addEventListener('pagehide', () => { saveHostWorkspaceNow(); });
 try { welcomeSeen = localStorage.getItem(STORAGE_KEYS.welcome) === '1'; } catch (err) { welcomeSeen = false; }
 maybeShowWelcome();
 </script>

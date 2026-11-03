@@ -112,13 +112,264 @@ construct preview updates. No inline handlers or CSP errors.
 
 **Try.**
 1. Open each section in the browser build.
-2. Repeat in Q2DV Full.
+2. Repeat in Q2DV.
 3. Confirm the expected refresh/clear action each time.
 
 **Edge cases.**
 - A section without `data-toggle-action` must be ignored.
 - A missing action key must not throw.
+
+### Public GFP example bundle - bundle 0.1.0
+
+**Surface.** Data -> Evidence bundle URL field; Q2DV host bundle auto-detection;
+public `bundles/GFP/`.
+
+**Should do.** A GFP session (P42212, 238 aa) loads 6 claims, 4 relations,
+7 features and 10 evidence records; the chromophore, beta-barrel, dimer
+interface, A206K and EGFP tracks are visible and selectable.
+
+**Try.**
+1. Open the browser app and load `bundles/GFP/manifest.json` with a GFP sequence.
+2. Open Q2DV, then load a GFP sequence while it is open; the host should switch
+   from waiting/no bundle to GFP automatically, without reopening.
+3. Inspect Claims, Relations and Features; open the 1GFL/DOI evidence links.
+4. Select residues 65-67 and check the chromophore context.
+5. Change to a non-matching sequence; stale GFP bundle rows must clear.
+
+**Edge cases.**
+- A different loaded sequence must refuse the bundle, not mix tracks.
+- The 1GFL interface is a crystal contact; it must not be described as a
+  solution dimer measurement.
+- Missing profiles/schema files must not stop claims, relations or features.
 - Do not revert to inline `ontoggle` handlers.
+
+### First host analysis: ChimeraX RSA/SASA - 0.71.12
+
+**Surface.** Analyze -> ChimeraX analysis -> Compute RSA in ChimeraX; the
+resulting `CX_RSA` track; model/chain mapping.
+
+**Should do.** ChimeraX `measure sasa` computes per-residue area, normalizes it
+with the Tien et al. max-ASA values, maps the active model chain to the Q2DV
+reference, and adds `CX_RSA` with ChimeraX provenance. Browser RSA remains.
+
+**Try.**
+1. Load GFP and open 1GFL in ChimeraX.
+2. Analyze -> ChimeraX analysis -> Compute RSA in ChimeraX.
+3. Confirm `CX_RSA` exists, covers the mapped residues and displays a graph row.
+4. Check the status names the model, method and coverage.
+5. Compare its shape with the browser RSA row; note that the methods differ.
+
+**Edge cases.**
+- No model: fail with an actionable status, not a crash.
+- Missing/truncated 1GFL residues: coverage below 100% is expected.
+- No sequence: the button refuses.
+- Browser build: the button reports that ChimeraX is not the host.
+- Re-running replaces `CX_RSA`, not duplicates it.
+- `measure sasa` failure must not alter browser tracks.
+
+### Host capability flags + offload skeleton - 0.71.11
+
+**Surface.** `window.Q2DVHost.capabilities`; browser fallback path; future
+ChimeraX analysis adapters.
+
+**Should do.** Capabilities advertise command, selection, file, workspace and
+per-analysis support. Disabled analyses return the browser result; enabled
+skeletons reach the host bridge without changing data.
+
+**Try.**
+1. Open the browser build; no host capability is required.
+2. Open ChimeraX; inspect `window.Q2DVHost.capabilities` in the console.
+3. Confirm disabled analyses still use the browser path.
+4. Confirm no offload changes the sequence, tracks or claims.
+
+**Edge cases.**
+- Unknown or disabled offload must be a no-op, not an error dialog.
+- An older host without `capabilities` must behave as before.
+- A host offload failure must not leave half-applied data.
+
+### Layout presets + dark contrast - 0.71.10
+
+**Surface.** Header Layout selector, sidebar details, legend, dark mode, browser
+and ChimeraX hosts.
+
+**Should do.** Demo, Analysis, Compact and Wide presets change sidebar width,
+section collapse state and legend visibility only. Compact hides the legend.
+Manual section/legend changes switch the selector to Custom. Dark text remains
+readable on generated cards, empty states and the Selection workspace.
+
+**Try.**
+1. Open the browser build; switch Demo -> Analysis -> Compact -> Wide.
+2. Confirm the sidebar width and collapsed sections change; Compact hides the legend.
+3. Toggle a sidebar section or the legend; confirm Layout becomes Custom.
+4. Restart; confirm the chosen preset or Custom is remembered.
+5. Repeat in ChimeraX at 1640x740 and 1280x720.
+6. In dark mode, inspect the empty state, Selection Workspace, changelog,
+   host badge, version pill, modals, cards and saved-selection slots.
+
+**Edge cases.**
+- `prefers-reduced-motion` and theme switching must not reset the layout.
+- A missing saved layout falls back to Demo in ChimeraX and Analysis in the browser.
+- Invalid layout values must not break the page.
+- Compact must still expose a way to show the legend again.
+- Resizing the window must not make controls unreadable.
+
+### Host file origin + workspace persistence - 0.71.8/0.71.9
+
+Automated coverage: `tests/host_workspace_test.py` (corrupt current, backup
+recovery, five-backup cap, atomic temp cleanup, invalid schema).
+
+**Surface.** Q2DV host startup/close; `~/Q2DV_files/workspace/`; a deleted or
+changed WebEngine profile.
+
+**Should do.** The host page loads from its pinned local `file://` URL, with no
+custom-scheme registration warning and no local port. In ChimeraX, Q2DV restores
+sequence, tracks, selection, bundle and preferences from
+`workspace/current.json` even when the WebEngine profile is removed. Writes are
+atomic, current.json is versioned, and five backups are kept. Window geometry
+defaults to 1640x740 and is remembered in `workspace/settings.json`.
+
+**Try.**
+1. Start Q2DV; confirm the origin is `file:///.../q2dv_full/html/index.html?host=chimerax&theme=...` and no `q2dvfull`/scheme-registration error appears.
+2. Open Q2DV with GFP, select a range, change a preference.
+3. Close/restart Q2DV; confirm the workspace and selection return.
+4. Delete the WebEngine profile only; reopen Q2DV; confirm the workspace still
+   returns from the file.
+5. Set `Q2DV_TEST_FETCH=1`; confirm an external UniProt fetch returns HTTP 200
+   from the file origin.
+6. Corrupt `current.json`; confirm a backup is used.
+7. Check `current.json` contains no raw PDB/CIF text.
+8. Resize the Q2DV window, close it, reopen; confirm the size is remembered.
+
+**Edge cases.**
+- A missing workspace must fall back to browser localStorage without error.
+- An unsupported workspace schema must be rejected, not half-applied.
+- A workspace write failure must not block the UI.
+- Browser mode must never depend on the host workspace.
+
+### Light/dark theme + ChimeraX auto-match - 0.71.7
+
+**Surface.** Header `Dark` / `Light` toggle; Q2DV host startup; all main panels
+and the Selection workspace.
+
+**Should do.** The toggle switches the whole app between light and dark and the
+choice persists in the browser. In the ChimeraX host, Q2DV starts in the theme
+inferred from ChimeraX's Qt window palette/color scheme; the user can still
+switch afterward.
+
+**Try.**
+1. Open the browser build; switch Dark -> Light -> Dark.
+2. Reload; confirm the saved theme returns.
+3. Use a dark ChimeraX UI and open Q2DV; confirm the initial theme is dark.
+4. Use a light ChimeraX UI; confirm the initial theme is light.
+5. Toggle Q2DV after startup and confirm the text, panels, sidebar and modals
+   remain readable.
+
+**Edge cases.**
+- `?theme=dark`/`?theme=light` must win over a saved browser preference.
+- A browser preference must be used when no host theme is supplied.
+- Track annotation colours must remain distinguishable in both themes.
+- The theme toggle must not create an inline script or violate the CSP.
+
+### GFP structures banked into ChimeraX - host 0.6.21
+
+**Surface.** Q2DV host bundle loading; `~/Q2DV_files/structures/`; ChimeraX
+`open` command and File > Open.
+
+**Should do.** Loading the GFP bundle banks `1GFL.pdb` and `1EMA.pdb` into the
+vault. If no atomic model is open, the host opens 1GFL automatically; 1EMA stays
+available for the S65T reference view.
+
+**Try.**
+1. Open a saved GFP session in Q2DV with no model open in ChimeraX.
+2. Confirm `bundle structures banked=2` and `bundle structure opened=...1GFL.pdb chain=A`.
+3. Confirm only one GFP cartoon/cylinder is visible, not chains A and B.
+4. Run `open ~/Q2DV_files/structures/1EMA.pdb` for the single-chain S65T reference.
+5. Reopen Q2DV with 1GFL already open; confirm the host does not duplicate it.
+
+**Edge cases.**
+- 1GFL has two chains in its asymmetric unit but its author biological unit is
+  monomeric; auto-open must hide/keep only chain A.
+- A model already open must not be replaced or duplicated by auto-open.
+- `Q2DV_FILES_DIR` must relocate both banked PDBs.
+- A bundle without a local structure must still load claims/features.
+- Do not auto-open a structure for the wrong sequence.
+
+### Compact ChimeraX Selection Workspace + automatic 3D selection - 0.71.6
+
+**Surface.** Selection tab in the Q2DV host; Scope, Scale, Selected Range,
+Selection Info and the loaded ChimeraX model.
+
+**Should do.** At the default host size, the sidebar controls are compact and
+readable. Selecting a residue range automatically selects the matching residues
+in the loaded ChimeraX model without pressing **Run in ChimeraX**.
+
+**Try.**
+1. Open Q2DV at the normal ChimeraX size and inspect the Selection tab.
+2. Load 1GFL or 2CFQ in ChimeraX, then open the matching Q2DV session.
+3. Drag-select residues 65-67 in GFP; confirm the chromophore is selected in
+   ChimeraX.
+4. Select a LacY TM range; confirm the corresponding residues are selected in
+   2CFQ/1PV6.
+5. Change the range; confirm the ChimeraX selection follows after a short debounce.
+6. In the browser build, confirm the sidebar remains unchanged and no bridge
+   call is attempted.
+
+**Edge cases.**
+- A range mapped through a shifted/missing initiator Met must still hit the
+  correct residue.
+- A mutated/truncated experimental chain (1GFL has 230 resolved residues vs the
+  238-aa GFP reference) must still map substitutions and short terminal gaps.
+- Selecting `SS_NETSURFP2` must select all 122 predicted strand positions in
+  1GFL chain A, not fail at the first mismatch.
+- No matching model/chain must warn and must not select a different chain.
+- Multiple models with the same sequence should not select a decoy silently.
+- The browser build must not require the ChimeraX bridge.
+
+### Public LacY example bundle - bundle 0.1.0
+
+**Surface.** Data -> Evidence bundle URL field; Q2DV host bundle auto-detection;
+public `bundles/LacY/`; Options -> Local Structure Cache.
+
+**Should do.** A LacY session (P02920, 417 aa) loads 5 claims, 3 relations,
+3 features and 7 evidence records; the 12-TM topology and signature tracks are
+visible; the 1PV6 contact is shown as a crystal contact, not a biological dimer.
+
+**Try.**
+1. Load `bundles/LacY/manifest.json` with a LacY sequence.
+2. Confirm the UniProt topology has 12 ranges and the N/C termini are cytoplasmic.
+3. Open the 1PV6 relation and confirm `biological_unit: monomer`.
+4. Open a LacY Q2DV session in ChimeraX; the host should select LacY, not GFP or TerC.
+5. Select a TM range, open 2CFQ from the file vault, and inspect the membrane view.
+
+**Edge cases.**
+- LacY is 417 aa; ESMFold must not be used for the full-length model (400-aa cap).
+- 1PV6 has two chains but the author biological unit is monomeric; do not call it a dimer.
+- Phobius 12 vs TMHMM 11 disagreement must remain visible.
+- A GFP sequence must reject the LacY bundle.
+
+### ChimeraX file handoff - 0.71.5
+
+**Surface.** Q2DV host bridge; Options -> Local Structure Cache; attached/fetched
+structures; imported `.hhr`; in-app homolog search.
+
+**Should do.** In the ChimeraX host, attached/fetched PDB/CIF/AF3 files are
+written under `~/Q2DV_files/structures/`; imported `.hhr` and in-app homolog
+search snapshots are written under `~/Q2DV_files/homologs/`. The structure cache
+list shows the vault path and an **Open in ChimeraX** button per saved PDB/CIF.
+
+**Try.**
+1. Fetch 1GFL in Q2DV; confirm the file appears under `Q2DV_files/structures/`.
+2. Import an `.hhr`; confirm it appears under `Q2DV_files/homologs/`.
+3. Run an in-app homolog search; confirm a `q2dv-homologs-*.json` snapshot.
+4. Open the structure cache, press **Open in ChimeraX**, and confirm the model
+   opens.
+5. Repeat in the browser build; confirm no host files are written and no
+   ChimeraX button appears.
+
+**Edge cases.**
+- `Q2DV_FILES_DIR` must relocate the vault for both subfolders.
+- A save failure must log, not block the structure from loading in Q2DV.
+- Opening a file outside the vault must be refused.
 
 ### CSP-safe collapsible sections - 0.71.3
 
@@ -147,7 +398,7 @@ because Qt WebEngine clipboard access is unreliable. Keep raw text entry and
 attach-file controls available.
 
 **Try.**
-1. Open Q2DV Full. Confirm the two Paste Clipboard buttons and the click-to-paste
+1. Open Q2DV. Confirm the two Paste Clipboard buttons and the click-to-paste
    dropzone are absent.
 2. Open the raw text drawer and confirm manual text entry still works.
 3. Open the browser build and confirm the paste controls are still visible.
@@ -167,7 +418,7 @@ first; send the generated `select`, `color`, or `label` command through
 QWebChannel. Hide the button in the browser and leave `Copy Command` unchanged.
 
 **Try.**
-1. Open Q2DV Full, select a region or row, and confirm `Run in ChimeraX` appears.
+1. Open Q2DV, select a region or row, and confirm `Run in ChimeraX` appears.
 2. Generate a command, click Run, and check the ChimeraX Log and 3D selection.
 3. Switch the command engine to PyMOL; expect a warning and no send.
 4. Open the browser build; the button is hidden.
@@ -188,7 +439,7 @@ with `data-q2dv-host="chimerax"`, and send the current 1-indexed selection range
 to ChimeraX through the QWebChannel `Send selection` action.
 
 **Try.**
-1. Open `Q2DV Full`. The host badge reads **ChimeraX**.
+1. Open `Q2DV`. The host badge reads **ChimeraX**.
 2. Use **View -> Toggle 3D Viewer**; expect the informational message that
    ChimeraX provides 3D, not a Py3Dmol panel.
 3. Select a residue range, click **Send selection**, and check the ChimeraX
@@ -213,7 +464,7 @@ functions are linked to ChimeraX.
 **Try.**
 1. Open the page in a browser. Expect the bubble to read **Standalone**; click it
    and expect the browser-specific message.
-2. Open it through `Q2DV Full` or append `?host=chimerax`. Expect **ChimeraX**;
+2. Open it through `Q2DV` or append `?host=chimerax`. Expect **ChimeraX**;
    click it and expect the ChimeraX-specific message.
 3. Confirm the header still fits at narrow width and the version bubble still
    opens the changelog.

@@ -1,0 +1,91 @@
+{
+  "schema_version": "q2dv.bundle/1",
+  "bundle_id": "lacy-p02920-public",
+  "bundle_version": "0.1.1",
+  "created_at": "2026-10-29T00:00:00+00:00",
+  "target": "P02920",
+  "files": [
+    {
+      "path": "protein.json",
+      "bytes": 1486,
+      "sha256": "d1ae40f7d146ee1aee09e138a6e81ae5962c4736d2accc7316f8353aed605409",
+      "type": "protein"
+    },
+    {
+      "path": "features.json",
+      "bytes": 2818,
+      "sha256": "8f7b7a0d1adef8bc407c654ae45e23cc5cb54d7f7c345759bb52a61db43466b4",
+      "type": "features"
+    },
+    {
+      "path": "claims.json",
+      "bytes": 3916,
+      "sha256": "5ce1d26838279c76d44c0a9fb2ff2d3356b1f2b698402482de213ad2dc3939e6",
+      "type": "claims"
+    },
+    {
+      "path": "relations.json",
+      "bytes": 1433,
+      "sha256": "680764fb8f017dfdcbc37cdc35562e13077cb51cccf880a6569795d8c47dbb52",
+      "type": "relations"
+    },
+    {
+      "path": "evidence.json",
+      "bytes": 2969,
+      "sha256": "3dc9b388c351671a24fbd323a546bf6718a50af50215b76e6fb2f1ed238f69cb",
+      "type": "evidence"
+    },
+    {
+      "path": "indexes.json",
+      "bytes": 441,
+      "sha256": "137b39d075e1abab9f67d6cac5d2b7d939bde4b03a1ad0c8678c255eba39b85b",
+      "type": "indexes"
+    },
+    {
+      "path": "schema/q2dv-bundle.schema.json",
+      "bytes": 11257,
+      "sha256": "b4ed82293b5f93bab3f688579de6f0d82d02078a7c13b3399f97ba103327c9e9",
+      "type": "q2dv-bundle.schema"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2060,
+      "sha256": "da78bdfca7bfef88be813c4f34311711f09529cd491c9859e053c0c5c219e481",
+      "type": "README.md"
+    },
+    {
+      "path": "structures/2CFQ.pdb",
+      "bytes": 310473,
+      "sha256": "29bd68f02bbb146318f9310239c9f72e955edd2f9a8c2c5607822cf2c3263b60",
+      "type": "structure"
+    },
+    {
+      "path": "structures/1PV6.pdb",
+      "bytes": 571131,
+      "sha256": "9b618733957415dcc52f2705446c21ed7664646586e0dc98d86022c822b42434",
+      "type": "structure"
+    }
+  ],
+  "counts": {
+    "claims": 5,
+    "relations": 3,
+    "features_total": 3,
+    "features_curated": 3,
+    "features_q2dv": 0,
+    "evidence": 7
+  },
+  "entrypoints": {
+    "protein": "protein.json",
+    "features": "features.json",
+    "claims": "claims.json",
+    "relations": "relations.json",
+    "evidence": "evidence.json",
+    "indexes": "indexes.json"
+  },
+  "load_strategy": "eager",
+  "notes": [
+    "Public LacY example; contains no TerC or laboratory data.",
+    "1PV6 crystal contact is not a biological dimer; the author unit is monomeric.",
+    "LacY is 417 aa; ESMFold (400 aa cap) is not valid for the full-length model."
+  ]
+}

@@ -12,6 +12,12 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
 - `DESIGN.md` — architecture decisions, roadmap and open items.
 - `CHIMERAX_PLUGIN_PLAN.md` — ChimeraX-first plugin plan, host architecture, add-on review and phased roadmap.
 - `CHIMERAX_STARTUP.md` — CliX + Q2DV startup configuration for ChimeraX.
+- `CHIMERAX_ECOSYSTEM.md` — working map of ChimeraX add-ons and their possible data exchange with Q2DV.
+- `DEMO_ROADMAP.md` — two-week implementation, review and test plan using GFP and LacY.
+- `CHIMERAX_INTEGRATION_PLAN.md` — storage redesign, window/layout presets and host-offload roadmap.
+- `FEATURE_TEST_CHECKLIST.md` — rolling checkmark checklist for normal and edge-case feature testing.
 - `RECIPE_MODEL.md` — definition of a Q2DV recipe as a versioned, host-neutral analysis protocol.
+- `bundles/GFP/README.md` — public GFP example bundle (6 claims, 4 relations, 7 features).
+- `bundles/LacY/README.md` — public LacY membrane example bundle (5 claims, 3 relations, 3 features).
 - `UX_GUIDELINES.md` — the design-pass checklist and UI conventions.
 - `CHANGELOG.md` — release notes (also readable in-app via the version badge).

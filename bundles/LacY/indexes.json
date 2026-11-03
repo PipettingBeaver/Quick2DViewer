@@ -1,0 +1,23 @@
+{
+  "by_protein": {
+    "P02920": {
+      "features": [
+        "F:P02920:tm_uniprot",
+        "F:P02920:lacy_signatures",
+        "F:P02920:crystal_contact_1pv6"
+      ],
+      "claims": [
+        "LACY-FAMILY-01",
+        "LACY-SYMPORT-01",
+        "LACY-ALT-01",
+        "LACY-MOTIF-01",
+        "LACY-STRUCT-01"
+      ],
+      "relations": [
+        "REL:LACY:LACY",
+        "REL:LACY:LACTOSE",
+        "REL:LACY:H+"
+      ]
+    }
+  }
+}

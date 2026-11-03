@@ -1,6 +1,6 @@
 # Quick2DViewer + ChimeraX plugin plan
 
-**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.4. The full page loads at a fixed origin, the bundle auto-loads as Q52356, the QWebChannel ping returns, the contextual command panel is wired, Py3Dmol is disabled, clipboard paste controls are hidden, and a persistent WebEngine profile stores localStorage. Full recipe/UI QA and membrane recipes remain.
+**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.13, host 0.6.33. The pinned page loads from a local `file://` URL, the host workspace restores the saved sequence/state, the matching bundle (TerC, GFP, or LacY) is selected, and QWebChannel handles commands and a host-visible file vault. Py3Dmol is disabled and clipboard paste controls are hidden. Full recipe/UI QA and membrane recipes remain.
 **Scope:** general Q2DV program, not lab-specific TerC data  
 **Decision:** keep one Q2DV core with two hosts: browser and ChimeraX. Do not fork.
 
@@ -30,8 +30,9 @@ Q2DV core
         |     file picker, URL loader, localStorage, Py3Dmol
         |
         +-- ChimeraX host
-              local loopback bundle server, QWebChannel,
-              membrane recipes, ChimeraX commands, image saving
+              file:// pinned page, QWebChannel,
+              host-side bundle injection, membrane recipes,
+              ChimeraX commands, image saving
 ```
 
 ### Host contract
@@ -63,13 +64,12 @@ implementation.
 
 | Feature | Browser | ChimeraX | Status |
 |---|---|---|---|
-| Load local bundle | folder picker / URL | loopback `/bundle/manifest.json` | prototyped |
+| Load local bundle | folder picker / URL | host-side JSON injection | prototyped |
 | Claims/relations/features | yes | same UI | existing core |
 | Residue selection | yes | sends context to ChimeraX | implemented via Send selection |
 | Recipe execution | copy `.cxc` | allowlisted QWebChannel command | in progress |
 | Save image | browser download | ChimeraX save | existing prototype |
 | Public app unaffected | yes | optional host | requirement |
-| Fallback panel | n/a | `Q2DV Bridge` | installed |
 | Host badge | Standalone | ChimeraX | added in Q2DV 0.70.0 |
 
 ### P1 - ChimeraX structural workflow
@@ -97,17 +97,28 @@ implementation.
 | Generated models | RFdiffusion/ColabFold | constrained hypothesis only |
 | Public demo | GFP bundle | safe URL-loader showcase |
 
-## 4. ChimeraX integration review
+## 4. Ecosystem working document
+
+The add-on map, interop contracts and phased adapters now live in
+[`CHIMERAX_ECOSYSTEM.md`](CHIMERAX_ECOSYSTEM.md). That document is the place to
+record new add-on findings; this plan stays focused on the Q2DV host. The
+two-week execution plan, GFP/LacY test pair and demo gates live in
+[`DEMO_ROADMAP.md`](DEMO_ROADMAP.md). Durable workspace storage, window/layout
+presets and host offload sequencing are in
+[`CHIMERAX_INTEGRATION_PLAN.md`](CHIMERAX_INTEGRATION_PLAN.md).
+
+## 5. ChimeraX integration review
 
 ### Current platform status
 
 - ChimeraX **1.12** is current on this machine (June 2026).
 - It includes PyQt6 WebEngine, `HtmlToolInstance`, `HtmlView`, custom URL scheme
   registration and `QWebChannel`.
-- HTML tools can call Python through a custom scheme; ChimeraX's own tutorial
-  documents this.
-- The official `mcp` bridge is present in the development tree but is
-  **pre-alpha** and tied to 1.10dev; do not make it a production dependency yet.
+- HTML tools can call Python through QWebChannel; a custom URL scheme must be
+  registered before QApplication, so this host uses a local file URL instead.
+- The `mcp` command and MCPServer bundle are now documented in the 1.12 user
+  guide; the installed MCPServer is 0.2.0. Treat agent control as guarded,
+  confirmation-based, and not a production dependency.
 - The Flatpak build has no offscreen renderer; image scripts use GUI mode. A
   native install may differ.
 
@@ -123,30 +134,32 @@ Key sources:
 ### Recommended embedding mechanics
 
 1. Pin a copy of Q2DV in the ChimeraX bundle.
-2. Serve it from a loopback-only HTTP server inside the bundle.
-3. Serve the selected local bundle at `/bundle/`.
-4. Use QWebChannel for selection/recipe calls.
+2. Serve it from the pinned local `file://` page inside the bundle.
+3. Load the selected bundle through host-side JSON injection.
+4. Use QWebChannel for selection/recipe/workspace calls.
 5. Disable Q2DV's Py3Dmol panel in embedded mode; ChimeraX is the 3D view.
 6. Keep the standalone browser page as the source of truth.
 
-A custom-scheme-only bridge is possible, but loopback plus QWebChannel avoids
-file URL, CORS and folder-picker edge cases.
+The local file URL gives an origin without a local port and avoids early
+custom-scheme registration. Bundle JSON is injected through the host, so Q2DV
+does not need to fetch a local bundle from the page origin; external API fetch
+still works from the file origin.
 
-## 5. Recipe model
+## 6. Recipe model
 
 A recipe is a versioned, host-neutral analysis protocol, not a command list.
 See `RECIPE_MODEL.md` for the schema, categories, context contract, aliases and
 migration order. The temporary fixed toolbar was removed; the current
 contextual path is the existing command panel with `Run in ChimeraX`.
 
-## 6. Add-on review
+## 7. Add-on review
 
 | Add-on / surface | Status checked | Why it matters for Q2DV | Integration stance |
 |---|---|---|---|
 | **Pellaeon 0.2.13** | installed; Toolshed; MIT; ChimeraX 1.9+ | chat/tool calls inside ChimeraX; local Ollama or cloud; command audit | P1 interactive; not a dependency |
 | **ChopChopMF 1.5** | Toolshed; updated 2026 | PAE/pDockQ/ipSAE/Foldseek/compare; JSON output; headless commands | strong P1/P2 candidate |
 | **ISOLDE** | Toolshed; academic/nonprofit | flexible fitting to cryo-EM/crystallographic maps | P2 if a map exists |
-| **ChimeraX MCP (official)** | develop branch; pre-alpha; 1.10dev | external agents control ChimeraX | watch; not production |
+| **ChimeraX MCP (official)** | documented in 1.12; MCPServer 0.2.0 installed | external agents control ChimeraX | guarded; not production |
 | **dovas-net/chimeraX-mcp** | local stdio; ~119 tools | broad external-agent surface | evaluate after official |
 | **mahynotch/chimerax-mcp** | PyPI; early | simple MCP install | evaluate on public data |
 | **N283T/chimerax-mcp-plus** | small project | API search/recipes/screenshots | evaluate |
@@ -169,7 +182,7 @@ terms.
 - Third-party MCP servers: GitHub projects; verify maintenance, license and
   security before installation.
 
-## 7. ChimeraX-first UX
+## 8. ChimeraX-first UX
 
 The ChimeraX panel should prioritize:
 
@@ -184,7 +197,7 @@ The ChimeraX panel should prioritize:
 
 Hide browser-only controls in the ChimeraX panel:
 
-- folder picker (use ChimeraX/Qt dialog or loopback bundle);
+- folder picker (use ChimeraX/Qt dialog or host-side bundle injection);
 - Py3Dmol panel;
 - browser download as primary save;
 - URL loader as primary bundle path.
@@ -192,12 +205,12 @@ Hide browser-only controls in the ChimeraX panel:
 Keep them available in the browser host. Do not remove browser features just
 because the ChimeraX host does not use them.
 
-## 8. Implementation phases
+## 9. Implementation phases
 
-### Phase 0 - fallback panel (done)
+### Phase 0 - prototype retired
 
-`Q2DV Bridge` docked panel with allowlisted recipes. This is the minimum viable
-integration and remains the fallback.
+The earlier small `Q2DV Bridge` prototype has been removed. The Q2DV host is now
+the single ChimeraX integration.
 
 ### Phase 1 - full Q2DV page (in progress)
 
@@ -237,7 +250,7 @@ integration and remains the fallback.
 - `coordset` for trajectories.
 - Acceptance: each add-on has a public-data demo and a fallback.
 
-## 9. Testing and acceptance
+## 10. Testing and acceptance
 
 - Core: existing `npm test`.
 - Host contract: browser stub and ChimeraX stub.
@@ -248,11 +261,11 @@ integration and remains the fallback.
 - Security: unknown recipe rejected; no arbitrary Python/shell.
 - Regression: standalone browser unaffected.
 
-## 10. Risks
+## 11. Risks
 
 | Risk | Mitigation |
 |---|---|
-| CSP/WebEngine asset failures | same-origin loopback; no CDN; disable Py3Dmol |
+| CSP/WebEngine asset failures | local file URL; no CDN; disable Py3Dmol |
 | Folder picker limitations | Qt dialog + `/bundle/` server |
 | Docked panel too small | large tab/window; responsive layout |
 | Q2DV changes break host | pinned version + compatibility check |
@@ -261,7 +274,7 @@ integration and remains the fallback.
 | Two-host drift | one core; host adapter; shared tests |
 | Plugin displaces science | keep the MD/triage work as the primary task |
 
-## 11. Startup configuration
+## 12. Startup configuration
 
 Install CliX and set these under **Favorites -> Settings -> Startup -> Execute
 these commands at startup**:
@@ -269,14 +282,13 @@ these commands at startup**:
 ```text
 ui tool show clix
 ui tool hide "command line interface"
-ui tool show "Q2DV Full"
+ui tool show "Q2DV"
 ```
 
-For the fallback panel, replace the last line with `ui tool show "Q2DV Bridge"`.
 See `CHIMERAX_STARTUP.md` for laptop and recovery notes. Do not load both Q2DV
 hosts at once.
 
-## 12. Decision summary
+## 13. Decision summary
 
 **ChimeraX-first product direction, browser-compatible core, one codebase, two
 thin hosts.**

@@ -1,0 +1,149 @@
+[
+  {
+    "id": "GFP-STRUCT-01",
+    "subject": "P42212",
+    "predicate": "structure",
+    "value": "11-stranded beta-barrel with an internal chromophore",
+    "statement": "avGFP folds as an 11-stranded beta-barrel that encloses the chromophore.",
+    "conditions": {},
+    "details": {
+      "chromophore_residues": [
+        65,
+        66,
+        67
+      ],
+      "barrel_strands": 11
+    },
+    "evidence_refs": [
+      "STRUCT:1GFL",
+      "STRUCT:1EMA",
+      "DOI:10.1038/nbt1096-1246"
+    ],
+    "confidence": "high",
+    "status": "accepted",
+    "source_type": "public_literature"
+  },
+  {
+    "id": "GFP-CHROM-01",
+    "subject": "P42212",
+    "predicate": "chromophore",
+    "value": "S65-Y66-G67",
+    "statement": "The GFP chromophore is formed autocatalytically from Ser65, Tyr66, and Gly67; maturation requires molecular oxygen.",
+    "conditions": {
+      "oxygen": "required"
+    },
+    "details": {
+      "residues": [
+        65,
+        66,
+        67
+      ],
+      "maturation": "autocatalytic"
+    },
+    "evidence_refs": [
+      "DOI:10.1146/annurev.biochem.67.1.509",
+      "STRUCT:1GFL"
+    ],
+    "confidence": "high",
+    "status": "accepted",
+    "source_type": "public_literature"
+  },
+  {
+    "id": "GFP-DIMER-01",
+    "subject": "P42212",
+    "predicate": "oligomerization",
+    "value": "dimer; A206K reduces dimerization",
+    "statement": "GFP can form dimers. The A206K substitution at the dimer interface is used to make monomeric GFP.",
+    "conditions": {
+      "context": "in vitro / crystal contact"
+    },
+    "details": {
+      "interface_residues": [
+        38,
+        39,
+        73,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147,
+        149,
+        168,
+        170,
+        202,
+        204,
+        205,
+        206,
+        207,
+        208,
+        209,
+        210,
+        211,
+        219,
+        221,
+        223
+      ],
+      "monomerizing_mutation": "A206K"
+    },
+    "evidence_refs": [
+      "STRUCT:1GFL",
+      "DOI:10.1126/science.1068539"
+    ],
+    "confidence": "moderate",
+    "status": "accepted",
+    "source_type": "public_literature"
+  },
+  {
+    "id": "GFP-EGFP-01",
+    "subject": "P42212",
+    "predicate": "variant",
+    "value": "EGFP (F64L/S65T)",
+    "statement": "F64L and S65T are the substitutions used in enhanced GFP; FACS-optimized GFP mutants improve folding and brightness.",
+    "conditions": {
+      "temperature": "37 C"
+    },
+    "details": {
+      "mutations": [
+        "F64L",
+        "S65T"
+      ]
+    },
+    "evidence_refs": [
+      "DOI:10.1016/0378-1119(95)00685-0"
+    ],
+    "confidence": "moderate",
+    "status": "accepted",
+    "source_type": "public_literature"
+  },
+  {
+    "id": "GFP-SF-01",
+    "subject": "P42212",
+    "predicate": "variant",
+    "value": "superfolder GFP",
+    "statement": "Superfolder GFP mutations improve folding and solubility in bacterial and fusion contexts.",
+    "conditions": {},
+    "details": {},
+    "evidence_refs": [
+      "DOI:10.1038/nbt1172"
+    ],
+    "confidence": "high",
+    "status": "accepted",
+    "source_type": "public_literature"
+  },
+  {
+    "id": "GFP-REPORTER-01",
+    "subject": "P42212",
+    "predicate": "function",
+    "value": "genetically encoded fluorescent reporter",
+    "statement": "GFP is a genetically encoded fluorescent reporter that can be fused to proteins and imaged in living cells.",
+    "conditions": {},
+    "details": {},
+    "evidence_refs": [
+      "DOI:10.1146/annurev.biochem.67.1.509"
+    ],
+    "confidence": "high",
+    "status": "accepted",
+    "source_type": "public_literature"
+  }
+]

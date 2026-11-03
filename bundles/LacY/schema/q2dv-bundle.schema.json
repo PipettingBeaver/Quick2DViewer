@@ -1,0 +1,581 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.org/q2dv/bundle.schema.json",
+  "title": "Q2DV TerC bundle v1",
+  "description": "Record definitions for the browser-first Q2DV bundle. Each data file is an array of one record type; manifest.json uses the Manifest definition.",
+  "definitions": {
+    "Evidence": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "source_type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(DOI|THESIS|UNIPROT|CORPUS|COMPUTATIONAL|STRUCT|Q2DV):"
+        },
+        "type": {
+          "enum": [
+            "paper",
+            "thesis",
+            "database",
+            "search",
+            "analysis",
+            "structure",
+            "q2dv_session"
+          ]
+        },
+        "source_type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "year": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "journal": {
+          "type": "string"
+        },
+        "doi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "local_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "local_only": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CoordinateMap": {
+      "type": "object",
+      "required": [
+        "type",
+        "target"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "identity",
+            "global_alignment",
+            "msa_column",
+            "structure_chain",
+            "none"
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "identity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "coverage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "aligned_columns": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "qStart": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "qEnd": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tStart": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tEnd": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "qSeq": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tSeq": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method": {
+          "type": "string"
+        }
+      }
+    },
+    "Oligomer": {
+      "type": "object",
+      "required": [
+        "state",
+        "confidence"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "monomer",
+            "dimer",
+            "trimer",
+            "higher_order",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "enum": [
+            "experimental",
+            "predicted",
+            "none",
+            "inferred"
+          ]
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confidence": {
+          "type": "string"
+        }
+      }
+    },
+    "Protein": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "sequence",
+        "length"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "gene": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "organism": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "string",
+          "pattern": "^[A-Z]+$"
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "uniprot": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pfam": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "superfamily": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plasmid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "Profile": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "homolog",
+            "lab_thesis",
+            "structure",
+            "interactome"
+          ]
+        },
+        "protein": {
+          "$ref": "#/definitions/Protein"
+        },
+        "coordinate_map": {
+          "$ref": "#/definitions/CoordinateMap"
+        },
+        "structure": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "completeness": {
+          "type": "object"
+        },
+        "oligomer": {
+          "$ref": "#/definitions/Oligomer"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Feature": {
+      "type": "object",
+      "required": [
+        "id",
+        "protein",
+        "type",
+        "encoding"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "protein": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "encoding": {
+          "enum": [
+            "dense_array",
+            "sparse",
+            "string",
+            "residues",
+            "range"
+          ]
+        },
+        "length": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "values": {
+          "type": [
+            "array",
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "residues": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "start": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "end": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "min": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "source_type": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "subject",
+        "predicate",
+        "value",
+        "confidence",
+        "status",
+        "source_type",
+        "evidence_refs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "predicate": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "statement": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "object"
+        },
+        "details": {
+          "type": "object"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "proposed",
+            "accepted",
+            "rejected",
+            "conflicting"
+          ]
+        },
+        "source_type": {
+          "type": "string"
+        }
+      }
+    },
+    "Relation": {
+      "type": "object",
+      "required": [
+        "id",
+        "a",
+        "b",
+        "type",
+        "method",
+        "confidence",
+        "status",
+        "evidence_refs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "a": {
+          "type": "string"
+        },
+        "b": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "interface_status": {
+          "type": "string"
+        },
+        "interface_a": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "interface_b": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "stoichiometry": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "object"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "proposed",
+            "accepted",
+            "rejected",
+            "conflicting"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Manifest": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "bundle_id",
+        "bundle_version",
+        "target",
+        "files",
+        "counts",
+        "entrypoints",
+        "load_strategy"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "q2dv.bundle/1"
+        },
+        "bundle_id": {
+          "type": "string"
+        },
+        "bundle_version": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "bytes",
+              "sha256",
+              "type"
+            ]
+          }
+        },
+        "counts": {
+          "type": "object"
+        },
+        "entrypoints": {
+          "type": "object"
+        },
+        "load_strategy": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

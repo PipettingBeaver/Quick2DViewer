@@ -1,0 +1,91 @@
+{
+  "schema_version": "q2dv.bundle/1",
+  "bundle_id": "gfp-p42212-public",
+  "bundle_version": "0.1.0",
+  "created_at": "2026-10-29T00:00:00+00:00",
+  "target": "P42212",
+  "files": [
+    {
+      "path": "protein.json",
+      "bytes": 1257,
+      "sha256": "3df55685e88a99ba29c0d2bad69f17dff019fbb163737f2bfa8f6764f28775cd",
+      "type": "protein"
+    },
+    {
+      "path": "features.json",
+      "bytes": 5622,
+      "sha256": "b660dd33a501b23515774ba495ad8d24cb705663050580a59f3819352638faaa",
+      "type": "features"
+    },
+    {
+      "path": "claims.json",
+      "bytes": 3615,
+      "sha256": "6e0cfef13d521e030e85fd506c103219957c098ffbfdee9793496aceefbf450d",
+      "type": "claims"
+    },
+    {
+      "path": "relations.json",
+      "bytes": 2079,
+      "sha256": "8b16b3eb1e8b41dbb6e005b613aafbf9addc78c171f68d8ca3b8ededa51f90b6",
+      "type": "relations"
+    },
+    {
+      "path": "evidence.json",
+      "bytes": 4225,
+      "sha256": "54125afdf87d7f5da14cb2c7b338ad806673648d198468052019192f73f9a28c",
+      "type": "evidence"
+    },
+    {
+      "path": "indexes.json",
+      "bytes": 589,
+      "sha256": "d75ce718fcc123cedd4888fdfdbe9168b36be3ca6ea7442ad2f2ca0556e639ab",
+      "type": "indexes"
+    },
+    {
+      "path": "schema/q2dv-bundle.schema.json",
+      "bytes": 11257,
+      "sha256": "b4ed82293b5f93bab3f688579de6f0d82d02078a7c13b3399f97ba103327c9e9",
+      "type": "q2dv-bundle.schema"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1924,
+      "sha256": "d02751f79b61dbbd78c27a0633c7a266d4448203a2d621be7ebbb4e5cf84cfa9",
+      "type": "README.md"
+    },
+    {
+      "path": "structures/1GFL.pdb",
+      "bytes": 360126,
+      "sha256": "60eb370ad1a2c7c63382399d8655e0448fc29acc2a436e1a6112a5d599390d6f",
+      "type": "structure"
+    },
+    {
+      "path": "structures/1EMA.pdb",
+      "bytes": 190188,
+      "sha256": "f1b9fdc2b871cc41f21f645a21b4948ce12d79b29197256330b108c9b503b088",
+      "type": "structure"
+    }
+  ],
+  "counts": {
+    "claims": 6,
+    "relations": 4,
+    "features_total": 7,
+    "features_curated": 5,
+    "features_q2dv": 2,
+    "evidence": 10
+  },
+  "entrypoints": {
+    "protein": "protein.json",
+    "features": "features.json",
+    "claims": "claims.json",
+    "relations": "relations.json",
+    "evidence": "evidence.json",
+    "indexes": "indexes.json"
+  },
+  "load_strategy": "eager",
+  "notes": [
+    "Public GFP example; contains no TerC or laboratory data.",
+    "Dimer interface is a 1GFL crystal contact map; A206K is the monomerizing control.",
+    "PSIPRED/SPOTD rows come from GFP/Q2D_GFP.txt."
+  ]
+}

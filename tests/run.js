@@ -20,6 +20,8 @@ const IPR_PROSITE_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/iprs
 const PDBE_OUTLIERS_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-outliers.json'), 'utf-8');
 const PDBE_QUALITY_FIXTURE = fs.readFileSync(path.join(ROOT, 'tests/fixtures/pdbe-1gfl-quality.json'), 'utf-8');
 const Q2D_GFP_FIXTURE = fs.readFileSync(path.join(ROOT, 'GFP/Q2D_GFP.txt'), 'utf-8');
+const GFP_BUNDLE_DIR = path.join(ROOT, 'bundles/GFP');
+const LACY_BUNDLE_DIR = path.join(ROOT, 'bundles/LacY');
 
 // ---------- DOM stubs ----------
 function makeEl() {
@@ -5181,6 +5183,170 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     catch (err) { bundleMismatch = err.message; }
     assert(/does not match/.test(bundleMismatch), 'a bundle for another sequence is refused');
     assert(ctxRun(`q2dvBundle`) === null, 'and leaves no half-loaded bundle');
+
+    const gfpManifest = JSON.parse(fs.readFileSync(path.join(GFP_BUNDLE_DIR, 'manifest.json'), 'utf-8'));
+    const gfpProtein = JSON.parse(fs.readFileSync(path.join(GFP_BUNDLE_DIR, 'protein.json'), 'utf-8'));
+    const gfpPaths = ['manifest.json', ...Object.values(gfpManifest.entrypoints)];
+    sandbox.__gfpBundleFiles = gfpPaths.map(p => ({
+        name: p.split('/').pop(), webkitRelativePath: 'gfp/' + p,
+        text: async () => fs.readFileSync(path.join(GFP_BUNDLE_DIR, p), 'utf-8')
+    }));
+    ctxRun(`parsedTracks = { AA: ${JSON.stringify(gfpProtein.sequence)} }; trackMeta = {}; q2dvBundle = null; q2dvBundleBaseUrl = '';`);
+    await ctxRun(`loadBundleFromFiles(__gfpBundleFiles)`);
+    assert(ctxRun(`q2dvBundle && q2dvBundle.protein.id`) === 'P42212', 'the public GFP bundle loads');
+    assert(ctxRun(`q2dvBundle.claims.length`) === gfpManifest.counts.claims, 'GFP claim count matches the manifest');
+    assert(ctxRun(`q2dvBundle.relations.length`) === gfpManifest.counts.relations, 'GFP relation count matches the manifest');
+    assert(ctxRun(`q2dvBundle.features.length`) === gfpManifest.counts.features_total, 'GFP feature count matches the manifest');
+    assert(ctxRun(`q2dvBundle.features.some(f => f.id === 'F:P42212:chromophore' && f.residues.join(',') === '65,66,67')`), 'GFP chromophore is S65-Y66-G67');
+    assert(ctxRun(`q2dvBundle.relations.find(r => r.id === 'REL:GFP:GFP').interface_a.includes(206)`), 'GFP dimer relation includes the A206K interface position');
+    assert(fs.existsSync(path.join(GFP_BUNDLE_DIR, 'structures/1GFL.pdb')), 'the GFP bundle ships its 1GFL structure');
+    assert(ctxRun(`q2dvBundle.protein.structures.find(s => s.id === 'STRUCT:1GFL').auto_open`) === true, '1GFL is marked for host auto-open');
+    assert(ctxRun(`q2dvBundle.protein.structures.find(s => s.id === 'STRUCT:1GFL').auto_chain`) === 'A', '1GFL auto-open uses one biological chain');
+    assert(fs.existsSync(path.join(GFP_BUNDLE_DIR, 'structures/1EMA.pdb')), 'the GFP bundle ships its 1EMA reference');
+    ctxRun(`addBundleTracksToViewer('curated')`);
+    assert(ctxRun(`Object.keys(parsedTracks).filter(k => k.startsWith('BND_')).length`) === 7, 'GFP features add seven BND rows');
+    assert(ctxRun(`parsedTracks['BND_F_P42212_chromophore'].split('').reduce((n, c) => n + (c === '*' ? 1 : 0), 0)`) === 3, 'GFP chromophore marks three residues');
+    ctxRun(`clearBundleTracks(); q2dvBundle = null; parsedTracks = {}; trackMeta = {};`);
+
+    const lacyManifest = JSON.parse(fs.readFileSync(path.join(LACY_BUNDLE_DIR, 'manifest.json'), 'utf-8'));
+    const lacyProtein = JSON.parse(fs.readFileSync(path.join(LACY_BUNDLE_DIR, 'protein.json'), 'utf-8'));
+    const lacyPaths = ['manifest.json', ...Object.values(lacyManifest.entrypoints)];
+    sandbox.__lacyBundleFiles = lacyPaths.map(p => ({
+        name: p.split('/').pop(), webkitRelativePath: 'lacy/' + p,
+        text: async () => fs.readFileSync(path.join(LACY_BUNDLE_DIR, p), 'utf-8')
+    }));
+    ctxRun(`parsedTracks = { AA: ${JSON.stringify(lacyProtein.sequence)} }; trackMeta = {}; q2dvBundle = null; q2dvBundleBaseUrl = '';`);
+    await ctxRun(`loadBundleFromFiles(__lacyBundleFiles)`);
+    assert(ctxRun(`q2dvBundle && q2dvBundle.protein.id`) === 'P02920', 'the public LacY bundle loads');
+    assert(ctxRun(`q2dvBundle.protein.length`) === 417, 'LacY keeps its 417-aa public sequence');
+    assert(ctxRun(`q2dvBundle.features.find(f => f.id === 'F:P02920:tm_uniprot').details.ranges.length`) === 12, 'LacY feature carries 12 TM ranges');
+    assert(ctxRun(`q2dvBundle.relations.find(r => r.id === 'REL:LACY:LACY').conditions.biological_unit`) === 'monomer', 'LacY crystal contact is not called a biological dimer');
+    assert(fs.existsSync(path.join(LACY_BUNDLE_DIR, 'structures/2CFQ.pdb')), 'the LacY bundle ships 2CFQ');
+    assert(fs.existsSync(path.join(LACY_BUNDLE_DIR, 'structures/1PV6.pdb')), 'the LacY bundle ships 1PV6');
+    assert(ctxRun(`q2dvBundle.protein.structures.find(s => s.id === 'STRUCT:2CFQ').auto_open`) === true, '2CFQ is marked for host auto-open');
+    assert(ctxRun(`q2dvBundle.claims.length`) === lacyManifest.counts.claims, 'LacY claim count matches the manifest');
+    assert(ctxRun(`q2dvBundle.features.length`) === lacyManifest.counts.features_total, 'LacY feature count matches the manifest');
+    ctxRun(`q2dvBundle = null; parsedTracks = {}; trackMeta = {};`);
+
+    section('light/dark theme');
+    ctxRun(`applyTheme('dark', false)`);
+    assert(ctxRun(`document.documentElement.getAttribute('data-theme')`) === 'dark', 'dark theme sets the document theme attribute');
+    assert(ctxRun(`document.getElementById('themeToggle').textContent`) === 'Light', 'the toggle offers the light mode when dark is active');
+    ctxRun(`applyTheme('light', false)`);
+    assert(ctxRun(`document.documentElement.getAttribute('data-theme')`) === 'light', 'light theme restores the light attribute');
+    ctxRun(`applyTheme('dark', false)`);
+    assert(ctxRun(`saveSlotAccent(0)`) === '#60a5fa' && ctxRun(`saveSlotFill(0)`) === '#1e3a8a', 'saved selection slots use dark-theme accents');
+    ctxRun(`applyTheme('light', false)`);
+    ctxRun(`location.search = '?theme=dark'`);
+    assert(ctxRun(`queryTheme()`) === 'dark', 'the host query supplies the initial theme');
+    ctxRun(`location.search = ''; applyTheme('light', false)`);
+
+    section('layout presets');
+    ctxRun(`applyLayoutPreset('compact', false)`);
+    assert(ctxRun(`document.documentElement.getAttribute('data-layout-preset')`) === 'compact', 'compact preset marks the document');
+    assert(ctxRun(`document.getElementById('mainLegend').hidden`) === true, 'compact preset hides the legend');
+    assert(ctxRun(`layoutPreset`) === 'compact', 'compact preset is recorded');
+    ctxRun(`applyLayoutPreset('analysis', false)`);
+    assert(ctxRun(`document.documentElement.getAttribute('data-layout-preset')`) === 'analysis', 'analysis preset marks the document');
+    assert(ctxRun(`document.getElementById('mainLegend').hidden`) === false, 'analysis preset shows the legend');
+    await new Promise(r => setTimeout(r, 160));
+    ctxRun(`markLayoutCustom()`);
+    assert(ctxRun(`document.documentElement.getAttribute('data-layout-preset')`) === 'custom', 'manual changes switch to Custom');
+    ctxRun(`applyLayoutPreset('analysis', false)`);
+
+    section('host capability flags + offload skeleton');
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        capabilities: { runCommand: true, selectResidues: true, workspace: true, offload: { rsa: false, interface: true } },
+        offload(name, payload) { sandbox.__offloaded = { name, payload }; return Promise.resolve('unsupported: ' + name); }
+    };
+    assert(ctxRun(`hostSupports('workspace')`) === true, 'workspace capability is advertised');
+    assert(ctxRun(`hostSupports('rsa')`) === false, 'unavailable analysis capability is not advertised');
+    assert(ctxRun(`offloadToChimeraX('rsa', {})`) === null, 'unavailable analysis falls back to the browser path');
+    const offloaded = await ctxRun(`offloadToChimeraX('interface', { ranges: [[1, 2]] })`);
+    assert(offloaded === 'unsupported: interface' && sandbox.__offloaded.name === 'interface', 'enabled offload reaches the host bridge skeleton');
+    sandbox.Q2DVHost = null;
+
+    section('ChimeraX host file handoff');
+    sandbox.__hostSaved = [];
+    sandbox.__hostOpened = '';
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        saveFile(kind, name, text) {
+            sandbox.__hostSaved.push({ kind, name, text });
+            return Promise.resolve('/tmp/Q2DV_files/' + kind + '/' + name);
+        },
+        openFile(path) {
+            sandbox.__hostOpened = path;
+            return Promise.resolve('ok');
+        },
+        filesDir() { return Promise.resolve('/tmp/Q2DV_files'); }
+    };
+    ctxRun(`hostSavedFilePaths = {}; hostFilesDir = '';`);
+    const savedPath = await ctxRun(`syncQ2DVHostFile('structures', '1GFL.pdb', 'ATOM')`);
+    assert(savedPath === '/tmp/Q2DV_files/structures/1GFL.pdb', 'host save returns the ChimeraX path');
+    assert(sandbox.__hostSaved.length === 1 && sandbox.__hostSaved[0].kind === 'structures', 'host save receives the structure file kind');
+    assert(sandbox.__hostSaved[0].text === 'ATOM', 'host save receives the raw structure text');
+    const opened = await ctxRun(`openQ2DVHostFile('1GFL.pdb')`);
+    assert(opened === 'ok' && sandbox.__hostOpened === '/tmp/Q2DV_files/structures/1GFL.pdb', 'the host can open the saved structure');
+    await ctxRun(`syncQ2DVHostHomologs('BLAST', { queryLength: 4, hits: [{ hitId: 'P1', significant: true }] })`);
+    const homologSave = sandbox.__hostSaved[sandbox.__hostSaved.length - 1];
+    assert(homologSave.kind === 'homologs' && /^q2dv-homologs-BLAST-.*\.json$/.test(homologSave.name), 'host stores an in-app homolog snapshot');
+    sandbox.Q2DVHost = null;
+    ctxRun(`hostSavedFilePaths = {}; hostFilesDir = '';`);
+
+    section('ChimeraX selection sync');
+    sandbox.__hostSelections = [];
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        selectResidues(ranges, sequence) {
+            sandbox.__hostSelections.push({ ranges, sequence });
+            return Promise.resolve('ok: #1/A:65-67');
+        }
+    };
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(238) }; selectionMode = 'point'; rowRanges = []; selectStart = 64; selectEnd = 66; lastSelectionSyncKey = ''; selectionSyncTimer = null;`);
+    ctxRun(`syncSelectionToChimerax()`);
+    await new Promise(r => setTimeout(r, 220));
+    assert(sandbox.__hostSelections.length === 1, 'a selection change sends one debounced ChimeraX request');
+    assert(JSON.stringify(sandbox.__hostSelections[0].ranges) === '[[65,67]]', 'the ChimeraX request uses one-based ranges');
+    assert(sandbox.__hostSelections[0].sequence.length === 238, 'the ChimeraX request carries the reference sequence');
+    sandbox.Q2DVHost = null;
+    ctxRun(`parsedTracks = {}; selectStart = null; selectEnd = null; rowRanges = []; lastSelectionSyncKey = '';`);
+
+    section('ChimeraX RSA offload result');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(4) }; trackMeta = {}; graphHighlights = {};`);
+    const rsaApplied = ctxRun(`applyChimeraXRsaResult({ ok: true, method: 'ChimeraX measure sasa', model: '#1/A', coverage: 1, values: [0.1, null, 0.5, 0.9] })`);
+    assert(rsaApplied === true, 'valid SASA result is accepted');
+    assert(ctxRun(`Array.isArray(parsedTracks.CX_RSA)`) === true, 'SASA result becomes a CX_RSA track');
+    assert(ctxRun(`parsedTracks.CX_RSA[0].val`) === 0.1 && ctxRun(`parsedTracks.CX_RSA[1]`) === null, 'SASA values/null are preserved');
+    assert(ctxRun(`trackMeta.CX_RSA.source`) === 'ChimeraX', 'SASA track carries ChimeraX provenance');
+    assert(ctxRun(`applyChimeraXRsaResult({ ok: false })`) === false, 'failed SASA result is rejected');
+    ctxRun(`parsedTracks = {}; trackMeta = {}; graphHighlights = {};`);
+
+    section('host workspace');
+    sandbox.__hostWorkspace = '';
+    sandbox.__hostSettings = [];
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        saveWorkspace(text) {
+            sandbox.__hostWorkspace = text;
+            return Promise.resolve('/tmp/Q2DV_files/workspace/current.json');
+        },
+        loadWorkspace() { return Promise.resolve(''); },
+        saveHostSettings(text) {
+            sandbox.__hostSettings.push(text);
+            return Promise.resolve('ok');
+        }
+    };
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(4) }; currentProteinLabel = 'Test';`);
+    const workspacePath = await ctxRun(`saveHostWorkspaceNow()`);
+    assert(workspacePath === '/tmp/Q2DV_files/workspace/current.json', 'workspace save returns the host path');
+    assert(JSON.parse(sandbox.__hostWorkspace).schema === 'q2dv.workspace/1', 'workspace uses a versioned envelope');
+    assert(JSON.parse(sandbox.__hostWorkspace).state.parsedTracks.AA.length === 4, 'workspace carries the current state');
+    const settingsResult = await ctxRun(`saveHostSettings({ theme: 'dark' })`);
+    assert(settingsResult === 'ok' && JSON.parse(sandbox.__hostSettings[0]).theme === 'dark', 'host settings carry the theme');
+    sandbox.Q2DVHost = null;
+    ctxRun(`parsedTracks = {}; currentProteinLabel = null; hostWorkspaceLoaded = false;`);
 
     // attachStructureText is async, so the attach-time coordination store has to
     // be checked here rather than in the synchronous section above.

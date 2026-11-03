@@ -1,0 +1,119 @@
+[
+  {
+    "id": "REL:GFP:GFP",
+    "a": "P42212",
+    "b": "P42212",
+    "type": "self_association",
+    "method": "1GFL crystal contact (4.5 A) + A206K mutagenesis",
+    "interface_status": "crystal_contact",
+    "interface_a": [
+      38,
+      39,
+      73,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      149,
+      168,
+      170,
+      202,
+      204,
+      205,
+      206,
+      207,
+      208,
+      209,
+      210,
+      211,
+      219,
+      221,
+      223
+    ],
+    "interface_b": [
+      38,
+      39,
+      73,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      149,
+      168,
+      170,
+      202,
+      204,
+      205,
+      206,
+      207,
+      208,
+      209,
+      210,
+      211,
+      219,
+      221,
+      223
+    ],
+    "stoichiometry": "dimer",
+    "conditions": {},
+    "confidence": "moderate",
+    "status": "accepted",
+    "evidence_refs": [
+      "STRUCT:1GFL",
+      "DOI:10.1126/science.1068539"
+    ]
+  },
+  {
+    "id": "REL:GFP:O2",
+    "a": "P42212",
+    "b": "O2",
+    "type": "chemical_requirement",
+    "method": "biochemical maturation",
+    "interface_status": "not_applicable",
+    "conditions": {
+      "process": "chromophore maturation"
+    },
+    "confidence": "high",
+    "status": "accepted",
+    "evidence_refs": [
+      "DOI:10.1146/annurev.biochem.67.1.509"
+    ]
+  },
+  {
+    "id": "REL:GFP:EGFP",
+    "a": "P42212",
+    "b": "EGFP",
+    "type": "variant_of",
+    "method": "site-directed mutagenesis",
+    "interface_status": "not_applicable",
+    "conditions": {
+      "mutations": [
+        "F64L",
+        "S65T"
+      ]
+    },
+    "confidence": "moderate",
+    "status": "accepted",
+    "evidence_refs": [
+      "DOI:10.1016/0378-1119(95)00685-0"
+    ]
+  },
+  {
+    "id": "REL:GFP:SFGFP",
+    "a": "P42212",
+    "b": "superfolder GFP",
+    "type": "variant_of",
+    "method": "directed evolution",
+    "interface_status": "not_applicable",
+    "conditions": {},
+    "confidence": "high",
+    "status": "accepted",
+    "evidence_refs": [
+      "DOI:10.1038/nbt1172"
+    ]
+  }
+]

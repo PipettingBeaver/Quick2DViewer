@@ -1,0 +1,118 @@
+[
+  {
+    "id": "UNIPROT:P02920",
+    "type": "database",
+    "source_type": "public_database",
+    "title": "UniProtKB P02920 LACY_ECOLI",
+    "url": "https://www.uniprot.org/uniprotkb/P02920/entry",
+    "year": null,
+    "authors": [],
+    "journal": "UniProtKB",
+    "doi": null,
+    "local_only": false
+  },
+  {
+    "id": "STRUCT:1PV6",
+    "type": "structure",
+    "source_type": "public_database",
+    "title": "Crystal structure of lactose permease (1PV6)",
+    "authors": [
+      "Abramson J.",
+      "Smirnova I.",
+      "Kasho V.",
+      "Verner G.",
+      "Kaback H.R.",
+      "Iwata S."
+    ],
+    "year": 2003,
+    "journal": "PDB",
+    "doi": "10.1126/science.1088196",
+    "url": "https://www.rcsb.org/structure/1PV6",
+    "local_only": false
+  },
+  {
+    "id": "STRUCT:2CFQ",
+    "type": "structure",
+    "source_type": "public_database",
+    "title": "Sugar-free lactose permease at neutral pH (2CFQ)",
+    "authors": [
+      "Mirza O.",
+      "Guan L.",
+      "Verner G.",
+      "Iwata S.",
+      "Kaback H.R."
+    ],
+    "year": 2006,
+    "journal": "PDB",
+    "doi": "10.1038/sj.emboj.7601028",
+    "url": "https://www.rcsb.org/structure/2CFQ",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1126/science.1088196",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "Structure and mechanism of the lactose permease of Escherichia coli",
+    "authors": [
+      "Abramson J.",
+      "Smirnova I.",
+      "Kasho V.",
+      "Verner G.",
+      "Kaback H.R.",
+      "Iwata S."
+    ],
+    "year": 2003,
+    "journal": "Science",
+    "doi": "10.1126/science.1088196",
+    "url": "https://doi.org/10.1126/science.1088196",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1038/sj.emboj.7601028",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "Structural evidence for induced fit and a mechanism for sugar/H+ symport in LacY",
+    "authors": [
+      "Mirza O.",
+      "Guan L.",
+      "Verner G.",
+      "Iwata S.",
+      "Kaback H.R."
+    ],
+    "year": 2006,
+    "journal": "The EMBO Journal",
+    "doi": "10.1038/sj.emboj.7601028",
+    "url": "https://doi.org/10.1038/sj.emboj.7601028",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1073/pnas.0707688104",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "Structural determination of wild-type lactose permease",
+    "authors": [
+      "Guan L.",
+      "Mirza O.",
+      "Verner G.",
+      "Iwata S.",
+      "Kaback H.R."
+    ],
+    "year": 2007,
+    "journal": "PNAS",
+    "doi": "10.1073/pnas.0707688104",
+    "url": "https://doi.org/10.1073/pnas.0707688104",
+    "local_only": false
+  },
+  {
+    "id": "COMPUTATIONAL:PROSITE:LACY",
+    "type": "analysis",
+    "source_type": "computational",
+    "title": "PROSITE LacY/RafB signatures PS00896 and PS00897",
+    "authors": [],
+    "year": null,
+    "journal": "PROSITE",
+    "doi": null,
+    "url": "https://prosite.expasy.org/PS00896",
+    "local_only": false
+  }
+]

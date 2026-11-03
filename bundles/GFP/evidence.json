@@ -1,0 +1,161 @@
+[
+  {
+    "id": "UNIPROT:P42212",
+    "type": "database",
+    "source_type": "public_database",
+    "title": "UniProtKB P42212 GFP_AEQVI",
+    "url": "https://www.uniprot.org/uniprotkb/P42212/entry",
+    "year": null,
+    "authors": [],
+    "journal": "UniProtKB",
+    "doi": null,
+    "local_only": false
+  },
+  {
+    "id": "STRUCT:1GFL",
+    "type": "structure",
+    "source_type": "public_database",
+    "title": "Structure of green fluorescent protein (1GFL)",
+    "authors": [
+      "Yang F.",
+      "Moss L.G.",
+      "Phillips G.N."
+    ],
+    "year": 1996,
+    "journal": "PDB",
+    "doi": "10.1038/nbt1096-1246",
+    "url": "https://www.rcsb.org/structure/1GFL",
+    "local_only": false
+  },
+  {
+    "id": "STRUCT:1EMA",
+    "type": "structure",
+    "source_type": "public_database",
+    "title": "Crystal structure of Aequorea victoria GFP (1EMA)",
+    "authors": [
+      "Ormo M.",
+      "Cubitt A.B.",
+      "Kallio K.",
+      "Gross L.A.",
+      "Tsien R.Y.",
+      "Remington S.J."
+    ],
+    "year": 1996,
+    "journal": "PDB",
+    "doi": "10.1126/science.273.5280.1392",
+    "url": "https://www.rcsb.org/structure/1EMA",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1126/science.273.5280.1392",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "Crystal structure of the Aequorea victoria green fluorescent protein",
+    "authors": [
+      "Ormo M.",
+      "Cubitt A.B.",
+      "Kallio K.",
+      "Gross L.A.",
+      "Tsien R.Y.",
+      "Remington S.J."
+    ],
+    "year": 1996,
+    "journal": "Science",
+    "doi": "10.1126/science.273.5280.1392",
+    "url": "https://doi.org/10.1126/science.273.5280.1392",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1038/nbt1096-1246",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "The molecular structure of green fluorescent protein",
+    "authors": [
+      "Yang F.",
+      "Moss L.G.",
+      "Phillips G.N."
+    ],
+    "year": 1996,
+    "journal": "Nature Biotechnology",
+    "doi": "10.1038/nbt1096-1246",
+    "url": "https://doi.org/10.1038/nbt1096-1246",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1146/annurev.biochem.67.1.509",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "The green fluorescent protein",
+    "authors": [
+      "Tsien R.Y."
+    ],
+    "year": 1998,
+    "journal": "Annual Review of Biochemistry",
+    "doi": "10.1146/annurev.biochem.67.1.509",
+    "url": "https://doi.org/10.1146/annurev.biochem.67.1.509",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1126/science.1068539",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "Partitioning of lipid-modified monomeric GFPs into membrane microdomains of live cells",
+    "authors": [
+      "Zacharias D.A.",
+      "Violin J.D.",
+      "Newton A.C.",
+      "Tsien R.Y."
+    ],
+    "year": 2002,
+    "journal": "Science",
+    "doi": "10.1126/science.1068539",
+    "url": "https://doi.org/10.1126/science.1068539",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1038/nbt1172",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "Engineering and characterization of a superfolder green fluorescent protein",
+    "authors": [
+      "Pedelacq J.-D.",
+      "Cabantous S.",
+      "Tran T.",
+      "Terwilliger T.C.",
+      "Waldo G.S."
+    ],
+    "year": 2005,
+    "journal": "Nature Biotechnology",
+    "doi": "10.1038/nbt1172",
+    "url": "https://doi.org/10.1038/nbt1172",
+    "local_only": false
+  },
+  {
+    "id": "DOI:10.1016/0378-1119(95)00685-0",
+    "type": "paper",
+    "source_type": "public_literature",
+    "title": "FACS-optimized mutants of the green fluorescent protein (GFP)",
+    "authors": [
+      "Cormack B.P.",
+      "Valdivia R.H.",
+      "Falkow S."
+    ],
+    "year": 1996,
+    "journal": "Gene",
+    "doi": "10.1016/0378-1119(95)00685-0",
+    "url": "https://doi.org/10.1016/0378-1119(95)00685-0",
+    "local_only": false
+  },
+  {
+    "id": "COMPUTATIONAL:Q2DV:GFP_Q2D",
+    "type": "analysis",
+    "source_type": "computational",
+    "title": "Q2DV Quick2D prediction for GFP (PSIPRED, SPOTD)",
+    "authors": [],
+    "year": null,
+    "journal": null,
+    "doi": null,
+    "url": null,
+    "local_only": false
+  }
+]

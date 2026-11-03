@@ -1,0 +1,29 @@
+{
+  "by_protein": {
+    "P42212": {
+      "features": [
+        "F:P42212:chromophore",
+        "F:P42212:beta_barrel",
+        "F:P42212:dimer_interface",
+        "F:P42212:A206K",
+        "F:P42212:EGFP_mutations",
+        "F:P42212:SS_PSIPRED",
+        "F:P42212:DO_SPOTD"
+      ],
+      "claims": [
+        "GFP-STRUCT-01",
+        "GFP-CHROM-01",
+        "GFP-DIMER-01",
+        "GFP-EGFP-01",
+        "GFP-SF-01",
+        "GFP-REPORTER-01"
+      ],
+      "relations": [
+        "REL:GFP:GFP",
+        "REL:GFP:O2",
+        "REL:GFP:EGFP",
+        "REL:GFP:SFGFP"
+      ]
+    }
+  }
+}

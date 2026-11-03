@@ -1,0 +1,327 @@
+[
+  {
+    "id": "F:P42212:chromophore",
+    "protein": "P42212",
+    "type": "chromophore",
+    "label": "Chromophore S65-Y66-G67",
+    "encoding": "residues",
+    "length": 238,
+    "residues": [
+      65,
+      66,
+      67
+    ],
+    "source_type": "public_literature",
+    "confidence": "high",
+    "details": {
+      "maturation": "autocatalytic; requires O2",
+      "evidence": "1GFL sequence; Tsien 1998"
+    },
+    "evidence_refs": [
+      "STRUCT:1GFL",
+      "DOI:10.1146/annurev.biochem.67.1.509"
+    ]
+  },
+  {
+    "id": "F:P42212:beta_barrel",
+    "protein": "P42212",
+    "type": "fold",
+    "label": "11 beta-strands (1GFL)",
+    "encoding": "residues",
+    "length": 238,
+    "residues": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127,
+      128,
+      148,
+      149,
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      160,
+      161,
+      162,
+      163,
+      164,
+      165,
+      166,
+      167,
+      168,
+      169,
+      170,
+      176,
+      177,
+      178,
+      179,
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      199,
+      200,
+      201,
+      202,
+      203,
+      204,
+      205,
+      206,
+      207,
+      208,
+      217,
+      218,
+      219,
+      220,
+      221,
+      222,
+      223,
+      224,
+      225,
+      226,
+      227
+    ],
+    "source_type": "public_database",
+    "confidence": "high",
+    "details": {
+      "ranges": [
+        [
+          11,
+          22
+        ],
+        [
+          25,
+          36
+        ],
+        [
+          41,
+          48
+        ],
+        [
+          92,
+          100
+        ],
+        [
+          105,
+          115
+        ],
+        [
+          118,
+          128
+        ],
+        [
+          148,
+          155
+        ],
+        [
+          160,
+          170
+        ],
+        [
+          176,
+          187
+        ],
+        [
+          199,
+          208
+        ],
+        [
+          217,
+          227
+        ]
+      ],
+      "source": "PDB 1GFL SHEET records"
+    },
+    "evidence_refs": [
+      "STRUCT:1GFL"
+    ]
+  },
+  {
+    "id": "F:P42212:dimer_interface",
+    "protein": "P42212",
+    "type": "interface",
+    "label": "Dimer interface (1GFL, 4.5 A)",
+    "encoding": "residues",
+    "length": 238,
+    "residues": [
+      38,
+      39,
+      73,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      149,
+      168,
+      170,
+      202,
+      204,
+      205,
+      206,
+      207,
+      208,
+      209,
+      210,
+      211,
+      219,
+      221,
+      223
+    ],
+    "source_type": "public_database",
+    "confidence": "moderate",
+    "details": {
+      "source": "1GFL chains A/B; heavy-atom contact <=4.5 A",
+      "note": "crystal contact; A206K reduces dimerization"
+    },
+    "evidence_refs": [
+      "STRUCT:1GFL",
+      "DOI:10.1126/science.1068539"
+    ]
+  },
+  {
+    "id": "F:P42212:A206K",
+    "protein": "P42212",
+    "type": "variant",
+    "label": "Monomerizing mutation A206K",
+    "encoding": "residues",
+    "length": 238,
+    "residues": [
+      206
+    ],
+    "source_type": "public_literature",
+    "confidence": "high",
+    "details": {
+      "mutation": "A206K"
+    },
+    "evidence_refs": [
+      "DOI:10.1126/science.1068539"
+    ]
+  },
+  {
+    "id": "F:P42212:EGFP_mutations",
+    "protein": "P42212",
+    "type": "variant",
+    "label": "EGFP substitutions F64L/S65T",
+    "encoding": "residues",
+    "length": 238,
+    "residues": [
+      64,
+      65
+    ],
+    "source_type": "public_literature",
+    "confidence": "moderate",
+    "details": {
+      "mutations": [
+        "F64L",
+        "S65T"
+      ]
+    },
+    "evidence_refs": [
+      "DOI:10.1016/0378-1119(95)00685-0"
+    ]
+  },
+  {
+    "id": "F:P42212:SS_PSIPRED",
+    "protein": "P42212",
+    "type": "secondary_structure",
+    "label": "PSIPRED secondary structure",
+    "encoding": "string",
+    "length": 238,
+    "values": "             EEEEEEEEE  EEEEEEEEEEE    EEEEEEEEE        HHHHEE                    HHHHH    EEEEEEEEEE  EEEEEEEEEEEE  EEEEEEEEEEE             EE    EEEEEE      EEEEEEEEEEE     EEEEEEEE EEE           EEEEEEEEEE        EEEEEEEEEE            ",
+    "source_type": "computational",
+    "confidence": "medium",
+    "details": {
+      "method": "PSIPRED via Quick2D",
+      "H": "helix",
+      "E": "strand"
+    },
+    "evidence_refs": [
+      "COMPUTATIONAL:Q2DV:GFP_Q2D"
+    ]
+  },
+  {
+    "id": "F:P42212:DO_SPOTD",
+    "protein": "P42212",
+    "type": "disorder",
+    "label": "SPOTD disorder",
+    "encoding": "string",
+    "length": 238,
+    "values": "DDDDDD                                                                                                                                                                                                                                   DD  D",
+    "source_type": "computational",
+    "confidence": "medium",
+    "details": {
+      "method": "SPOTD via Quick2D",
+      "D": "disorder"
+    },
+    "evidence_refs": [
+      "COMPUTATIONAL:Q2DV:GFP_Q2D"
+    ]
+  }
+]

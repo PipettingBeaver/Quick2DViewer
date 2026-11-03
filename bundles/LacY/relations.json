@@ -1,0 +1,70 @@
+[
+  {
+    "id": "REL:LACY:LACY",
+    "a": "P02920",
+    "b": "P02920",
+    "type": "crystal_contact",
+    "method": "1PV6 chains A/B; heavy-atom contact <=4.5 A",
+    "interface_status": "crystal_contact",
+    "interface_a": [
+      5,
+      10,
+      18,
+      157,
+      168,
+      172,
+      180
+    ],
+    "interface_b": [
+      5,
+      10,
+      18,
+      157,
+      168,
+      172,
+      180
+    ],
+    "stoichiometry": "two chains in asymmetric unit",
+    "conditions": {
+      "biological_unit": "monomer"
+    },
+    "confidence": "low",
+    "status": "accepted",
+    "evidence_refs": [
+      "STRUCT:1PV6"
+    ]
+  },
+  {
+    "id": "REL:LACY:LACTOSE",
+    "a": "P02920",
+    "b": "lactose",
+    "type": "transports",
+    "method": "biochemical transport assay and structures",
+    "interface_status": "not_applicable",
+    "conditions": {
+      "driver": "proton electrochemical gradient"
+    },
+    "confidence": "high",
+    "status": "accepted",
+    "evidence_refs": [
+      "DOI:10.1126/science.1088196",
+      "DOI:10.1038/sj.emboj.7601028"
+    ]
+  },
+  {
+    "id": "REL:LACY:H+",
+    "a": "P02920",
+    "b": "H+",
+    "type": "chemical_requirement",
+    "method": "proton-coupled symport",
+    "interface_status": "not_applicable",
+    "conditions": {
+      "process": "lactose transport"
+    },
+    "confidence": "high",
+    "status": "accepted",
+    "evidence_refs": [
+      "DOI:10.1126/science.1088196"
+    ]
+  }
+]

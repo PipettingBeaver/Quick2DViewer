@@ -1,0 +1,45 @@
+{
+  "id": "P02920",
+  "name": "Lactose permease",
+  "gene": "lacY",
+  "organism": "Escherichia coli",
+  "sequence": "MYYLKNTNFWMFGLFFFFYFFIMGAYFPFFPIWLHDINHISKSDTGIIFAAISLFSLLFQPLFGLLSDKLGLRKYLLWIITGMLVMFAPFFIFIFGPLLQYNILVGSIVGGIYLGFCFNAGAPAVEAFIEKVSRRSNFEFGRARMFGCVGWALCASIVGIMFTINNQFVFWLGSGCALILAVLLFFAKTDAPSSATVANAVGANHSAFSLKLALELFRQPKLWFLSLYVIGVSCTYDVFDQQFANFFTSFFATGEQGTRVFGYVTTMGELLNASIMFFAPLIINRIGGKNALLLAGTIMSVRIIGSSFATSALEVVILKTLHMFEVPFLLVGCFKYITSQFEVRFSATIYLVCFCFFKQLAMIFMSVLAGNMYESIGFQGAYLVLGLVALGFTLISVFTLSGPGPLSLLRRQVNEVA",
+  "length": 417,
+  "uniprot": "P02920",
+  "pfam": [
+    "PF01306"
+  ],
+  "superfamily": "MFS",
+  "description": "Lactose/proton symporter (LacY); public membrane reference example.",
+  "oligomer": {
+    "state": "monomer",
+    "evidence": "experimental",
+    "source": "2CFQ/1PV6 author biological unit: monomeric",
+    "confidence": "high"
+  },
+  "structures": [
+    {
+      "id": "STRUCT:1PV6",
+      "source": "PDB",
+      "kind": "two chains in asymmetric unit",
+      "note": "author biological unit monomeric; crystal contact only",
+      "path": "structures/1PV6.pdb",
+      "auto_open": false
+    },
+    {
+      "id": "STRUCT:2CFQ",
+      "source": "PDB",
+      "kind": "monomer",
+      "note": "sugar-free at neutral pH",
+      "path": "structures/2CFQ.pdb",
+      "auto_open": true,
+      "auto_chain": "A"
+    }
+  ],
+  "evidence_refs": [
+    "UNIPROT:P02920",
+    "STRUCT:1PV6",
+    "STRUCT:2CFQ",
+    "DOI:10.1126/science.1088196"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "id": "P42212",
+  "name": "Green fluorescent protein",
+  "gene": "GFP",
+  "organism": "Aequorea victoria",
+  "sequence": "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK",
+  "length": 238,
+  "uniprot": "P42212",
+  "pfam": [],
+  "superfamily": null,
+  "description": "Aequorea victoria green fluorescent protein (avGFP); public reference example.",
+  "oligomer": {
+    "state": "dimer",
+    "evidence": "experimental",
+    "source": "1GFL crystal contact; A206K monomerizes",
+    "confidence": "moderate"
+  },
+  "structures": [
+    {
+      "id": "STRUCT:1GFL",
+      "source": "PDB",
+      "kind": "dimer",
+      "note": "2 chains; 4.5 A inter-chain contact map",
+      "path": "structures/1GFL.pdb",
+      "auto_open": true,
+      "auto_chain": "A"
+    },
+    {
+      "id": "STRUCT:1EMA",
+      "source": "PDB",
+      "kind": "monomer",
+      "note": "S65T variant; beta-barrel reference",
+      "path": "structures/1EMA.pdb",
+      "auto_open": false
+    }
+  ],
+  "evidence_refs": [
+    "UNIPROT:P42212",
+    "STRUCT:1GFL",
+    "DOI:10.1038/nbt1096-1246"
+  ]
+}
