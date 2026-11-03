@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ngLdKtqySbxq8c9A7tvjVsTIxGMz8+ZMvXvfXEtSAxA=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-7OuQcSzEp/80zf3294WC5bJ6iu64p6SrUpVfQs7RwjQ=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -2493,6 +2493,53 @@
             background: var(--q2dv-panel-3);
             color: var(--q2dv-text);
             border-color: var(--q2dv-border);
+        }
+
+        html[data-theme="dark"] .ps-name {
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] .ps-sub,
+        html[data-theme="dark"] .ps-label,
+        html[data-theme="dark"] .ps-more {
+            color: var(--q2dv-muted);
+        }
+        html[data-theme="dark"] .ps-func {
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] .ps-chip {
+            background: #1e2a3d;
+            color: #bfdbfe;
+            border-color: #334155;
+        }
+        html[data-theme="dark"] .ps-chip-acc {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .ps-chip-rev {
+            background: #10291b;
+            color: #86efac;
+            border-color: #166534;
+        }
+        html[data-theme="dark"] .ps-kw {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+            border-color: var(--q2dv-border);
+        }
+        html[data-theme="dark"] .ps-go-c {
+            background: #082f49;
+            color: #7dd3fc;
+            border-color: #0c4a6e;
+        }
+        html[data-theme="dark"] .ps-go-f {
+            background: #3b0a2a;
+            color: #f9a8d4;
+            border-color: #831843;
+        }
+        html[data-theme="dark"] .ps-go-p {
+            background: #1a2e05;
+            color: #bef264;
+            border-color: #3f6212;
         }
 
         html[data-theme="dark"] .app-version {
@@ -13146,7 +13193,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.71.13';
+const APP_VERSION = '0.71.14';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

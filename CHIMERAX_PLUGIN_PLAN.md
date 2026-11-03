@@ -1,6 +1,6 @@
 # Quick2DViewer + ChimeraX plugin plan
 
-**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.13, host 0.6.33. The pinned page loads from a local `file://` URL, the host workspace restores the saved sequence/state, the matching bundle (TerC, GFP, or LacY) is selected, and QWebChannel handles commands and a host-visible file vault. Py3Dmol is disabled and clipboard paste controls are hidden. Full recipe/UI QA and membrane recipes remain.
+**Status:** Phase 1-3 plumbing verified; Q2DV 0.71.14, host 0.6.34. The pinned page loads from a local `file://` URL, the host workspace restores the saved sequence/state, the matching bundle (TerC, GFP, or LacY) is selected, and QWebChannel handles commands and a host-visible file vault. Py3Dmol is disabled and clipboard paste controls are hidden. Full recipe/UI QA and membrane recipes remain.
 **Scope:** general Q2DV program, not lab-specific TerC data  
 **Decision:** keep one Q2DV core with two hosts: browser and ChimeraX. Do not fork.
 

@@ -67,6 +67,7 @@ Format for new features:
 - [ ] Preset/Custom choice survives a reload/restart.
 - [ ] Dark empty state, sidebar, cards and modals have readable contrast.
 - [ ] Changelog headings/body, host badge and version pill are readable in dark mode.
+- [ ] Protein Summary name, function text, accession/reviewed chips, keywords and GO terms are readable in dark mode.
 - [ ] Saved slots 1-5 use dark fills/accents; overlays/rings still distinguish slots.
 
 **Edge cases**

@@ -2,7 +2,7 @@
 
 **Status:** working plan, started 2026-10-29.  
 **Target:** in-person demo for at least two professors, approximately 2026-11-12.  
-**Baseline:** Q2DV 0.71.13, ChimeraX host 0.6.33, ChimeraX 1.12.  
+**Baseline:** Q2DV 0.71.14, ChimeraX host 0.6.34, ChimeraX 1.12.  
 **Public reference proteins:** GFP P42212 and lactose permease LacY P02920.
 
 This roadmap converts the ideas in `CHIMERAX_ECOSYSTEM.md` into a demo-sized
@@ -220,7 +220,7 @@ three candidates. Remaining W1 work: evidence/document review, browser visual
 check, and the ESMFold preflight gate.
 
 **W2 progress:** Q2DV -> ChimeraX automatic selection is implemented in app
-0.71.13 / host 0.6.33: the host matches the active model chain by sequence and
+0.71.14 / host 0.6.34: the host matches the active model chain by sequence and
 maps Q2DV reference positions to its residue numbers. The GFP bundle now banks
 1GFL/1EMA and opens 1GFL when no model is present. The reverse direction,
 ChimeraX -> Q2DV, is still pending.

@@ -1,7 +1,7 @@
 # ChimeraX ecosystem and Q2DV interoperability
 
 **Status:** working document, reviewed 2026-10-29.  
-**Q2DV baseline:** app 0.71.13, ChimeraX host 0.6.33, ChimeraX 1.12.  
+**Q2DV baseline:** app 0.71.14, ChimeraX host 0.6.34, ChimeraX 1.12.  
 **Scope:** the ChimeraX features and add-ons that could exchange data with Q2DV.
 This is a map and a decision log, not a promise to implement every item.
 **Demo execution:** see `DEMO_ROADMAP.md` for the two-week GFP/LacY plan,
@@ -144,7 +144,7 @@ Checked with `toolshed list` on 2026-10-29:
 - Installed and relevant: **CliX 0.2.7**, **Pellaeon 0.2.13**,
   **MCPServer 0.2.0**, **ShowSequences 1.0.3**, **MDcrds 2.19**.
 - Not installed: ISOLDE, ChopChopMF, PICKLUSTER, MolCompose, AllMetal3D, MIC.
-- Q2DV host 0.6.33 and Q2DV app 0.71.13 are the current baseline.
+- Q2DV host 0.6.34 and Q2DV app 0.71.14 are the current baseline.
 
 Installed does not mean integrated. The adapters below still need their own
 version and public-data tests. Some Toolshed compatibility bounds are older than
