@@ -5439,6 +5439,9 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentSpecs.length >= 10 && agentSpecs.every(s => s.handler === undefined), 'the registry exposes tool specs without handlers');
     assert(agentSpecs.every(s => /^q2dv_[a-z_]+$/.test(s.name)), 'every tool has an MCP-safe name');
     assert(new Set(agentSpecs.map(s => s.id)).size === agentSpecs.length, 'tool ids are unique');
+    const agentToolCache = JSON.parse(fs.readFileSync(path.join(ROOT, 'mcp/tools.json'), 'utf-8'));
+    assert(JSON.stringify(agentToolCache.tools.map(t => t.id).sort()) === JSON.stringify(agentSpecs.map(t => t.id).sort()), 'the MCP tool cache matches the app registry');
+    assert(agentToolCache.app_version === ctxRun(`APP_VERSION`), 'the MCP tool cache was generated from this app version');
     const agentStatus = await ctxRun(`agentRequest({ id: 't1', action: 'q2dv.status', actor: { kind: 'agent', id: 'test' } })`);
     assert(agentStatus.status === 'ok' && agentStatus.data.schema === 'q2dv.agent/1' && agentStatus.data.app_version === ctxRun(`APP_VERSION`), 'status returns the versioned agent envelope');
     assert(agentStatus.data.host.kind === 'standalone', 'status reports the host mode');

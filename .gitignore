@@ -9,3 +9,7 @@ backups/
 
 # Local meta-loop state and tooling — not part of the public repo
 .opencode/
+
+# Python bytecode
+__pycache__/
+*.pyc

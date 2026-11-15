@@ -16,6 +16,7 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
 - `DEMO_ROADMAP.md` — two-week implementation, review and test plan using GFP and LacY.
 - `CHIMERAX_INTEGRATION_PLAN.md` — storage redesign, window/layout presets and host-offload roadmap.
 - `MCP_AGENT_PLAN.md` — `q2dv-mcp` domain-layer design: capability registry, decision tiers, step-flow review and test scenarios.
+- `mcp/README.md` — run and register the `q2dv-mcp` server; generated tool cache and host socket.
 - `QA_CHECKLIST.md` — the active fillable manual QA pass: session/release gate,
   demo acceptance, current feature cards, cross-cutting edge suites and a bug log.
 - `QA_ARCHIVE.md` — historical feature cards and the numbered `0.16.0` → `0.66.x`

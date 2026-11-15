@@ -12,6 +12,23 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.6] - 2026-11-15
+
+### Added
+- **`q2dv-mcp` stdio server.** Exposes the generated Q2DV tool registry, four
+  resources (`state`, `snapshot`, `tracks`, `timeline`), typed
+  `host_unavailable`/`host_timeout` errors, and `human_required` results for
+  actions that need approval in Q2DV. No network transport.
+- **Host socket bridge.** The ChimeraX plugin listens on
+  `~/Q2DV_files/agent/agent.sock` (directory 0700, socket 0600), forwards
+  requests to `window.q2dvAgentRequest` and returns versioned result envelopes.
+  It starts when the Q2DV tool loads and is removed on close.
+- **Generated tool cache.** `npm run agent:tools` writes `mcp/tools.json` from
+  the single app registry; `npm test` fails if the cache or app version drifts.
+- **MCP protocol tests.** `npm run test:mcp` covers initialize, tools/list,
+  tools/call, resources/read, host-unavailable and a fake host over a Unix
+  socket.
+
 ## [0.72.5] - 2026-11-15
 
 ### Fixed

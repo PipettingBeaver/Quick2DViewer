@@ -411,6 +411,31 @@ transport yet.
 
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
+### MCP server and host socket — 0.72.6
+
+**Surface:** `mcp/q2dv_mcp.py`, MCP client, `~/Q2DV_files/agent/agent.sock`.
+
+- [ ] `npm run agent:tools` regenerates `mcp/tools.json`; `npm test` agrees with
+      the app registry and version.
+- [ ] `npm run test:mcp` passes without ChimeraX running.
+- [ ] With ChimeraX and the Q2DV tool open, `agent.sock` exists, the directory
+      is `0700` and the socket is `0600`.
+- [ ] An MCP client lists 11 `q2dv_*` tools and reads `q2dv://state`.
+- [ ] `q2dv_status` returns the app version; an import returns
+      `human_required`.
+- [ ] Approving in Q2DV → Agent lets a later status/ledger call show the result.
+- [ ] With ChimeraX closed, tools/list still works and a call reports
+      `host_unavailable` (not a protocol crash).
+- [ ] No TCP listener is created for the agent bridge.
+
+**Edge**
+
+- [ ] An unknown tool is a `-32602` JSON-RPC error; an unknown resource is too.
+- [ ] Restarting ChimeraX removes the stale socket and recreates it.
+- [ ] Dropping the client mid-call does not leave the host blocked.
+
+**Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
+
 ---
 
 ## 5. Workspace, storage and layout

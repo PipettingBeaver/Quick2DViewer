@@ -3,8 +3,10 @@
   "private": true,
   "description": "Dev tooling only \u2014 the app itself is the single-file index.html with no dependencies.",
   "scripts": {
-    "test": "node tests/run.js && python3 tests/host_workspace_test.py",
+    "test": "node tests/run.js && python3 tests/host_workspace_test.py && python3 mcp/test_q2dv_mcp.py",
     "doc:workflow": "node tools/build-workflow-doc.js",
-    "csp": "node tools/update-csp.js"
+    "csp": "node tools/update-csp.js",
+    "agent:tools": "node tools/export-agent-tools.js",
+    "test:mcp": "python3 mcp/test_q2dv_mcp.py"
   }
 }

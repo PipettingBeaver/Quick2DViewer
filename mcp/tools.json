@@ -1,0 +1,324 @@
+{
+  "schema": "q2dv.tool-cache/1",
+  "app_version": "0.72.6",
+  "generated_at": "2026-11-15T14:39:30.195Z",
+  "tools": [
+    {
+      "id": "q2dv.status",
+      "name": "q2dv_status",
+      "title": "Read application status",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "id": "q2dv.snapshot",
+      "name": "q2dv_snapshot",
+      "title": "Read a bounded session snapshot",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "track_limit": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.list_tracks",
+      "name": "q2dv_list_tracks",
+      "title": "List loaded tracks",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.read_track",
+      "name": "q2dv_read_track",
+      "title": "Read a slice of one track",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "track"
+        ],
+        "properties": {
+          "track": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer"
+          },
+          "end": {
+            "type": "integer"
+          },
+          "max": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.describe",
+      "name": "q2dv_describe",
+      "title": "Describe tools and host capabilities",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "id": "q2dv.select",
+      "name": "q2dv_select",
+      "title": "Set the residue selection",
+      "tier": "agent-run",
+      "readOnly": false,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "ranges"
+        ],
+        "properties": {
+          "ranges": {
+            "type": "array",
+            "items": {
+              "type": "array"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.import",
+      "name": "q2dv_import",
+      "title": "Import a sequence or PDB entry",
+      "tier": "require-human",
+      "readOnly": false,
+      "destructive": false,
+      "grantClass": "imports",
+      "flags": {
+        "reversible": false,
+        "network": true,
+        "writes_files": false,
+        "changes_sequence": true
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sequence",
+              "pdb",
+              "file"
+            ]
+          },
+          "sequence": {
+            "type": "string"
+          },
+          "fasta": {
+            "type": "string"
+          },
+          "pdb": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.run",
+      "name": "q2dv_run",
+      "title": "Run a read-only analysis recipe",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "recipe"
+        ],
+        "properties": {
+          "recipe": {
+            "type": "string"
+          },
+          "track": {
+            "type": "string"
+          },
+          "structure": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.propose",
+      "name": "q2dv_propose",
+      "title": "Propose a decision for review",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "require-human",
+              "agent-run",
+              "info",
+              "denied"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "args": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.decide",
+      "name": "q2dv_decide",
+      "title": "Approve or reject a pending decision",
+      "tier": "agent-run",
+      "readOnly": false,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "approve"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "approve": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.ledger",
+      "name": "q2dv_ledger",
+      "title": "Read the agent action ledger",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "since_seq": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  ]
+}
