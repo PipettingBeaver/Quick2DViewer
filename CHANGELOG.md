@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.1] - 2026-11-15
+
+### Fixed
+- **Pi-helix in annotation concordance.** SS tracks mark pi-helix with `P`;
+  it now counts as helix when compared with PDB HELIX records, which include
+  every helix class, so helix recall and agreement are no longer under-reported.
+- **Stale concordance output.** A failed comparison now clears and hides the
+  previous result instead of leaving it beside the error message.
+
 ## [0.72.0] - 2026-11-15
 
 ### Added

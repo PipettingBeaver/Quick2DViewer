@@ -5264,6 +5264,12 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     ctxRun(`parsedTracks = { AA: 'M'.repeat(8), SS_TEST: '..HHHE..' };`);
     const annSets = ctxRun(`(() => { const a = annotationSetsForTrack('SS_TEST'); return { helix: Array.from(a.predHelix), sheet: Array.from(a.predSheet) }; })()`);
     assert(JSON.stringify(annSets.helix) === '[2,3,4]' && JSON.stringify(annSets.sheet) === '[5]', 'SS annotation sets split helix and sheet');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(8), SS_PI: '..PPH...' };`);
+    const piSets = ctxRun(`(() => { const a = annotationSetsForTrack('SS_PI'); return Array.from(a.predHelix); })()`);
+    assert(JSON.stringify(piSets) === '[2,3,4]', 'pi-helix (P) counts as helix, matching PDB HELIX records');
+    ctxRun(`document.getElementById('concordanceTrack').value = ''; document.getElementById('concordanceResults').style.display = 'block'; document.getElementById('concordanceResults').textContent = 'stale result';`);
+    assert(ctxRun(`runStructureConcordance()`) === false, 'concordance refuses to run without a track');
+    assert(ctxRun(`document.getElementById('concordanceResults').style.display`) === 'none' && ctxRun(`document.getElementById('concordanceResults').textContent`) === '', 'a failed concordance run clears the previous result');
     ctxRun(`parsedTracks = {};`);
 
     section('layout presets');
