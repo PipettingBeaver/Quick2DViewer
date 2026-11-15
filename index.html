@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-cpjs1pnD8BsZ/AY0gLb5qXhfAa86tjQZ5T/tKRCmMgQ=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+JIXWugMnKCL7TLwIM6mWKAF9234EUommRKsp0N2i+k=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -606,6 +606,19 @@
             color: #0f172a;
             resize: vertical;
         }
+        .agent-grants { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0; font-size: 0.72rem; color: #475569; }
+        .agent-grant-list { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+        .agent-grant-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 1px 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #334155;
+        }
+        .agent-grant-chip .copy-btn { margin: 0; padding: 0 5px; font-size: 0.62rem; }
         .agent-try-status { font-size: 0.72rem; color: #475569; }
         .agent-timeline { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
         .agent-timeline summary { font-size: 0.8rem; font-weight: 700; color: #334155; cursor: pointer; }
@@ -2745,6 +2758,12 @@
             color: var(--q2dv-text);
         }
         html[data-theme="dark"] .agent-try-status { color: var(--q2dv-muted); }
+        html[data-theme="dark"] .agent-grants { color: var(--q2dv-muted); }
+        html[data-theme="dark"] .agent-grant-chip {
+            background: var(--q2dv-panel-3);
+            border-color: var(--q2dv-border);
+            color: var(--q2dv-text);
+        }
         html[data-theme="dark"] .agent-timeline { border-color: var(--q2dv-border); }
         html[data-theme="dark"] .agent-timeline summary { color: var(--q2dv-text); }
         html[data-theme="dark"] .agent-timeline-count { color: var(--q2dv-muted); }
@@ -4261,6 +4280,12 @@
                 </div>
             </fieldset>
             <textarea id="agentTryArgs" rows="3" aria-label="Request arguments as JSON">{"kind":"sequence","sequence":"MAMM"}</textarea>
+        </div>
+        <div class="agent-grants">
+            <strong>Session grants:</strong>
+            <span id="agentGrantList" class="agent-grant-list">none</span>
+            <button type="button" class="tb-btn tb-btn-secondary" data-action="agentGrantToday" data-arg="imports" style="font-size:0.7rem; padding:2px 7px;">Grant imports today</button>
+            <button type="button" class="tb-btn tb-btn-secondary" data-action="agentGrantToday" data-arg="commands" style="font-size:0.7rem; padding:2px 7px;">Grant commands today</button>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
             <span id="agentDecisionCount" style="font-size:0.72rem; color:#64748b;"></span>
@@ -10109,6 +10134,33 @@ const AGENT_TOOLS = [
         handler: agentToolDescribe
     },
     {
+        id: 'q2dv.host_capabilities', name: 'q2dv_host_capabilities', title: 'Describe the ChimeraX host and installed add-ons',
+        tier: 'agent-run', readOnly: true, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
+        input: { type: 'object', properties: {} },
+        handler: agentToolHostCapabilities
+    },
+    {
+        id: 'q2dv.command', name: 'q2dv_command', title: 'Run an allowlisted ChimeraX command',
+        tier: 'require-human', readOnly: false, destructive: false, grantClass: 'commands',
+        flags: { reversible: true, network: false, writes_files: true, changes_sequence: false },
+        input: {
+            type: 'object',
+            required: ['command'],
+            properties: { command: { type: 'string' } }
+        },
+        validate: (args) => {
+            const command = String(args.command || '').trim();
+            if (!command) return { ok: false, code: 'validation', message: 'A command is required.' };
+            if (/[\n;]/.test(command)) return { ok: false, code: 'validation', message: 'One command per step; newlines and semicolons are not allowed.' };
+            if (!AGENT_COMMAND_PREFIXES.some(prefix => command.toLowerCase().startsWith(prefix))) {
+                return { ok: false, code: 'policy_denied', message: 'That command prefix is not allowlisted for agent use.' };
+            }
+            return { ok: true };
+        },
+        handler: agentToolCommand
+    },
+    {
         id: 'q2dv.select', name: 'q2dv_select', title: 'Set the residue selection',
         tier: 'agent-run', readOnly: false, destructive: false,
         flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
@@ -10235,6 +10287,7 @@ function agentGrant(kind, scope) {
     if (!key) return false;
     agentGrants[key] = { scope: scope === 'always' ? 'always' : 'today', at: new Date().toISOString() };
     logAction('agent', 'grant ' + key, agentGrants[key].scope);
+    if (typeof renderAgentGrants === 'function') renderAgentGrants();
     return true;
 }
 function agentRevokeGrant(kind) {
@@ -10242,6 +10295,7 @@ function agentRevokeGrant(kind) {
     const had = !!agentGrants[key];
     delete agentGrants[key];
     if (had) logAction('agent', 'revoke grant ' + key, '');
+    if (typeof renderAgentGrants === 'function') renderAgentGrants();
     return had;
 }
 function agentGrantActive(kind) {
@@ -10402,6 +10456,42 @@ async function agentToolDescribe() {
         host: { kind: detectQ2DVHostMode(), capabilities: caps },
         tiers: AGENT_TIERS.slice()
     };
+}
+const AGENT_COMMAND_PREFIXES = [
+    'select ', 'color ', 'label ', 'contacts ', 'clashes ', 'hbonds ', 'setattr ',
+    'save ', 'view ', 'lighting ', 'measure ', 'distance ', 'angle ', 'torsion ',
+    'show ', 'hide ', 'cartoon ', 'style ', 'surface ', 'matchmaker ', 'align ',
+    'rmsd ', 'info ', 'help '
+];
+async function agentToolHostCapabilities() {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.getCapabilities !== 'function') {
+        return { schema: 'q2dv.capability/1', host: { kind: detectQ2DVHostMode() }, addons: [], commands: [], available: false };
+    }
+    let caps = {};
+    try {
+        const raw = await host.getCapabilities();
+        caps = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+    } catch (err) {
+        throw agentFail('capability_missing', 'The host did not return capabilities: ' + ((err && err.message) || err));
+    }
+    return Object.assign({ schema: 'q2dv.capability/1' }, caps || {});
+}
+async function agentToolCommand(args) {
+    const command = String(args.command || '').trim();
+    if (!command) throw agentFail('validation', 'A command is required.');
+    if (/[\n;]/.test(command)) throw agentFail('validation', 'One command per step; newlines and semicolons are not allowed.');
+    const lower = command.toLowerCase();
+    if (!AGENT_COMMAND_PREFIXES.some(prefix => lower.startsWith(prefix))) {
+        throw agentFail('policy_denied', 'That command prefix is not allowlisted for agent use.');
+    }
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.runAgentCommand !== 'function') {
+        throw agentFail('capability_missing', 'The host cannot run agent commands.');
+    }
+    const result = await host.runAgentCommand(command);
+    if (String(result).startsWith('error')) throw agentFail('policy_denied', String(result));
+    return { ok: true, command };
 }
 async function agentToolSelect(args) {
     const length = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA.length : 0;
@@ -10569,6 +10659,14 @@ async function agentRequest(request) {
         agentRecordEvent({ actor, call: { tool: spec.id, args }, rationale: req.rationale || [], evidence: req.evidence || [], status: 'error', duration_ms: Date.now() - started, result: { summary: err.message } });
         return agentResult(id, 'error', null, agentErrorJson(err));
     }
+    if (typeof spec.validate === 'function') {
+        const check = spec.validate(args);
+        if (!check || check.ok === false) {
+            const err = agentFail((check && check.code) || 'validation', (check && check.message) || 'Invalid arguments.');
+            agentRecordEvent({ actor, call: { tool: spec.id, args }, rationale: req.rationale || [], evidence: req.evidence || [], status: 'error', duration_ms: Date.now() - started, result: { summary: err.message } });
+            return agentResult(id, 'error', null, agentErrorJson(err));
+        }
+    }
     const tier = agentTierFor(spec, args);
     if (tier === 'denied') {
         const err = agentFail('policy_denied', spec.title + ' is denied by policy.');
@@ -10608,7 +10706,8 @@ window.q2dvAgent = {
     exportScenario: agentScenarioFromLedger,
     runScenario: agentRunScenario,
     timeline: renderAgentTimeline,
-    stopTimeline: agentTimelineStop
+    stopTimeline: agentTimelineStop,
+    grants: renderAgentGrants
 };
 
 function agentDecisionPendingIds() {
@@ -10736,6 +10835,7 @@ function renderAgentDecisions() {
 function openAgentDecisions() {
     agentUpdateBadge();
     renderAgentDecisions();
+    renderAgentGrants();
     renderAgentTimeline();
     agentDecisionNotice('');
     openModalAsDialog('agentModal');
@@ -10778,6 +10878,40 @@ function agentGrantForDecision(id) {
     agentDecisionNotice('Granted ' + spec.grantClass + ' for today. Approve the card to run it.');
     renderAgentDecisions();
     return true;
+}
+function agentGrantToday(kind) {
+    const key = String(kind || '').trim();
+    if (!key) return false;
+    agentGrant(key, 'today');
+    agentDecisionNotice('Granted ' + key + ' for today.');
+    renderAgentDecisions();
+    return true;
+}
+function agentRevokeToday(kind) {
+    const key = String(kind || '').trim();
+    if (!key) return false;
+    agentRevokeGrant(key);
+    agentDecisionNotice('Revoked ' + key + '.');
+    renderAgentDecisions();
+    return true;
+}
+function renderAgentGrants() {
+    const list = document.getElementById('agentGrantList');
+    if (!list) return;
+    list.innerHTML = '';
+    const kinds = Object.keys(agentGrants).filter(agentGrantActive);
+    if (!kinds.length) {
+        list.appendChild(agentEl('span', 'agent-empty', 'none'));
+        return;
+    }
+    kinds.forEach(kind => {
+        const chip = agentEl('span', 'agent-grant-chip', kind);
+        const btn = agentEl('button', 'copy-btn', 'Revoke');
+        btn.type = 'button';
+        btn.addEventListener('click', () => agentRevokeToday(kind));
+        chip.appendChild(btn);
+        list.appendChild(chip);
+    });
 }
 function copyAgentLedger() {
     const text = JSON.stringify(agentLedgerEvents(null, null), null, 2);
@@ -14926,7 +15060,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.8';
+const APP_VERSION = '0.72.9';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -25938,6 +26072,8 @@ const ACTION_HANDLERS = {
     agentTimelineStep: delegateAction(agentTimelineStep),
     agentTimelinePlay: delegateAction(agentTimelinePlay),
     agentTimelineExport: delegateAction(agentTimelineExport),
+    agentGrantToday: delegateAction(agentGrantToday),
+    agentRevokeToday: delegateAction(agentRevokeToday),
     openChangelogModal: delegateAction(openChangelogModal),
     openDataSources: delegateAction(openDataSources),
     openDataSourcesModal: delegateAction(openDataSourcesModal),

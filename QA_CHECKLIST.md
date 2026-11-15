@@ -422,6 +422,20 @@ transport yet.
 - [ ] A `human_required` result carries no usable approval token; a `q2dv_decide`
       call without the page-held token is refused.
 
+**Capabilities, commands and audit (0.72.9)**
+
+- [ ] `q2dv_host_capabilities` lists the host version and installed
+      `ChimeraX-*` bundles.
+- [ ] `q2dv_command` returns `human_required` and the card shows the command
+      text.
+- [ ] A disallowed prefix (`delete all`) or a command containing `;`/a newline
+      is refused.
+- [ ] Grant commands for today; an approved command runs; Revoke restores the
+      gate.
+- [ ] The Agent panel lists active grants with Revoke.
+- [ ] `~/Q2DV_files/agent/audit.jsonl` gains one line per host call and rotates
+      to `.1`/`.2` at 10 MB.
+
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
 ### MCP server and host socket — 0.72.6

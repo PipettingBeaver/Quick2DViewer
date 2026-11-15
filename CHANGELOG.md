@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.9] - 2026-11-15
+
+### Added
+- **Host capability discovery.** `q2dv_host_capabilities` reports the ChimeraX
+  version, installed `ChimeraX-*` add-ons and the allowlisted command set, so an
+  agent can discover what the host can do without hardcoded add-on names.
+- **Reviewed command fallback.** `q2dv_command` runs one allowlisted base
+  ChimeraX/add-on command (selection, contacts, clashes, hbonds, setattr, save,
+  view, measure, style and similar). It is `require-human` with the `commands`
+  grant class; disallowed prefixes and multi-command strings are refused.
+- **Session grants panel.** Active grants render in the Agent panel with a
+  Revoke control; imports and commands can be granted for today.
+- **Persistent audit log.** Each host call appends a compact record to
+  `~/Q2DV_files/agent/audit.jsonl` (10 MB cap, two rotated backups).
+
 ## [0.72.8] - 2026-11-15
 
 ### Fixed

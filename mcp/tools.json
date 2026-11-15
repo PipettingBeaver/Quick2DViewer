@@ -1,7 +1,7 @@
 {
   "schema": "q2dv.tool-cache/1",
-  "app_version": "0.72.8",
-  "generated_at": "2026-11-15T15:25:26.614Z",
+  "app_version": "0.72.9",
+  "generated_at": "2026-11-15T15:36:47.275Z",
   "tools": [
     {
       "id": "q2dv.status",
@@ -118,6 +118,50 @@
       "input": {
         "type": "object",
         "properties": {}
+      }
+    },
+    {
+      "id": "q2dv.host_capabilities",
+      "name": "q2dv_host_capabilities",
+      "title": "Describe the ChimeraX host and installed add-ons",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "id": "q2dv.command",
+      "name": "q2dv_command",
+      "title": "Run an allowlisted ChimeraX command",
+      "tier": "require-human",
+      "readOnly": false,
+      "destructive": false,
+      "grantClass": "commands",
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": true,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          }
+        }
       }
     },
     {

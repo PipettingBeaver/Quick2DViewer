@@ -73,6 +73,17 @@ Session grants ("Allow imports for today") are also issued in that panel.
 - `q2dv://tracks` — track summaries with source and provenance.
 - `q2dv://timeline` — structured agent action ledger.
 
+## Capabilities and commands
+
+`q2dv_host_capabilities` reports the host version, installed `ChimeraX-*`
+add-ons and the allowlisted command prefixes. `q2dv_command` runs one reviewed
+command through that allowlist; it is `human_required` and can be granted for
+the session under the `commands` class. Add-on manifests can live in
+`~/Q2DV_files/adapters/*.json`.
+
+Host calls are appended to `~/Q2DV_files/agent/audit.jsonl` (10 MB cap, two
+rotated backups).
+
 ## Testing
 
 ```bash

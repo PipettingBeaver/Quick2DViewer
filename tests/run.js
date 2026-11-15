@@ -5507,6 +5507,32 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     const agentUiGrant = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
     assert(ctxRun(`agentGrantForDecision(${JSON.stringify(agentUiGrant.decision.id)})`) === true && ctxRun(`agentGrantActive('imports')`) === true, 'the card can grant its action class for today');
     ctxRun(`agentRevokeGrant('imports')`);
+    assert(ctxRun(`agentGrantToday('commands')`) === true && ctxRun(`agentGrantActive('commands')`) === true, 'the grants panel can grant a command class');
+    ctxRun(`renderAgentGrants()`);
+    assert(ctxRun(`document.getElementById('agentGrantList').children.length`) >= 1, 'active grants render with a revoke control');
+    ctxRun(`agentRevokeToday('commands')`);
+    assert(ctxRun(`agentGrantActive('commands')`) === false, 'revoking from the panel restores the gate');
+    const agentCapsNoHost = await ctxRun(`agentRequest({ action: 'q2dv.host_capabilities' })`);
+    assert(agentCapsNoHost.status === 'ok' && agentCapsNoHost.data.available === false, 'capability discovery degrades without a host');
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        getCapabilities() {
+            return Promise.resolve(JSON.stringify({ host: { kind: 'chimerax', version: 'test' }, addons: [{ name: 'ChimeraX-MolCompose', version: '0.1.3' }], commands: ['select'] }));
+        },
+        runAgentCommand(command) { sandbox.__lastAgentCommand = command; return Promise.resolve('ok'); }
+    };
+    ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+    const agentCapsHost = await ctxRun(`agentRequest({ action: 'q2dv.host_capabilities' })`);
+    assert(agentCapsHost.status === 'ok' && agentCapsHost.data.addons.length === 1 && agentCapsHost.data.addons[0].name === 'ChimeraX-MolCompose', 'capability discovery reports installed add-ons');
+    const agentCmdPending = await ctxRun(`agentRequest({ action: 'q2dv.command', args: { command: 'contacts /A' } })`);
+    assert(agentCmdPending.status === 'human_required', 'a host command requires human approval');
+    await ctxRun(`agentRejectDecision(${JSON.stringify(agentCmdPending.decision.id)})`);
+    const agentCmdBad = await ctxRun(`agentRequest({ action: 'q2dv.command', args: { command: 'delete all' } })`);
+    assert(agentCmdBad.status === 'error' && agentCmdBad.error.code === 'policy_denied', 'a command prefix outside the allowlist is refused');
+    assert(ctxRun(`agentGrantToday('commands')`) === true, 'a command grant can be issued');
+    const agentCmdRun = await ctxRun(`agentRequest({ action: 'q2dv.command', args: { command: 'select /A:1-2' } })`);
+    assert(agentCmdRun.status === 'ok' && sandbox.__lastAgentCommand === 'select /A:1-2', 'a granted command runs through the host');
+    ctxRun(`agentRevokeGrant('commands'); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
     ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);
     assert(agentTryImport.status === 'human_required' && ctxRun(`agentDecisionPendingCount()`) === 1, 'the panel queues a request without a console');
