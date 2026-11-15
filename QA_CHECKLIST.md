@@ -361,6 +361,35 @@ Q2DV host bundle auto-detection.
 
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
+### Agent API and decision ledger — 0.72.2
+
+**Surface:** browser console / harness (`window.q2dvAgentRequest`); no UI or MCP
+transport yet.
+
+- [ ] `agentRequest({ action: 'q2dv.status' })` returns an `q2dv.agent.result/1`
+      envelope with the app version and host mode.
+- [ ] `q2dv.snapshot` reports the sequence length, a 64-character SHA-256, the
+      selection and non-sequence tracks.
+- [ ] `q2dv.read_track` returns only the requested slice and flags truncation.
+- [ ] `q2dv.select` moves the page selection and mirrors it to ChimeraX when the
+      link allows it.
+- [ ] `q2dv.import` for a sequence/PDB returns `human_required` with a decision
+      and token; approving with the right token executes it once.
+- [ ] A wrong or replayed token is refused; a rejected decision does not run.
+- [ ] `q2dv.ledger` shows actor, tool, args, status and duration, capped at 500
+      events / 100 MB.
+- [ ] `npm test` covers the registry, validation, tiers, grants and ledger.
+
+**Edge**
+
+- [ ] An unregistered action (for example `q2dv.eval`) is rejected.
+- [ ] An import whose arguments changed after approval is refused.
+- [ ] Replacing a non-matching reference sequence without clearing input is a
+      precondition error, not a silent overwrite.
+- [ ] A session grant expires at local midnight; revoking it restores the gate.
+
+**Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
+
 ---
 
 ## 5. Workspace, storage and layout

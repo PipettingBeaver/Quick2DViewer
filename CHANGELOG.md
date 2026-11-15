@@ -12,6 +12,23 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.2] - 2026-11-15
+
+### Added
+- **Agent API foundation.** A single `q2dv.agent/1` tool registry and dispatcher
+  (`window.q2dvAgentRequest`) exposes status, snapshot, track listing/reading,
+  selection, imports, read-only recipes, decision proposals and approvals.
+  Responses are versioned envelopes with typed errors; no arbitrary evaluation
+  is accepted.
+- **Structured action ledger.** Agent calls record `q2dv.event/1` entries with
+  actor, arguments, rationale, evidence, status, duration and decision id,
+  capped at 500 events / 100 MB and readable through `q2dv.ledger`.
+- **Tiered decisions.** Network/sequence imports require a human decision with a
+  single-use approval token bound to the exact arguments. Session grants
+  (once/today) and revocation are available through `window.q2dvAgent`.
+- **Snapshot contract.** `q2dv.snapshot/1` reports the sequence hash, selection,
+  tracks, host models and versions for an external agent.
+
 ## [0.72.1] - 2026-11-15
 
 ### Fixed
