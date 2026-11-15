@@ -1,9 +1,9 @@
 # Agent access plan: q2dv-mcp, capability registry, and step-flow review
 
-**Status:** Phase 1 logic layer, the Phase 2 decision queue and the Phase 3
-`q2dv-mcp` stdio server plus host socket bridge are implemented 2026-11-15
-(Q2DV 0.72.6). The step-flow timeline and capability manifests remain. Not a
-production dependency.
+**Status:** Phases 1-4 are implemented 2026-11-15 (Q2DV 0.72.7): agent registry
+and dispatcher, decision queue, `q2dv-mcp` stdio server with the host socket
+bridge, and the activity timeline plus scenario runner/export. Live state replay
+and addon capability manifests remain. Not a production dependency.
 **Baseline:** Q2DV 0.72.1, ChimeraX host 0.6.35, ChimeraX 1.12.
 **Related:** `RECIPE_MODEL.md`, `CHIMERAX_ECOSYSTEM.md`,
 `CHIMERAX_PLUGIN_PLAN.md`, `CHIMERAX_INTEGRATION_PLAN.md`, `DESIGN.md`.

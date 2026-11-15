@@ -1,7 +1,7 @@
 {
   "schema": "q2dv.tool-cache/1",
-  "app_version": "0.72.6",
-  "generated_at": "2026-11-15T14:39:30.195Z",
+  "app_version": "0.72.7",
+  "generated_at": "2026-11-15T15:02:42.880Z",
   "tools": [
     {
       "id": "q2dv.status",

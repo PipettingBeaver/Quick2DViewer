@@ -5511,13 +5511,29 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentTryBad.status === 'error' && ctxRun(`document.getElementById('agentTryStatus').textContent`).indexOf('valid JSON') !== -1, 'invalid JSON in the panel is reported');
     assert(ctxRun(`JSON.stringify(agentTryDefaults('q2dv.import'))`).indexOf('sequence') !== -1, 'the panel offers a prefilled import request');
     ctxRun(`agentDecisions = {}; agentUpdateBadge();`);
+    ctxRun(`agentEvents = [
+        { schema: 'q2dv.event/1', seq: 1, at: '2026-11-15T10:00:00Z', actor: { kind: 'agent', id: 't' }, call: { tool: 'q2dv.select', args: { ranges: [[1,2]] } }, status: 'ok', duration_ms: 5, result: { summary: 'select' } },
+        { schema: 'q2dv.event/1', seq: 2, at: '2026-11-15T10:00:01Z', actor: { kind: 'agent', id: 't' }, call: { tool: 'q2dv.ledger', args: {} }, status: 'ok', duration_ms: 1, result: { summary: 'ledger' } },
+        { schema: 'q2dv.event/1', seq: 3, at: '2026-11-15T10:00:02Z', actor: { kind: 'agent', id: 't' }, call: { tool: 'q2dv.run', args: { recipe: 'q2dv.compare.ss-structure', track: 'SS_A' } }, status: 'ok', duration_ms: 9, result: { summary: 'helix recall 0.86' } }
+    ]; agentEventSeq = 3; agentEventBytes = 0; agentTimelineIndex = -1;`);
+    const agentScenario = ctxRun(`agentScenarioFromLedger()`);
+    assert(agentScenario.schema === 'q2dv.scenario/1' && agentScenario.steps.length === 2 && agentScenario.steps[0].run === 'q2dv.select' && agentScenario.steps[1].run === 'q2dv.run', 'the ledger exports only executable steps');
+    ctxRun(`renderAgentTimeline()`);
+    assert(ctxRun(`document.getElementById('agentTimelineList').children.length`) >= 3, 'the timeline renders one row per event');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(10) }; selectStart = null; selectEnd = null; rowRanges = []; selectionMode = 'point';`);
+    const agentScenarioRun = await ctxRun(`agentRunScenario(${JSON.stringify({ schema: 'q2dv.scenario/1', steps: [{ run: 'q2dv.select', args: { ranges: [[1, 3]] } }, { assert: 'status == ok' }, { assert: 'result.ranges.0.0 == 1' }] })})`);
+    assert(agentScenarioRun.passed === true && agentScenarioRun.steps.length === 3, 'a scenario runs registered steps and passes assertions');
+    const agentScenarioFail = await ctxRun(`agentRunScenario(${JSON.stringify({ steps: [{ run: 'q2dv.select', args: { ranges: [[1, 3]] } }, { assert: 'result.ranges.0.0 == 99' }] })})`);
+    assert(agentScenarioFail.passed === false && agentScenarioFail.failures.length === 1, 'a failing assertion is reported');
+    const agentScenarioGate = await ctxRun(`agentRunScenario(${JSON.stringify({ steps: [{ run: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } }] })})`);
+    assert(agentScenarioGate.passed === false && /human approval/.test(agentScenarioGate.failures[0]), 'a scenario cannot bypass human approval');
     const agentProposeReply = await ctxRun(`agentRequest({ action: 'q2dv.propose', args: { tool: 'q2dv.select', tier: 'require-human', title: 'Select region', why: 'test', args: { ranges: [[1,2]] } } })`);
     assert(agentProposeReply.status === 'ok' && agentProposeReply.data.tier === 'require-human' && agentProposeReply.data.action.tool === 'q2dv.select', 'propose returns a decision card');
     const agentLedger = await ctxRun(`agentRequest({ action: 'q2dv.ledger', args: { limit: 5 } })`);
     assert(agentLedger.status === 'ok' && agentLedger.data.events.length === 5, 'ledger returns the newest events');
     assert(agentLedger.data.events.every(ev => ev.schema === 'q2dv.event/1' && ev.actor && ev.call), 'events carry actor and call');
     assert(ctxRun(`agentEvents.length <= AGENT_EVENT_MAX`) && ctxRun(`agentEventBytes > 0`), 'ledger stays within its event cap and tracks bytes');
-    ctxRun(`parsedTracks = {}; currentProteinLabel = null; agentEvents = []; agentEventSeq = 0; agentEventBytes = 0; agentDecisions = {}; agentGrants = {};`);
+    ctxRun(`parsedTracks = {}; currentProteinLabel = null; agentEvents = []; agentEventSeq = 0; agentEventBytes = 0; agentDecisions = {}; agentGrants = {}; agentTimelineIndex = -1; agentTimelineStop();`);
 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed ? 1 : 0);

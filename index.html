@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dx5r7vVdY96JHhthbfgbid1w5SEQltq5lyAP1/K8Sic=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-NcMx8QNMwXSQjn8MC4Q1lm4ovDPDS4iTWQj6h/U9Qwk=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -607,6 +607,26 @@
             resize: vertical;
         }
         .agent-try-status { font-size: 0.72rem; color: #475569; }
+        .agent-timeline { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+        .agent-timeline summary { font-size: 0.8rem; font-weight: 700; color: #334155; cursor: pointer; }
+        .agent-timeline-count { font-weight: 500; color: #64748b; margin-left: 6px; }
+        .agent-timeline-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+        .agent-timeline-list { display: flex; flex-direction: column; gap: 4px; max-height: 32vh; overflow: auto; }
+        .agent-timeline-row {
+            display: grid;
+            grid-template-columns: 44px 132px 1fr;
+            gap: 4px 8px;
+            padding: 4px 6px;
+            border-radius: 5px;
+            border: 1px solid transparent;
+            font-size: 0.72rem;
+        }
+        .agent-timeline-row.current { border-color: #c4b5fd; background: #f5f3ff; }
+        .agent-timeline-row .t { color: #64748b; }
+        .agent-timeline-row .tool { font-weight: 600; color: #334155; overflow-wrap: anywhere; }
+        .agent-timeline-row .meta { color: #64748b; }
+        .agent-timeline-row .why { grid-column: 1 / -1; color: #334155; }
+        .agent-scenario { margin-top: 8px; max-height: 30vh; overflow: auto; font-size: 0.68rem; white-space: pre-wrap; }
         [data-q2dv-host="chimerax"] [data-action="menuBarAction"][data-arg="p3d"] { display: none !important; }
         [data-q2dv-host="chimerax"] #p3dViewer { display: none !important; }
         [data-q2dv-host="chimerax"] [data-action="handlePasteFromClipboard"],
@@ -2725,6 +2745,16 @@
             color: var(--q2dv-text);
         }
         html[data-theme="dark"] .agent-try-status { color: var(--q2dv-muted); }
+        html[data-theme="dark"] .agent-timeline { border-color: var(--q2dv-border); }
+        html[data-theme="dark"] .agent-timeline summary { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-timeline-count { color: var(--q2dv-muted); }
+        html[data-theme="dark"] .agent-timeline-row { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-timeline-row.current { background: #1e1033; border-color: #5b21b6; }
+        html[data-theme="dark"] .agent-timeline-row .t,
+        html[data-theme="dark"] .agent-timeline-row .meta { color: var(--q2dv-muted); }
+        html[data-theme="dark"] .agent-timeline-row .tool,
+        html[data-theme="dark"] .agent-timeline-row .why { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-scenario { background: var(--q2dv-panel-3); color: var(--q2dv-text); }
         html[data-theme="dark"] .menubar-menu button { color: var(--q2dv-text); }
         html[data-theme="dark"] .menubar-menu button:hover {
             background: var(--q2dv-panel-3);
@@ -4238,6 +4268,17 @@
         </div>
         <div id="agentDecisionStatus" class="agent-status" role="status" aria-live="polite"></div>
         <div id="agentDecisionList" class="agent-decision-list"></div>
+        <details class="agent-timeline" id="agentTimelineSection">
+            <summary>Agent activity <span id="agentTimelineCount" class="agent-timeline-count"></span></summary>
+            <div class="agent-timeline-controls">
+                <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTimelineStep" style="font-size:0.72rem; padding:3px 8px;">Step</button>
+                <button type="button" class="tb-btn tb-btn-secondary" id="agentTimelinePlayBtn" data-action="agentTimelinePlay" style="font-size:0.72rem; padding:3px 8px;">Play</button>
+                <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTimelineExport" style="font-size:0.72rem; padding:3px 8px;">Export scenario</button>
+                <span id="agentTimelineStatus" class="agent-try-status" role="status" aria-live="polite"></span>
+            </div>
+            <div id="agentTimelineList" class="agent-timeline-list"></div>
+            <pre id="agentScenarioOutput" class="data-box agent-scenario" hidden></pre>
+        </details>
     </div>
 </div>
 
@@ -10259,6 +10300,8 @@ function agentRecordEvent(entry) {
         if (agentEventBytes < 0) agentEventBytes = 0;
     }
     try { logAction('agent', ev.call ? ev.call.tool : 'agent', ev.status + (ev.result && ev.result.summary ? ' - ' + ev.result.summary : '')); } catch (e) { /* log is best effort */ }
+    const modal = document.getElementById('agentModal');
+    if (modal && modal.style && modal.style.display === 'flex' && typeof renderAgentTimeline === 'function') renderAgentTimeline();
     return ev;
 }
 function agentLedgerEvents(limit, sinceSeq) {
@@ -10479,6 +10522,16 @@ async function agentToolDecide(args) {
     rec.status = 'approved';
     rec.decision.approval = { mode: 'click', token: null, expires_at: null };
     logAction('agent', 'decision approved', rec.decision.id + ' (' + spec.id + ')');
+    agentRecordEvent({
+        actor: { kind: 'agent', id: 'approval' },
+        call: { tool: spec.id, args: JSON.parse(JSON.stringify(rec.decision.action.args)) },
+        rationale: ['Approved in the Q2DV Agent panel.'],
+        evidence: [],
+        status: 'ok',
+        duration_ms: 0,
+        result: { summary: spec.title },
+        decision_id: rec.decision.id
+    });
     agentUpdateBadge();
     renderAgentDecisions();
     return { id: rec.decision.id, status: 'approved', result: data };
@@ -10550,7 +10603,11 @@ window.q2dvAgent = {
     reject: agentRejectDecision,
     open: openAgentDecisions,
     render: renderAgentDecisions,
-    tryRequest: agentTryRequest
+    tryRequest: agentTryRequest,
+    exportScenario: agentScenarioFromLedger,
+    runScenario: agentRunScenario,
+    timeline: renderAgentTimeline,
+    stopTimeline: agentTimelineStop
 };
 
 function agentDecisionPendingIds() {
@@ -10678,6 +10735,7 @@ function renderAgentDecisions() {
 function openAgentDecisions() {
     agentUpdateBadge();
     renderAgentDecisions();
+    renderAgentTimeline();
     agentDecisionNotice('');
     openModalAsDialog('agentModal');
 }
@@ -10724,6 +10782,159 @@ function copyAgentLedger() {
     const text = JSON.stringify(agentLedgerEvents(null, null), null, 2);
     const ok = legacyCopyText(text);
     showToast(ok ? 'Agent activity copied as JSON.' : 'Could not copy the agent activity.', ok ? 'success' : 'error');
+}
+let agentTimelineIndex = -1;
+let agentTimelineTimer = null;
+function agentScenarioFromLedger() {
+    const allowed = ['q2dv.import', 'q2dv.select', 'q2dv.run'];
+    const steps = [];
+    agentLedgerEvents(null, null).forEach(ev => {
+        const tool = ev.call && ev.call.tool;
+        if (!tool || allowed.indexOf(tool) === -1 || ev.status !== 'ok') return;
+        steps.push({ run: tool, args: (ev.call.args || {}) });
+    });
+    return { schema: 'q2dv.scenario/1', source_app_version: APP_VERSION, steps };
+}
+function agentScenarioValue(source, path) {
+    const parts = String(path || '').split('.').filter(Boolean);
+    let value = source;
+    for (let i = 0; i < parts.length; i++) {
+        if (value == null) return undefined;
+        value = value[parts[i]];
+    }
+    return value;
+}
+function agentScenarioLiteral(raw) {
+    const text = String(raw == null ? '' : raw).trim();
+    if ((text.charAt(0) === '"' && text.charAt(text.length - 1) === '"') ||
+        (text.charAt(0) === "'" && text.charAt(text.length - 1) === "'")) {
+        return text.slice(1, -1);
+    }
+    if (text === 'true') return true;
+    if (text === 'false') return false;
+    if (text === 'null') return null;
+    const num = Number(text);
+    return Number.isFinite(num) ? num : text;
+}
+function agentScenarioAssert(expression, lastResult) {
+    const m = String(expression || '').match(/^(.+?)\s*(>=|<=|==|!=|>|<)\s*(.+)$/);
+    if (!m) return false;
+    const path = m[1].trim();
+    const op = m[2];
+    const right = agentScenarioLiteral(m[3]);
+    let left;
+    if (path === 'status' || path === 'result.status') {
+        left = lastResult ? lastResult.status : undefined;
+    } else if (path.indexOf('result.') === 0) {
+        left = agentScenarioValue(lastResult ? lastResult.data : undefined, path.slice(7));
+    } else if (path.indexOf('data.') === 0) {
+        left = agentScenarioValue(lastResult ? lastResult.data : undefined, path.slice(5));
+    } else {
+        left = agentScenarioValue(lastResult ? lastResult.data : undefined, path);
+    }
+    if (op === '==') return left === right;
+    if (op === '!=') return left !== right;
+    if (op === '>') return Number(left) > Number(right);
+    if (op === '<') return Number(left) < Number(right);
+    if (op === '>=') return Number(left) >= Number(right);
+    if (op === '<=') return Number(left) <= Number(right);
+    return false;
+}
+async function agentRunScenario(scenario) {
+    const steps = (scenario && Array.isArray(scenario.steps)) ? scenario.steps : [];
+    const out = { schema: 'q2dv.scenario.result/1', passed: true, steps: [], failures: [] };
+    let last = null;
+    for (let i = 0; i < steps.length; i++) {
+        const step = steps[i] || {};
+        const tool = step.run || step.tool;
+        if (tool) {
+            const res = await agentRequest({ action: tool, args: step.args || {}, actor: { kind: 'scenario', id: 'runner' } });
+            last = res;
+            out.steps.push({ index: i, run: tool, status: res.status });
+            if (res.status === 'human_required') {
+                out.passed = false;
+                out.failures.push('step ' + i + ' ' + tool + ' needs human approval in Q2DV -> Agent');
+                if (!step.continueOnError) break;
+            } else if (res.status === 'error') {
+                out.passed = false;
+                out.failures.push('step ' + i + ' ' + tool + ' failed: ' + ((res.error && res.error.message) || 'unknown error'));
+                if (!step.continueOnError) break;
+            }
+        }
+        if (step.assert) {
+            const ok = agentScenarioAssert(step.assert, last);
+            out.steps.push({ index: i, assert: step.assert, passed: ok });
+            if (!ok) {
+                out.passed = false;
+                out.failures.push('assert failed at step ' + i + ': ' + step.assert);
+                if (!step.continueOnError) break;
+            }
+        }
+    }
+    return out;
+}
+function renderAgentTimeline() {
+    const list = document.getElementById('agentTimelineList');
+    if (!list) return;
+    list.innerHTML = '';
+    const events = agentLedgerEvents(null, null);
+    const shown = events.slice(-100);
+    const offset = events.length - shown.length;
+    const count = document.getElementById('agentTimelineCount');
+    if (count) count.textContent = events.length ? '(' + events.length + ')' : '';
+    shown.forEach((ev, i) => {
+        const row = agentEl('div', 'agent-timeline-row' + ((offset + i) === agentTimelineIndex ? ' current' : ''));
+        row.appendChild(agentEl('span', 't', ev.at ? String(ev.at).slice(11, 19) : ''));
+        row.appendChild(agentEl('span', 'tool', (ev.call && ev.call.tool) || 'agent'));
+        const meta = [ev.status || '', (typeof ev.duration_ms === 'number' ? ev.duration_ms + 'ms' : '')].filter(Boolean).join(' · ');
+        row.appendChild(agentEl('span', 'meta', meta));
+        const why = (ev.result && ev.result.summary) ? ev.result.summary : ((ev.rationale || []).join(' '));
+        if (why) row.appendChild(agentEl('div', 'why', why));
+        list.appendChild(row);
+    });
+    if (!shown.length) list.appendChild(agentEl('p', 'agent-empty', 'No agent activity yet.'));
+}
+function agentTimelineStep() {
+    const events = agentLedgerEvents(null, null);
+    if (!events.length) return;
+    agentTimelineIndex = (agentTimelineIndex < 0 || agentTimelineIndex >= events.length - 1) ? 0 : agentTimelineIndex + 1;
+    renderAgentTimeline();
+    const ev = events[agentTimelineIndex] || {};
+    const status = document.getElementById('agentTimelineStatus');
+    if (status) status.textContent = 'Step ' + (agentTimelineIndex + 1) + ' / ' + events.length + ': ' + ((ev.call && ev.call.tool) || 'agent');
+    const list = document.getElementById('agentTimelineList');
+    const offset = Math.max(0, events.length - 100);
+    const row = list && list.children ? list.children[agentTimelineIndex - offset] : null;
+    if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+}
+function agentTimelineStop() {
+    if (agentTimelineTimer) {
+        clearInterval(agentTimelineTimer);
+        agentTimelineTimer = null;
+    }
+    const btn = document.getElementById('agentTimelinePlayBtn');
+    if (btn) btn.textContent = 'Play';
+}
+function agentTimelinePlay() {
+    if (agentTimelineTimer) { agentTimelineStop(); return; }
+    if (!agentLedgerEvents(null, null).length) return;
+    const btn = document.getElementById('agentTimelinePlayBtn');
+    if (btn) btn.textContent = 'Pause';
+    agentTimelineTimer = setInterval(() => {
+        const total = agentLedgerEvents(null, null).length;
+        if (!total || agentTimelineIndex >= total - 1) { agentTimelineStop(); return; }
+        agentTimelineIndex = agentTimelineIndex < 0 ? 0 : agentTimelineIndex + 1;
+        renderAgentTimeline();
+    }, 1200);
+}
+function agentTimelineExport() {
+    const scenario = agentScenarioFromLedger();
+    const text = JSON.stringify(scenario, null, 2);
+    const out = document.getElementById('agentScenarioOutput');
+    if (out) { out.hidden = false; out.textContent = text; }
+    const ok = legacyCopyText(text);
+    const status = document.getElementById('agentTimelineStatus');
+    if (status) status.textContent = ok ? 'Scenario copied (' + scenario.steps.length + ' steps).' : 'Scenario shown below (' + scenario.steps.length + ' steps).';
 }
 function agentTryDefaults(tool) {
     return {
@@ -14714,7 +14925,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.6';
+const APP_VERSION = '0.72.7';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -25723,6 +25934,9 @@ const ACTION_HANDLERS = {
     closeAgentDecisions: delegateAction(closeAgentDecisions),
     copyAgentLedger: delegateAction(copyAgentLedger),
     agentTryRequest: delegateAction(agentTryRequest),
+    agentTimelineStep: delegateAction(agentTimelineStep),
+    agentTimelinePlay: delegateAction(agentTimelinePlay),
+    agentTimelineExport: delegateAction(agentTimelineExport),
     openChangelogModal: delegateAction(openChangelogModal),
     openDataSources: delegateAction(openDataSources),
     openDataSourcesModal: delegateAction(openDataSourcesModal),

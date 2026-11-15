@@ -409,6 +409,17 @@ transport yet.
 - [ ] Dark mode: File/View/Analyze menu items and the Agent modal title, intro
       and request form are readable, not dark-on-dark.
 
+**Activity timeline and scenarios (0.72.7)**
+
+- [ ] Agent → Agent activity lists events with time, tool, status and duration.
+- [ ] Step highlights one row; Play advances it; Pause stops.
+- [ ] Export scenario copies a `q2dv.scenario/1` JSON with only
+      import/select/run steps.
+- [ ] `q2dvAgent.runScenario({steps:[...]})` passes a matching assertion and
+      reports a failing one by step index.
+- [ ] A scenario import step stops with "human approval" rather than running.
+- [ ] Approving a decision adds the executed action as its own timeline row.
+
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
 ### MCP server and host socket — 0.72.6

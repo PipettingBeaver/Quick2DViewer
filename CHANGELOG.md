@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.7] - 2026-11-15
+
+### Added
+- **Agent activity timeline.** The Agent panel now lists structured events with
+  time, tool, status, duration and result summary. **Step** highlights one row,
+  **Play/Pause** advances the pointer, and **Export scenario** writes a
+  `q2dv.scenario/1` file containing the executable import/select/run steps.
+- **Scenario runner.** `window.q2dvAgent.runScenario(scenario)` executes
+  registered steps and checks assertions such as `status == ok` or
+  `result.ranges.0.0 == 1`, with typed failures and `continueOnError`. A
+  scenario cannot bypass human approval: an import step reports
+  `human_required` and stops.
+- **Approved actions in the timeline.** Executing an approved decision records
+  its own event, so the timeline shows the action that actually ran.
+
 ## [0.72.6] - 2026-11-15
 
 ### Added
