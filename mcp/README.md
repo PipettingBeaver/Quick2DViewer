@@ -62,8 +62,9 @@ If the socket is missing, open the Q2DV tool in ChimeraX and check
 
 Read-only tools run immediately. Imports and other state-changing actions return
 `human_required` with a decision id. The user approves or rejects it in
-**Q2DV → Agent**; the MCP client cannot approve on its own. Session grants
-("Allow imports for today") are also issued in that panel.
+**Q2DV → Agent**; the MCP client cannot approve on its own and the usable
+approval token is never returned to the client (`approval.token` is null).
+Session grants ("Allow imports for today") are also issued in that panel.
 
 ## Resources
 

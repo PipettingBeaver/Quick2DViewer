@@ -12,6 +12,14 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.8] - 2026-11-15
+
+### Fixed
+- **Approval tokens stay in the page.** A `human_required` result returned to an
+  agent or MCP client now carries `approval.token: null`. The usable token is
+  held only in the Q2DV decision record, so an external client cannot approve
+  its own proposal with `q2dv.decide`. The Agent panel still approves normally.
+
 ## [0.72.7] - 2026-11-15
 
 ### Added

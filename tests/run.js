@@ -5472,7 +5472,8 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentRunBad.status === 'error' && agentRunBad.error.code === 'validation', 'unknown recipes are rejected');
     ctxRun(`parsedTracks = {}; currentProteinLabel = null;`);
     const agentImport = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM', label: 'GFP test' }, rationale: ['test'] })`);
-    assert(agentImport.status === 'human_required' && agentImport.decision.tier === 'require-human' && /^tk-/.test(agentImport.decision.approval.token), 'a network/sequence import requires a human decision');
+    assert(agentImport.status === 'human_required' && agentImport.decision.approval.token === null, 'the agent does not receive the approval token');
+    assert(/^tk-/.test(ctxRun(`agentDecisions[${JSON.stringify(agentImport.decision.id)}].token`)), 'the approval token is held for the human path');
     assert(ctxRun(`agentDecisionPendingCount()`) === 1, 'a pending decision appears in the queue');
     assert(ctxRun(`document.getElementById('agentDecisionBadge').textContent`) === '1', 'the header badge shows the pending count');
     assert(ctxRun(`agentDecisionFlagsText({ flags: { network: true, changes_sequence: true, reversible: false } })`).indexOf('not reversible') !== -1, 'the decision card describes the action effects');
@@ -5480,7 +5481,10 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(ctxRun(`document.getElementById('agentDecisionList').children.length`) >= 1, 'the decision queue renders a card');
     const agentWrong = await ctxRun(`agentRequest({ action: 'q2dv.decide', args: ${JSON.stringify({ id: agentImport.decision.id, approve: true, token: 'tk-wrong' })} })`);
     assert(agentWrong.status === 'error' && agentWrong.error.code === 'policy_denied', 'a mismatched approval token is refused');
-    const agentDecideArgs = { id: agentImport.decision.id, approve: true, token: agentImport.decision.approval.token };
+    const agentNoToken = await ctxRun(`agentRequest({ action: 'q2dv.decide', args: ${JSON.stringify({ id: agentImport.decision.id, approve: true })} })`);
+    assert(agentNoToken.status === 'error' && agentNoToken.error.code === 'policy_denied', 'approval without the held token is refused');
+    const agentApprovalToken = ctxRun(`agentDecisions[${JSON.stringify(agentImport.decision.id)}].token`);
+    const agentDecideArgs = { id: agentImport.decision.id, approve: true, token: agentApprovalToken };
     const agentApproved = await ctxRun(`agentRequest({ action: 'q2dv.decide', args: ${JSON.stringify(agentDecideArgs)} })`);
     assert(agentApproved.status === 'ok' && agentApproved.data.status === 'approved' && ctxRun(`parsedTracks.AA`) === 'MAMM', 'an approved decision executes through the same handler');
     const agentReplay = await ctxRun(`agentRequest({ action: 'q2dv.decide', args: ${JSON.stringify(agentDecideArgs)} })`);

@@ -419,6 +419,8 @@ transport yet.
       reports a failing one by step index.
 - [ ] A scenario import step stops with "human approval" rather than running.
 - [ ] Approving a decision adds the executed action as its own timeline row.
+- [ ] A `human_required` result carries no usable approval token; a `q2dv_decide`
+      call without the page-held token is refused.
 
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
