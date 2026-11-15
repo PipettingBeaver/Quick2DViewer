@@ -5557,6 +5557,17 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentScenarioFail.passed === false && agentScenarioFail.failures.length === 1, 'a failing assertion is reported');
     const agentScenarioGate = await ctxRun(`agentRunScenario(${JSON.stringify({ steps: [{ run: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } }] })})`);
     assert(agentScenarioGate.passed === false && /human approval/.test(agentScenarioGate.failures[0]), 'a scenario cannot bypass human approval');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(10), SS_X: '...' }; selectStart = 7; selectEnd = 8; selectionMode = 'point'; rowRanges = [];`);
+    const agentState = ctxRun(`agentStateSnapshot()`);
+    assert(agentState.selection.ranges[0][0] === 8 && agentState.selection.ranges[0][1] === 9 && agentState.tracks.indexOf('SS_X') !== -1, 'state snapshots record selection and tracks');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(10), SS_Y: '...' }; selectStart = 7; selectEnd = 8; selectionMode = 'point'; rowRanges = [];
+        agentEvents = [{ schema: 'q2dv.event/1', seq: 1, at: '2026-11-15T10:00:00Z', call: { tool: 'q2dv.select', args: { ranges: [[2,4]] } }, status: 'ok', state_after: { selection: { mode: 'point', ranges: [[2,4]], selectStart: 2, selectEnd: 4, rowRanges: [] }, tracks: ['SS_X'] } }];
+        agentEventSeq = 1; agentEventBytes = 0; agentTimelineIndex = 0;`);
+    assert(ctxRun(`agentTimelineRestore()`) === true, 'a step with recorded state can be restored');
+    assert(ctxRun(`selectStart`) === 1 && ctxRun(`selectEnd`) === 3, 'restoring a step applies the recorded selection');
+    const agentTimelineStatus = ctxRun(`document.getElementById('agentTimelineStatus').textContent`);
+    assert(agentTimelineStatus.indexOf('added since') !== -1 && agentTimelineStatus.indexOf('not recreated') !== -1, 'track differences are reported, not silently recreated');
+    ctxRun(`agentEvents = Array.from({ length: 10 }, (_, i) => ({ schema: 'q2dv.event/1', seq: i + 1, at: '2026-11-15T10:00:0' + (i % 10) + 'Z', actor: { kind: 'agent', id: 't' }, call: { tool: 'q2dv.select', args: {} }, status: 'ok', duration_ms: 1, result: { summary: '' } })); agentEventSeq = 10; agentEventBytes = 0;`);
     const agentProposeReply = await ctxRun(`agentRequest({ action: 'q2dv.propose', args: { tool: 'q2dv.select', tier: 'require-human', title: 'Select region', why: 'test', args: { ranges: [[1,2]] } } })`);
     assert(agentProposeReply.status === 'ok' && agentProposeReply.data.tier === 'require-human' && agentProposeReply.data.action.tool === 'q2dv.select', 'propose returns a decision card');
     const agentLedger = await ctxRun(`agentRequest({ action: 'q2dv.ledger', args: { limit: 5 } })`);

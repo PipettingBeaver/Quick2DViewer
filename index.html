@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-+JIXWugMnKCL7TLwIM6mWKAF9234EUommRKsp0N2i+k=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nmEHR1AVtcPhbyaLG9hH4rLryHhOzToAC+jwyc3qGZc=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -4297,6 +4297,7 @@
             <summary>Agent activity <span id="agentTimelineCount" class="agent-timeline-count"></span></summary>
             <div class="agent-timeline-controls">
                 <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTimelineStep" style="font-size:0.72rem; padding:3px 8px;">Step</button>
+                <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTimelineRestore" style="font-size:0.72rem; padding:3px 8px;">Restore step</button>
                 <button type="button" class="tb-btn tb-btn-secondary" id="agentTimelinePlayBtn" data-action="agentTimelinePlay" style="font-size:0.72rem; padding:3px 8px;">Play</button>
                 <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTimelineExport" style="font-size:0.72rem; padding:3px 8px;">Export scenario</button>
                 <span id="agentTimelineStatus" class="agent-try-status" role="status" aria-live="polite"></span>
@@ -10609,11 +10610,12 @@ async function agentToolDecide(args) {
     const spec = agentToolSpec(rec.decision.action.tool);
     if (!spec) throw agentFail('validation', 'Unknown tool on the decision.');
     if (agentPayloadFor(spec.id, rec.decision.action.args) !== rec.payload) throw agentFail('policy_denied', 'Decision arguments changed after approval.');
+    const stateBefore = spec.readOnly ? null : agentStateSnapshot();
     const data = await spec.handler(rec.decision.action.args, { actor: { kind: 'human', id: 'approval' }, decisionId: rec.decision.id });
     rec.status = 'approved';
     rec.decision.approval = { mode: 'click', token: null, expires_at: null };
     logAction('agent', 'decision approved', rec.decision.id + ' (' + spec.id + ')');
-    agentRecordEvent({
+    const approvedEvent = {
         actor: { kind: 'agent', id: 'approval' },
         call: { tool: spec.id, args: JSON.parse(JSON.stringify(rec.decision.action.args)) },
         rationale: ['Approved in the Q2DV Agent panel.'],
@@ -10622,7 +10624,12 @@ async function agentToolDecide(args) {
         duration_ms: 0,
         result: { summary: spec.title },
         decision_id: rec.decision.id
-    });
+    };
+    if (stateBefore) {
+        approvedEvent.state_before = stateBefore;
+        approvedEvent.state_after = agentStateSnapshot();
+    }
+    agentRecordEvent(approvedEvent);
     agentUpdateBadge();
     renderAgentDecisions();
     return { id: rec.decision.id, status: 'approved', result: data };
@@ -10678,12 +10685,20 @@ async function agentRequest(request) {
         agentRecordEvent({ actor, call: { tool: spec.id, args }, rationale: req.rationale || [], evidence: req.evidence || [], status: 'human_required', duration_ms: Date.now() - started, result: { summary: decision.title }, decision_id: decision.id });
         return agentResult(id, 'human_required', null, null, decision);
     }
+    const stateBefore = spec.readOnly ? null : agentStateSnapshot();
     try {
         const data = await spec.handler(args, req);
-        agentRecordEvent({ actor, call: { tool: spec.id, args }, rationale: req.rationale || [], evidence: req.evidence || [], status: 'ok', duration_ms: Date.now() - started, result: { summary: spec.title } });
+        const event = { actor, call: { tool: spec.id, args }, rationale: req.rationale || [], evidence: req.evidence || [], status: 'ok', duration_ms: Date.now() - started, result: { summary: spec.title } };
+        if (stateBefore) {
+            event.state_before = stateBefore;
+            event.state_after = agentStateSnapshot();
+        }
+        agentRecordEvent(event);
         return agentResult(id, 'ok', data);
     } catch (err) {
-        agentRecordEvent({ actor, call: { tool: spec.id, args }, rationale: req.rationale || [], evidence: req.evidence || [], status: 'error', duration_ms: Date.now() - started, result: { summary: (err && err.message) || String(err) } });
+        const event = { actor, call: { tool: spec.id, args }, rationale: req.rationale || [], evidence: req.evidence || [], status: 'error', duration_ms: Date.now() - started, result: { summary: (err && err.message) || String(err) } };
+        if (stateBefore) event.state_before = stateBefore;
+        agentRecordEvent(event);
         return agentResult(id, 'error', null, agentErrorJson(err));
     }
 }
@@ -10707,6 +10722,7 @@ window.q2dvAgent = {
     runScenario: agentRunScenario,
     timeline: renderAgentTimeline,
     stopTimeline: agentTimelineStop,
+    restoreStep: agentTimelineRestore,
     grants: renderAgentGrants
 };
 
@@ -10929,6 +10945,72 @@ function agentScenarioFromLedger() {
         steps.push({ run: tool, args: (ev.call.args || {}) });
     });
     return { schema: 'q2dv.scenario/1', source_app_version: APP_VERSION, steps };
+}
+function agentStateSnapshot() {
+    const ranges = getCurrentRangesZeroBased().map(([s, e]) => [s + 1, e + 1]);
+    return {
+        selection: {
+            mode: selectionMode,
+            ranges,
+            selectStart: selectStart == null ? null : selectStart + 1,
+            selectEnd: selectEnd == null ? null : selectEnd + 1,
+            rowRanges: rowRanges.map(([s, e]) => [s + 1, e + 1])
+        },
+        tracks: Object.keys(parsedTracks || {}).filter(key => key !== 'AA')
+    };
+}
+function agentRestoreSelectionFromState(state) {
+    const sel = state && state.selection;
+    if (!sel) return false;
+    const ranges = Array.isArray(sel.ranges) ? sel.ranges : [];
+    if (!ranges.length) { clearSelection(); return true; }
+    if (sel.mode === 'row' && Array.isArray(sel.rowRanges) && sel.rowRanges.length) {
+        selectionMode = 'row';
+        activeRowKey = null;
+        activeRowType = null;
+        rowRanges = sel.rowRanges.map(([s, e]) => [Number(s) - 1, Number(e) - 1]);
+        selectStart = null;
+        selectEnd = null;
+        updateSelectionUI();
+        updateManualPiecewiseSelection();
+    } else {
+        const first = ranges[0] || [1, 1];
+        selectionMode = 'point';
+        activeRowKey = null;
+        activeRowType = null;
+        rowRanges = [];
+        selectStart = Number(first[0]) - 1;
+        selectEnd = Number(first[1]) - 1;
+        updateSelectionUI();
+        calculateSelectionMetadata();
+    }
+    schedulePersist();
+    return true;
+}
+function agentTimelineRestore() {
+    const events = agentLedgerEvents(null, null);
+    if (!events.length) return false;
+    const index = (agentTimelineIndex < 0 || agentTimelineIndex >= events.length) ? events.length - 1 : agentTimelineIndex;
+    const ev = events[index] || {};
+    const state = ev.state_after || ev.state_before;
+    const status = document.getElementById('agentTimelineStatus');
+    if (!state) {
+        if (status) status.textContent = 'Step ' + (index + 1) + ' has no recorded state.';
+        return false;
+    }
+    agentRestoreSelectionFromState(state);
+    const currentTracks = Object.keys(parsedTracks || {}).filter(key => key !== 'AA');
+    const recorded = new Set(state.tracks || []);
+    const added = currentTracks.filter(key => !recorded.has(key));
+    const missing = Array.from(recorded).filter(key => currentTracks.indexOf(key) === -1);
+    agentTimelineIndex = index;
+    renderAgentTimeline();
+    if (status) {
+        status.textContent = 'Restored step ' + (index + 1) + '/' + events.length +
+            (added.length ? ' · added since: ' + added.join(', ') : '') +
+            (missing.length ? ' · not recreated: ' + missing.join(', ') : '');
+    }
+    return true;
 }
 function agentScenarioValue(source, path) {
     const parts = String(path || '').split('.').filter(Boolean);
@@ -15060,7 +15142,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.9';
+const APP_VERSION = '0.72.10';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -26070,6 +26152,7 @@ const ACTION_HANDLERS = {
     copyAgentLedger: delegateAction(copyAgentLedger),
     agentTryRequest: delegateAction(agentTryRequest),
     agentTimelineStep: delegateAction(agentTimelineStep),
+    agentTimelineRestore: delegateAction(agentTimelineRestore),
     agentTimelinePlay: delegateAction(agentTimelinePlay),
     agentTimelineExport: delegateAction(agentTimelineExport),
     agentGrantToday: delegateAction(agentGrantToday),

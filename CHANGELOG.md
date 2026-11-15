@@ -12,6 +12,19 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.10] - 2026-11-15
+
+### Added
+- **Step restore.** State-changing agent events record a compact selection and
+  track snapshot. **Restore step** reapplies the recorded selection and reports
+  tracks added since or not recreated, so the timeline can be walked without
+  pretending a selected state can rebuild deleted data.
+
+### Fixed
+- **Timeline state capture.** Non-read-only actions now record `state_before`
+  and `state_after`; approved decisions record the state of the action that
+  actually ran.
+
 ## [0.72.9] - 2026-11-15
 
 ### Added

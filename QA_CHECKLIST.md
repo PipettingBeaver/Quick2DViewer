@@ -413,6 +413,8 @@ transport yet.
 
 - [ ] Agent → Agent activity lists events with time, tool, status and duration.
 - [ ] Step highlights one row; Play advances it; Pause stops.
+- [ ] **Restore step** reapplies the recorded selection and reports tracks added
+      since or not recreated.
 - [ ] Export scenario copies a `q2dv.scenario/1` JSON with only
       import/select/run steps.
 - [ ] `q2dvAgent.runScenario({steps:[...]})` passes a matching assertion and
