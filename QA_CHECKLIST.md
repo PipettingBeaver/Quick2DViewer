@@ -388,6 +388,20 @@ transport yet.
       precondition error, not a silent overwrite.
 - [ ] A session grant expires at local midnight; revoking it restores the gate.
 
+**Decision queue (0.72.3)**
+
+- [ ] The header **Agent** badge appears only while a decision is pending and
+      shows the count.
+- [ ] Session → Agent decisions shows tool, arguments, why, effects and
+      expected result for each card.
+- [ ] Approve runs the action once and the badge decrements; Reject closes the
+      card without running it.
+- [ ] Allow `<class>` for today grants a session pass; the card still needs
+      Approve.
+- [ ] Pause closes the panel and leaves the card pending.
+- [ ] Tab reaches every button, and closing returns focus to the opener.
+- [ ] HTML-looking rationale is displayed as text, never as markup.
+
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
 ---

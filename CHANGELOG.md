@@ -12,6 +12,17 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.3] - 2026-11-15
+
+### Added
+- **Agent decision queue.** An **Agent** badge in the header and Session → Agent
+  decisions open a review panel. Each card shows the proposed tool, arguments,
+  rationale, evidence, effects and expected result. **Approve** runs through the
+  token-checked path, **Reject** closes the card without running it, **Allow
+  <class> for today** grants a session pass, and **Pause** leaves it pending.
+  Native buttons, an `aria-live` status line, keyboard focus, and dark-theme
+  styles.
+
 ## [0.72.2] - 2026-11-15
 
 ### Added

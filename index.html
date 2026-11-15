@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1/+NtDg+9Ku6NKAgd1M8KkxX1nj3YwCNnkWLg9Ot/Gs=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Teir55YV8VEEUQrAxmnc3z09Y2JuSERS3D0gbRESci4=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -532,6 +532,48 @@
         .app-host:hover { background: #cffafe; color: #155e75; }
         .app-host.chimerax { border-color: #86efac; background: #f0fdf4; color: #15803d; }
         .app-host.chimerax:hover { background: #dcfce7; color: #166534; }
+        .app-agent {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 1px 7px;
+            border: 1px solid #ddd6fe;
+            border-radius: 999px;
+            background: #f5f3ff;
+            color: #6d28d9;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            vertical-align: middle;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .app-agent:hover { background: #ede9fe; color: #5b21b6; }
+        .app-agent.has-decisions { border-color: #c4b5fd; background: #ede9fe; color: #5b21b6; }
+        .agent-badge {
+            display: inline-block;
+            min-width: 15px;
+            margin-left: 5px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: #7c3aed;
+            color: #ffffff;
+            font-size: 0.62rem;
+            line-height: 15px;
+            text-align: center;
+        }
+        .agent-status { min-height: 1.2em; font-size: 0.74rem; color: #475569; margin: 4px 0 8px; }
+        .agent-decision-list { display: flex; flex-direction: column; gap: 8px; max-height: 55vh; overflow: auto; }
+        .agent-decision-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; background: #f8fafc; }
+        .agent-decision-card.pending { border-color: #ddd6fe; background: #faf5ff; }
+        .agent-decision-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+        .agent-tier { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6d28d9; }
+        .agent-why { margin: 6px 0; font-size: 0.78rem; color: #334155; line-height: 1.4; }
+        .agent-meta { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 6px 0 0; font-size: 0.72rem; }
+        .agent-meta dt { color: #64748b; font-weight: 600; }
+        .agent-meta dd { margin: 0; color: #334155; overflow-wrap: anywhere; }
+        .agent-decision-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .agent-resolution { margin: 8px 0 0; font-size: 0.72rem; color: #64748b; }
+        .agent-empty { margin: 0; font-size: 0.78rem; color: #64748b; }
         [data-q2dv-host="chimerax"] [data-action="menuBarAction"][data-arg="p3d"] { display: none !important; }
         [data-q2dv-host="chimerax"] #p3dViewer { display: none !important; }
         [data-q2dv-host="chimerax"] [data-action="handlePasteFromClipboard"],
@@ -2619,6 +2661,22 @@
             background: #163722;
             color: #bbf7d0;
         }
+        html[data-theme="dark"] .app-agent {
+            background: #2e1065;
+            border-color: #5b21b6;
+            color: #c4b5fd;
+        }
+        html[data-theme="dark"] .app-agent:hover { background: #3b0f7a; color: #ddd6fe; }
+        html[data-theme="dark"] .app-agent.has-decisions { background: #3b0f7a; border-color: #7c3aed; color: #ede9fe; }
+        html[data-theme="dark"] .agent-status { color: var(--q2dv-muted); }
+        html[data-theme="dark"] .agent-decision-card { background: var(--q2dv-panel-2); border-color: var(--q2dv-border); }
+        html[data-theme="dark"] .agent-decision-card.pending { background: #1e1033; border-color: #5b21b6; }
+        html[data-theme="dark"] .agent-tier { color: #c4b5fd; }
+        html[data-theme="dark"] .agent-why,
+        html[data-theme="dark"] .agent-meta dd { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-meta dt,
+        html[data-theme="dark"] .agent-resolution,
+        html[data-theme="dark"] .agent-empty { color: var(--q2dv-muted); }
         html[data-theme="dark"] #changelogBody h3.cl-ver,
         html[data-theme="dark"] .doc-body h3.cl-ver {
             color: var(--q2dv-text);
@@ -2660,7 +2718,7 @@
 <div class="container">
     <div class="app-header">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <h2><span id="appTitle">Quick2DViewer - 1D Protein Viewer</span> <button type="button" class="app-version" id="appVersion" title="View the changelog" data-action="openChangelogModal"></button><button type="button" class="app-host" id="appHost" title="Detect the Q2DV host" data-action="showHostInfo"></button></h2>
+            <h2><span id="appTitle">Quick2DViewer - 1D Protein Viewer</span> <button type="button" class="app-version" id="appVersion" title="View the changelog" data-action="openChangelogModal"></button><button type="button" class="app-host" id="appHost" title="Detect the Q2DV host" data-action="showHostInfo"></button><button type="button" class="app-agent" id="appAgent" title="Agent decisions waiting for review" data-action="openAgentDecisions">Agent<span id="agentDecisionBadge" class="agent-badge" hidden>0</span></button></h2>
             <span class="jump-box">
                 <input id="jumpInput" type="search" placeholder="Jump to…" autocomplete="off"
                     aria-label="Jump to a menu, tab, guide step, data source or loaded track"
@@ -2717,6 +2775,7 @@
                     <button type="button" role="menuitem" data-action="openMacroModal" title="Record, export and replay a workflow as a macro: the API/import steps with their providers and parameters">Macro</button>
                     <button type="button" role="menuitem" data-action="openHypothesisModal" title="Rank candidate residues from the loaded evidence and suggest a test for each, with the evidence that drove it">Hypotheses</button>
                     <button type="button" role="menuitem" data-action="openActionLog" title="Everything this session: clicks, menu choices, API jobs and what came back - newest first">Log</button>
+                    <button type="button" role="menuitem" data-action="openAgentDecisions" title="Proposed agent actions waiting for review: approve, reject, or grant for today">Agent decisions</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -4092,6 +4151,26 @@
             <button type="button" class="copy-btn" data-action="clearActionLog">Clear</button>
         </div>
         <pre id="actionLogBody" class="data-box" style="font-size:0.7rem; max-height:50vh; overflow:auto; white-space:pre-wrap; margin:0; color:#334155;">(no actions recorded yet this session)</pre>
+    </div>
+</div>
+
+<div class="modal-overlay" id="agentModal" role="dialog" aria-modal="true" aria-labelledby="agentTitle">
+    <div class="modal-content" style="width: 760px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+            <h3 id="agentTitle" style="margin: 0; color: #0f172a;">Agent decisions</h3>
+            <button data-action="closeAgentDecisions" style="background: #ef4444; padding: 4px 10px; font-size: 0.8rem;">Close</button>
+        </div>
+        <p style="font-size:0.78rem; color:#64748b; margin: 12px 0 8px; line-height:1.4;">
+            Proposed actions from an attached agent. Each card shows the tool, its arguments, why it
+            was proposed and what will change. Nothing runs until you approve it. A grant lasts for
+            this session unless you revoke it. Pause leaves a card pending.
+        </p>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+            <span id="agentDecisionCount" style="font-size:0.72rem; color:#64748b;"></span>
+            <button type="button" class="copy-btn" data-action="copyAgentLedger">Copy agent activity (JSON)</button>
+        </div>
+        <div id="agentDecisionStatus" class="agent-status" role="status" aria-live="polite"></div>
+        <div id="agentDecisionList" class="agent-decision-list"></div>
     </div>
 </div>
 
@@ -10096,6 +10175,7 @@ function agentCreateDecision(spec, args, req) {
         decision, payload, token, expires, status: 'pending',
         actor: agentActor(req), toolId: spec.id, args: JSON.parse(JSON.stringify(args || {}))
     };
+    agentDecisionCreated(decision);
     return decision;
 }
 function agentRecordEvent(entry) {
@@ -10319,6 +10399,8 @@ async function agentToolDecide(args) {
         rec.status = 'rejected';
         rec.decision.approval = { mode: 'click', token: null, expires_at: null };
         logAction('agent', 'decision rejected', rec.decision.id);
+        agentUpdateBadge();
+        renderAgentDecisions();
         return { id: rec.decision.id, status: 'rejected' };
     }
     if (Date.now() > rec.expires) throw agentFail('policy_denied', 'Approval token has expired.');
@@ -10330,6 +10412,8 @@ async function agentToolDecide(args) {
     rec.status = 'approved';
     rec.decision.approval = { mode: 'click', token: null, expires_at: null };
     logAction('agent', 'decision approved', rec.decision.id + ' (' + spec.id + ')');
+    agentUpdateBadge();
+    renderAgentDecisions();
     return { id: rec.decision.id, status: 'approved', result: data };
 }
 async function agentToolLedger(args) {
@@ -10393,8 +10477,186 @@ window.q2dvAgent = {
     tools: agentToolSpecs,
     tierFor: agentTierFor,
     grant: agentGrant,
-    revokeGrant: agentRevokeGrant
+    revokeGrant: agentRevokeGrant,
+    pending: agentDecisionPendingCount,
+    approve: agentApproveDecision,
+    reject: agentRejectDecision,
+    open: openAgentDecisions,
+    render: renderAgentDecisions
 };
+
+function agentDecisionPendingIds() {
+    return Object.keys(agentDecisions).filter(id => agentDecisions[id].status === 'pending');
+}
+function agentDecisionPendingCount() {
+    return agentDecisionPendingIds().length;
+}
+function agentUpdateBadge() {
+    const n = agentDecisionPendingCount();
+    const badge = document.getElementById('agentDecisionBadge');
+    const btn = document.getElementById('appAgent');
+    if (badge) { badge.textContent = n ? String(n) : ''; badge.hidden = n === 0; }
+    if (btn) {
+        btn.classList.toggle('has-decisions', n > 0);
+        btn.setAttribute('aria-label', n ? n + ' agent decision(s) waiting for review' : 'Agent decisions');
+    }
+}
+function agentDecisionCreated(decision) {
+    agentUpdateBadge();
+    const modal = document.getElementById('agentModal');
+    if (modal && modal.style && modal.style.display === 'flex') renderAgentDecisions();
+    if (typeof showToast === 'function') showToast('Agent decision waiting: ' + (decision.title || decision.id), 'info');
+}
+function agentDecisionNotice(text) {
+    const el = document.getElementById('agentDecisionStatus');
+    if (el) el.textContent = text || '';
+}
+function agentDecisionFlagsText(decision) {
+    const flags = (decision && decision.flags) || {};
+    const bits = [];
+    if (flags.network) bits.push('network');
+    if (flags.changes_sequence) bits.push('changes sequence');
+    if (flags.writes_files) bits.push('writes files');
+    if (flags.destructive) bits.push('destructive');
+    bits.push(flags.reversible === false ? 'not reversible' : 'reversible');
+    return bits.join(' · ');
+}
+function agentEl(tag, className, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text != null) el.textContent = String(text);
+    return el;
+}
+function agentButton(label, onClick, className) {
+    const btn = agentEl('button', className || 'tb-btn tb-btn-secondary', label);
+    btn.type = 'button';
+    btn.addEventListener('click', onClick);
+    return btn;
+}
+function agentDecisionCard(rec) {
+    const d = rec.decision || {};
+    const card = agentEl('div', 'agent-decision-card ' + (rec.status === 'pending' ? 'pending' : 'resolved'));
+    const head = agentEl('div', 'agent-decision-head');
+    head.appendChild(agentEl('strong', '', d.title || rec.toolId || d.id));
+    head.appendChild(agentEl('span', 'agent-tier', d.tier || 'info'));
+    card.appendChild(head);
+    if (d.why) card.appendChild(agentEl('p', 'agent-why', d.why));
+    const meta = agentEl('dl', 'agent-meta');
+    const addRow = (label, value) => {
+        meta.appendChild(agentEl('dt', '', label));
+        meta.appendChild(agentEl('dd', '', value));
+    };
+    addRow('Action', d.action ? d.action.tool : 'info only');
+    if (d.action && d.action.args && Object.keys(d.action.args).length) {
+        addRow('Arguments', JSON.stringify(d.action.args).slice(0, 400));
+    }
+    if (d.expected) addRow('Expected', d.expected);
+    const flagsText = agentDecisionFlagsText(d);
+    if (flagsText) addRow('Effects', flagsText);
+    if (Array.isArray(d.evidence) && d.evidence.length) {
+        addRow('Evidence', d.evidence.map(e => {
+            if (!e) return '';
+            if (typeof e === 'string') return e;
+            return [e.kind, e.id].filter(Boolean).join(':');
+        }).filter(Boolean).join(', '));
+    }
+    card.appendChild(meta);
+    if (rec.status === 'pending') {
+        const actions = agentEl('div', 'agent-decision-actions');
+        const approve = agentButton('Approve', () => {
+            approve.disabled = true;
+            agentApproveDecision(d.id).then(res => { if (!res || res.status !== 'ok') approve.disabled = false; });
+        }, 'tb-btn tb-btn-primary');
+        actions.appendChild(approve);
+        actions.appendChild(agentButton('Reject', () => agentRejectDecision(d.id)));
+        const spec = agentToolSpec(d.action && d.action.tool);
+        if (spec && spec.grantClass) {
+            actions.appendChild(agentButton('Allow ' + spec.grantClass + ' for today', () => agentGrantForDecision(d.id)));
+        }
+        actions.appendChild(agentButton('Pause', () => {
+            agentDecisionNotice('Paused: ' + (d.title || d.id));
+            closeAgentDecisions();
+        }));
+        card.appendChild(actions);
+    } else {
+        card.appendChild(agentEl('p', 'agent-resolution', 'Resolved: ' + rec.status));
+    }
+    return card;
+}
+function renderAgentDecisions() {
+    const list = document.getElementById('agentDecisionList');
+    if (!list) return;
+    list.innerHTML = '';
+    const ids = Object.keys(agentDecisions);
+    ids.sort((a, b) => {
+        const pa = agentDecisions[a].status === 'pending' ? 0 : 1;
+        const pb = agentDecisions[b].status === 'pending' ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return b.localeCompare(a);
+    });
+    let resolvedShown = 0;
+    ids.forEach(id => {
+        const rec = agentDecisions[id];
+        if (rec.status !== 'pending') {
+            if (resolvedShown >= 3) return;
+            resolvedShown++;
+        }
+        list.appendChild(agentDecisionCard(rec));
+    });
+    if (!ids.length) list.appendChild(agentEl('p', 'agent-empty', 'No agent decisions yet.'));
+    const count = document.getElementById('agentDecisionCount');
+    if (count) count.textContent = agentDecisionPendingCount() + ' pending';
+}
+function openAgentDecisions() {
+    agentUpdateBadge();
+    renderAgentDecisions();
+    agentDecisionNotice('');
+    openModalAsDialog('agentModal');
+}
+function closeAgentDecisions() {
+    closeModalAsDialog('agentModal');
+}
+function agentApproveDecision(id) {
+    const rec = agentDecisions[id];
+    if (!rec) return Promise.resolve({ status: 'error', error: { message: 'Unknown decision.' } });
+    if (rec.status !== 'pending') return Promise.resolve({ status: 'ok', data: { status: rec.status, replayed: true } });
+    return agentRequest({ action: 'q2dv.decide', args: { id, approve: true, token: rec.token }, actor: { kind: 'human', id: 'ui' } }).then(res => {
+        if (res.status === 'ok') {
+            agentDecisionNotice('Approved: ' + (rec.decision.title || id));
+            showToast('Agent action approved.', 'success');
+        } else {
+            agentDecisionNotice('Could not approve: ' + ((res.error && res.error.message) || 'unknown error'));
+            showToast('Agent action was not approved.', 'error');
+        }
+        agentUpdateBadge();
+        renderAgentDecisions();
+        return res;
+    });
+}
+function agentRejectDecision(id) {
+    const rec = agentDecisions[id];
+    if (!rec) return Promise.resolve({ status: 'error', error: { message: 'Unknown decision.' } });
+    return agentRequest({ action: 'q2dv.decide', args: { id, approve: false }, actor: { kind: 'human', id: 'ui' } }).then(res => {
+        if (res.status === 'ok') agentDecisionNotice('Rejected: ' + (rec.decision.title || id));
+        agentUpdateBadge();
+        renderAgentDecisions();
+        return res;
+    });
+}
+function agentGrantForDecision(id) {
+    const rec = agentDecisions[id];
+    const spec = rec ? agentToolSpec(rec.decision && rec.decision.action && rec.decision.action.tool) : null;
+    if (!spec || !spec.grantClass) { agentDecisionNotice('This action has no grant class.'); return false; }
+    agentGrant(spec.grantClass, 'today');
+    agentDecisionNotice('Granted ' + spec.grantClass + ' for today. Approve the card to run it.');
+    renderAgentDecisions();
+    return true;
+}
+function copyAgentLedger() {
+    const text = JSON.stringify(agentLedgerEvents(null, null), null, 2);
+    const ok = legacyCopyText(text);
+    showToast(ok ? 'Agent activity copied as JSON.' : 'Could not copy the agent activity.', ok ? 'success' : 'error');
+}
 // --- Macro recording + replay (DESIGN 18, slice 1) --------------------------
 // A macro is a JSON list of the session's replayable actions: capability runs
 // and imports with their resolved provider and parameters. The recording hooks
@@ -14330,7 +14592,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.2';
+const APP_VERSION = '0.72.3';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -25335,6 +25597,9 @@ const ACTION_HANDLERS = {
     onUniprotAccessionInput: delegateAction(onUniprotAccessionInput),
     onUniprotModeChange: delegateAction(onUniprotModeChange),
     openActionLog: delegateAction(openActionLog),
+    openAgentDecisions: delegateAction(openAgentDecisions),
+    closeAgentDecisions: delegateAction(closeAgentDecisions),
+    copyAgentLedger: delegateAction(copyAgentLedger),
     openChangelogModal: delegateAction(openChangelogModal),
     openDataSources: delegateAction(openDataSources),
     openDataSourcesModal: delegateAction(openDataSourcesModal),

@@ -1,8 +1,8 @@
 # Agent access plan: q2dv-mcp, capability registry, and step-flow review
 
-**Status:** Phase 1 logic layer implemented 2026-11-15 (Q2DV 0.72.2): tool
-registry, dispatcher, snapshot, event ledger and tiered decisions. Host adapter,
-MCP transport and step-flow UI remain. Not a production dependency.
+**Status:** Phase 1 logic layer and the Phase 2 decision queue implemented
+2026-11-15 (Q2DV 0.72.3). Host adapter, MCP transport and step-flow timeline
+remain. Not a production dependency.
 **Baseline:** Q2DV 0.72.1, ChimeraX host 0.6.35, ChimeraX 1.12.
 **Related:** `RECIPE_MODEL.md`, `CHIMERAX_ECOSYSTEM.md`,
 `CHIMERAX_PLUGIN_PLAN.md`, `CHIMERAX_INTEGRATION_PLAN.md`, `DESIGN.md`.

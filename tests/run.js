@@ -5470,6 +5470,11 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     ctxRun(`parsedTracks = {}; currentProteinLabel = null;`);
     const agentImport = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM', label: 'GFP test' }, rationale: ['test'] })`);
     assert(agentImport.status === 'human_required' && agentImport.decision.tier === 'require-human' && /^tk-/.test(agentImport.decision.approval.token), 'a network/sequence import requires a human decision');
+    assert(ctxRun(`agentDecisionPendingCount()`) === 1, 'a pending decision appears in the queue');
+    assert(ctxRun(`document.getElementById('agentDecisionBadge').textContent`) === '1', 'the header badge shows the pending count');
+    assert(ctxRun(`agentDecisionFlagsText({ flags: { network: true, changes_sequence: true, reversible: false } })`).indexOf('not reversible') !== -1, 'the decision card describes the action effects');
+    ctxRun(`renderAgentDecisions()`);
+    assert(ctxRun(`document.getElementById('agentDecisionList').children.length`) >= 1, 'the decision queue renders a card');
     const agentWrong = await ctxRun(`agentRequest({ action: 'q2dv.decide', args: ${JSON.stringify({ id: agentImport.decision.id, approve: true, token: 'tk-wrong' })} })`);
     assert(agentWrong.status === 'error' && agentWrong.error.code === 'policy_denied', 'a mismatched approval token is refused');
     const agentDecideArgs = { id: agentImport.decision.id, approve: true, token: agentImport.decision.approval.token };
@@ -5477,6 +5482,7 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentApproved.status === 'ok' && agentApproved.data.status === 'approved' && ctxRun(`parsedTracks.AA`) === 'MAMM', 'an approved decision executes through the same handler');
     const agentReplay = await ctxRun(`agentRequest({ action: 'q2dv.decide', args: ${JSON.stringify(agentDecideArgs)} })`);
     assert(agentReplay.data.status === 'approved' && agentReplay.data.replayed === true, 'replaying an approved decision does not re-run it');
+    assert(ctxRun(`agentDecisionPendingCount()`) === 0 && ctxRun(`document.getElementById('agentDecisionBadge').hidden`) === true, 'resolving a decision clears the badge');
     ctxRun(`parsedTracks = {};`);
     assert(ctxRun(`agentGrant('imports', 'today')`) === true, 'a session grant can be issued');
     const agentGranted = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
@@ -5484,6 +5490,16 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     ctxRun(`agentRevokeGrant('imports')`);
     const agentBlocked = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
     assert(agentBlocked.status === 'human_required', 'revoking the grant restores the human gate');
+    await ctxRun(`agentRejectDecision(${JSON.stringify(agentBlocked.decision.id)})`);
+    const agentUiImport = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
+    const agentUiApprove = await ctxRun(`agentApproveDecision(${JSON.stringify(agentUiImport.decision.id)})`);
+    assert(agentUiApprove.status === 'ok' && ctxRun(`agentDecisionPendingCount()`) === 0, 'the UI approve path executes and resolves the card');
+    const agentUiReject = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
+    await ctxRun(`agentRejectDecision(${JSON.stringify(agentUiReject.decision.id)})`);
+    assert(ctxRun(`agentDecisions[${JSON.stringify(agentUiReject.decision.id)}].status`) === 'rejected', 'the UI reject path closes the card without running it');
+    const agentUiGrant = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
+    assert(ctxRun(`agentGrantForDecision(${JSON.stringify(agentUiGrant.decision.id)})`) === true && ctxRun(`agentGrantActive('imports')`) === true, 'the card can grant its action class for today');
+    ctxRun(`agentRevokeGrant('imports')`);
     const agentProposeReply = await ctxRun(`agentRequest({ action: 'q2dv.propose', args: { tool: 'q2dv.select', tier: 'require-human', title: 'Select region', why: 'test', args: { ranges: [[1,2]] } } })`);
     assert(agentProposeReply.status === 'ok' && agentProposeReply.data.tier === 'require-human' && agentProposeReply.data.action.tool === 'q2dv.select', 'propose returns a decision card');
     const agentLedger = await ctxRun(`agentRequest({ action: 'q2dv.ledger', args: { limit: 5 } })`);
