@@ -15,7 +15,10 @@ What already works:
 
 - Q2DV app and ChimeraX host share one bundle/track/claim/features model.
 - The host selects the bundle by the current sequence (TerC, GFP, or LacY).
-- Q2DV -> ChimeraX selection is automatic and uses sequence-aware mapping.
+- The host exposes loaded model chains so Q2DV can adopt a sequence on startup
+  (single model) or ask which model to use (several models).
+- Selection is bidirectional with a Both / Q2DV→ChimeraX / ChimeraX→Q2DV / Off
+  link and sequence-aware mapping in both directions.
 - Structures and homologs are banked in `~/Q2DV_files/`.
 - GFP now banks 1GFL/1EMA and shows 1GFL chain A as the biological unit.
 - The host injects the initial ChimeraX light/dark theme.
@@ -25,9 +28,9 @@ What is still weak:
 
 - **Persistence depends on WebEngine localStorage.** A profile change, cache
   reset, reinstall, or a profile path mismatch looks like “all my data reset”.
-- The host window is a fixed `size_hint=(1100, 900)` and has no layout preset.
-- The selection sidebar was tuned for one window size; the rest of the app is
-  not.
+- The host reports its viewport/screen size for troubleshooting, but the
+  Selection sidebar is still tuned for one window size; further compaction of
+  the right sidebar is pending.
 - Most analysis still runs in JavaScript, even when ChimeraX already has the
   model and a mature analysis API.
 - There are rule/data/workflow presets, but no saved **workspace/layout**

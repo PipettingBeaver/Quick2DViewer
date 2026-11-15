@@ -222,8 +222,12 @@ check, and the ESMFold preflight gate.
 **W2 progress:** Q2DV -> ChimeraX automatic selection is implemented in app
 0.71.15 / host 0.6.35: the host matches the active model chain by sequence and
 maps Q2DV reference positions to its residue numbers. The GFP bundle now banks
-1GFL/1EMA and opens 1GFL when no model is present. The reverse direction,
-ChimeraX -> Q2DV, is still pending.
+1GFL/1EMA and opens 1GFL when no model is present. The 2026-11-10 host pass adds
+the reverse direction (ChimeraX -> Q2DV) with a Both / Q2DV→ChimeraX /
+ChimeraX→Q2DV / Off link, a model-context startup path (single model auto-load,
+multi-model picker), deferred selection retry while a model opens, and viewport
+size diagnostics. Annotation concordance now compares SS/TM tracks with PDB
+HELIX/SHEET records.
 
 ## 5. Two-week schedule
 

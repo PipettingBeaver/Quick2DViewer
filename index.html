@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-h96TqoUBNWhjrggNeyDHA4jdBcnrbhwYjx3+rCHs5jw=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-D+guuim3une8dcwGN8To8chNmgxf5+0o+u/mhNFvCxA=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -2361,6 +2361,29 @@
             background: var(--q2dv-panel-3);
             color: var(--q2dv-text);
             border-color: var(--q2dv-border);
+            color-scheme: dark;
+        }
+        /* Native <option> popups are drawn by the platform; setting only the
+           <select> colour can leave the opened list dark-on-dark on Linux. */
+        html[data-theme="dark"] select option,
+        html[data-theme="dark"] select optgroup,
+        html[data-theme="dark"] .q2dv-select option,
+        html[data-theme="dark"] .q2dv-select optgroup,
+        html[data-theme="dark"] .tb-select option,
+        html[data-theme="dark"] .tb-select optgroup {
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+        }
+        html[data-theme="dark"] select option:checked,
+        html[data-theme="dark"] .q2dv-select option:checked,
+        html[data-theme="dark"] .tb-select option:checked {
+            background: var(--q2dv-accent);
+            color: #ffffff;
+        }
+        html[data-theme="dark"] select option:disabled,
+        html[data-theme="dark"] .q2dv-select option:disabled,
+        html[data-theme="dark"] .tb-select option:disabled {
+            color: var(--q2dv-muted);
         }
         html[data-theme="dark"] input::placeholder,
         html[data-theme="dark"] textarea::placeholder {
@@ -2757,6 +2780,26 @@
                 </select>
             </div>
 
+            <div id="hostModelSection" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;" hidden>
+                <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">ChimeraX model</h4>
+                <p style="font-size:0.78rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                    Read the reference sequence from a model already open in ChimeraX. With several
+                    models, choose the one Q2DV should use; the matching public bundle is selected automatically.
+                </p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <select id="hostModelSelect" class="q2dv-select"
+                        style="font-size:0.78rem; padding:4px 6px; min-width:280px; max-width:100%;">
+                        <option value="">No atomic model open in ChimeraX</option>
+                    </select>
+                    <button type="button" class="tb-btn tb-btn-primary" data-action="applyHostModelSelection"
+                        style="font-size:0.72rem; padding:3px 8px;">Use model</button>
+                    <button type="button" class="tb-btn tb-btn-secondary" data-action="refreshHostModelChoices"
+                        style="font-size:0.72rem; padding:3px 8px;">Refresh</button>
+                </div>
+                <div id="hostModelStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                <div id="hostViewportInfo" style="font-size:0.72rem; color:#64748b; margin-top:4px;"></div>
+            </div>
+
             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
                 <h4 style="margin: 0 0 6px; color: #0f172a; font-size: 0.95rem;">Import</h4>
                 <p style="font-size:0.78rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
@@ -2932,7 +2975,29 @@
                     <button type="button" id="saveSel5" class="save-sel-btn" data-slot="4">5</button>
                 </div>
             </div>
-            
+
+            <div id="hostLinkRow" class="selection-control-row" hidden style="display:flex; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                <strong>ChimeraX link:</strong>
+                <select id="hostSelectionLinkMode" class="q2dv-select"
+                    data-action="setHostSelectionLinkMode" data-arg="$value"
+                    title="Choose which direction selection travels between ChimeraX and Q2DV"
+                    style="font-size:0.7rem; padding:1px 3px; max-width:190px;">
+                    <option value="both">Both directions</option>
+                    <option value="to-host">Q2DV → ChimeraX only</option>
+                    <option value="to-page">ChimeraX → Q2DV only</option>
+                    <option value="off">Off (independent)</option>
+                </select>
+                <span class="info-icon" tabindex="0">ⓘ<span class="tooltip-content">
+                    <strong>ChimeraX selection link</strong><br>
+                    <strong>Both</strong> - selecting in either app updates the other.<br>
+                    <strong>Q2DV → ChimeraX</strong> - Q2DV drives the 3D selection; ChimeraX picks are ignored.<br>
+                    <strong>ChimeraX → Q2DV</strong> - a ChimeraX selection updates the Q2DV residue range; Q2DV does not move the 3D selection.<br>
+                    <strong>Off</strong> - the two selections are independent.<br>
+                    Mapping uses chain/sequence alignment, so a shifted or truncated model still selects the covered residues.
+                </span></span>
+                <span id="hostLinkStatus" style="font-size:0.68rem; color:#64748b;"></span>
+            </div>
+
             <details class="workflow-section" id="proteinSummarySection" open style="margin-top:10px;" hidden>
                 <summary>Protein Summary <span class="info-icon" data-action="preventDefault">ⓘ<span class="tooltip-content">
                     <strong>Protein Summary</strong><br>
@@ -3163,6 +3228,26 @@
                     </p>
                     <button type="button" class="tb-btn tb-btn-secondary" data-action="runChimeraXRSA" style="font-size:0.72rem; padding:3px 8px;">Compute RSA in ChimeraX</button>
                     <div id="chimeraXRsaStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                </details>
+
+                <details class="workflow-section qa-new" id="concordanceSection" style="margin-top: 10px;"
+                    data-toggle-action="renderConcordanceTracks">
+                    <summary>Annotation concordance</summary>
+                    <p style="font-size:0.75rem; color:#64748b; margin:0 0 8px; line-height:1.4;">
+                        Compare a secondary-structure or topology track with the HELIX/SHEET records of the
+                        attached experimental PDB. Reports overlap, precision, recall and agreement over the
+                        residues the structure actually covers, so a prediction that disagrees with the model is visible.
+                    </p>
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <select id="concordanceTrack" class="q2dv-select"
+                            style="font-size:0.72rem; padding:2px 4px; max-width:230px;" aria-label="Annotation track to compare">
+                            <option value="">No SS/TM track loaded</option>
+                        </select>
+                        <button type="button" class="tb-btn tb-btn-secondary" data-action="runStructureConcordance"
+                            style="font-size:0.72rem; padding:3px 8px;">Compare</button>
+                    </div>
+                    <div id="concordanceStatus" style="font-size:0.72rem; color:#64748b; margin-top:6px;"></div>
+                    <div id="concordanceResults" class="data-box" style="display:none; margin-top:6px; white-space:pre-wrap; font-size:0.72rem; line-height:1.5;"></div>
                 </details>
 
                 <details class="workflow-section qa-new" id="ensembleSection" style="margin-top: 10px;"
@@ -4374,7 +4459,12 @@ let hostWorkspaceSaveTimer = null;
 let hostFilesDir = '';
 let hostSavedFilePaths = {};
 let selectionSyncTimer = null;
+let hostViewportRefreshTimer = null;
 let lastSelectionSyncKey = '';
+let hostModelCandidates = [];
+let hostModelSignature = '';
+let hostSelectionLinkMode = 'both';
+const HOST_SELECTION_LINK_MODES = ['both', 'to-host', 'to-page', 'off'];
 function queryTheme() {
     const m = String((window.location && window.location.search) || '').match(/[?&]theme=(dark|light)(?:&|$)/i);
     return m ? m[1].toLowerCase() : null;
@@ -4415,12 +4505,12 @@ function toggleTheme() {
 
 const LAYOUT_PRESETS = {
     demo: {
-        width: '380px', legend: true,
+        width: '380px', legend: false,
         open: ['fastaSection'],
         close: ['selectionInfoSection', 'constantsSection']
     },
     analysis: {
-        width: '340px', legend: true,
+        width: '340px', legend: false,
         open: ['selectionInfoSection', 'fastaSection', 'constantsSection'],
         close: []
     },
@@ -4430,7 +4520,7 @@ const LAYOUT_PRESETS = {
         close: ['selectionInfoSection', 'fastaSection', 'constantsSection']
     },
     wide: {
-        width: '320px', legend: true,
+        width: '320px', legend: false,
         open: ['selectionInfoSection', 'fastaSection', 'constantsSection'],
         close: []
     }
@@ -4504,6 +4594,17 @@ function loadHostSettings() {
             let settings = {};
             try { settings = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {}); } catch (err) { return; }
             if (settings && LAYOUT_PRESETS[settings.layout_preset]) applyLayoutPreset(settings.layout_preset, false);
+            if (settings && HOST_SELECTION_LINK_MODES.indexOf(settings.selection_link_mode) !== -1 &&
+                settings.selection_link_mode !== hostSelectionLinkMode) {
+                hostSelectionLinkMode = settings.selection_link_mode;
+                const select = document.getElementById('hostSelectionLinkMode');
+                if (select) select.value = hostSelectionLinkMode;
+                const status = document.getElementById('hostLinkStatus');
+                if (status) status.textContent = hostSelectionLinkMode === 'off'
+                    ? 'Selections are independent.'
+                    : hostSelectionLinkLabel(hostSelectionLinkMode) + '.';
+                syncHostSelectionLinkToHost();
+            }
         }).catch(err => console.error('Q2DV host settings load failed:', err));
     } catch (err) {
         console.error('Q2DV host settings load failed:', err);
@@ -4532,9 +4633,248 @@ function syncQ2DVHostBadge() {
     document.documentElement.classList.toggle('host-chimerax', mode === 'chimerax');
     const runEl = document.getElementById('runInChimeraxBtn');
     if (runEl) runEl.hidden = mode !== 'chimerax';
+    initHostSelectionLinkMode();
+    refreshHostModelChoices();
+    refreshHostViewportInfo();
     refreshQ2DVHostFilesDir();
     loadHostWorkspace();
     loadHostSettings();
+}
+
+// --- ChimeraX model context ------------------------------------------------
+// The host exposes every model chain with a usable sequence. Q2DV uses that
+// context when it has no reference sequence yet, and offers an explicit picker
+// in Input Data when ChimeraX has more than one model open.
+function hostModelLabel(c) {
+    if (!c) return 'ChimeraX model';
+    const where = (c.model || c.chain) ? ('#' + (c.model || '?') + (c.chain ? '/' + c.chain : '')) : 'model';
+    const name = c.name ? String(c.name) : '';
+    const length = c.length ? (c.length + ' aa') : '';
+    const bundle = c.bundle_id ? (' · ' + c.bundle_id) : '';
+    return [where, name, length].filter(Boolean).join(' · ') + bundle;
+}
+
+function hostModelDisplayName(c) {
+    if (!c) return 'ChimeraX model';
+    return c.bundle_id || c.name || ('ChimeraX #' + (c.model || '?') + (c.chain ? '/' + c.chain : ''));
+}
+
+function hostModelSignatureFor(candidates) {
+    return (candidates || []).map(c => [c.model, c.chain, c.length, c.bundle_id || ''].join(':')).join('|');
+}
+
+function renderHostModelChoices() {
+    const section = document.getElementById('hostModelSection');
+    const select = document.getElementById('hostModelSelect');
+    const status = document.getElementById('hostModelStatus');
+    const host = detectQ2DVHostMode() === 'chimerax';
+    if (section) section.hidden = !host;
+    if (!host || !select) return;
+    const previous = select.value;
+    select.innerHTML = '';
+    if (!hostModelCandidates.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No atomic model open in ChimeraX';
+        select.appendChild(opt);
+        select.disabled = true;
+    } else {
+        select.disabled = false;
+        hostModelCandidates.forEach((c, index) => {
+            const opt = document.createElement('option');
+            opt.value = String(index);
+            opt.textContent = hostModelLabel(c);
+            select.appendChild(opt);
+        });
+        if (previous && hostModelCandidates[Number(previous)]) select.value = previous;
+    }
+    if (status) {
+        const ref = (parsedTracks && typeof parsedTracks.AA === 'string' && parsedTracks.AA.length)
+            ? (parsedTracks.AA.length + ' aa reference loaded')
+            : 'no reference sequence loaded';
+        status.textContent = hostModelCandidates.length
+            ? (hostModelCandidates.length + ' model chain(s) available · ' + ref +
+               (hostModelCandidates.length > 1 ? ' · choose one to use as the reference.' : ''))
+            : ('No model chain with a sequence is open in ChimeraX · ' + ref + '.');
+    }
+}
+
+function refreshHostModelChoices() {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.getModelContext !== 'function') {
+        renderHostModelChoices();
+        return;
+    }
+    try {
+        Promise.resolve(window.Q2DVHost.getModelContext()).then(raw => {
+            let data = raw;
+            try { if (typeof raw === 'string') data = JSON.parse(raw); } catch (err) { data = null; }
+            hostModelCandidates = (data && Array.isArray(data.candidates)) ? data.candidates : [];
+            renderHostModelChoices();
+            maybeAutoLoadHostModel();
+        }).catch(err => console.error('Q2DV model context failed:', err));
+    } catch (err) {
+        console.error('Q2DV model context failed:', err);
+    }
+}
+
+function maybeAutoLoadHostModel() {
+    const current = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (current || !hostModelCandidates.length) return;
+    const signature = hostModelSignatureFor(hostModelCandidates);
+    if (signature === hostModelSignature) return;
+    hostModelSignature = signature;
+    if (hostModelCandidates.length === 1) {
+        const c = hostModelCandidates[0];
+        applyHostModelSequence(c.sequence, hostModelDisplayName(c), c, { auto: true });
+        return;
+    }
+    const matching = hostModelCandidates.filter(c => c.bundle_id);
+    if (matching.length === 1) {
+        // A single known bundle is a strong hint, but with several models the
+        // user still gets the explicit picker below; do not guess silently.
+        const status = document.getElementById('hostModelStatus');
+        if (status) status.textContent += ' Looks like ' + hostModelLabel(matching[0]) + '; use "Use model" to load it.';
+        return;
+    }
+    showToast('ChimeraX has ' + hostModelCandidates.length + ' model chains. Choose the reference model in Input Data → ChimeraX model.', 'info');
+}
+
+function applyHostModelSequence(seq, label, meta, opts) {
+    const clean = String(seq || '').replace(/\s+/g, '').toUpperCase();
+    if (!clean) return false;
+    const current = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    if (current && current !== clean) {
+        if (opts && opts.auto) return false;
+        showToast('Clear input data before switching the reference to a different ChimeraX model.', 'warn');
+        return false;
+    }
+    if (current === clean) {
+        if (!(opts && opts.auto)) showToast((label || 'That ChimeraX model') + ' is already the reference sequence.', 'info');
+        return true;
+    }
+    parsedTracks = parsedTracks || {};
+    parsedTracks.AA = clean;
+    currentProteinLabel = label || currentProteinLabel || null;
+    if (typeof renderProteinSummary === 'function') renderProteinSummary();
+    if (typeof renderViewer === 'function') renderViewer(parsedTracks);
+    if (typeof refreshInputDataModalIfVisible === 'function') refreshInputDataModalIfVisible();
+    logAction('session', 'sequence from ChimeraX', label || (clean.length + ' aa'));
+    schedulePersist();
+    showToast('Loaded ' + (label || 'the ChimeraX model') + ' (' + clean.length + ' aa) into ' + APP_SHORT + '.', 'success');
+    return true;
+}
+
+function applyHostModelSelection() {
+    const select = document.getElementById('hostModelSelect');
+    const index = select ? Number(select.value) : NaN;
+    const candidate = hostModelCandidates[index];
+    if (!candidate) { showToast('No ChimeraX model is selected.', 'warn'); return false; }
+    return applyHostModelSequence(candidate.sequence, hostModelDisplayName(candidate), candidate, {});
+}
+
+// --- ChimeraX <-> Q2DV selection link --------------------------------------
+function hostSelectionLinkAllows(direction) {
+    if (detectQ2DVHostMode() !== 'chimerax') return false;
+    if (hostSelectionLinkMode === 'both') return true;
+    return hostSelectionLinkMode === direction;
+}
+
+function hostSelectionLinkLabel(mode) {
+    if (mode === 'to-host') return 'Q2DV → ChimeraX only';
+    if (mode === 'to-page') return 'ChimeraX → Q2DV only';
+    if (mode === 'off') return 'Off (independent selections)';
+    return 'Both directions';
+}
+
+function syncHostSelectionLinkToHost() {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.setSelectionLinkMode !== 'function') return;
+    try {
+        Promise.resolve(window.Q2DVHost.setSelectionLinkMode(hostSelectionLinkMode)).catch(err => console.error('Q2DV selection link failed:', err));
+    } catch (err) {
+        console.error('Q2DV selection link failed:', err);
+    }
+}
+
+function setHostSelectionLinkMode(value) {
+    const mode = HOST_SELECTION_LINK_MODES.indexOf(String(value)) !== -1 ? String(value) : 'both';
+    hostSelectionLinkMode = mode;
+    try { localStorage.setItem('q2dv_host_selection_link', mode); } catch (err) {}
+    const select = document.getElementById('hostSelectionLinkMode');
+    if (select && select.value !== mode) select.value = mode;
+    syncHostSelectionLinkToHost();
+    saveHostSettings({ selection_link_mode: mode });
+    const status = document.getElementById('hostLinkStatus');
+    if (status) status.textContent = mode === 'off' ? 'Selections are independent.' : hostSelectionLinkLabel(mode) + '.';
+    showToast('ChimeraX selection link: ' + hostSelectionLinkLabel(mode) + '.', 'info');
+    schedulePersist();
+    return true;
+}
+
+function initHostSelectionLinkMode() {
+    const host = detectQ2DVHostMode() === 'chimerax';
+    const row = document.getElementById('hostLinkRow');
+    if (row) row.hidden = !host;
+    if (!host) return;
+    let mode = 'both';
+    try { mode = localStorage.getItem('q2dv_host_selection_link') || 'both'; } catch (err) {}
+    if (HOST_SELECTION_LINK_MODES.indexOf(mode) === -1) mode = 'both';
+    hostSelectionLinkMode = mode;
+    const select = document.getElementById('hostSelectionLinkMode');
+    if (select) select.value = mode;
+    const status = document.getElementById('hostLinkStatus');
+    if (status) status.textContent = mode === 'off' ? 'Selections are independent.' : hostSelectionLinkLabel(mode) + '.';
+    syncHostSelectionLinkToHost();
+}
+
+// Called by the ChimeraX host when its selection changes. Ranges are 1-based.
+function applyHostSelectionFromHost(ranges) {
+    if (!hostSelectionLinkAllows('to-page')) return false;
+    if (!parsedTracks || typeof parsedTracks.AA !== 'string' || !parsedTracks.AA.length) return false;
+    const clean = (Array.isArray(ranges) ? ranges : [])
+        .map(pair => [Number(pair && pair[0]) - 1, Number(pair && pair[1]) - 1])
+        .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && s >= 0 && e >= s && e < parsedTracks.AA.length);
+    const merged = mergeRanges(clean);
+    const key = merged.map(([s, e]) => (s + 1) + '-' + (e + 1)).join(',') + '|' + parsedTracks.AA.length;
+    // Drop any Q2DV -> ChimeraX push still queued: the host is the source now.
+    if (selectionSyncTimer) { clearTimeout(selectionSyncTimer); selectionSyncTimer = null; }
+    // Suppress the echo back to ChimeraX: this selection came from the host.
+    lastSelectionSyncKey = key;
+    if (!merged.length) { clearSelection(); return true; }
+    if (merged.length === 1) {
+        selectionMode = 'point';
+        activeRowKey = null; activeRowType = null; rowRanges = [];
+        selectStart = merged[0][0]; selectEnd = merged[0][1];
+        updateSelectionUI();
+        calculateSelectionMetadata();
+    } else {
+        selectionMode = 'row';
+        activeRowKey = null; activeRowType = null;
+        rowRanges = merged;
+        selectStart = null; selectEnd = null;
+        updateSelectionUI();
+        updateManualPiecewiseSelection();
+    }
+    schedulePersist();
+    return true;
+}
+
+function refreshHostViewportInfo() {
+    const el = document.getElementById('hostViewportInfo');
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.viewportInfo !== 'function') {
+        if (el) el.textContent = '';
+        return;
+    }
+    try {
+        Promise.resolve(window.Q2DVHost.viewportInfo()).then(raw => {
+            let info = raw;
+            try { if (typeof raw === 'string') info = JSON.parse(raw); } catch (err) { info = null; }
+            if (!el || !info || info.error) return;
+            el.textContent = 'ChimeraX viewport: ' + info.width + '×' + info.height +
+                ' @ ' + info.dpr + '× · screen ' + info.screen_width + '×' + info.screen_height + '.';
+        }).catch(err => console.error('Q2DV viewport info failed:', err));
+    } catch (err) {
+        console.error('Q2DV viewport info failed:', err);
+    }
 }
 
 function hostFilePath(fileName) {
@@ -4593,6 +4933,7 @@ function syncQ2DVHostHomologs(source, parsed) {
 }
 
 function syncSelectionToChimerax() {
+    if (!hostSelectionLinkAllows('to-host')) return;
     if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.selectResidues !== 'function') return;
     const ranges = getCurrentRangesZeroBased().map(([s, e]) => [s + 1, e + 1]);
     if (!ranges.length || !parsedTracks || typeof parsedTracks.AA !== 'string' || !parsedTracks.AA.length) return;
@@ -4700,6 +5041,192 @@ function runChimeraXRSA() {
     }).catch(err => setStatus('ChimeraX RSA failed: ' + err, 'error'));
 }
 
+// --- Annotation concordance ------------------------------------------------
+// Compare a secondary-structure or topology track with the HELIX/SHEET
+// records of an attached experimental PDB. PDB header records use author
+// numbering; mapChainToReference converts those to the Q2DV reference.
+function parsePdbHelixSheet(text) {
+    const helix = {}, sheet = {};
+    const add = (bag, chain, start, end) => {
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return;
+        (bag[chain] = bag[chain] || []).push([start, end]);
+    };
+    String(text || '').split('\n').forEach(line => {
+        if (line.startsWith('HELIX')) {
+            const chain = (line.substring(19, 20) || '').trim() || '_';
+            add(helix, chain, parseInt(line.substring(21, 25), 10), parseInt(line.substring(33, 37), 10));
+        } else if (line.startsWith('SHEET')) {
+            const chain = (line.substring(21, 22) || '').trim() || '_';
+            add(sheet, chain, parseInt(line.substring(22, 26), 10), parseInt(line.substring(33, 37), 10));
+        }
+    });
+    return { helix, sheet };
+}
+
+function inResidueRanges(number, ranges) {
+    return (ranges || []).some(([start, end]) => number >= start && number <= end);
+}
+
+function rangesFromIndices(indices) {
+    const ordered = Array.from(indices).sort((a, b) => a - b);
+    const ranges = [];
+    if (!ordered.length) return ranges;
+    let start = ordered[0], prev = ordered[0];
+    for (const index of ordered.slice(1)) {
+        if (index === prev + 1) { prev = index; continue; }
+        ranges.push([start, prev]);
+        start = prev = index;
+    }
+    ranges.push([start, prev]);
+    return ranges;
+}
+
+function shortRangeList(indices, limit) {
+    const ranges = rangesFromIndices(indices);
+    const shown = ranges.slice(0, limit || 6).map(([s, e]) => s === e ? String(s + 1) : ((s + 1) + '-' + (e + 1)));
+    return shown.join(', ') + (ranges.length > (limit || 6) ? ' …' : '');
+}
+
+function structureSsSets(file) {
+    const text = cachedStructureTexts[file];
+    if (!text) return { error: 'The attached structure has no cached text. Re-attach the PDB file.' };
+    const ext = structExt(file);
+    if (ext !== 'pdb' && !/^(ATOM|HEADER|HELIX)/m.test(text)) {
+        return { error: 'Concordance reads PDB HELIX/SHEET records. Attach the PDB form of the entry (CIF parsing is not implemented here).' };
+    }
+    const chains = parseStructureChains(text, ext);
+    const ss = parsePdbHelixSheet(text);
+    const helix = new Set(), sheet = new Set(), mapped = new Set();
+    Object.keys(chains).forEach(chainId => {
+        const chain = chains[chainId];
+        const mapIndex = mapChainToReference(chain, parsedTracks.AA);
+        const helixRanges = ss.helix[chainId] || [];
+        const sheetRanges = ss.sheet[chainId] || [];
+        chain.forEach((residue, index) => {
+            const ref = mapIndex.get(index);
+            if (ref == null || ref < 0 || ref >= parsedTracks.AA.length) return;
+            mapped.add(ref);
+            if (inResidueRanges(residue.resSeq, helixRanges)) helix.add(ref);
+            if (inResidueRanges(residue.resSeq, sheetRanges)) sheet.add(ref);
+        });
+    });
+    if (!mapped.size) return { error: 'No structure chain maps onto the loaded reference sequence.' };
+    return { helix, sheet, mapped, chains: Object.keys(chains) };
+}
+
+function annotationSetsForTrack(key) {
+    const track = parsedTracks[key];
+    if (!track) return null;
+    const predHelix = new Set(), predSheet = new Set(), predAny = new Set();
+    for (let i = 0; i < track.length; i++) {
+        const ch = String(track[i] || '');
+        if (!ch || ch === '.' || ch === ' ' || ch === '-') continue;
+        predAny.add(i);
+        if ('HGIM'.indexOf(ch) !== -1) predHelix.add(i);
+        if ('EB'.indexOf(ch) !== -1) predSheet.add(i);
+    }
+    return { predHelix, predSheet, predAny };
+}
+
+function concordanceMetrics(predicted, actual, universe) {
+    let tp = 0, fp = 0, fn = 0;
+    universe.forEach(index => {
+        const p = predicted.has(index), a = actual.has(index);
+        if (p && a) tp++;
+        else if (p) fp++;
+        else if (a) fn++;
+    });
+    const n = universe.size;
+    const tn = n - tp - fp - fn;
+    return {
+        n, tp, fp, fn, tn,
+        predicted: tp + fp, observed: tp + fn,
+        precision: (tp + fp) ? tp / (tp + fp) : null,
+        recall: (tp + fn) ? tp / (tp + fn) : null,
+        agreement: n ? (tp + tn) / n : null
+    };
+}
+
+function formatConcordanceMetric(label, m) {
+    const pct = value => value == null ? 'n/a' : Math.round(value * 100) + '%';
+    return label + ': predicted ' + m.predicted + ', observed ' + m.observed +
+        ', overlap ' + m.tp + ' · precision ' + pct(m.precision) +
+        ' · recall ' + pct(m.recall) + ' · agreement ' + pct(m.agreement) + '.';
+}
+
+function renderConcordanceTracks() {
+    const select = document.getElementById('concordanceTrack');
+    if (!select) return;
+    const keys = Object.keys(parsedTracks || {}).filter(k => /^(SS_|TM_|TP_)/.test(k) && typeof parsedTracks[k] === 'string');
+    const current = select.value;
+    select.innerHTML = '';
+    if (!keys.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No SS/TM annotation track loaded';
+        select.appendChild(opt);
+        return;
+    }
+    keys.forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = (typeof formatTrackLabel === 'function' ? formatTrackLabel(key) : key) + ' (' + key + ')';
+        select.appendChild(opt);
+    });
+    if (current && keys.indexOf(current) !== -1) select.value = current;
+}
+
+function concordanceStructureCandidate() {
+    const preferred = (typeof p3dModel === 'object' && p3dModel && p3dModel.fileName && cachedStructureTexts[p3dModel.fileName])
+        ? p3dModel.fileName : '';
+    if (preferred) return preferred;
+    return Object.keys(cachedStructureTexts || {}).find(f => p3dUsableStructure(f)) || '';
+}
+
+function runStructureConcordance() {
+    const statusEl = document.getElementById('concordanceStatus');
+    const outEl = document.getElementById('concordanceResults');
+    const setStatus = (text, kind) => {
+        if (statusEl) {
+            statusEl.textContent = text || '';
+            statusEl.style.color = kind === 'error' ? '#f87171' : (kind === 'success' ? '#4ade80' : '');
+        }
+    };
+    const select = document.getElementById('concordanceTrack');
+    const key = select ? select.value : '';
+    if (!key) { setStatus('Load an SS or TM annotation track first.', 'error'); return false; }
+    if (!parsedTracks || typeof parsedTracks.AA !== 'string' || !parsedTracks.AA.length) { setStatus('Load a reference sequence first.', 'error'); return false; }
+    const file = concordanceStructureCandidate();
+    if (!file) { setStatus('Attach an experimental PDB structure first.', 'error'); return false; }
+    const sets = structureSsSets(file);
+    if (sets.error) { setStatus(sets.error, 'error'); return false; }
+    const annotation = annotationSetsForTrack(key);
+    if (!annotation) { setStatus('That annotation track has no per-residue data.', 'error'); return false; }
+    const helix = concordanceMetrics(annotation.predHelix, sets.helix, sets.mapped);
+    const sheet = concordanceMetrics(annotation.predSheet, sets.sheet, sets.mapped);
+    const lines = [];
+    lines.push('Annotation: ' + (typeof formatTrackLabel === 'function' ? formatTrackLabel(key) : key) + ' (' + key + ')');
+    lines.push('Structure: ' + file + ' · chains ' + sets.chains.join(', '));
+    lines.push('Mapped reference residues: ' + sets.mapped.size + ' / ' + parsedTracks.AA.length);
+    lines.push(formatConcordanceMetric('Helix', helix));
+    if (key.indexOf('SS_') === 0 || annotation.predSheet.size || sets.sheet.size) {
+        lines.push(formatConcordanceMetric('Sheet', sheet));
+    }
+    const missedHelix = new Set(Array.from(sets.helix).filter(i => sets.mapped.has(i) && !annotation.predHelix.has(i)));
+    const extraHelix = new Set(Array.from(annotation.predHelix).filter(i => sets.mapped.has(i) && !sets.helix.has(i)));
+    if (missedHelix.size) lines.push('Structure helix not annotated: ' + shortRangeList(missedHelix));
+    if (extraHelix.size) lines.push('Annotated helix not in structure: ' + shortRangeList(extraHelix));
+    if (!sets.helix.size && !sets.sheet.size) lines.push('No HELIX/SHEET records were found in this entry.');
+    if (outEl) {
+        outEl.style.display = 'block';
+        outEl.textContent = lines.join('\n');
+    }
+    setStatus('Concordance computed for ' + key + ' against ' + file + '.', 'success');
+    logAction('api', 'annotation concordance', key + ' vs ' + file + ' · ' +
+        'helix ' + (helix.agreement == null ? 'n/a' : Math.round(helix.agreement * 100) + '%') + ' agreement');
+    return true;
+}
+
 function saveHostSettings(patch) {
     if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.saveHostSettings !== 'function') return;
     try {
@@ -4770,9 +5297,12 @@ function loadHostWorkspace() {
 
 function showHostInfo() {
     const chimerax = detectQ2DVHostMode() === 'chimerax';
-    showToast(chimerax
+    if (chimerax) refreshHostViewportInfo();
+    const viewport = document.getElementById('hostViewportInfo');
+    const detail = (chimerax && viewport && viewport.textContent) ? (' ' + viewport.textContent) : '';
+    showToast((chimerax
         ? 'ChimeraX detected. Functions are linked to ChimeraX.'
-        : 'Browser detected. Functions and data are standalone, and not linked to ChimeraX.',
+        : 'Browser detected. Functions and data are standalone, and not linked to ChimeraX.') + detail,
         chimerax ? 'success' : 'info', { dismissible: true });
 }
 function runInChimerax() {
@@ -4872,6 +5402,23 @@ function sanitizePersistedState(state) {
     clean.keyedVariantsInfo = sanitizeImportedMap(state.keyedVariantsInfo);
     clean.domainHitsInfo = sanitizeImportedMap(state.domainHitsInfo);
     clean.uniprotFeatureTracks = sanitizeImportedMap(state.uniprotFeatureTracks);
+    if (state.macroLastRun && typeof state.macroLastRun === 'object' && !Array.isArray(state.macroLastRun)) {
+        const run = state.macroLastRun;
+        clean.macroLastRun = {
+            name: String(run.name || '').slice(0, 120),
+            at: String(run.at || '').slice(0, 40),
+            stopped: !!run.stopped,
+            outcomes: Array.isArray(run.outcomes) ? run.outcomes.slice(0, 100).map(o => ({
+                type: String((o && o.type) || '').slice(0, 40),
+                description: String((o && o.description) || '').slice(0, 200),
+                status: String((o && o.status) || '').slice(0, 20),
+                retries: Number(o && o.retries) || 0,
+                message: String((o && o.message) || '').slice(0, 500)
+            })) : []
+        };
+    } else {
+        clean.macroLastRun = null;
+    }
     clean.graphHighlights = sanitizeImportedMap(state.graphHighlights);
     clean.trackOffsets = sanitizeImportedMap(state.trackOffsets);
     clean.structureReferences = sanitizeImportedMap(state.structureReferences || state.structureCacheIndex);
@@ -6278,6 +6825,7 @@ async function runTopologyPrediction() {
         const m = err && err.message ? err.message : String(err);
         setStatus('Topology prediction failed: ' + m);
         endGuideTask('topology', 'Topology prediction failed: ' + m, 'error');
+        if (macroReplaying) throw err;
     }
 }
 
@@ -6576,6 +7124,7 @@ async function runDomainScan() {
         const m = err && err.message ? err.message : String(err);
         setStatus('hmmscan failed: ' + m);
         endGuideTask('annotation', 'hmmscan failed: ' + m, 'error');
+        if (macroReplaying) throw err;
     }
 }
 
@@ -6645,6 +7194,7 @@ async function runHomologSearch() {
         const m = err && err.message ? err.message : String(err);
         setStatus('Homolog search failed: ' + m);
         endGuideTask('annotation', 'Homolog search failed: ' + m, 'error');
+        if (macroReplaying) throw err;
     }
 }
 // Merges a realigned full-length sequence into an existing homolog row: the
@@ -9012,6 +9562,7 @@ async function fetchPdbEntry(rawId) {
         setStatus('RCSB fetch failed: ' + m);
         endGuideTask('structure', 'RCSB fetch failed: ' + m, 'error');
         showToast('Could not fetch ' + id + ' from RCSB (' + m + '). Check the id, or download it from rcsb.org and attach the file.', 'error');
+        if (macroReplaying) throw err;
         return false;
     }
 }
@@ -9049,6 +9600,7 @@ async function runStructureValidation() {
         const m = err && err.message ? err.message : String(err);
         setStatus('PDBe validation failed: ' + m);
         endGuideTask('structure', 'PDBe validation failed: ' + m, 'error');
+        if (macroReplaying) throw err;
     }
 }
 
@@ -9681,6 +10233,14 @@ function macroCheckinDecision(decision) {
 }
 // One step under the failure policy: auto-retry (3), proceed, pause and ask,
 // or stop. Returns an outcome for the run report.
+// Retrying a 15-minute EBI timeout, a fair-use block or a 4xx refusal just
+// wastes another full job; only retry errors that can plausibly clear by
+// themselves (network blips, a 5xx, a transient poll failure).
+function macroErrorIsTransient(err, message) {
+    if (err && err.fairUseBlocked) return false;
+    return !/timed out|temporarily blocked|fair use|contact email|job (FAILURE|ERROR|FAILED)|HTTP 4\d\d|no job id|not found|needs a /i
+        .test(String(message || ''));
+}
 async function macroExecuteStepWithPolicy(step, index, total) {
     const retryLimit = macroFailurePolicy === 'retry3' ? 3 : 0;
     let attempt = 0;
@@ -9691,13 +10251,17 @@ async function macroExecuteStepWithPolicy(step, index, total) {
             return { status: (out && out.status) || 'done', retries: attempt, message: (out && out.reason) || '' };
         } catch (err) {
             const message = (err && err.message) || String(err);
-            if (attempt < retryLimit) {
+            const transient = macroErrorIsTransient(err, message);
+            if (transient && attempt < retryLimit) {
                 attempt++;
                 logAction('macro', 'step ' + (index + 1) + ' retry ' + attempt, message);
                 continue;
             }
             if (macroFailurePolicy === 'proceed' || macroFailurePolicy === 'retry3') {
-                return { status: 'failed', retries: attempt, message: message };
+                return {
+                    status: 'failed', retries: attempt,
+                    message: message + (transient ? '' : ' (not retried: non-transient)')
+                };
             }
             if (macroFailurePolicy === 'stop') {
                 return { status: 'failed', retries: attempt, message: message, stop: true };
@@ -9771,18 +10335,21 @@ async function macroReplay(dryRun) {
     logAction('macro', 'replay started', macroSteps.length + ' step(s), policy ' + macroFailurePolicy);
     const outcomes = [];
     let stopped = false;
-    for (let i = 0; i < macroSteps.length; i++) {
-        const step = macroSteps[i];
-        const out = await macroExecuteStepWithPolicy(step, i, macroSteps.length);
-        outcomes.push({ type: step.type, description: macroStepDescription(step), status: out.status, retries: out.retries, message: out.message });
-        if (out.status === 'failed') logAction('error', 'macro step ' + (i + 1) + ' failed', out.message);
-        else logAction('macro', 'step ' + (i + 1) + ' ' + out.status, out.message || '');
-        renderMacroModalIfVisible();
-        if (out.stop) { stopped = true; break; }
+    try {
+        for (let i = 0; i < macroSteps.length; i++) {
+            const step = macroSteps[i];
+            const out = await macroExecuteStepWithPolicy(step, i, macroSteps.length);
+            outcomes.push({ type: step.type, description: macroStepDescription(step), status: out.status, retries: out.retries, message: out.message });
+            if (out.status === 'failed') logAction('error', 'macro step ' + (i + 1) + ' failed', out.message);
+            else logAction('macro', 'step ' + (i + 1) + ' ' + out.status, out.message || '');
+            renderMacroModalIfVisible();
+            if (out.stop) { stopped = true; break; }
+        }
+    } finally {
+        macroReplaying = false;
+        macroSetBanner('');
+        if (macroCheckinResolver) macroCheckinDecision('stop');
     }
-    macroReplaying = false;
-    macroSetBanner('');
-    if (macroCheckinResolver) macroCheckinDecision('stop');
     const counts = { done: 0, skipped: 0, failed: 0 };
     outcomes.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
     macroLastRun = { name: macroName, at: new Date().toISOString(), outcomes, stopped };
@@ -9897,6 +10464,7 @@ function openActionLog() { renderActionLog(); openModalAsDialog('actionLogModal'
 function closeActionLog() { closeModalAsDialog('actionLogModal'); }
 // Console access for debugging/macros: q2dvActions() returns the log as JSON.
 window.q2dvActions = () => actionLogText(true);
+window.q2dvApplyHostSelection = applyHostSelectionFromHost;
 // Uncaught errors and rejected promises are the hardest thing to diagnose from a
 // screenshot, so they are recorded in the action log too (visible in Help →
 // Debugging console). Purely additive: nothing is caught or suppressed.
@@ -11896,6 +12464,8 @@ function renderInputDataModal() {
 }
 function openInputDataModal() {
     renderInputDataModal();
+    refreshHostModelChoices();
+    refreshHostViewportInfo();
     openModalAsDialog('inputDataModal');
     if (typeof tourOnUiEvent === 'function') tourOnUiEvent('input-modal-open');
 }
@@ -12198,6 +12768,7 @@ function toggleTrackManagerTrack(k) {
 function refreshTrackManagerIfVisible() {
     const panel = document.getElementById('side-panel-tracks');
     if (panel && !panel.hidden) { renderTrackManager(); renderRulesList(); }
+    renderConcordanceTracks();
 }
 // Refreshes the Input Data modal's summary + workflow checklist when data
 // changes while the modal is open (e.g. a batch import from its own buttons).
@@ -13112,7 +13683,8 @@ const TOGGLE_ACTIONS = {
         else clearGuideCoachmark();
     },
     renderEnsembleModelList: el => { if (el.open) renderEnsembleModelList(); },
-    renderConstructPreview: el => { if (el.open) renderConstructPreview(); }
+    renderConstructPreview: el => { if (el.open) renderConstructPreview(); },
+    renderConcordanceTracks: el => { if (el.open) renderConcordanceTracks(); }
 };
 function installToggleActions() {
     document.querySelectorAll('details[data-toggle-action]').forEach(el => {
@@ -13220,7 +13792,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.71.15';
+const APP_VERSION = '0.72.0';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -16942,6 +17514,7 @@ async function fetchVariantEffectPredictions() {
         const m = err && err.message ? err.message : String(err);
         setStatus('Variant effect assessment failed: ' + m);
         endGuideTask('annotation', 'Variant effect assessment failed: ' + m, 'error');
+        if (macroReplaying) throw err;
     }
 }
 
@@ -22261,6 +22834,10 @@ function gatherPersistableState() {
         uniprotFeatureTracks: uniprotFeatureTracks,
         proteinSummary: proteinSummary,
         domainHitsInfo: domainHitsInfo,
+        // Last macro outcome, so a failed step can be reviewed after a reload
+        // (the modal report is otherwise memory-only). Messages are capped by
+        // sanitizePersistedState.
+        macroLastRun: macroLastRun,
         selection: {
             selectStart, selectEnd, selectionMode, activeRowKey, activeRowType,
             rowRanges, dragOriginTrackKey, crossRefTrackKey, lastRanges
@@ -22677,6 +23254,8 @@ function applyPersistedState(state) {
     proteinSummary = state.proteinSummary || null;
     renderProteinSummary();
     domainHitsInfo = state.domainHitsInfo || {};
+    macroLastRun = state.macroLastRun || null;
+    if (typeof renderMacroModalIfVisible === 'function') renderMacroModalIfVisible();
     // A session saved before the info maps existed (pre-0.23.0) restores its rows
     // but not their backing data: the rows still render, yet tooltips degrade and
     // the Options panels show no sources. Say so once instead of leaving it a
@@ -24264,6 +24843,10 @@ const ACTION_HANDLERS = {
     toggleTheme: delegateAction(toggleTheme),
     onLayoutPresetChange: delegateAction(onLayoutPresetChange),
     runChimeraXRSA: delegateAction(runChimeraXRSA),
+    runStructureConcordance: delegateAction(runStructureConcordance),
+    applyHostModelSelection: delegateAction(applyHostModelSelection),
+    refreshHostModelChoices: delegateAction(refreshHostModelChoices),
+    setHostSelectionLinkMode: delegateAction(setHostSelectionLinkMode),
     toggleP3DHomologFlat: delegateAction(toggleP3DHomologFlat),
     toggleP3DLock: delegateAction(toggleP3DLock),
     toggleP3DSize: delegateAction(toggleP3DSize),
@@ -24382,6 +24965,11 @@ document.addEventListener('toggle', (event) => {
 loadStateFromStorage();
 if (layoutPreset !== 'custom') applyLayoutPreset(layoutPreset, false);
 window.addEventListener('pagehide', () => { saveHostWorkspaceNow(); });
+window.addEventListener('resize', () => {
+    if (detectQ2DVHostMode() !== 'chimerax') return;
+    if (hostViewportRefreshTimer) clearTimeout(hostViewportRefreshTimer);
+    hostViewportRefreshTimer = setTimeout(() => { hostViewportRefreshTimer = null; refreshHostViewportInfo(); }, 150);
+});
 try { welcomeSeen = localStorage.getItem(STORAGE_KEYS.welcome) === '1'; } catch (err) { welcomeSeen = false; }
 maybeShowWelcome();
 </script>

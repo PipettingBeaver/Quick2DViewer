@@ -12,6 +12,33 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.0] - 2026-11-15
+
+### Added
+- **ChimeraX selection link.** A link control in the ChimeraX host panel chooses
+  Both, Q2DV→ChimeraX, ChimeraX→Q2DV, or Off. Incoming host ranges become a point
+  or piecewise selection, and the page can push its selection back; chain/sequence
+  mapping keeps a shifted or truncated model aligned.
+- **ChimeraX model context.** On startup Q2DV reads the models ChimeraX has open,
+  fills an empty reference sequence from a single model, and offers a picker when
+  several are open. The matching public bundle is selected automatically, and the
+  panel reports the host viewport size for diagnostics.
+- **Annotation concordance.** Compares an SS or TM track with the HELIX/SHEET
+  records of the attached experimental PDB and reports overlap, precision, recall
+  and agreement over covered residues, plus which helices disagree.
+
+### Fixed
+- **ChimeraX page selection race.** A host selection now cancels any Q2DV→ChimeraX
+  push still queued, so the two applications cannot disagree after a quick
+  selection change.
+- **Macro replay state.** `macroReplaying` is reset in a `finally` block, so an
+  exception during a replay no longer leaves replay and recording disabled or
+  turns later API failures into uncaught errors.
+- **Dark-mode native selects.** `<option>` and `<optgroup>` popups use dark
+  surfaces and readable selected/disabled colours instead of platform dark-on-dark.
+- **Host viewport refresh.** Resize events are debounced so dragging the ChimeraX
+  window does not flood the host bridge.
+
 ## [0.71.15] - 2026-10-29
 
 ### Fixed

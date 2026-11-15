@@ -15,7 +15,10 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
 - `CHIMERAX_ECOSYSTEM.md` — working map of ChimeraX add-ons and their possible data exchange with Q2DV.
 - `DEMO_ROADMAP.md` — two-week implementation, review and test plan using GFP and LacY.
 - `CHIMERAX_INTEGRATION_PLAN.md` — storage redesign, window/layout presets and host-offload roadmap.
-- `FEATURE_TEST_CHECKLIST.md` — rolling checkmark checklist for normal and edge-case feature testing.
+- `QA_CHECKLIST.md` — the active fillable manual QA pass: session/release gate,
+  demo acceptance, current feature cards, cross-cutting edge suites and a bug log.
+- `QA_ARCHIVE.md` — historical feature cards and the numbered `0.16.0` → `0.66.x`
+  regression rows; use it to look up old expected values.
 - `RECIPE_MODEL.md` — definition of a Q2DV recipe as a versioned, host-neutral analysis protocol.
 - `bundles/GFP/README.md` — public GFP example bundle (6 claims, 4 relations, 7 features).
 - `bundles/LacY/README.md` — public LacY membrane example bundle (5 claims, 3 relations, 3 features).

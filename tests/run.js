@@ -4877,6 +4877,19 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(macroRetryOk === true, 'a step that succeeds on the third attempt passes');
     assert(ctxRun(`window.__macroAttempts`) === 3, 'auto-retry used three attempts (got ' + ctxRun(`window.__macroAttempts`) + ')');
     assert(ctxRun(`macroLastRun.outcomes[0].retries`) === 2, 'the report records the retry count');
+    assert(ctxRun(`macroErrorIsTransient(null, 'HTTP 503')`) === true, 'a 5xx/network error is retryable');
+    assert(ctxRun(`macroErrorIsTransient({ fairUseBlocked: true }, 'blocked')`) === false, 'a fair-use block is not retried');
+    assert(ctxRun(`macroErrorIsTransient(null, 'timed out after 900s')`) === false, 'a long EBI timeout is not retried');
+    ctxRun(`parsedTracks = { AA: 'MKVW' }; macroFailurePolicy = 'retry3'; window.__macroNoRetry = 0; runTopologyPrediction = async () => { window.__macroNoRetry++; throw new Error('timed out after 900s'); }; macroSteps = [{ type: 'topology' }];`);
+    await ctxRun(`macroReplay(false)`);
+    assert(ctxRun(`window.__macroNoRetry`) === 1, 'a non-transient timeout is attempted once, not four times');
+    assert(ctxRun(`macroLastRun.outcomes[0].message`).indexOf('not retried: non-transient') !== -1, 'the report says why it was not retried');
+    ctxRun(`window.__macroOrigStep = macroExecuteStepWithPolicy; macroExecuteStepWithPolicy = async () => { throw new Error('report render exploded'); }; macroSteps = [{ type: 'topology' }];`);
+    let macroLoopThrew = false;
+    try { await ctxRun(`macroReplay(false)`); } catch (err) { macroLoopThrew = true; }
+    assert(macroLoopThrew === true, 'an exception in the replay loop propagates');
+    assert(ctxRun(`macroReplaying`) === false, 'macroReplaying is reset even when the replay loop throws');
+    ctxRun(`macroExecuteStepWithPolicy = window.__macroOrigStep; delete window.__macroOrigStep;`);
     ctxRun(`runTopologyPrediction = async () => { throw new Error('HTTP 500'); }; macroSteps = [{ type: 'topology' }];`);
     await ctxRun(`macroReplay(false)`);
     const macroFailReport = ctxRun(`macroRunReportText()`);
@@ -5241,6 +5254,18 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(ctxRun(`queryTheme()`) === 'dark', 'the host query supplies the initial theme');
     ctxRun(`location.search = ''; applyTheme('light', false)`);
 
+    section('annotation concordance helpers');
+    const parsedSs = ctxRun(`parsePdbHelixSheet('HELIX    1   1 GLY A    2  GLY A   10  1\\nSHEET    1   A 2 VAL A   3  VAL A   8  0')`);
+    assert(JSON.stringify(parsedSs.helix.A) === '[[2,10]]' && JSON.stringify(parsedSs.sheet.A) === '[[3,8]]', 'PDB HELIX/SHEET records are parsed with author numbering');
+    const metrics = ctxRun(`concordanceMetrics(new Set([1,2,3]), new Set([2,3,4]), new Set([0,1,2,3,4,5]))`);
+    assert(metrics.tp === 2 && metrics.fp === 1 && metrics.fn === 1 && metrics.tn === 2, 'concordance counts TP/FP/FN/TN');
+    assert(Math.abs(metrics.precision - 2/3) < 1e-9 && metrics.recall === 2/3 && metrics.agreement === 4/6, 'concordance computes precision, recall and agreement');
+    assert(JSON.stringify(ctxRun(`rangesFromIndices(new Set([1,2,4]))`)) === '[[1,2],[4,4]]', 'concordance ranges merge adjacent residues');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(8), SS_TEST: '..HHHE..' };`);
+    const annSets = ctxRun(`(() => { const a = annotationSetsForTrack('SS_TEST'); return { helix: Array.from(a.predHelix), sheet: Array.from(a.predSheet) }; })()`);
+    assert(JSON.stringify(annSets.helix) === '[2,3,4]' && JSON.stringify(annSets.sheet) === '[5]', 'SS annotation sets split helix and sheet');
+    ctxRun(`parsedTracks = {};`);
+
     section('layout presets');
     ctxRun(`applyLayoutPreset('compact', false)`);
     assert(ctxRun(`document.documentElement.getAttribute('data-layout-preset')`) === 'compact', 'compact preset marks the document');
@@ -5248,7 +5273,10 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(ctxRun(`layoutPreset`) === 'compact', 'compact preset is recorded');
     ctxRun(`applyLayoutPreset('analysis', false)`);
     assert(ctxRun(`document.documentElement.getAttribute('data-layout-preset')`) === 'analysis', 'analysis preset marks the document');
-    assert(ctxRun(`document.getElementById('mainLegend').hidden`) === false, 'analysis preset shows the legend');
+    assert(ctxRun(`document.getElementById('mainLegend').hidden`) === true, 'analysis preset leaves the legend off by default');
+    ctxRun(`toggleLegend()`);
+    assert(ctxRun(`document.getElementById('mainLegend').hidden`) === false, 'the legend can still be shown from its toggle');
+    ctxRun(`applyLayoutPreset('analysis', false)`);
     await new Promise(r => setTimeout(r, 160));
     ctxRun(`markLayoutCustom()`);
     assert(ctxRun(`document.documentElement.getAttribute('data-layout-preset')`) === 'custom', 'manual changes switch to Custom');
@@ -5312,6 +5340,43 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(sandbox.__hostSelections[0].sequence.length === 238, 'the ChimeraX request carries the reference sequence');
     sandbox.Q2DVHost = null;
     ctxRun(`parsedTracks = {}; selectStart = null; selectEnd = null; rowRanges = []; lastSelectionSyncKey = '';`);
+
+    section('ChimeraX selection link + model context');
+    sandbox.__linkModes = [];
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        setSelectionLinkMode(mode) { sandbox.__linkModes.push(mode); return Promise.resolve('ok'); },
+        getModelContext() {
+            return Promise.resolve(JSON.stringify({
+                candidates: [{ model: '1', chain: 'A', length: 4, sequence: 'MAMM', bundle_id: 'P1', name: 'GFP' }]
+            }));
+        }
+    };
+    ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+    ctxRun(`setHostSelectionLinkMode('to-host')`);
+    await new Promise(r => setTimeout(r, 0));
+    assert(sandbox.__linkModes.indexOf('to-host') !== -1, 'the selection link mode reaches the host');
+    assert(ctxRun(`hostSelectionLinkAllows('to-host')`) === true && ctxRun(`hostSelectionLinkAllows('to-page')`) === false, 'to-host allows only Q2DV -> ChimeraX');
+    ctxRun(`setHostSelectionLinkMode('both')`);
+    assert(ctxRun(`hostSelectionLinkAllows('to-host')`) === true && ctxRun(`hostSelectionLinkAllows('to-page')`) === true, 'both allows either direction');
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(6) }; selectionMode = 'point'; rowRanges = []; selectStart = null; selectEnd = null; lastSelectionSyncKey = '';`);
+    assert(ctxRun(`applyHostSelectionFromHost([[2, 3]])`) === true, 'a host selection is accepted');
+    assert(ctxRun(`selectStart`) === 1 && ctxRun(`selectEnd`) === 2, 'a contiguous host range becomes a point selection');
+    assert(ctxRun(`applyHostSelectionFromHost([[1, 1], [3, 4]])`) === true, 'a disjoint host selection is accepted');
+    assert(JSON.stringify(ctxRun(`rowRanges`)) === '[[0,0],[2,3]]', 'disjoint host ranges are stored as piecewise ranges');
+    ctxRun(`selectionSyncTimer = setTimeout(() => { window.__stalePush = true; }, 160);`);
+    ctxRun(`applyHostSelectionFromHost([[1, 2]])`);
+    assert(ctxRun(`selectionSyncTimer`) === null, 'a host selection cancels any queued Q2DV -> ChimeraX push');
+    assert(ctxRun(`typeof window.q2dvApplyHostSelection`) === 'function', 'the host can call the page selection callback');
+    ctxRun(`parsedTracks = {}; hostModelSignature = ''; hostModelCandidates = [];`);
+    await ctxRun(`refreshHostModelChoices()`);
+    await new Promise(r => setTimeout(r, 0));
+    assert(ctxRun(`hostModelCandidates.length`) === 1, 'the model context is populated from the host');
+    assert(ctxRun(`document.getElementById('hostModelSelect').disabled`) === false, 'the model picker is enabled when a model exists');
+    assert(/P1/.test(ctxRun(`hostModelLabel(hostModelCandidates[0])`)), 'the model label includes the matching bundle id');
+    assert(ctxRun(`parsedTracks.AA`) === 'MAMM', 'a single ChimeraX model fills an empty Q2DV reference sequence');
+    sandbox.Q2DVHost = null;
+    ctxRun(`delete window.__Q2DV_HOST__; window.Q2DVHost = null; syncQ2DVHostBadge(); parsedTracks = {}; hostModelCandidates = []; hostModelSignature = ''; selectStart = null; selectEnd = null; rowRanges = []; lastSelectionSyncKey = '';`);
 
     section('ChimeraX RSA offload result');
     ctxRun(`parsedTracks = { AA: 'M'.repeat(4) }; trackMeta = {}; graphHighlights = {};`);

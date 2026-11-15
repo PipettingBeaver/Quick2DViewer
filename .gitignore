@@ -6,3 +6,6 @@ TerC/
 
 # Local UI backups — not part of the public repo
 backups/
+
+# Local meta-loop state and tooling — not part of the public repo
+.opencode/
