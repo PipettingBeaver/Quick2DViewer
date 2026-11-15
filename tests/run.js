@@ -5500,7 +5500,7 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     const agentUiGrant = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
     assert(ctxRun(`agentGrantForDecision(${JSON.stringify(agentUiGrant.decision.id)})`) === true && ctxRun(`agentGrantActive('imports')`) === true, 'the card can grant its action class for today');
     ctxRun(`agentRevokeGrant('imports')`);
-    ctxRun(`agentDecisions = {}; agentUpdateBadge(); document.getElementById('agentTryTool').value = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
+    ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);
     assert(agentTryImport.status === 'human_required' && ctxRun(`agentDecisionPendingCount()`) === 1, 'the panel queues a request without a console');
     ctxRun(`document.getElementById('agentTryArgs').value = 'not json';`);

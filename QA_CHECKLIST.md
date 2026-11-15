@@ -399,8 +399,11 @@ transport yet.
 - [ ] Allow `<class>` for today grants a session pass; the card still needs
       Approve.
 - [ ] Pause closes the panel and leaves the card pending.
-- [ ] **Queue a test request** creates a decision without opening DevTools;
-      invalid JSON is reported inline.
+- [ ] **Queue a test request** uses radio chips (no native dropdown) and creates
+      a decision without opening DevTools; invalid JSON is reported inline.
+- [ ] Selecting a chip updates the JSON arguments to that tool's default.
+- [ ] In ChimeraX, opening the request picker does not draw an expanding white
+      rectangle.
 - [ ] Tab reaches every button, and closing returns focus to the opener.
 - [ ] HTML-looking rationale is displayed as text, never as markup.
 - [ ] Dark mode: File/View/Analyze menu items and the Agent modal title, intro

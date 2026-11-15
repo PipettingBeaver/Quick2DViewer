@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-p1GjMSKgShMTa1vridlUq9KtP4I0PPejs0ZoWIzxCHI=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-rSl4L9vyKsGeANJfGGWnJpEJ7hFuGdkDIZDLHNs5yv4=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -577,8 +577,22 @@
         .agent-modal-title { margin: 0; color: #0f172a; }
         .agent-modal-intro { font-size: 0.78rem; color: #64748b; margin: 12px 0 8px; line-height: 1.4; }
         .agent-try { border: 1px dashed #cbd5e1; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; background: #ffffff; }
-        .agent-try-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-        .agent-try label { font-size: 0.72rem; font-weight: 600; color: #475569; }
+        .agent-try fieldset { border: 0; margin: 0; padding: 0; }
+        .agent-try legend { font-size: 0.72rem; font-weight: 600; color: #475569; padding: 0; margin-bottom: 5px; }
+        .agent-try-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .agent-try-tools label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            padding: 2px 7px;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            cursor: pointer;
+            color: #334155;
+            background: #f8fafc;
+        }
+        .agent-try-tools input { margin: 0; }
         .agent-try textarea {
             width: 100%;
             box-sizing: border-box;
@@ -2699,7 +2713,12 @@
         html[data-theme="dark"] .agent-modal-title { color: var(--q2dv-text); }
         html[data-theme="dark"] .agent-modal-intro { color: var(--q2dv-muted); }
         html[data-theme="dark"] .agent-try { background: var(--q2dv-panel-2); border-color: var(--q2dv-border); }
-        html[data-theme="dark"] .agent-try label { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-try legend { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-try-tools label {
+            border-color: var(--q2dv-border);
+            background: var(--q2dv-panel-3);
+            color: var(--q2dv-text);
+        }
         html[data-theme="dark"] .agent-try textarea {
             background: var(--q2dv-panel-3);
             border-color: var(--q2dv-border);
@@ -4200,17 +4219,17 @@
             this session unless you revoke it. Pause leaves a card pending.
         </p>
         <div class="agent-try">
-            <div class="agent-try-row">
-                <label for="agentTryTool">Queue a test request</label>
-                <select id="agentTryTool" class="q2dv-select" style="font-size:0.72rem; padding:3px 6px;">
-                    <option value="q2dv.import">q2dv.import · sequence</option>
-                    <option value="q2dv.select">q2dv.select · ranges</option>
-                    <option value="q2dv.snapshot">q2dv.snapshot · read-only</option>
-                    <option value="q2dv.run">q2dv.run · concordance</option>
-                </select>
-                <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTryRequest" style="font-size:0.72rem; padding:3px 8px;">Request</button>
-                <span id="agentTryStatus" class="agent-try-status" role="status" aria-live="polite"></span>
-            </div>
+            <fieldset>
+                <legend>Queue a test request</legend>
+                <div class="agent-try-tools">
+                    <label><input type="radio" name="agentTryTool" value="q2dv.import" checked> import</label>
+                    <label><input type="radio" name="agentTryTool" value="q2dv.select"> select</label>
+                    <label><input type="radio" name="agentTryTool" value="q2dv.snapshot"> snapshot</label>
+                    <label><input type="radio" name="agentTryTool" value="q2dv.run"> concordance</label>
+                    <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTryRequest" style="font-size:0.72rem; padding:3px 8px;">Request</button>
+                    <span id="agentTryStatus" class="agent-try-status" role="status" aria-live="polite"></span>
+                </div>
+            </fieldset>
             <textarea id="agentTryArgs" rows="3" aria-label="Request arguments as JSON">{"kind":"sequence","sequence":"MAMM"}</textarea>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
@@ -10714,16 +10733,17 @@ function agentTryDefaults(tool) {
         'q2dv.run': { recipe: 'q2dv.compare.ss-structure', track: 'SS_Q2D' }
     }[tool] || {};
 }
-function agentTryToolChange() {
-    const tool = document.getElementById('agentTryTool');
+let agentTryToolValue = 'q2dv.import';
+function agentTryToolChange(event) {
+    const value = (event && event.target && event.target.value) ? event.target.value : agentTryToolValue;
+    agentTryToolValue = value || 'q2dv.import';
     const args = document.getElementById('agentTryArgs');
-    if (tool && args) args.value = JSON.stringify(agentTryDefaults(tool.value));
+    if (args) args.value = JSON.stringify(agentTryDefaults(agentTryToolValue));
 }
 function agentTryRequest() {
-    const toolEl = document.getElementById('agentTryTool');
     const argsEl = document.getElementById('agentTryArgs');
     const status = document.getElementById('agentTryStatus');
-    const tool = toolEl ? toolEl.value : '';
+    const tool = agentTryToolValue || 'q2dv.import';
     let args = {};
     try {
         args = (argsEl && argsEl.value.trim()) ? JSON.parse(argsEl.value) : {};
@@ -10749,12 +10769,15 @@ function agentTryRequest() {
     });
 }
 function initAgentUi() {
-    const tool = document.getElementById('agentTryTool');
-    if (tool && tool.addEventListener) {
-        tool.addEventListener('change', agentTryToolChange);
-        const args = document.getElementById('agentTryArgs');
-        if (args && !args.value) args.value = JSON.stringify(agentTryDefaults(tool.value));
+    const tools = document.querySelectorAll('input[name="agentTryTool"]');
+    if (tools && tools.forEach) {
+        tools.forEach(input => {
+            if (input && input.addEventListener) input.addEventListener('change', agentTryToolChange);
+            if (input && input.checked) agentTryToolValue = input.value;
+        });
     }
+    const args = document.getElementById('agentTryArgs');
+    if (args && !args.value) args.value = JSON.stringify(agentTryDefaults(agentTryToolValue));
 }
 // --- Macro recording + replay (DESIGN 18, slice 1) --------------------------
 // A macro is a JSON list of the session's replayable actions: capability runs
@@ -14691,7 +14714,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.4';
+const APP_VERSION = '0.72.5';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

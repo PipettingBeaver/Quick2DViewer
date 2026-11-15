@@ -12,6 +12,16 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.5] - 2026-11-15
+
+### Fixed
+- **Agent request picker.** Replaced the native `<select>` with radio chips.
+  QtWebEngine misrendered the skinned dropdown as a growing white popup in the
+  embedded ChimeraX panel. The chips avoid the native popup and update the JSON
+  arguments when the tool changes.
+- **Agent request test coverage.** The panel path is checked for queuing an
+  import decision and for reporting invalid JSON.
+
 ## [0.72.4] - 2026-11-15
 
 ### Added
