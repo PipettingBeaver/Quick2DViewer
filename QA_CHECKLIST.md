@@ -399,8 +399,12 @@ transport yet.
 - [ ] Allow `<class>` for today grants a session pass; the card still needs
       Approve.
 - [ ] Pause closes the panel and leaves the card pending.
+- [ ] **Queue a test request** creates a decision without opening DevTools;
+      invalid JSON is reported inline.
 - [ ] Tab reaches every button, and closing returns focus to the opener.
 - [ ] HTML-looking rationale is displayed as text, never as markup.
+- [ ] Dark mode: File/View/Analyze menu items and the Agent modal title, intro
+      and request form are readable, not dark-on-dark.
 
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 

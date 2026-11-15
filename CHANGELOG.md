@@ -12,6 +12,20 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.4] - 2026-11-15
+
+### Added
+- **Agent panel request form.** The decision queue can queue a test request
+  without opening the page console: pick a tool, edit its JSON arguments and
+  press Request. Invalid JSON is reported inline, and read-only tools show
+  their result summary.
+
+### Fixed
+- **Dark dropdown contrast.** File/View/Analyze menu items now use the theme
+  foreground on dark panels instead of the light-theme slate colour.
+- **Agent modal contrast.** The title, intro, request form and status line use
+  theme-aware colours in dark mode.
+
 ## [0.72.3] - 2026-11-15
 
 ### Added
