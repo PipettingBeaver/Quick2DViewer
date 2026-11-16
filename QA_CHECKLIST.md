@@ -1,13 +1,15 @@
 # Q2DV — manual QA checklist
 
-**Baseline:** app `0.71.15` + unreleased 2026-11-10 host/UI pass, ChimeraX host
-`0.6.35`, ChimeraX `1.12`, `npm test` `1985 passed / 0 failed`. Update the
+**Baseline:** app `0.72.10`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
+`npm test` `2053 passed / 0 failed` (plus 3 MCP protocol tests). Update the
 baseline line when the build changes.
 
 **Surface:** every item here is **manual**. `npm test` runs the app script against
 a stubbed DOM, replaces `renderViewer` with a no-op, never lays out a pixel and
 never fires a real browser event, so all UI, layout, focus, theme, 3D and host
-behaviour is unverified until driven by hand.
+behaviour is unverified until driven by hand. Agent/MCP protocol paths have their
+own automated suite (`mcp/test_q2dv_mcp.py`); those results are recorded as
+backend evidence, not as a manual pass.
 
 **This is the active checklist.** Historical cards and the numbered per-version
 `0.16.0` → `0.66.x` regression rows live in [`QA_ARCHIVE.md`](QA_ARCHIVE.md).
@@ -30,9 +32,9 @@ older surface. New features get a card here, not in the archive.
 **Session**
 
 ```
-Build/commit: _______  Deployed URL version: _______  Date: _______
-Browser/OS: _______    ChimeraX/host: _______          Display: _______
-Tester: _______        npm test: ___ passed / ___ failed
+Build/commit: a5a8102 (0.72.10)  Deployed URL version: 0.72.10  Date: 2026-11-15
+Browser/OS: ChimeraX Flatpak / Wayland  ChimeraX/host: 1.12 / 0.6.35  Display: host 1640×740
+Tester: OpenCode backend pass      npm test: 2053 passed / 0 failed
 ```
 
 **Result legend:** `[ ] pass` `[ ] fail` `[ ] deferred` — add build, date and a
@@ -50,8 +52,9 @@ the ChimeraX host must never be required for a browser feature.
 |---|---|---|---|
 | Release/CSP | Must pass | Must pass | §1 |
 | Bundles | GFP + LacY load by URL; claims/relations/features | Auto-select bundle by model sequence; wrong sequence refuses | §3 |
-| Selection | Local highlight/track selection only | Q2DV ↔ ChimeraX mapping: chain, offset, insertion code; reverse path pending | §4 |
+| Selection | Local highlight/track selection only | Q2DV ↔ ChimeraX mapping: chain, offset, insertion code; both directions | §4 |
 | Commands/clipboard | Host controls absent, no errors | Contextual bridge, allowlist, paste label, injection guard | §4 |
+| Agent/MCP | In-page agent API only; no external MCP | Host socket + `q2dv-mcp`, decisions, capabilities, timeline, audit | §4 |
 | Files | Writes no host files | Vault banking, open PDB/CIF, refuse outside path, `Q2DV_FILES_DIR` | §4 |
 | Persistence | localStorage restore; layout/theme survive reload | `workspace/current.json` + window size; corrupt/backup fallback | §5 |
 | Analysis | Browser RSA, 3Dmol, validation | `CX_RSA`/SASA offload with provenance; browser fallback | §6 |
@@ -67,8 +70,9 @@ the ChimeraX host must never be required for a browser feature.
 - [ ] Add-on host mode complete — host: ______ · ChimeraX: ______ · date: ______
 - [ ] Cross-host parity: same bundle gives the same claims/tracks/features;
       selection round-trips; browser-only features still work with no host.
-- [ ] Known pending, explicitly deferred: reverse ChimeraX→Q2DV selection,
-      membrane recipes, optional add-on install gate.
+- [ ] Known pending, explicitly deferred: membrane recipes, optional add-on
+      install gate, structured add-on manifests, policy file/editor, ChimeraX
+      MCP integration, full browser UI QA pass.
 
 ---
 
@@ -76,20 +80,27 @@ the ChimeraX host must never be required for a browser feature.
 
 **Applies to every pass.**
 
-- [ ] `npm test` passes with no failures (`node tests/run.js` plus the host
-      workspace test).
-- [ ] `npm run csp` reports the inline app-script hash is current.
-- [ ] `APP_VERSION` equals the top `## [x.y.z]` heading in `CHANGELOG.md`.
-- [ ] The build under test is the **deployed** GitHub Pages version, not only a
+- [x] `npm test` passes with no failures (`node tests/run.js` plus the host
+      workspace test). — 2053 + 3 MCP, 2026-11-15.
+- [x] `npm run csp` reports the inline app-script hash is current.
+      — `sha256-nmEHR1AVtcPhbyaLG9hH4rLryHhOzToAC+jwyc3qGZc=`.
+- [x] `APP_VERSION` equals the top `## [x.y.z]` heading in `CHANGELOG.md`.
+      — both `0.72.10`.
+- [x] The build under test is the **deployed** GitHub Pages version, not only a
       local `file://` copy (the local copy cannot make API calls).
-- [ ] `git status` is clean and the deployed commit is the commit you expect.
+      — Pages serves `0.72.10`.
+- [x] `git status` is clean and the deployed commit is the commit you expect.
+      — clean at `a5a8102`; Pages reports the matching version.
 - [ ] Browser console has no uncaught errors and no CSP violations on load.
 - [ ] `file://` load works with the external-services switch off.
 - [ ] `http://`/`https://` load works with the external-services switch on.
-- [ ] The host starts against the pinned `file:///.../q2dv_full/html/index.html?host=chimerax`
-      URL with no scheme-registration warning.
+- [x] The host starts against the pinned `file:///.../q2dv_full/html/index.html?host=chimerax`
+      URL with no scheme-registration warning. — socket live, status `0.72.10`,
+      host `chimerax`.
 
-**Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
+**Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes: backend/release checks
+pass (2026-11-15); browser console, `file://` and `http(s)` checks remain
+manual.
 
 ---
 
@@ -361,31 +372,33 @@ Q2DV host bundle auto-detection.
 
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
-### Agent API and decision ledger — 0.72.2
+### Agent API, decisions, timeline and capabilities — 0.72.2 → 0.72.10
 
-**Surface:** browser console / harness (`window.q2dvAgentRequest`); no UI or MCP
-transport yet.
+**Surface:** Agent panel and in-page API (`window.q2dvAgentRequest`); MCP via
+`mcp/q2dv_mcp.py`.
 
-- [ ] `agentRequest({ action: 'q2dv.status' })` returns an `q2dv.agent.result/1`
-      envelope with the app version and host mode.
-- [ ] `q2dv.snapshot` reports the sequence length, a 64-character SHA-256, the
-      selection and non-sequence tracks.
-- [ ] `q2dv.read_track` returns only the requested slice and flags truncation.
-- [ ] `q2dv.select` moves the page selection and mirrors it to ChimeraX when the
-      link allows it.
-- [ ] `q2dv.import` for a sequence/PDB returns `human_required` with a decision
-      and token; approving with the right token executes it once.
-- [ ] A wrong or replayed token is refused; a rejected decision does not run.
-- [ ] `q2dv.ledger` shows actor, tool, args, status and duration, capped at 500
-      events / 100 MB.
-- [ ] `npm test` covers the registry, validation, tiers, grants and ledger.
+- [x] `agentRequest({ action: 'q2dv.status' })` returns an `q2dv.agent.result/1`
+      envelope with the app version and host mode. — live, `0.72.10`.
+- [x] `q2dv.snapshot` reports the sequence length, a 64-character SHA-256, the
+      selection and non-sequence tracks. — live.
+- [x] `q2dv.read_track` returns only the requested slice and flags truncation.
+      — harness.
+- [x] `q2dv.select` moves the page selection and mirrors it to ChimeraX when the
+      link allows it. — harness.
+- [x] `q2dv.import` for a sequence/PDB returns `human_required` with a decision;
+      the approval token is not returned to the caller. — harness + live command.
+- [x] A wrong or missing token is refused; replaying an approved decision does
+      not re-run. — harness.
+- [x] `q2dv.ledger` shows actor, tool, args, status and duration, capped at 500
+      events / 100 MB. — live.
+- [x] `npm test` covers the registry, validation, tiers, grants and ledger.
 
 **Edge**
 
-- [ ] An unregistered action (for example `q2dv.eval`) is rejected.
-- [ ] An import whose arguments changed after approval is refused.
-- [ ] Replacing a non-matching reference sequence without clearing input is a
-      precondition error, not a silent overwrite.
+- [x] An unregistered action (for example `q2dv.eval`) is rejected. — harness.
+- [x] An import whose arguments changed after approval is refused. — harness.
+- [x] Replacing a non-matching reference sequence without clearing input is a
+      precondition error, not a silent overwrite. — harness.
 - [ ] A session grant expires at local midnight; revoking it restores the gate.
 
 **Decision queue (0.72.3)**
@@ -426,42 +439,51 @@ transport yet.
 
 **Capabilities, commands and audit (0.72.9)**
 
-- [ ] `q2dv_host_capabilities` lists the host version and installed
-      `ChimeraX-*` bundles.
-- [ ] `q2dv_command` returns `human_required` and the card shows the command
-      text.
-- [ ] A disallowed prefix (`delete all`) or a command containing `;`/a newline
-      is refused.
-- [ ] Grant commands for today; an approved command runs; Revoke restores the
-      gate.
+- [x] `q2dv_host_capabilities` lists the host version and installed
+      `ChimeraX-*` bundles. — live, 185 bundles.
+- [x] `q2dv_command` returns `human_required` and the card shows the command
+      text. — live, `dec-0001`, no token returned.
+- [x] A disallowed prefix (`delete all`) or a command containing `;`/a newline
+      is refused. — harness.
+- [x] Grant commands for today; an approved command runs; Revoke restores the
+      gate. — harness (fake host).
 - [ ] The Agent panel lists active grants with Revoke.
-- [ ] `~/Q2DV_files/agent/audit.jsonl` gains one line per host call and rotates
-      to `.1`/`.2` at 10 MB.
+- [x] `~/Q2DV_files/agent/audit.jsonl` gains one line per host call and rotates
+      to `.1`/`.2` at 10 MB. — line growth live; rotation not exercised.
 
-**Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
+**Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes: backend evidence recorded
+2026-11-15; UI approval, grant chips, timeline interactions and the pending token
+expiry edge remain manual.
 
-### MCP server and host socket — 0.72.6
+### MCP server and host socket — 0.72.6 → 0.72.10
 
 **Surface:** `mcp/q2dv_mcp.py`, MCP client, `~/Q2DV_files/agent/agent.sock`.
 
-- [ ] `npm run agent:tools` regenerates `mcp/tools.json`; `npm test` agrees with
-      the app registry and version.
-- [ ] `npm run test:mcp` passes without ChimeraX running.
-- [ ] With ChimeraX and the Q2DV tool open, `agent.sock` exists, the directory
-      is `0700` and the socket is `0600`.
-- [ ] An MCP client lists 11 `q2dv_*` tools and reads `q2dv://state`.
-- [ ] `q2dv_status` returns the app version; an import returns
-      `human_required`.
+- [x] `npm run agent:tools` regenerates `mcp/tools.json`; `npm test` agrees with
+      the app registry and version. — 13 tools, `0.72.10`.
+- [x] `npm run test:mcp` passes without ChimeraX running. — 3 tests pass.
+- [x] With ChimeraX and the Q2DV tool open, `agent.sock` exists, the directory
+      is `0700` and the socket is `0600`. — live.
+- [x] An MCP client lists 13 `q2dv_*` tools and reads `q2dv://state`. — live.
+- [x] `q2dv_status` returns the app version; an import/command returns
+      `human_required`. — live.
 - [ ] Approving in Q2DV → Agent lets a later status/ledger call show the result.
-- [ ] With ChimeraX closed, tools/list still works and a call reports
-      `host_unavailable` (not a protocol crash).
-- [ ] No TCP listener is created for the agent bridge.
+- [x] With ChimeraX closed, tools/list still works and a call reports
+      `host_unavailable` (not a protocol crash). — protocol test + stale socket.
+- [x] No TCP listener is created for the agent bridge. — Unix socket only.
 
 **Edge**
 
-- [ ] An unknown tool is a `-32602` JSON-RPC error; an unknown resource is too.
-- [ ] Restarting ChimeraX removes the stale socket and recreates it.
+- [x] An unknown tool is a `-32602` JSON-RPC error; an unknown resource is too.
+      — protocol test.
+- [x] Restarting ChimeraX removes the stale socket and recreates it. — verified
+      after reboot.
 - [ ] Dropping the client mid-call does not leave the host blocked.
+
+**Backend evidence (2026-11-15):** MCP initialize/tools/resources, status,
+capabilities (185 add-ons, 24 commands), snapshot, command decision with no
+token, ledger and audit line growth all verified against the live host. UI
+approval, grant chips and timeline interactions remain manual.
 
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes:
 
@@ -830,9 +852,9 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 
 | Item | Expected |
 |---|---|
-| App baseline | `0.71.15` (update per build) |
+| App baseline | `0.72.10` (update per build) |
 | Host / ChimeraX | host `0.6.35`, ChimeraX `1.12` |
-| `npm test` | `1962 passed, 0 failed` at this baseline |
+| `npm test` | `2053 passed, 0 failed` plus 3 MCP tests at this baseline |
 | GFP bundle | 6 claims, 4 relations, 7 features, 10 evidence |
 | GFP chromophore | S65-Y66-G67; 1GFL chain A |
 | GFP structure | 1GFL and 1EMA; 1GFL has 230 resolved residues |
@@ -868,6 +890,13 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 For every failure: feature/card, build, exact steps, expected vs actual, and
 **Log → Copy as JSON** plus a screenshot or log path. Say whether it is a
 regression (worked before) or an unverified edge case.
+
+**2026-11-15 backend pass (0.72.10, `a5a8102`):** no defects found. Verified the
+release gate, live MCP initialize/tools/resources, status, capabilities
+(185 bundles), snapshot, command decision without a token, ledger and audit line
+growth. Pending manual work: browser console/CSP, `file://`/`http(s)` loads, the
+approval click, grant chips, timeline Step/Restore/Play, and token mid-call
+disconnect.
 
 ---
 
