@@ -12,6 +12,29 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.12] - 2026-11-15
+
+### Added
+- **MaveDB provider.** The ChimeraX host fetches a public MaveDB score set,
+  caches it under `~/Q2DV_files/datasets/mavedb` (five files, 200 MB cap), parses
+  HGVS protein variants (including multi-substitution rows), and translates the
+  target DNA to align the DMS reference to the Q2DV sequence (the avGFP scan
+  lacks the initiator Met and carries F64L, so raw positions are not reused).
+  It returns per-residue coverage, effect and deleterious components plus a
+  combined score and ranked windows. `q2dv.mavedb` defaults to the avGFP scan
+  `urn:mavedb:00000080-a-2`, adds a `..._EXP` experimental track and selects the
+  highest-scoring cluster. Human approval is required; `mavedb` is a grant
+  class. Host-side avoids CORS; the CSV API has no browser CORS header.
+- **MaveDB provider tests.** `npm run test:mavedb` covers HGVS parsing,
+  multi-substitution rows, component aggregation, weight normalization,
+  cache-only reads and reference mismatches.
+
+### Changed
+- **Severe reset is explicit.** The old “Clear all data...” action is now
+  **Reset all add-on data...**, with two confirmations, a save-session-first
+  warning and a note that cached PDB/CIF copies are kept. “Clear input data”
+  remains the light action.
+
 ## [0.72.11] - 2026-11-15
 
 ### Fixed

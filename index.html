@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nWH/S9XFL0zyEwgIeJix1AVem65a1b3Ry5RwRmuoSBQ=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MCwEY4xMT2qVIxkl4GUhztITJmkLgSBBPZJInzXUW8o=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -2837,7 +2837,7 @@
                     <button type="button" role="menuitem" data-action="menuBarAction" data-arg="save">Save session (.json)</button>
                     <button type="button" role="menuitem" data-action="menuBarAction" data-arg="options">Options…</button>
                     <button type="button" role="menuitem" data-action="menuBarAction" data-arg="clearInput">Clear input data</button>
-                    <button type="button" role="menuitem" data-action="menuBarAction" data-arg="clearAll">Clear all data…</button>
+                    <button type="button" role="menuitem" data-action="menuBarAction" data-arg="clearAll">Reset all add-on data...</button>
                 </div>
             </div>
             <div class="menubar-item">
@@ -4053,8 +4053,8 @@
             </p>
             <div id="cachedDataInfo" class="data-box" style="font-size: 0.78rem; white-space: pre-wrap; line-height: 1.5;">No cached data yet.</div>
             <button data-action="clearInputData" style="margin-top: 10px;">Clear input data</button>
-            <button data-action="clearAllData" style="background: #dc2626; margin-top: 10px; margin-left: 8px;">Clear all data…</button>
-            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px; display:block; margin-top: 6px;">Clear input data removes the sequence, structures, annotations and selection but keeps your preferences. Clear all data also wipes preferences and the welcome state. Cached PDB/CIF copies below are left intact by both.</span>
+            <button data-action="clearAllData" style="background: #dc2626; margin-top: 10px; margin-left: 8px;">Reset all add-on data...</button>
+            <span style="font-size: 0.75rem; color: #94a3b8; margin-left: 8px; display:block; margin-top: 6px;">Clear input data removes the sequence, structures, annotations and selection but keeps your preferences and saved session. Reset all add-on data wipes the loaded input, preferences, customization and welcome state after two confirmations; save a session backup first (File &gt; Save session). Cached PDB/CIF copies below are left intact by both.</span>
         </div>
 
         <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
@@ -10194,6 +10194,36 @@ const AGENT_TOOLS = [
         handler: agentToolRun
     },
     {
+        id: 'q2dv.mavedb', name: 'q2dv_mavedb', title: 'Fetch and analyze a MaveDB deep mutational scan',
+        tier: 'require-human', readOnly: false, destructive: false, grantClass: 'mavedb',
+        flags: { reversible: true, network: true, writes_files: true, changes_sequence: false },
+        input: {
+            type: 'object',
+            properties: {
+                urn: { type: 'string' },
+                weights: { type: 'object' },
+                window: { type: 'integer' },
+                min_variants: { type: 'integer' },
+                threshold: { type: 'number' },
+                refresh: { type: 'boolean' },
+                cache_only: { type: 'boolean' }
+            }
+        },
+        validate: (args) => {
+            if (args.urn && !/^urn:mavedb:/.test(String(args.urn))) {
+                return { ok: false, code: 'validation', message: 'MaveDB URN must start with urn:mavedb:' };
+            }
+            if (args.window != null && (!Number.isInteger(args.window) || args.window < 1 || args.window > 50)) {
+                return { ok: false, code: 'validation', message: 'window must be an integer from 1 to 50' };
+            }
+            if (args.weights != null && (typeof args.weights !== 'object' || Array.isArray(args.weights))) {
+                return { ok: false, code: 'validation', message: 'weights must be an object' };
+            }
+            return { ok: true };
+        },
+        handler: agentToolMavedb
+    },
+    {
         id: 'q2dv.propose', name: 'q2dv_propose', title: 'Propose a decision for review',
         tier: 'agent-run', readOnly: true, destructive: false,
         flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
@@ -10573,6 +10603,55 @@ async function agentToolRun(args) {
     if (recipe === 'q2dv.compare.ss-structure' || recipe === 'q2dv.analysis.concordance') return agentComputeConcordance(args);
     throw agentFail('validation', 'Unknown recipe: ' + recipe);
 }
+let agentMavedbLast = null;
+async function agentToolMavedb(args) {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.mavedbAnalysis !== 'function') {
+        throw agentFail('capability_missing', 'The host has no MaveDB provider. Restart ChimeraX with the updated plugin.');
+    }
+    if (!(parsedTracks && typeof parsedTracks.AA === 'string' && parsedTracks.AA.length)) {
+        throw agentFail('precondition', 'Load a reference sequence first.');
+    }
+    const payload = {
+        urn: args.urn || 'urn:mavedb:00000080-a-2',
+        sequence: parsedTracks.AA,
+        weights: args.weights,
+        window: args.window,
+        min_variants: args.min_variants,
+        threshold: args.threshold,
+        refresh: !!args.refresh,
+        cache_only: !!args.cache_only
+    };
+    const raw = await host.mavedbAnalysis(JSON.stringify(payload));
+    let res = raw;
+    try { if (typeof raw === 'string') res = JSON.parse(raw); } catch (err) { res = null; }
+    if (!res || res.ok !== true) throw agentFail('upstream_network', (res && res.error) || 'MaveDB analysis failed.');
+    const rows = (res.residues || []).filter(row => row.combined != null).map(row => ({ pos: row.pos, val: row.combined }));
+    if (rows.length) addExperimentalRows('MaveDB combined', 'dms', rows, () => {});
+    if (Array.isArray(res.top_clusters) && res.top_clusters.length) {
+        const top = res.top_clusters[0];
+        try { await agentToolSelect({ ranges: [[top.start, top.end]] }); } catch (err) { /* selection is best effort */ }
+    }
+    agentMavedbLast = res;
+    return {
+        urn: res.urn,
+        title: res.title,
+        license: res.license,
+        rows: res.rows,
+        mapped_rows: res.mapped_rows,
+        skipped_rows: res.skipped_rows,
+        wt_mismatches: res.wt_mismatches,
+        mapping_method: res.mapping_method,
+        dms_sequence_length: res.dms_sequence_length,
+        alignment_ratio: res.alignment_ratio,
+        skipped_positions: res.skipped_positions,
+        weights: res.weights,
+        percentiles: res.percentiles,
+        top_clusters: res.top_clusters,
+        summary: res.summary,
+        cache_path: res.cache_path
+    };
+}
 async function agentToolPropose(args, req) {
     const toolId = String(args.tool || (args.action && args.action.tool) || '');
     const spec = agentToolSpec(toolId);
@@ -10748,6 +10827,8 @@ window.q2dvAgent = {
     timeline: renderAgentTimeline,
     stopTimeline: agentTimelineStop,
     restoreStep: agentTimelineRestore,
+    mavedb: agentToolMavedb,
+    lastMavedb: () => agentMavedbLast,
     grants: renderAgentGrants
 };
 
@@ -15173,7 +15254,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.11';
+const APP_VERSION = '0.72.12';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -25990,7 +26071,10 @@ async function clearInputData() {
 }
 
 async function clearAllData() {
-    if (!(await confirmDialog('This permanently deletes everything: the loaded input data, your preferences and customization, and the welcome state. Continue?', { okLabel: 'Clear all data', danger: true }))) {
+    if (!(await confirmDialog('Reset all add-on data permanently deletes the loaded input, preferences, customization, saved selections and welcome state. Save a session backup first (File > Save session) if you may need this. Cached PDB/CIF copies are kept. Continue?', { okLabel: 'Continue', danger: true }))) {
+        return;
+    }
+    if (!(await confirmDialog('FINAL CONFIRMATION: this cannot be undone. Reset all add-on data now?', { okLabel: 'Reset all add-on data', danger: true }))) {
         return;
     }
     resetInputDataState();
@@ -26001,8 +26085,8 @@ async function clearAllData() {
     try { localStorage.removeItem(STORAGE_KEYS.state); } catch (err) { console.error(err); }
     try { localStorage.removeItem(STORAGE_KEYS.welcome); } catch (err) { console.error(err); }
     renderCachedDataInfo();
-    logAction('session', 'cleared all data');
-    showToast('All data and preferences cleared.', 'success');
+    logAction('session', 'reset all add-on data');
+    showToast('All add-on data and preferences reset.', 'success');
 }
 
 function copyText(elementId) {

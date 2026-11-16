@@ -5539,7 +5539,35 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     const agentCmdFailResult = await ctxRun(`agentApproveDecision(${JSON.stringify(agentCmdFail.decision.id)})`);
     assert(agentCmdFailResult.status === 'error' && ctxRun(`agentDecisions[${JSON.stringify(agentCmdFail.decision.id)}].status`) === 'failed', 'a failed approved action resolves as failed, not pending');
     assert(/No atoms/.test(ctxRun(`agentDecisions[${JSON.stringify(agentCmdFail.decision.id)}].error`)), 'the failure keeps the host message');
-    ctxRun(`window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        mavedbAnalysis() {
+            return Promise.resolve(JSON.stringify({
+                ok: true, urn: 'urn:mavedb:test', title: 'Test scan', license: 'CC0',
+                rows: 3, mapped_rows: 3, skipped_rows: 0, wt_mismatches: 0,
+                residues: [
+                    { pos: 1, n: 2, coverage: 0.1, effect: 0.2, deleterious: 0.5, combined: 0.3 },
+                    { pos: 2, n: 2, coverage: 0.1, effect: 0.2, deleterious: 0.5, combined: 0.4 }
+                ],
+                top_clusters: [{ start: 1, end: 2, score: 0.35, coverage: 0.1, effect: 0.2, deleterious: 0.5, n: 4 }],
+                weights: { coverage: 0.3, effect: 0.4, deleterious: 0.3 },
+                percentiles: { p5: 1, p25: 2, p50: 3, p95: 4 },
+                summary: 'Top cluster 1-2'
+            }));
+        }
+    };
+    ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge(); parsedTracks = { AA: 'M'.repeat(10) };`);
+    const agentMavBad = await ctxRun(`agentRequest({ action: 'q2dv.mavedb', args: { urn: 'https://example.com' } })`);
+    assert(agentMavBad.status === 'error' && agentMavBad.error.code === 'validation', 'a non-MaveDB URN is refused');
+    const agentMavPending = await ctxRun(`agentRequest({ action: 'q2dv.mavedb', args: {} })`);
+    assert(agentMavPending.status === 'human_required', 'MaveDB analysis requires human approval');
+    await ctxRun(`agentRejectDecision(${JSON.stringify(agentMavPending.decision.id)})`);
+    assert(ctxRun(`agentGrantToday('mavedb')`) === true, 'a MaveDB grant can be issued');
+    const agentMav = await ctxRun(`agentRequest({ action: 'q2dv.mavedb', args: { min_variants: 1 } })`);
+    assert(agentMav.status === 'ok' && /Test scan/.test(agentMav.data.title) && agentMav.data.top_clusters.length === 1, 'MaveDB returns a combined-score cluster');
+    assert(Object.keys(ctxRun(`parsedTracks`)).some(k => /_EXP$/.test(k) && /MaveDB/i.test(k)), 'the combined score becomes an experimental track');
+    assert(ctxRun(`selectStart`) === 0 && ctxRun(`selectEnd`) === 1, 'the top MaveDB cluster is selected');
+    ctxRun(`agentRevokeGrant('mavedb'); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
     ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);
     assert(agentTryImport.status === 'human_required' && ctxRun(`agentDecisionPendingCount()`) === 1, 'the panel queues a request without a console');

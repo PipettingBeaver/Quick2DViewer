@@ -1,8 +1,8 @@
 # Q2DV — manual QA checklist
 
-**Baseline:** app `0.72.11`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
-`npm test` `2055 passed / 0 failed` (plus 3 MCP protocol tests). Update the
-baseline line when the build changes.
+**Baseline:** app `0.72.12`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
+`npm test` `2061 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
+provider tests). Update the baseline line when the build changes.
 
 **Surface:** every item here is **manual**. `npm test` runs the app script against
 a stubbed DOM, replaces `renderViewer` with a no-op, never lays out a pixel and
@@ -453,6 +453,24 @@ Q2DV host bundle auto-detection.
 - [x] `~/Q2DV_files/agent/audit.jsonl` gains one line per host call and rotates
       to `.1`/`.2` at 10 MB. — line growth live; rotation not exercised.
 
+**MaveDB and reset (0.72.12)**
+
+- [ ] `q2dv.mavedb` returns `human_required`; approving fetches/caches the CSV
+      and adds a `..._EXP` experimental track.
+- [ ] The top cluster is selected and the components/weights are reported.
+- [ ] A second run uses the cache; `refresh` re-fetches; five CSVs are retained.
+- [ ] A mismatched reference reports `wt_mismatches` instead of shifting
+      silently.
+- [ ] **Reset all add-on data...** requires two confirmations and warns to save
+      a session first; **Clear input data** remains the light action.
+
+**MaveDB backend evidence (2026-11-15):** the real avGFP score set
+`urn:mavedb:00000080-a-2` fetched and parsed 53,990 rows; the target DNA
+translated to a 237-aa DMS reference and aligned to the 238-aa Q2DV sequence
+(ratio 0.994); F64L is the only reference mismatch. Ranked clusters: 81-85
+(0.61), 63-67 (0.60, chromophore), 53-57, 216-220, 27-31. Provider tests pass;
+the live host bridge needs a ChimeraX restart.
+
 **Result:** `[ ] pass` `[ ] fail` `[ ] deferred` — notes: backend evidence recorded
 2026-11-15; UI approval, grant chips, timeline interactions and the pending token
 expiry edge remain manual.
@@ -462,11 +480,11 @@ expiry edge remain manual.
 **Surface:** `mcp/q2dv_mcp.py`, MCP client, `~/Q2DV_files/agent/agent.sock`.
 
 - [x] `npm run agent:tools` regenerates `mcp/tools.json`; `npm test` agrees with
-      the app registry and version. — 13 tools, `0.72.10`.
+      the app registry and version. — 14 tools, `0.72.12`.
 - [x] `npm run test:mcp` passes without ChimeraX running. — 3 tests pass.
 - [x] With ChimeraX and the Q2DV tool open, `agent.sock` exists, the directory
       is `0700` and the socket is `0600`. — live.
-- [x] An MCP client lists 13 `q2dv_*` tools and reads `q2dv://state`. — live.
+- [x] An MCP client lists 14 `q2dv_*` tools and reads `q2dv://state`. — live.
 - [x] `q2dv_status` returns the app version; an import/command returns
       `human_required`. — live.
 - [ ] Approving in Q2DV → Agent lets a later status/ledger call show the result.
@@ -854,9 +872,9 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 
 | Item | Expected |
 |---|---|
-| App baseline | `0.72.11` (update per build) |
+| App baseline | `0.72.12` (update per build) |
 | Host / ChimeraX | host `0.6.35`, ChimeraX `1.12` |
-| `npm test` | `2055 passed, 0 failed` plus 3 MCP tests at this baseline |
+| `npm test` | `2061 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
 | GFP bundle | 6 claims, 4 relations, 7 features, 10 evidence |
 | GFP chromophore | S65-Y66-G67; 1GFL chain A |
 | GFP structure | 1GFL and 1EMA; 1GFL has 230 resolved residues |
@@ -898,9 +916,13 @@ release gate, live MCP initialize/tools/resources, status, capabilities
 (185 bundles), snapshot, command decision without a token, ledger and audit line
 growth. **0.72.11** adds the failed-approval resolution (`dec-0001` with no atoms
 now resolves as `failed`, harness-verified); live re-check after reopening the
-tool. Pending manual work: browser console/CSP, `file://`/`http(s)` loads, the
-approval click, grant chips, timeline Step/Restore/Play, and token mid-call
-disconnect.
+tool. **0.72.12** adds the host-side MaveDB provider and the explicit
+**Reset all add-on data...** flow. During the MaveDB pass, raw HGVS positions
+were found to be offset by one because the avGFP DMS lacks the initiator Met and
+carries F64L; fixed by translating the target DNA and aligning (ratio 0.994).
+The live host bridge still needs a ChimeraX restart. Pending manual work: browser
+console/CSP, `file://`/`http(s)` loads, the approval click, grant chips, timeline
+Step/Restore/Play, MaveDB UI, and token mid-call disconnect.
 
 ---
 

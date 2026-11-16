@@ -1,7 +1,7 @@
 {
   "schema": "q2dv.tool-cache/1",
-  "app_version": "0.72.11",
-  "generated_at": "2026-11-16T03:15:47.508Z",
+  "app_version": "0.72.12",
+  "generated_at": "2026-11-16T04:22:32.700Z",
   "tools": [
     {
       "id": "q2dv.status",
@@ -260,6 +260,47 @@
           },
           "structure": {
             "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.mavedb",
+      "name": "q2dv_mavedb",
+      "title": "Fetch and analyze a MaveDB deep mutational scan",
+      "tier": "require-human",
+      "readOnly": false,
+      "destructive": false,
+      "grantClass": "mavedb",
+      "flags": {
+        "reversible": true,
+        "network": true,
+        "writes_files": true,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "urn": {
+            "type": "string"
+          },
+          "weights": {
+            "type": "object"
+          },
+          "window": {
+            "type": "integer"
+          },
+          "min_variants": {
+            "type": "integer"
+          },
+          "threshold": {
+            "type": "number"
+          },
+          "refresh": {
+            "type": "boolean"
+          },
+          "cache_only": {
+            "type": "boolean"
           }
         }
       }

@@ -81,6 +81,14 @@ command through that allowlist; it is `human_required` and can be granted for
 the session under the `commands` class. Add-on manifests can live in
 `~/Q2DV_files/adapters/*.json`.
 
+`q2dv_mavedb` fetches a public MaveDB score set through the ChimeraX host (the
+API has no browser CORS header), caches the CSV, maps HGVS substitutions to the
+reference, and returns per-residue coverage/effect/deleterious components with a
+combined score and ranked windows. The default is the avGFP scan
+`urn:mavedb:00000080-a-2`; the top cluster is selected and a `..._EXP` track is
+added. It is `human_required` with the `mavedb` grant class. Cache:
+`~/Q2DV_files/datasets/mavedb` (5 files, 200 MB cap).
+
 Host calls are appended to `~/Q2DV_files/agent/audit.jsonl` (10 MB cap, two
 rotated backups).
 

@@ -124,7 +124,7 @@ class McpProtocolTests(unittest.TestCase):
                 self.assertEqual(init["result"]["protocolVersion"], "2025-06-18")
                 proc.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
                 tools = proc.call("tools/list", {}, 2)
-                self.assertEqual(len(tools["result"]["tools"]), 13)
+                self.assertEqual(len(tools["result"]["tools"]), 14)
                 names = [t["name"] for t in tools["result"]["tools"]]
                 self.assertIn("q2dv_status", names)
                 self.assertIn("q2dv_snapshot", names)
