@@ -12,6 +12,24 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.13] - 2026-11-15
+
+### Added
+- **Agent-callable workspace safety.** `q2dv_backup` saves the workspace and
+  returns the newest backup path; `q2dv_clear_input` backs up first, clears the
+  input data and removes the host `current.json`; `q2dv_restore` restores the
+  latest backup into the page. Both state-changing tools are `human_required`.
+  The UI “Clear input data” and “Reset all add-on data...” now also clear the
+  host workspace. The severe reset remains UI-only with two confirmations.
+- **Session auto-approve.** A human-only Agent-panel toggle runs imports,
+  commands and MaveDB without decision cards for the rest of the session.
+  Destructive actions stay blocked, and every action remains in the ledger and
+  audit. The toggle is not exposed to the agent.
+- **Evidence vignettes.** `q2dv_vignette` (and the Agent panel’s **Draft
+  vignette**) assembles a `q2dv.vignette/1` dossier from the current selection,
+  tracks, latest MaveDB scan, weights, uncertainty, blind spots, citations and a
+  `proposed` review status. It is read-only and agent-run.
+
 ## [0.72.12] - 2026-11-15
 
 ### Added

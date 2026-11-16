@@ -89,6 +89,13 @@ combined score and ranked windows. The default is the avGFP scan
 added. It is `human_required` with the `mavedb` grant class. Cache:
 `~/Q2DV_files/datasets/mavedb` (5 files, 200 MB cap).
 
+`q2dv_backup`, `q2dv_clear_input` and `q2dv_restore` manage the host workspace:
+backup returns the newest backup path, clear backs up first and removes both the
+page input and the host `current.json`, and restore reapplies the latest backup.
+The severe “Reset all add-on data...” action stays UI-only. `q2dv_vignette`
+assembles a reviewable evidence dossier; it does not approve itself. Session
+auto-approve is a human-only Agent-panel toggle and is never exposed as a tool.
+
 Host calls are appended to `~/Q2DV_files/agent/audit.jsonl` (10 MB cap, two
 rotated backups).
 

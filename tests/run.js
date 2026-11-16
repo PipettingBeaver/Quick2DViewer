@@ -5512,6 +5512,10 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(ctxRun(`document.getElementById('agentGrantList').children.length`) >= 1, 'active grants render with a revoke control');
     ctxRun(`agentRevokeToday('commands')`);
     assert(ctxRun(`agentGrantActive('commands')`) === false, 'revoking from the panel restores the gate');
+    ctxRun(`agentAutoApprove = true; parsedTracks = {};`);
+    const agentAuto = await ctxRun(`agentRequest({ action: 'q2dv.import', args: { kind: 'sequence', sequence: 'MAMM' } })`);
+    assert(agentAuto.status === 'ok' && ctxRun(`parsedTracks.AA`) === 'MAMM', 'auto-approve runs an action without a card');
+    ctxRun(`agentAutoApprove = false; parsedTracks = {};`);
     const agentCapsNoHost = await ctxRun(`agentRequest({ action: 'q2dv.host_capabilities' })`);
     assert(agentCapsNoHost.status === 'ok' && agentCapsNoHost.data.available === false, 'capability discovery degrades without a host');
     sandbox.Q2DVHost = {
@@ -5567,7 +5571,30 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentMav.status === 'ok' && /Test scan/.test(agentMav.data.title) && agentMav.data.top_clusters.length === 1, 'MaveDB returns a combined-score cluster');
     assert(Object.keys(ctxRun(`parsedTracks`)).some(k => /_EXP$/.test(k) && /MaveDB/i.test(k)), 'the combined score becomes an experimental track');
     assert(ctxRun(`selectStart`) === 0 && ctxRun(`selectEnd`) === 1, 'the top MaveDB cluster is selected');
+    const agentVig = await ctxRun(`agentRequest({ action: 'q2dv.vignette', args: { question: 'test question' } })`);
+    assert(agentVig.status === 'ok' && agentVig.data.schema === 'q2dv.vignette/1' && agentVig.data.analysis.top_clusters[0].start === 1, 'a vignette combines the scan and the current context');
+    assert(agentVig.data.blind_spots.indexOf('epistasis') !== -1, 'the vignette carries a blind-spot checklist');
     ctxRun(`agentRevokeGrant('mavedb'); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(4) }; currentProteinLabel = 'Test';`);
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        saveWorkspace(text) { sandbox.__wsText = text; return Promise.resolve('/tmp/Q2DV_files/workspace/current.json'); },
+        latestBackup() { return Promise.resolve('/tmp/Q2DV_files/workspace/backups/current-test.json'); },
+        clearWorkspace() { sandbox.__cleared = true; return Promise.resolve('ok'); },
+        restoreWorkspace() { return Promise.resolve(sandbox.__wsText || ''); }
+    };
+    ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+    const agentBackup = await ctxRun(`agentRequest({ action: 'q2dv.backup' })`);
+    assert(agentBackup.status === 'ok' && /backups/.test(agentBackup.data.path), 'backup returns the newest backup path');
+    const agentClear = await ctxRun(`agentRequest({ action: 'q2dv.clear_input' })`);
+    assert(agentClear.status === 'human_required', 'clearing input requires approval');
+    await ctxRun(`agentApproveDecision(${JSON.stringify(agentClear.decision.id)})`);
+    assert(ctxRun(`parsedTracks.AA`) === undefined && sandbox.__cleared === true, 'approved clear removes input and the host workspace');
+    const agentRestore = await ctxRun(`agentRequest({ action: 'q2dv.restore' })`);
+    assert(agentRestore.status === 'human_required', 'restoring a backup requires approval');
+    await ctxRun(`agentApproveDecision(${JSON.stringify(agentRestore.decision.id)})`);
+    assert(ctxRun(`parsedTracks.AA.length`) === 4, 'restoring the latest backup brings the input back');
+    ctxRun(`window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
     ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);
     assert(agentTryImport.status === 'human_required' && ctxRun(`agentDecisionPendingCount()`) === 1, 'the panel queues a request without a console');

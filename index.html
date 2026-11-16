@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MCwEY4xMT2qVIxkl4GUhztITJmkLgSBBPZJInzXUW8o=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/OoYQ3AQ7ZHHurVz24wsYlEQ/ng8UQwbDcXpuuveTq4=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -619,6 +619,9 @@
             color: #334155;
         }
         .agent-grant-chip .copy-btn { margin: 0; padding: 0 5px; font-size: 0.62rem; }
+        .agent-auto { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 6px 0 10px; font-size: 0.72rem; color: #475569; }
+        .agent-auto label { display: inline-flex; gap: 5px; align-items: center; font-weight: 600; }
+        .agent-auto-status { color: #b45309; }
         .agent-try-status { font-size: 0.72rem; color: #475569; }
         .agent-timeline { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
         .agent-timeline summary { font-size: 0.8rem; font-weight: 700; color: #334155; cursor: pointer; }
@@ -2764,6 +2767,9 @@
             border-color: var(--q2dv-border);
             color: var(--q2dv-text);
         }
+        html[data-theme="dark"] .agent-auto { color: var(--q2dv-muted); }
+        html[data-theme="dark"] .agent-auto label { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-auto-status { color: #fbbf24; }
         html[data-theme="dark"] .agent-timeline { border-color: var(--q2dv-border); }
         html[data-theme="dark"] .agent-timeline summary { color: var(--q2dv-text); }
         html[data-theme="dark"] .agent-timeline-count { color: var(--q2dv-muted); }
@@ -4286,6 +4292,11 @@
             <span id="agentGrantList" class="agent-grant-list">none</span>
             <button type="button" class="tb-btn tb-btn-secondary" data-action="agentGrantToday" data-arg="imports" style="font-size:0.7rem; padding:2px 7px;">Grant imports today</button>
             <button type="button" class="tb-btn tb-btn-secondary" data-action="agentGrantToday" data-arg="commands" style="font-size:0.7rem; padding:2px 7px;">Grant commands today</button>
+            <button type="button" class="tb-btn tb-btn-secondary" data-action="agentGrantToday" data-arg="mavedb" style="font-size:0.7rem; padding:2px 7px;">Grant MaveDB today</button>
+        </div>
+        <div class="agent-auto">
+            <label><input type="checkbox" id="agentAutoApprove" data-action="setAgentAutoApprove"> Auto-approve agent actions this session</label>
+            <span id="agentAutoStatus" class="agent-auto-status">Off. Destructive actions stay blocked.</span>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
             <span id="agentDecisionCount" style="font-size:0.72rem; color:#64748b;"></span>
@@ -4300,10 +4311,12 @@
                 <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTimelineRestore" style="font-size:0.72rem; padding:3px 8px;">Restore step</button>
                 <button type="button" class="tb-btn tb-btn-secondary" id="agentTimelinePlayBtn" data-action="agentTimelinePlay" style="font-size:0.72rem; padding:3px 8px;">Play</button>
                 <button type="button" class="tb-btn tb-btn-secondary" data-action="agentTimelineExport" style="font-size:0.72rem; padding:3px 8px;">Export scenario</button>
+                <button type="button" class="tb-btn tb-btn-secondary" data-action="agentDraftVignette" style="font-size:0.72rem; padding:3px 8px;">Draft vignette</button>
                 <span id="agentTimelineStatus" class="agent-try-status" role="status" aria-live="polite"></span>
             </div>
             <div id="agentTimelineList" class="agent-timeline-list"></div>
             <pre id="agentScenarioOutput" class="data-box agent-scenario" hidden></pre>
+            <pre id="agentVignetteOutput" class="data-box agent-scenario" hidden></pre>
         </details>
     </div>
 </div>
@@ -10091,6 +10104,7 @@ let agentEventBytes = 0;
 let agentDecisions = {};
 let agentDecisionSeq = 0;
 let agentGrants = {};
+let agentAutoApprove = false;
 let agentTokenSeq = 0;
 let agentRequestSeq = 0;
 
@@ -10224,6 +10238,34 @@ const AGENT_TOOLS = [
         handler: agentToolMavedb
     },
     {
+        id: 'q2dv.vignette', name: 'q2dv_vignette', title: 'Draft a reviewable evidence vignette',
+        tier: 'agent-run', readOnly: true, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
+        input: { type: 'object', properties: { question: { type: 'string' }, notes: { type: 'string' } } },
+        handler: agentToolVignette
+    },
+    {
+        id: 'q2dv.backup', name: 'q2dv_backup', title: 'Save a workspace backup',
+        tier: 'agent-run', readOnly: false, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
+        input: { type: 'object', properties: {} },
+        handler: agentToolBackup
+    },
+    {
+        id: 'q2dv.clear_input', name: 'q2dv_clear_input', title: 'Clear the loaded input data (backup first)',
+        tier: 'require-human', readOnly: false, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: true },
+        input: { type: 'object', properties: {} },
+        handler: agentToolClearInput
+    },
+    {
+        id: 'q2dv.restore', name: 'q2dv_restore', title: 'Restore the latest workspace backup',
+        tier: 'require-human', readOnly: false, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: true },
+        input: { type: 'object', properties: {} },
+        handler: agentToolRestore
+    },
+    {
         id: 'q2dv.propose', name: 'q2dv_propose', title: 'Propose a decision for review',
         tier: 'agent-run', readOnly: true, destructive: false,
         flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
@@ -10341,6 +10383,7 @@ function agentGrantActive(kind) {
 function agentTierFor(spec, args) {
     if (!spec) return 'denied';
     if (spec.destructive) return 'denied';
+    if (agentAutoApprove && spec.tier !== 'denied') return 'agent-run';
     if (spec.readOnly) return 'agent-run';
     if (spec.grantClass && agentGrantActive(spec.grantClass)) return 'agent-run';
     if (spec.flags && (spec.flags.changes_sequence || spec.flags.network || spec.flags.writes_files)) return 'require-human';
@@ -10604,6 +10647,114 @@ async function agentToolRun(args) {
     throw agentFail('validation', 'Unknown recipe: ' + recipe);
 }
 let agentMavedbLast = null;
+let agentVignetteLast = null;
+async function agentToolBackup() {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.saveWorkspace !== 'function') throw agentFail('capability_missing', 'The host has no workspace store.');
+    if (!(parsedTracks && typeof parsedTracks.AA === 'string' && parsedTracks.AA.length)) throw agentFail('precondition', 'There is no input data to back up.');
+    const saved = await saveHostWorkspaceNow();
+    if (!saved || String(saved).startsWith('error')) throw agentFail('upstream_network', 'Workspace backup failed: ' + (saved || 'unknown error'));
+    let path = saved;
+    if (typeof host.latestBackup === 'function') {
+        const latest = await host.latestBackup();
+        if (latest && !String(latest).startsWith('error')) path = String(latest);
+    }
+    return { ok: true, path: path };
+}
+async function agentToolClearInput() {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.clearWorkspace !== 'function') throw agentFail('capability_missing', 'The host has no workspace store.');
+    const backup = (parsedTracks && parsedTracks.AA) ? await saveHostWorkspaceNow().catch(() => null) : null;
+    resetInputDataState();
+    try { localStorage.removeItem(STORAGE_KEYS.state); } catch (err) { /* ignore */ }
+    const cleared = await host.clearWorkspace();
+    if (String(cleared).startsWith('error')) throw agentFail('internal', String(cleared));
+    return { ok: true, backup: backup || null };
+}
+async function agentToolRestore() {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.restoreWorkspace !== 'function') throw agentFail('capability_missing', 'The host has no workspace store.');
+    const raw = await host.restoreWorkspace();
+    if (!raw || String(raw).startsWith('error')) throw agentFail('precondition', String(raw || 'No workspace backup was found.'));
+    let envelope;
+    try { envelope = JSON.parse(raw); } catch (err) { throw agentFail('internal', 'The workspace backup is not valid JSON.'); }
+    const state = envelope && envelope.state ? envelope.state : envelope;
+    if (!applyPersistedState(state)) throw agentFail('precondition', 'The backup has no usable session state.');
+    scheduleHostWorkspaceSave();
+    return { ok: true, restored: true };
+}
+function agentToolVignette(args) {    const sequence = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+    const selection = getCurrentRangesZeroBased().map(([s, e]) => [s + 1, e + 1]);
+    const tracks = Object.keys(parsedTracks || {}).filter(key => key !== 'AA').map(key => ({
+        id: key,
+        kind: typeof getTrackGroup === 'function' ? getTrackGroup(key) : 'other',
+        source: typeof getTrackSource === 'function' ? getTrackSource(key) : ''
+    }));
+    const scan = agentMavedbLast;
+    const top = (scan && Array.isArray(scan.top_clusters) && scan.top_clusters.length) ? scan.top_clusters[0] : null;
+    const evidence = [];
+    if (scan) {
+        evidence.push({
+            kind: 'dataset',
+            id: scan.urn,
+            title: scan.title,
+            license: scan.license,
+            top_clusters: scan.top_clusters,
+            mapping: scan.mapping_method,
+            alignment_ratio: scan.alignment_ratio
+        });
+    }
+    if (selection.length) evidence.push({ kind: 'selection', ranges: selection });
+    if (tracks.length) evidence.push({ kind: 'tracks', ids: tracks.map(t => t.id) });
+    return {
+        schema: 'q2dv.vignette/1',
+        id: 'vig-' + Date.now().toString(36),
+        question: (args && args.question) ? String(args.question) : 'What does the current evidence suggest about the selected region?',
+        context: {
+            app_version: APP_VERSION,
+            sequence_length: sequence.length,
+            sequence_label: currentProteinLabel || '',
+            selection,
+            tracks: tracks.slice(0, 40)
+        },
+        hypothesis: top
+            ? 'Residues ' + top.start + '-' + top.end + ' carry the strongest combined mutational signal in the loaded scan.'
+            : 'No quantitative scan is loaded; the vignette describes the selected tracks only.',
+        evidence,
+        analysis: scan ? {
+            method: 'MaveDB combined score',
+            weights: scan.weights,
+            window: scan.window,
+            percentiles: scan.percentiles,
+            top_clusters: scan.top_clusters,
+            mapping: scan.mapping_method,
+            alignment_ratio: scan.alignment_ratio,
+            wt_mismatches: scan.wt_mismatches
+        } : null,
+        uncertainty: scan ? [
+            'Fluorescence assay, not stability or expression',
+            'Error-prone PCR sampling bias',
+            'Multi-substitution rows share one score',
+            'F64L background in the avGFP library'
+        ] : ['No quantitative dataset is loaded'],
+        counter_evidence: [],
+        blind_spots: [
+            'homology-only evidence',
+            'intrinsic disorder',
+            'isoforms and PTMs',
+            'assay and cellular context',
+            'epistasis',
+            'coverage and sampling bias'
+        ],
+        next_tests: top ? [
+            'Measure stability for substitutions in ' + top.start + '-' + top.end,
+            'Compare 1EMA and 1GFL for the same region'
+        ] : ['Load a MaveDB score set or an experimental track'],
+        citations: scan ? [{ id: scan.urn, title: scan.title, license: scan.license }] : [],
+        notes: (args && args.notes) ? String(args.notes) : '',
+        review: { status: 'proposed', reviewer: '', decision: '' }
+    };
+}
 async function agentToolMavedb(args) {
     const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
     if (!host || typeof host.mavedbAnalysis !== 'function') {
@@ -10829,6 +10980,11 @@ window.q2dvAgent = {
     restoreStep: agentTimelineRestore,
     mavedb: agentToolMavedb,
     lastMavedb: () => agentMavedbLast,
+    vignette: agentToolVignette,
+    lastVignette: () => agentVignetteLast,
+    backup: agentToolBackup,
+    clearInput: agentToolClearInput,
+    restore: agentToolRestore,
     grants: renderAgentGrants
 };
 
@@ -10956,6 +11112,7 @@ function renderAgentDecisions() {
 }
 function openAgentDecisions() {
     agentUpdateBadge();
+    agentUpdateAutoApprove();
     renderAgentDecisions();
     renderAgentGrants();
     renderAgentTimeline();
@@ -11014,6 +11171,33 @@ function agentGrantToday(kind) {
     agentDecisionNotice('Granted ' + key + ' for today.');
     renderAgentDecisions();
     return true;
+}
+function setAgentAutoApprove(el) {
+    agentAutoApprove = !!(el && el.checked);
+    agentUpdateAutoApprove();
+    logAction('agent', agentAutoApprove ? 'auto-approve on' : 'auto-approve off', 'session');
+    if (agentAutoApprove) showToast('Auto-approve is ON for this session. Agent actions run without a decision card; destructive actions stay blocked.', 'warn');
+    else showToast('Auto-approve is off.', 'info');
+}
+function agentUpdateAutoApprove() {
+    const box = document.getElementById('agentAutoApprove');
+    if (box) box.checked = !!agentAutoApprove;
+    const status = document.getElementById('agentAutoStatus');
+    if (status) {
+        status.textContent = agentAutoApprove
+            ? 'ON for this session: imports, commands and MaveDB run without a card; destructive actions stay blocked; every action is audited.'
+            : 'Off. Destructive actions stay blocked.';
+    }
+}
+function agentDraftVignette() {
+    const vignette = agentToolVignette({ question: 'What does the current evidence suggest about the selected region?' });
+    agentVignetteLast = vignette;
+    const out = document.getElementById('agentVignetteOutput');
+    const text = JSON.stringify(vignette, null, 2);
+    if (out) { out.hidden = false; out.textContent = text; }
+    const ok = legacyCopyText(text);
+    agentDecisionNotice(ok ? 'Vignette copied (' + vignette.id + ').' : 'Vignette drafted (' + vignette.id + ').');
+    return vignette;
 }
 function agentRevokeToday(kind) {
     const key = String(kind || '').trim();
@@ -15254,7 +15438,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.12';
+const APP_VERSION = '0.72.13';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap
@@ -26055,6 +26239,15 @@ function resetPreferencesState() {
     document.getElementById('cxColor').style.display = '';
 }
 
+function clearHostWorkspaceSilently() {
+    if (detectQ2DVHostMode() !== 'chimerax' || !window.Q2DVHost || typeof window.Q2DVHost.clearWorkspace !== 'function') return;
+    try {
+        Promise.resolve(window.Q2DVHost.clearWorkspace()).catch(err => console.error('Q2DV workspace clear failed:', err));
+    } catch (err) {
+        console.error('Q2DV workspace clear failed:', err);
+    }
+}
+
 async function clearInputData() {
     if (!(await confirmDialog('Clear the loaded input data? The sequence, attached structures, annotations, selection and guide answers are removed. Your appearance and source preferences are kept.', { okLabel: 'Clear input data' }))) {
         return;
@@ -26065,6 +26258,7 @@ async function clearInputData() {
     lastPersistError = null;
     clearTimeout(persistTimer);
     try { localStorage.removeItem(STORAGE_KEYS.state); } catch (err) { console.error(err); }
+    clearHostWorkspaceSilently();
     renderCachedDataInfo();
     logAction('session', 'cleared input data');
     showToast('Input data cleared. Preferences are kept.', 'success');
@@ -26084,6 +26278,7 @@ async function clearAllData() {
     clearTimeout(persistTimer);
     try { localStorage.removeItem(STORAGE_KEYS.state); } catch (err) { console.error(err); }
     try { localStorage.removeItem(STORAGE_KEYS.welcome); } catch (err) { console.error(err); }
+    clearHostWorkspaceSilently();
     renderCachedDataInfo();
     logAction('session', 'reset all add-on data');
     showToast('All add-on data and preferences reset.', 'success');
@@ -26270,6 +26465,8 @@ const ACTION_HANDLERS = {
     agentTimelineRestore: delegateAction(agentTimelineRestore),
     agentTimelinePlay: delegateAction(agentTimelinePlay),
     agentTimelineExport: delegateAction(agentTimelineExport),
+    agentDraftVignette: delegateAction(agentDraftVignette),
+    setAgentAutoApprove: delegateAction(setAgentAutoApprove),
     agentGrantToday: delegateAction(agentGrantToday),
     agentRevokeToday: delegateAction(agentRevokeToday),
     openChangelogModal: delegateAction(openChangelogModal),
