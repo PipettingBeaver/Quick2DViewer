@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-/OoYQ3AQ7ZHHurVz24wsYlEQ/ng8UQwbDcXpuuveTq4=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-B0o8Yyqrdp5yfDSiOBMsTGkmUYFVFgbdbS4AnpdnfyA=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -10266,6 +10266,27 @@ const AGENT_TOOLS = [
         handler: agentToolRestore
     },
     {
+        id: 'q2dv.literature', name: 'q2dv_literature', title: 'Read curated literature and checklists',
+        tier: 'agent-run', readOnly: true, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
+        input: { type: 'object', properties: { topic: { type: 'string' } } },
+        handler: agentToolLiterature
+    },
+    {
+        id: 'q2dv.reference', name: 'q2dv_reference', title: 'Read the agent tool reference and effects',
+        tier: 'agent-run', readOnly: true, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
+        input: { type: 'object', properties: {} },
+        handler: agentToolReference
+    },
+    {
+        id: 'q2dv.policy', name: 'q2dv_policy', title: 'Read the effective agent policy',
+        tier: 'agent-run', readOnly: true, destructive: false,
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
+        input: { type: 'object', properties: {} },
+        handler: agentToolPolicy
+    },
+    {
         id: 'q2dv.propose', name: 'q2dv_propose', title: 'Propose a decision for review',
         tier: 'agent-run', readOnly: true, destructive: false,
         flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
@@ -10360,6 +10381,7 @@ function agentGrant(kind, scope) {
     if (!key) return false;
     agentGrants[key] = { scope: scope === 'always' ? 'always' : 'today', at: new Date().toISOString() };
     logAction('agent', 'grant ' + key, agentGrants[key].scope);
+    if (typeof saveAgentPolicy === 'function') saveAgentPolicy();
     if (typeof renderAgentGrants === 'function') renderAgentGrants();
     return true;
 }
@@ -10368,6 +10390,7 @@ function agentRevokeGrant(kind) {
     const had = !!agentGrants[key];
     delete agentGrants[key];
     if (had) logAction('agent', 'revoke grant ' + key, '');
+    if (typeof saveAgentPolicy === 'function') saveAgentPolicy();
     if (typeof renderAgentGrants === 'function') renderAgentGrants();
     return had;
 }
@@ -10527,8 +10550,112 @@ async function agentToolDescribe() {
         schema: AGENT_SCHEMA,
         app_version: APP_VERSION,
         tools: agentToolSpecs(),
+        reference: agentReferenceCatalog(),
         host: { kind: detectQ2DVHostMode(), capabilities: caps },
         tiers: AGENT_TIERS.slice()
+    };
+}
+function agentToolEffects(spec) {
+    const flags = (spec && spec.flags) || {};
+    const bits = [];
+    if (spec.readOnly) bits.push('read-only');
+    if (flags.network) bits.push('network');
+    if (flags.writes_files) bits.push('writes files');
+    if (flags.changes_sequence) bits.push('changes sequence');
+    if (spec.destructive) bits.push('destructive');
+    return bits.length ? bits.join(', ') : 'state change';
+}
+function agentReferenceCatalog() {
+    return {
+        schema: 'q2dv.reference/1',
+        app_version: APP_VERSION,
+        tools: AGENT_TOOLS.map(spec => ({
+            id: spec.id,
+            name: spec.name,
+            title: spec.title,
+            tier: spec.tier || 'require-human',
+            readOnly: !!spec.readOnly,
+            destructive: !!spec.destructive,
+            effects: agentToolEffects(spec),
+            approval: (spec.tier === 'require-human' || (spec.flags && (spec.flags.changes_sequence || spec.flags.network))) ? 'human' : 'agent',
+            input: spec.input || {},
+            doc: 'mcp/README.md'
+        }))
+    };
+}
+function agentToolReference() { return agentReferenceCatalog(); }
+let agentLiteratureLast = null;
+async function agentToolLiterature(args) {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.literature !== 'function') throw agentFail('capability_missing', 'The host has no literature registry.');
+    const raw = await host.literature(JSON.stringify({ topic: args.topic || '' }));
+    let res = raw;
+    try { if (typeof raw === 'string') res = JSON.parse(raw); } catch (err) { res = null; }
+    if (!res || res.ok !== true) throw agentFail('upstream_network', (res && res.error) || 'Literature lookup failed.');
+    agentLiteratureLast = res;
+    return res;
+}
+let agentPolicyPath = '';
+let agentPolicyLoaded = false;
+function agentPolicySnapshot() {
+    return {
+        schema: 'q2dv.policy/1',
+        updated_at: new Date().toISOString(),
+        auto_approve: { enabled: !!agentAutoApprove },
+        grants: JSON.parse(JSON.stringify(agentGrants || {})),
+        default_tier: 'require-human'
+    };
+}
+function saveAgentPolicy() {
+    const text = JSON.stringify(agentPolicySnapshot(), null, 2);
+    try { localStorage.setItem('q2dv_agent_policy', text); } catch (err) { /* ignore */ }
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (host && typeof host.savePolicy === 'function') {
+        try {
+            Promise.resolve(host.savePolicy(text)).then(path => {
+                if (path && !String(path).startsWith('error')) agentPolicyPath = String(path);
+            }).catch(err => console.error('Q2DV policy save failed:', err));
+        } catch (err) { console.error('Q2DV policy save failed:', err); }
+    }
+}
+async function loadAgentPolicy() {
+    let text = '';
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (host && typeof host.loadPolicy === 'function') {
+        try { text = await host.loadPolicy(); } catch (err) { text = ''; }
+    }
+    if (!text) {
+        try { text = localStorage.getItem('q2dv_agent_policy') || ''; } catch (err) { text = ''; }
+    }
+    agentPolicyLoaded = true;
+    if (!text) return false;
+    let policy;
+    try { policy = JSON.parse(text); } catch (err) { return false; }
+    if (!policy || policy.schema !== 'q2dv.policy/1') return false;
+    agentAutoApprove = !!(policy.auto_approve && policy.auto_approve.enabled);
+    agentGrants = (policy.grants && typeof policy.grants === 'object') ? policy.grants : {};
+    agentUpdateAutoApprove();
+    agentUpdateBadge();
+    if (agentAutoApprove) showToast('Auto-approve is ON from the saved agent policy. Turn it off in Agent -> decisions.', 'warn');
+    return true;
+}
+async function agentToolPolicy() {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    let stored = null;
+    if (host && typeof host.loadPolicy === 'function') {
+        try {
+            const raw = await host.loadPolicy();
+            if (raw && !String(raw).startsWith('error')) stored = JSON.parse(raw);
+        } catch (err) { stored = null; }
+    }
+    if (!stored) {
+        try { stored = JSON.parse(localStorage.getItem('q2dv_agent_policy') || 'null'); } catch (err) { stored = null; }
+    }
+    return {
+        schema: 'q2dv.policy/1',
+        stored: stored || null,
+        effective: { auto_approve: !!agentAutoApprove, grants: Object.keys(agentGrants || {}).filter(agentGrantActive) },
+        path: agentPolicyPath || null
     };
 }
 const AGENT_COMMAND_PREFIXES = [
@@ -10683,7 +10810,8 @@ async function agentToolRestore() {
     scheduleHostWorkspaceSave();
     return { ok: true, restored: true };
 }
-function agentToolVignette(args) {    const sequence = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
+async function agentToolVignette(args) {
+    const sequence = (parsedTracks && typeof parsedTracks.AA === 'string') ? parsedTracks.AA : '';
     const selection = getCurrentRangesZeroBased().map(([s, e]) => [s + 1, e + 1]);
     const tracks = Object.keys(parsedTracks || {}).filter(key => key !== 'AA').map(key => ({
         id: key,
@@ -10706,6 +10834,33 @@ function agentToolVignette(args) {    const sequence = (parsedTracks && typeof p
     }
     if (selection.length) evidence.push({ kind: 'selection', ranges: selection });
     if (tracks.length) evidence.push({ kind: 'tracks', ids: tracks.map(t => t.id) });
+    let literature = agentLiteratureLast;
+    if (!literature) {
+        const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+        if (host && typeof host.literature === 'function') {
+            try {
+                const raw = await host.literature(JSON.stringify({ topic: 'variant_effect' }));
+                const parsed = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+                if (parsed && parsed.ok === true) { literature = parsed; agentLiteratureLast = parsed; }
+            } catch (err) { literature = null; }
+        }
+    }
+    const defaultChecklist = [
+        { id: 'assay-context', question: 'What assay and context produced the score?', why: 'Fluorescence, viability and binding are not interchangeable.', refs: [] },
+        { id: 'coverage-bias', question: 'How many substitutions per residue were observed?', why: 'Raw density can reflect sampling, not functional importance.', refs: [] },
+        { id: 'epistasis', question: 'Could epistasis or stability thresholds explain the signal?', why: 'Combined effects can be non-additive.', refs: [] },
+        { id: 'mapping', question: 'Was the scan reference aligned to this sequence?', why: 'Offsets and background mutations shift positions.', refs: [] }
+    ];
+    const checklist = (literature && literature.checklists && literature.checklists.variant_effect)
+        ? literature.checklists.variant_effect
+        : defaultChecklist;
+    const citations = [];
+    if (scan) citations.push({ id: scan.urn, title: scan.title, license: scan.license });
+    if (literature && Array.isArray(literature.references)) {
+        literature.references.slice(0, 5).forEach(ref => citations.push({
+            id: ref.id, title: ref.title, doi: ref.doi || '', url: ref.url || ''
+        }));
+    }
     return {
         schema: 'q2dv.vignette/1',
         id: 'vig-' + Date.now().toString(36),
@@ -10746,11 +10901,13 @@ function agentToolVignette(args) {    const sequence = (parsedTracks && typeof p
             'epistasis',
             'coverage and sampling bias'
         ],
+        checklist: checklist.map(item => Object.assign({}, item, { status: 'unanswered' })),
+        literature: (literature && Array.isArray(literature.references)) ? literature.references : [],
         next_tests: top ? [
             'Measure stability for substitutions in ' + top.start + '-' + top.end,
             'Compare 1EMA and 1GFL for the same region'
         ] : ['Load a MaveDB score set or an experimental track'],
-        citations: scan ? [{ id: scan.urn, title: scan.title, license: scan.license }] : [],
+        citations: citations,
         notes: (args && args.notes) ? String(args.notes) : '',
         review: { status: 'proposed', reviewer: '', decision: '' }
     };
@@ -11113,6 +11270,7 @@ function renderAgentDecisions() {
 function openAgentDecisions() {
     agentUpdateBadge();
     agentUpdateAutoApprove();
+    if (!agentPolicyLoaded) loadAgentPolicy();
     renderAgentDecisions();
     renderAgentGrants();
     renderAgentTimeline();
@@ -11185,12 +11343,25 @@ function agentUpdateAutoApprove() {
     const status = document.getElementById('agentAutoStatus');
     if (status) {
         status.textContent = agentAutoApprove
-            ? 'ON for this session: imports, commands and MaveDB run without a card; destructive actions stay blocked; every action is audited.'
-            : 'Off. Destructive actions stay blocked.';
+            ? 'ON and saved in the agent policy: imports, commands and MaveDB run without a card; destructive actions stay blocked; every action is audited.'
+            : 'Off. Destructive actions stay blocked. The saved policy is updated when you change this.';
     }
 }
-function agentDraftVignette() {
-    const vignette = agentToolVignette({ question: 'What does the current evidence suggest about the selected region?' });
+async function setAgentAutoApprove(el) {
+    const next = !!(el && el.checked);
+    if (next && typeof confirmDialog === 'function') {
+        const ok = await confirmDialog('Auto-approve will run imports, commands and MaveDB without decision cards until you turn it off. The setting is saved in the agent policy. Destructive actions stay blocked. Continue?', { okLabel: 'Enable auto-approve', danger: true });
+        if (!ok) { if (el) el.checked = false; return; }
+    }
+    agentAutoApprove = next;
+    agentUpdateAutoApprove();
+    saveAgentPolicy();
+    logAction('agent', agentAutoApprove ? 'auto-approve on' : 'auto-approve off', 'policy');
+    if (agentAutoApprove) showToast('Auto-approve is ON and saved in the agent policy. Destructive actions stay blocked.', 'warn');
+    else showToast('Auto-approve is off.', 'info');
+}
+async function agentDraftVignette() {
+    const vignette = await agentToolVignette({ question: 'What does the current evidence suggest about the selected region?' });
     agentVignetteLast = vignette;
     const out = document.getElementById('agentVignetteOutput');
     const text = JSON.stringify(vignette, null, 2);
@@ -11502,6 +11673,7 @@ function initAgentUi() {
     }
     const args = document.getElementById('agentTryArgs');
     if (args && !args.value) args.value = JSON.stringify(agentTryDefaults(agentTryToolValue));
+    loadAgentPolicy();
 }
 // --- Macro recording + replay (DESIGN 18, slice 1) --------------------------
 // A macro is a JSON list of the session's replayable actions: capability runs
@@ -15438,7 +15610,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.13';
+const APP_VERSION = '0.72.14';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

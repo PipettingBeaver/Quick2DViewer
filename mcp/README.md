@@ -72,6 +72,9 @@ Session grants ("Allow imports for today") are also issued in that panel.
 - `q2dv://snapshot` — bounded session snapshot with sequence hash and models.
 - `q2dv://tracks` — track summaries with source and provenance.
 - `q2dv://timeline` — structured agent action ledger.
+- `q2dv://reference` — every tool with tier, approval mode, effects and inputs.
+- `q2dv://literature` — curated references and blind-spot checklists.
+- `q2dv://policy` — persisted auto-approve and grant policy.
 
 ## Capabilities and commands
 
@@ -94,7 +97,13 @@ backup returns the newest backup path, clear backs up first and removes both the
 page input and the host `current.json`, and restore reapplies the latest backup.
 The severe “Reset all add-on data...” action stays UI-only. `q2dv_vignette`
 assembles a reviewable evidence dossier; it does not approve itself. Session
-auto-approve is a human-only Agent-panel toggle and is never exposed as a tool.
+auto-approve is a human-only Agent-panel toggle, is persisted in
+`~/Q2DV_files/agent/policy.json`, and is never exposed as a tool.
+
+`q2dv_reference` / `q2dv://reference` and `AGENT_REFERENCE.md` are generated from
+the single tool registry, so a new tool appears in the agent-facing reference
+after `npm run agent:tools`. `q2dv_literature` / `q2dv://literature` expose the
+curated references and checklists in `mcp/literature.json`.
 
 Host calls are appended to `~/Q2DV_files/agent/audit.jsonl` (10 MB cap, two
 rotated backups).

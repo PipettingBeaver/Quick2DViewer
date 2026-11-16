@@ -1,13 +1,13 @@
 # Agent access plan: q2dv-mcp, capability registry, and step-flow review
 
-**Status:** Phases 1-5 plus MaveDB, workspace safety and evidence vignettes are
-implemented 2026-11-15 (Q2DV 0.72.13): agent registry and dispatcher, decision
-queue, `q2dv-mcp` stdio server, host socket bridge, activity timeline and
-scenario runner, capability discovery, reviewed command fallback, session
-grants, session auto-approve, rotated audit, host-side MaveDB aggregation,
-backup/clear/restore, and `q2dv.vignette/1`. Structured add-on manifests,
-vignette acceptance UI and the full auto-approval policy file remain. Not a
-production dependency.
+**Status:** Phases 1-5 plus MaveDB, workspace safety, evidence vignettes, a
+persisted policy, an agent reference and a curated literature/checklist layer
+are implemented 2026-11-15 (Q2DV 0.72.14): agent registry and dispatcher,
+decision queue, `q2dv-mcp`, host socket bridge, timeline, scenarios, capability
+discovery, reviewed commands, grants, persisted auto-approve, rotated audit,
+MaveDB aggregation, backup/clear/restore, `q2dv.vignette/1`, `q2dv.reference/1`
+and `q2dv.literature/1`. Vignette acceptance UI, structured add-on manifests and
+the full policy editor remain. Not a production dependency.
 **Baseline:** Q2DV 0.72.1, ChimeraX host 0.6.35, ChimeraX 1.12.
 **Related:** `RECIPE_MODEL.md`, `CHIMERAX_ECOSYSTEM.md`,
 `CHIMERAX_PLUGIN_PLAN.md`, `CHIMERAX_INTEGRATION_PLAN.md`, `DESIGN.md`.

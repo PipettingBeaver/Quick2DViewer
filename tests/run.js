@@ -5442,11 +5442,16 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     const agentToolCache = JSON.parse(fs.readFileSync(path.join(ROOT, 'mcp/tools.json'), 'utf-8'));
     assert(JSON.stringify(agentToolCache.tools.map(t => t.id).sort()) === JSON.stringify(agentSpecs.map(t => t.id).sort()), 'the MCP tool cache matches the app registry');
     assert(agentToolCache.app_version === ctxRun(`APP_VERSION`), 'the MCP tool cache was generated from this app version');
+    const agentReference = JSON.parse(fs.readFileSync(path.join(ROOT, 'mcp/reference.json'), 'utf-8'));
+    assert(agentReference.tools.length === agentSpecs.length && agentSpecs.every(s => agentReference.tools.some(t => t.id === s.id && t.effects)), 'the generated reference covers every tool');
+    const agentReferenceDoc = fs.readFileSync(path.join(ROOT, 'AGENT_REFERENCE.md'), 'utf-8');
+    assert(agentSpecs.every(s => agentReferenceDoc.indexOf(s.id) !== -1), 'the human agent reference lists every tool');
     const agentStatus = await ctxRun(`agentRequest({ id: 't1', action: 'q2dv.status', actor: { kind: 'agent', id: 'test' } })`);
     assert(agentStatus.status === 'ok' && agentStatus.data.schema === 'q2dv.agent/1' && agentStatus.data.app_version === ctxRun(`APP_VERSION`), 'status returns the versioned agent envelope');
     assert(agentStatus.data.host.kind === 'standalone', 'status reports the host mode');
     const agentDesc = await ctxRun(`agentRequest({ action: 'q2dv.describe' })`);
     assert(agentDesc.status === 'ok' && agentDesc.data.tools.some(t => t.id === 'q2dv.snapshot'), 'describe lists the tool registry');
+    assert(agentDesc.data.reference.tools.length === agentSpecs.length, 'describe carries the tool reference');
     assert(Array.isArray(agentDesc.data.host.capabilities), 'describe reports host capabilities');
     const agentEval = await ctxRun(`agentRequest({ action: 'q2dv.eval', args: { code: '1' } })`);
     assert(agentEval.status === 'error' && agentEval.error.code === 'validation', 'an unregistered action is rejected (no arbitrary eval)');
@@ -5595,6 +5600,32 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     await ctxRun(`agentApproveDecision(${JSON.stringify(agentRestore.decision.id)})`);
     assert(ctxRun(`parsedTracks.AA.length`) === 4, 'restoring the latest backup brings the input back');
     ctxRun(`window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
+    ctxRun(`parsedTracks = { AA: 'M'.repeat(10) };`);
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        literature() {
+            return Promise.resolve(JSON.stringify({
+                ok: true, schema: 'q2dv.literature/1',
+                references: [{ id: 'sarkisyan2016', title: 'GFP landscape', doi: '10.1038/nature17995' }],
+                checklists: { variant_effect: [{ id: 'assay-context', question: 'Assay?', why: 'Context matters.', refs: ['sarkisyan2016'] }] }
+            }));
+        },
+        savePolicy(text) { sandbox.__policyText = text; return Promise.resolve('/home/tan/Q2DV_files/agent/policy.json'); },
+        loadPolicy() { return Promise.resolve(sandbox.__policyText || ''); }
+    };
+    ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+    const agentLit = await ctxRun(`agentRequest({ action: 'q2dv.literature', args: { topic: 'dms' } })`);
+    assert(agentLit.status === 'ok' && agentLit.data.references[0].id === 'sarkisyan2016', 'literature lookup returns curated references');
+    const agentVigLit = await ctxRun(`agentRequest({ action: 'q2dv.vignette', args: { question: 'lit test' } })`);
+    assert(agentVigLit.status === 'ok' && agentVigLit.data.checklist.length === 1 && agentVigLit.data.checklist[0].id === 'assay-context', 'a vignette includes the literature checklist');
+    assert(agentVigLit.data.citations.some(c => c.doi === '10.1038/nature17995'), 'the vignette carries verified citation metadata');
+    ctxRun(`agentAutoApprove = true; agentGrants = { imports: { scope: 'today', at: new Date().toISOString() } }; saveAgentPolicy();`);
+    const agentPolicySaved = JSON.parse(sandbox.__policyText || '{}');
+    assert(agentPolicySaved.schema === 'q2dv.policy/1' && agentPolicySaved.auto_approve.enabled === true && agentPolicySaved.grants.imports, 'the policy file stores auto-approve and grants');
+    ctxRun(`agentAutoApprove = false; agentGrants = {};`);
+    await ctxRun(`loadAgentPolicy()`);
+    assert(ctxRun(`agentAutoApprove`) === true && ctxRun(`agentGrantActive('imports')`) === true, 'the saved policy is applied on load');
+    ctxRun(`agentAutoApprove = false; agentGrants = {}; saveAgentPolicy(); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
     ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);
     assert(agentTryImport.status === 'human_required' && ctxRun(`agentDecisionPendingCount()`) === 1, 'the panel queues a request without a console');

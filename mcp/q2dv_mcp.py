@@ -33,6 +33,9 @@ RESOURCES = [
     {"uri": "q2dv://snapshot", "name": "Q2DV snapshot", "description": "Bounded session snapshot with sequence hash, tracks and host models.", "mimeType": "application/json"},
     {"uri": "q2dv://tracks", "name": "Q2DV tracks", "description": "Track summaries with source and provenance.", "mimeType": "application/json"},
     {"uri": "q2dv://timeline", "name": "Q2DV agent timeline", "description": "The structured agent action ledger for this session.", "mimeType": "application/json"},
+    {"uri": "q2dv://reference", "name": "Q2DV agent tool reference", "description": "Every tool with its tier, approval mode, effects and inputs.", "mimeType": "application/json"},
+    {"uri": "q2dv://literature", "name": "Q2DV literature and checklists", "description": "Curated references and blind-spot checklists for vignettes.", "mimeType": "application/json"},
+    {"uri": "q2dv://policy", "name": "Q2DV agent policy", "description": "Persisted auto-approve and grant policy.", "mimeType": "application/json"},
 ]
 
 
@@ -245,6 +248,28 @@ def resource_request(uri, arguments):
 def handle_resources_read(request_id, params):
     params = params or {}
     uri = params.get("uri")
+    if uri in ("q2dv://reference", "q2dv://literature", "q2dv://policy"):
+        if uri == "q2dv://reference":
+            path = HERE / "reference.json"
+            if not path.is_file():
+                path = HERE / "tools.json"
+        elif uri == "q2dv://literature":
+            path = HERE / "literature.json"
+        else:
+            path = Path.home() / "Q2DV_files" / "agent" / "policy.json"
+            if not path.is_file():
+                text = json.dumps({
+                    "schema": "q2dv.policy/1",
+                    "auto_approve": {"enabled": False},
+                    "grants": {},
+                    "note": "No policy file yet.",
+                }, indent=2)
+                return rpc_result(request_id, {"contents": [{"uri": uri, "mimeType": "application/json", "text": text}]})
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            return rpc_error(request_id, -32603, "Could not read %s: %s" % (uri, exc))
+        return rpc_result(request_id, {"contents": [{"uri": uri, "mimeType": "application/json", "text": text}]})
     spec = resource_request(uri, None)
     if not spec:
         return rpc_error(request_id, -32602, "Unknown resource: %s" % uri)

@@ -87,14 +87,37 @@ try {
 }
 
 const tools = vm.runInContext('agentToolSpecs()', sandbox);
+const reference = vm.runInContext('agentToolReference()', sandbox);
 const version = vm.runInContext('APP_VERSION', sandbox);
 const payload = {
   schema: 'q2dv.tool-cache/1',
   app_version: version,
   generated_at: new Date().toISOString(),
-  tools
+  tools,
+  reference
 };
 const target = path.join(ROOT, 'mcp', 'tools.json');
 fs.mkdirSync(path.dirname(target), { recursive: true });
 fs.writeFileSync(target, JSON.stringify(payload, null, 2) + '\n');
+
+const refTarget = path.join(ROOT, 'mcp', 'reference.json');
+fs.writeFileSync(refTarget, JSON.stringify(reference, null, 2) + '\n');
+
+const lines = [
+  '# Agent tool reference',
+  '',
+  'Generated from `AGENT_TOOLS` in `index.html` by `npm run agent:tools`.',
+  'Do not edit by hand.',
+  '',
+  '| Tool | Tier | Approval | Effects | Input |',
+  '|---|---|---|---|---|'
+];
+reference.tools.forEach(tool => {
+  const input = Object.keys((tool.input && tool.input.properties) || {}).join(', ') || '-';
+  lines.push('| `' + tool.id + '` | ' + tool.tier + ' | ' + tool.approval + ' | ' + tool.effects + ' | ' + input + ' |');
+});
+lines.push('', 'Human documentation: `mcp/README.md` and `MCP_AGENT_PLAN.md`.', '');
+fs.writeFileSync(path.join(ROOT, 'AGENT_REFERENCE.md'), lines.join('\n'));
+
 console.log('wrote ' + target + ' (' + tools.length + ' tools, app ' + version + ')');
+console.log('wrote ' + refTarget + ' and AGENT_REFERENCE.md');

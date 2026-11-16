@@ -1,7 +1,7 @@
 {
   "schema": "q2dv.tool-cache/1",
-  "app_version": "0.72.13",
-  "generated_at": "2026-11-16T06:56:05.246Z",
+  "app_version": "0.72.14",
+  "generated_at": "2026-11-16T09:12:11.597Z",
   "tools": [
     {
       "id": "q2dv.status",
@@ -385,6 +385,64 @@
       }
     },
     {
+      "id": "q2dv.literature",
+      "name": "q2dv_literature",
+      "title": "Read curated literature and checklists",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "id": "q2dv.reference",
+      "name": "q2dv_reference",
+      "title": "Read the agent tool reference and effects",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "id": "q2dv.policy",
+      "name": "q2dv_policy",
+      "title": "Read the effective agent policy",
+      "tier": "agent-run",
+      "readOnly": true,
+      "destructive": false,
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
       "id": "q2dv.propose",
       "name": "q2dv_propose",
       "title": "Propose a decision for review",
@@ -484,5 +542,484 @@
         }
       }
     }
-  ]
+  ],
+  "reference": {
+    "schema": "q2dv.reference/1",
+    "app_version": "0.72.14",
+    "tools": [
+      {
+        "id": "q2dv.status",
+        "name": "q2dv_status",
+        "title": "Read application status",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.snapshot",
+        "name": "q2dv_snapshot",
+        "title": "Read a bounded session snapshot",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {
+            "track_limit": {
+              "type": "integer"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.list_tracks",
+        "name": "q2dv_list_tracks",
+        "title": "List loaded tracks",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer"
+            },
+            "offset": {
+              "type": "integer"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.read_track",
+        "name": "q2dv_read_track",
+        "title": "Read a slice of one track",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "required": [
+            "track"
+          ],
+          "properties": {
+            "track": {
+              "type": "string"
+            },
+            "start": {
+              "type": "integer"
+            },
+            "end": {
+              "type": "integer"
+            },
+            "max": {
+              "type": "integer"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.describe",
+        "name": "q2dv_describe",
+        "title": "Describe tools and host capabilities",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.host_capabilities",
+        "name": "q2dv_host_capabilities",
+        "title": "Describe the ChimeraX host and installed add-ons",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.command",
+        "name": "q2dv_command",
+        "title": "Run an allowlisted ChimeraX command",
+        "tier": "require-human",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "writes files",
+        "approval": "human",
+        "input": {
+          "type": "object",
+          "required": [
+            "command"
+          ],
+          "properties": {
+            "command": {
+              "type": "string"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.select",
+        "name": "q2dv_select",
+        "title": "Set the residue selection",
+        "tier": "agent-run",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "state change",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "required": [
+            "ranges"
+          ],
+          "properties": {
+            "ranges": {
+              "type": "array",
+              "items": {
+                "type": "array"
+              },
+              "minItems": 1
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.import",
+        "name": "q2dv_import",
+        "title": "Import a sequence or PDB entry",
+        "tier": "require-human",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "network, changes sequence",
+        "approval": "human",
+        "input": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "sequence",
+                "pdb",
+                "file"
+              ]
+            },
+            "sequence": {
+              "type": "string"
+            },
+            "fasta": {
+              "type": "string"
+            },
+            "pdb": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.run",
+        "name": "q2dv_run",
+        "title": "Run a read-only analysis recipe",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "required": [
+            "recipe"
+          ],
+          "properties": {
+            "recipe": {
+              "type": "string"
+            },
+            "track": {
+              "type": "string"
+            },
+            "structure": {
+              "type": "string"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.mavedb",
+        "name": "q2dv_mavedb",
+        "title": "Fetch and analyze a MaveDB deep mutational scan",
+        "tier": "require-human",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "network, writes files",
+        "approval": "human",
+        "input": {
+          "type": "object",
+          "properties": {
+            "urn": {
+              "type": "string"
+            },
+            "weights": {
+              "type": "object"
+            },
+            "window": {
+              "type": "integer"
+            },
+            "min_variants": {
+              "type": "integer"
+            },
+            "threshold": {
+              "type": "number"
+            },
+            "refresh": {
+              "type": "boolean"
+            },
+            "cache_only": {
+              "type": "boolean"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.vignette",
+        "name": "q2dv_vignette",
+        "title": "Draft a reviewable evidence vignette",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.backup",
+        "name": "q2dv_backup",
+        "title": "Save a workspace backup",
+        "tier": "agent-run",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "state change",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.clear_input",
+        "name": "q2dv_clear_input",
+        "title": "Clear the loaded input data (backup first)",
+        "tier": "require-human",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "changes sequence",
+        "approval": "human",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.restore",
+        "name": "q2dv_restore",
+        "title": "Restore the latest workspace backup",
+        "tier": "require-human",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "changes sequence",
+        "approval": "human",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.literature",
+        "name": "q2dv_literature",
+        "title": "Read curated literature and checklists",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {
+            "topic": {
+              "type": "string"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.reference",
+        "name": "q2dv_reference",
+        "title": "Read the agent tool reference and effects",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.policy",
+        "name": "q2dv_policy",
+        "title": "Read the effective agent policy",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.propose",
+        "name": "q2dv_propose",
+        "title": "Propose a decision for review",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {
+            "tool": {
+              "type": "string"
+            },
+            "tier": {
+              "type": "string",
+              "enum": [
+                "require-human",
+                "agent-run",
+                "info",
+                "denied"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "why": {
+              "type": "string"
+            },
+            "expected": {
+              "type": "string"
+            },
+            "args": {
+              "type": "object"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.decide",
+        "name": "q2dv_decide",
+        "title": "Approve or reject a pending decision",
+        "tier": "agent-run",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "state change",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "required": [
+            "id",
+            "approve"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "approve": {
+              "type": "boolean"
+            },
+            "token": {
+              "type": "string"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.ledger",
+        "name": "q2dv_ledger",
+        "title": "Read the agent action ledger",
+        "tier": "agent-run",
+        "readOnly": true,
+        "destructive": false,
+        "effects": "read-only",
+        "approval": "agent",
+        "input": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer"
+            },
+            "since_seq": {
+              "type": "integer"
+            }
+          }
+        },
+        "doc": "mcp/README.md"
+      }
+    ]
+  }
 }

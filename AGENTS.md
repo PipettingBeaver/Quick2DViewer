@@ -64,6 +64,19 @@ No lint, typecheck, formatter, or CI is configured.
 - Run via `file://` or `python3 -m http.server`; in-app fetches of `CHANGELOG.md` /
   `WORKFLOW.md` behave differently under `file://` (a fallback link is shown).
 
+## Agent surface
+
+- Any feature an agent should use must be a registered `AGENT_TOOLS` entry (or a
+  host capability/command), with tier, flags and input schema, plus a check in
+  `tests/run.js`. After adding one, run `npm run agent:tools` to regenerate
+  `mcp/tools.json`, `mcp/reference.json` and `AGENT_REFERENCE.md`.
+- The reference is derived from the registry and tests fail if a tool is missing;
+  this keeps agent-facing scope/effects and human docs in sync.
+- UI-only features stay human-only until a tool or capability is added. Do not
+  claim agent access without one.
+- Update `mcp/literature.json` when a claim's evidence base changes; vignettes
+  cite only verified entries.
+
 ## Definition of done
 - `npm run csp` has been run after the last script edit, and `npm test` passes,
   including the CSP hash check and the release invariant (`APP_VERSION` == top
