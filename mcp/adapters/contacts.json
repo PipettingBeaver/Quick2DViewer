@@ -1,0 +1,22 @@
+{
+  "schema": "q2dv.capability/1",
+  "id": "chimerax.contacts",
+  "kind": "addon",
+  "bundle": "ChimeraX-Contacts",
+  "version": "1.0.1",
+  "probe": { "command": "contacts" },
+  "actions": [
+    {
+      "id": "chimerax.contacts.query",
+      "mode": "command",
+      "title": "Find contacts for an atom spec",
+      "command": "contacts {atoms} radius {radius}",
+      "args": {
+        "atoms": { "type": "string", "description": "ChimeraX atom spec, for example /A:65-67" },
+        "radius": { "type": "number", "description": "Distance cutoff in Angstrom" }
+      },
+      "effects": ["writes contact pairs to the ChimeraX log"],
+      "review": true
+    }
+  ]
+}

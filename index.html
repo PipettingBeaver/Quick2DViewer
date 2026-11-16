@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-B0o8Yyqrdp5yfDSiOBMsTGkmUYFVFgbdbS4AnpdnfyA=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-v0pJaCAhI2UF1KeLqxe8gWtHmGV/uFku68/TXgZ5I9Y=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -643,6 +643,14 @@
         .agent-timeline-row .meta { color: #64748b; }
         .agent-timeline-row .why { grid-column: 1 / -1; color: #334155; }
         .agent-scenario { margin-top: 8px; max-height: 30vh; overflow: auto; font-size: 0.68rem; white-space: pre-wrap; }
+        .agent-vignette { margin-top: 10px; border: 1px solid #ddd6fe; border-radius: 8px; background: #faf5ff; padding: 10px 12px; }
+        .agent-vignette-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+        .agent-vignette-block { margin-top: 8px; font-size: 0.74rem; color: #334155; }
+        .agent-vignette-line { margin-top: 2px; color: #475569; overflow-wrap: anywhere; }
+        .agent-vignette-checklist { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+        .agent-vignette-checklist label { display: flex; gap: 6px; align-items: flex-start; }
+        .agent-vignette-review { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .agent-vignette-cite { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
         [data-q2dv-host="chimerax"] [data-action="menuBarAction"][data-arg="p3d"] { display: none !important; }
         [data-q2dv-host="chimerax"] #p3dViewer { display: none !important; }
         [data-q2dv-host="chimerax"] [data-action="handlePasteFromClipboard"],
@@ -2780,6 +2788,10 @@
         html[data-theme="dark"] .agent-timeline-row .tool,
         html[data-theme="dark"] .agent-timeline-row .why { color: var(--q2dv-text); }
         html[data-theme="dark"] .agent-scenario { background: var(--q2dv-panel-3); color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-vignette { background: #1e1033; border-color: #5b21b6; }
+        html[data-theme="dark"] .agent-vignette-block { color: var(--q2dv-text); }
+        html[data-theme="dark"] .agent-vignette-line,
+        html[data-theme="dark"] .agent-vignette-cite { color: var(--q2dv-muted); }
         html[data-theme="dark"] .menubar-menu button { color: var(--q2dv-text); }
         html[data-theme="dark"] .menubar-menu button:hover {
             background: var(--q2dv-panel-3);
@@ -4316,6 +4328,7 @@
             </div>
             <div id="agentTimelineList" class="agent-timeline-list"></div>
             <pre id="agentScenarioOutput" class="data-box agent-scenario" hidden></pre>
+            <div id="agentVignetteCard" class="agent-vignette" hidden></div>
             <pre id="agentVignetteOutput" class="data-box agent-scenario" hidden></pre>
         </details>
     </div>
@@ -10287,6 +10300,17 @@ const AGENT_TOOLS = [
         handler: agentToolPolicy
     },
     {
+        id: 'q2dv.addon', name: 'q2dv_addon', title: 'Run a structured ChimeraX add-on action',
+        tier: 'require-human', readOnly: false, destructive: false, grantClass: 'commands',
+        flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
+        input: {
+            type: 'object',
+            required: ['id', 'action'],
+            properties: { id: { type: 'string' }, action: { type: 'string' }, args: { type: 'object' } }
+        },
+        handler: agentToolAddon
+    },
+    {
         id: 'q2dv.propose', name: 'q2dv_propose', title: 'Propose a decision for review',
         tier: 'agent-run', readOnly: true, destructive: false,
         flags: { reversible: true, network: false, writes_files: false, changes_sequence: false },
@@ -10658,6 +10682,38 @@ async function agentToolPolicy() {
         path: agentPolicyPath || null
     };
 }
+async function agentToolAddon(args) {
+    const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
+    if (!host || typeof host.addonManifests !== 'function') throw agentFail('capability_missing', 'The host has no add-on manifests.');
+    const raw = await host.addonManifests();
+    let data = raw;
+    try { if (typeof raw === 'string') data = JSON.parse(raw); } catch (err) { data = null; }
+    if (!data || data.ok !== true) throw agentFail('upstream_network', (data && data.error) || 'Could not load add-on manifests.');
+    const manifest = (data.manifests || []).find(item => item.id === args.id);
+    if (!manifest) throw agentFail('validation', 'Unknown add-on manifest: ' + args.id);
+    const action = (manifest.actions || []).find(item => item.id === args.action);
+    if (!action) throw agentFail('validation', 'Unknown action: ' + args.action);
+    if (action.mode && action.mode !== 'command') throw agentFail('capability_missing', 'Structured query actions are not implemented yet.');
+    const values = args.args || {};
+    const schema = action.args || {};
+    Object.keys(schema).forEach(name => {
+        const spec = schema[name] || {};
+        const value = values[name];
+        if (value === undefined || value === null || value === '') throw agentFail('validation', 'Missing argument: ' + name);
+        if (spec.type === 'number' && !isFinite(Number(value))) throw agentFail('validation', 'Argument ' + name + ' must be a number');
+        if (spec.pattern && !(new RegExp(spec.pattern).test(String(value)))) throw agentFail('validation', 'Argument ' + name + ' has an invalid format');
+    });
+    let command = String(action.command || '');
+    command = command.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => {
+        if (!(name in values)) throw agentFail('validation', 'Missing argument: ' + name);
+        return String(values[name]);
+    });
+    if (!command || /[\n;]/.test(command)) throw agentFail('validation', 'Malformed command');
+    if (typeof host.runAgentCommand !== 'function') throw agentFail('capability_missing', 'The host cannot run agent commands.');
+    const result = await host.runAgentCommand(command);
+    if (String(result).startsWith('error')) throw agentFail('policy_denied', String(result));
+    return { ok: true, manifest: manifest.id, action: action.id, command: command };
+}
 const AGENT_COMMAND_PREFIXES = [
     'select ', 'color ', 'label ', 'contacts ', 'clashes ', 'hbonds ', 'setattr ',
     'save ', 'view ', 'lighting ', 'measure ', 'distance ', 'angle ', 'torsion ',
@@ -10861,7 +10917,7 @@ async function agentToolVignette(args) {
             id: ref.id, title: ref.title, doi: ref.doi || '', url: ref.url || ''
         }));
     }
-    return {
+    const vignette = {
         schema: 'q2dv.vignette/1',
         id: 'vig-' + Date.now().toString(36),
         question: (args && args.question) ? String(args.question) : 'What does the current evidence suggest about the selected region?',
@@ -10911,6 +10967,8 @@ async function agentToolVignette(args) {
         notes: (args && args.notes) ? String(args.notes) : '',
         review: { status: 'proposed', reviewer: '', decision: '' }
     };
+    agentVignetteLast = vignette;
+    return vignette;
 }
 async function agentToolMavedb(args) {
     const host = (typeof window !== 'undefined') ? window.Q2DVHost : null;
@@ -11139,9 +11197,13 @@ window.q2dvAgent = {
     lastMavedb: () => agentMavedbLast,
     vignette: agentToolVignette,
     lastVignette: () => agentVignetteLast,
+    reviewVignette: agentReviewVignette,
+    vignetteMarkdown: agentVignetteMarkdown,
+    exportVignette: agentExportVignette,
     backup: agentToolBackup,
     clearInput: agentToolClearInput,
     restore: agentToolRestore,
+    addon: agentToolAddon,
     grants: renderAgentGrants
 };
 
@@ -11363,12 +11425,164 @@ async function setAgentAutoApprove(el) {
 async function agentDraftVignette() {
     const vignette = await agentToolVignette({ question: 'What does the current evidence suggest about the selected region?' });
     agentVignetteLast = vignette;
+    renderAgentVignette(vignette);
     const out = document.getElementById('agentVignetteOutput');
     const text = JSON.stringify(vignette, null, 2);
-    if (out) { out.hidden = false; out.textContent = text; }
+    if (out) { out.hidden = true; out.textContent = text; }
     const ok = legacyCopyText(text);
     agentDecisionNotice(ok ? 'Vignette copied (' + vignette.id + ').' : 'Vignette drafted (' + vignette.id + ').');
     return vignette;
+}
+function renderAgentVignette(vignette) {
+    const card = document.getElementById('agentVignetteCard');
+    if (!card) return;
+    card.innerHTML = '';
+    if (!vignette) { card.hidden = true; return; }
+    card.hidden = false;
+    const head = agentEl('div', 'agent-vignette-head');
+    head.appendChild(agentEl('strong', '', vignette.question || 'Evidence vignette'));
+    head.appendChild(agentEl('span', 'agent-tier', (vignette.review && vignette.review.status) || 'proposed'));
+    card.appendChild(head);
+    if (vignette.hypothesis) card.appendChild(agentEl('p', 'agent-why', vignette.hypothesis));
+    const evidence = agentEl('div', 'agent-vignette-block');
+    evidence.appendChild(agentEl('strong', '', 'Evidence'));
+    (vignette.evidence || []).forEach(item => {
+        const text = [item.kind, item.id, item.title].filter(Boolean).join(': ') +
+            (item.ranges ? ' ' + JSON.stringify(item.ranges) : '');
+        evidence.appendChild(agentEl('div', 'agent-vignette-line', text));
+    });
+    card.appendChild(evidence);
+    if (vignette.analysis && Array.isArray(vignette.analysis.top_clusters) && vignette.analysis.top_clusters.length) {
+        const analysis = agentEl('div', 'agent-vignette-block');
+        analysis.appendChild(agentEl('strong', '', 'Top clusters'));
+        vignette.analysis.top_clusters.forEach(cluster => {
+            analysis.appendChild(agentEl('div', 'agent-vignette-line',
+                cluster.start + '-' + cluster.end + ' - combined ' + Number(cluster.score).toFixed(2) +
+                ' (coverage ' + Number(cluster.coverage).toFixed(2) + ', effect ' + Number(cluster.effect).toFixed(2) +
+                ', deleterious ' + Number(cluster.deleterious).toFixed(2) + ', n=' + cluster.n + ')'));
+        });
+        card.appendChild(analysis);
+    }
+    if (Array.isArray(vignette.uncertainty) && vignette.uncertainty.length) {
+        const uncertainty = agentEl('div', 'agent-vignette-block');
+        uncertainty.appendChild(agentEl('strong', '', 'Uncertainty'));
+        vignette.uncertainty.forEach(item => uncertainty.appendChild(agentEl('div', 'agent-vignette-line', item)));
+        card.appendChild(uncertainty);
+    }
+    if (Array.isArray(vignette.checklist) && vignette.checklist.length) {
+        const checklist = agentEl('div', 'agent-vignette-block');
+        checklist.appendChild(agentEl('strong', '', 'Checklist'));
+        const list = agentEl('div', 'agent-vignette-checklist');
+        vignette.checklist.forEach(item => {
+            const label = agentEl('label');
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.checked = item.status === 'checked';
+            box.addEventListener('change', () => { item.status = box.checked ? 'checked' : 'unanswered'; });
+            label.appendChild(box);
+            label.appendChild(agentEl('span', '', (item.question || item.id) + (item.why ? ' - ' + item.why : '')));
+            list.appendChild(label);
+        });
+        checklist.appendChild(list);
+        card.appendChild(checklist);
+    }
+    if (Array.isArray(vignette.citations) && vignette.citations.length) {
+        const citations = agentEl('div', 'agent-vignette-block');
+        citations.appendChild(agentEl('strong', '', 'Citations'));
+        vignette.citations.forEach(item => {
+            citations.appendChild(agentEl('div', 'agent-vignette-cite',
+                [item.title || item.id, item.doi ? 'doi:' + item.doi : '', item.url || ''].filter(Boolean).join(' - ')));
+        });
+        card.appendChild(citations);
+    }
+    const review = agentEl('div', 'agent-vignette-review');
+    const accept = agentEl('button', 'tb-btn tb-btn-primary', 'Accept');
+    accept.type = 'button';
+    accept.addEventListener('click', () => agentReviewVignette('accepted'));
+    const revise = agentEl('button', 'tb-btn tb-btn-secondary', 'Needs revision');
+    revise.type = 'button';
+    revise.addEventListener('click', () => agentReviewVignette('needs-revision'));
+    const reject = agentEl('button', 'tb-btn tb-btn-secondary', 'Reject');
+    reject.type = 'button';
+    reject.addEventListener('click', () => agentReviewVignette('rejected'));
+    const exportButton = agentEl('button', 'tb-btn tb-btn-secondary', 'Copy Markdown');
+    exportButton.type = 'button';
+    exportButton.addEventListener('click', agentExportVignette);
+    review.appendChild(accept);
+    review.appendChild(revise);
+    review.appendChild(reject);
+    review.appendChild(exportButton);
+    card.appendChild(review);
+}
+function agentReviewVignette(decision) {
+    if (!agentVignetteLast) return null;
+    const allowed = ['accepted', 'needs-revision', 'rejected'];
+    const status = allowed.indexOf(decision) === -1 ? 'needs-revision' : decision;
+    agentVignetteLast.review = Object.assign({}, agentVignetteLast.review, {
+        status: status,
+        reviewer: 'human',
+        decision: status,
+        at: new Date().toISOString()
+    });
+    agentRecordEvent({
+        actor: { kind: 'human', id: 'review' },
+        call: { tool: 'q2dv.vignette', args: { id: agentVignetteLast.id } },
+        rationale: ['Human review of the drafted vignette.'],
+        evidence: agentVignetteLast.evidence || [],
+        status: 'ok',
+        duration_ms: 0,
+        result: { summary: 'Vignette ' + status + ' (' + agentVignetteLast.id + ')' }
+    });
+    renderAgentVignette(agentVignetteLast);
+    showToast('Vignette ' + status + '.', status === 'accepted' ? 'success' : 'info');
+    return agentVignetteLast.review;
+}
+function agentVignetteMarkdown(vignette) {
+    if (!vignette) return '';
+    const lines = [];
+    lines.push('# ' + (vignette.question || 'Evidence vignette'));
+    lines.push('');
+    lines.push('Status: ' + ((vignette.review && vignette.review.status) || 'proposed'));
+    lines.push('');
+    if (vignette.hypothesis) {
+        lines.push('## Hypothesis');
+        lines.push('');
+        lines.push(vignette.hypothesis);
+        lines.push('');
+    }
+    lines.push('## Evidence');
+    (vignette.evidence || []).forEach(item => lines.push('- ' + [item.kind, item.id, item.title].filter(Boolean).join(': ')));
+    if (vignette.analysis && Array.isArray(vignette.analysis.top_clusters)) {
+        lines.push('');
+        lines.push('## Analysis');
+        vignette.analysis.top_clusters.forEach(cluster => lines.push('- ' + cluster.start + '-' + cluster.end + ': combined ' + Number(cluster.score).toFixed(2) + ', n=' + cluster.n));
+    }
+    if (Array.isArray(vignette.uncertainty) && vignette.uncertainty.length) {
+        lines.push('');
+        lines.push('## Uncertainty');
+        vignette.uncertainty.forEach(item => lines.push('- ' + item));
+    }
+    if (Array.isArray(vignette.checklist) && vignette.checklist.length) {
+        lines.push('');
+        lines.push('## Checklist');
+        vignette.checklist.forEach(item => lines.push('- [' + (item.status === 'checked' ? 'x' : ' ') + '] ' + (item.question || item.id)));
+    }
+    if (Array.isArray(vignette.citations) && vignette.citations.length) {
+        lines.push('');
+        lines.push('## Citations');
+        vignette.citations.forEach(item => lines.push('- ' + [item.title || item.id, item.doi ? 'doi:' + item.doi : '', item.url || ''].filter(Boolean).join(' ')));
+    }
+    if (vignette.review && vignette.review.decision) lines.push('', 'Review: ' + vignette.review.decision);
+    return lines.join('\n');
+}
+function agentExportVignette() {
+    if (!agentVignetteLast) return false;
+    const text = agentVignetteMarkdown(agentVignetteLast);
+    const out = document.getElementById('agentVignetteOutput');
+    if (out) { out.hidden = false; out.textContent = text; }
+    const ok = legacyCopyText(text);
+    agentDecisionNotice(ok ? 'Vignette Markdown copied.' : 'Markdown shown below.');
+    return ok;
 }
 function agentRevokeToday(kind) {
     const key = String(kind || '').trim();
@@ -15610,7 +15824,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.14';
+const APP_VERSION = '0.72.15';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

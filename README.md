@@ -13,6 +13,7 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
 - `CHIMERAX_PLUGIN_PLAN.md` — ChimeraX-first plugin plan, host architecture, add-on review and phased roadmap.
 - `CHIMERAX_STARTUP.md` — CliX + Q2DV startup configuration for ChimeraX.
 - `CHIMERAX_ECOSYSTEM.md` — working map of ChimeraX add-ons and their possible data exchange with Q2DV.
+- `CHIMERAX_ADDON_AUDIT.md` — installed/absent add-on audit, demo priorities, and the command/query manifest plan.
 - `DEMO_ROADMAP.md` — two-week implementation, review and test plan using GFP and LacY.
 - `CHIMERAX_INTEGRATION_PLAN.md` — storage redesign, window/layout presets and host-offload roadmap.
 - `MCP_AGENT_PLAN.md` — `q2dv-mcp` domain-layer design: capability registry, decision tiers, step-flow review and test scenarios.

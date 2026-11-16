@@ -105,6 +105,17 @@ the single tool registry, so a new tool appears in the agent-facing reference
 after `npm run agent:tools`. `q2dv_literature` / `q2dv://literature` expose the
 curated references and checklists in `mcp/literature.json`.
 
+`q2dv_addon` runs a declared action from `mcp/adapters/*.json` or
+`~/Q2DV_files/adapters/*.json`. Manifests are `q2dv.capability/1`; the first
+ones cover Mutation Scores and Contacts and are command-only. Arguments are
+validated, the rendered command is reviewed, and the existing `commands` grant
+applies. See `CHIMERAX_ADDON_AUDIT.md` for the candidate set and the structured
+query criteria.
+
+Vignettes are reviewed in the Agent panel: evidence, clusters, checklist,
+citations, Accept / Needs revision / Reject and Markdown export. A review is a
+human event; acceptance does not promote a claim automatically.
+
 Host calls are appended to `~/Q2DV_files/agent/audit.jsonl` (10 MB cap, two
 rotated backups).
 

@@ -5619,13 +5619,48 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     const agentVigLit = await ctxRun(`agentRequest({ action: 'q2dv.vignette', args: { question: 'lit test' } })`);
     assert(agentVigLit.status === 'ok' && agentVigLit.data.checklist.length === 1 && agentVigLit.data.checklist[0].id === 'assay-context', 'a vignette includes the literature checklist');
     assert(agentVigLit.data.citations.some(c => c.doi === '10.1038/nature17995'), 'the vignette carries verified citation metadata');
+    ctxRun(`renderAgentVignette(agentVignetteLast)`);
+    assert(ctxRun(`document.getElementById('agentVignetteCard').hidden`) === false, 'the vignette card is rendered');
+    assert(ctxRun(`agentVignetteLast.checklist[0].status`) === 'unanswered', 'checklist items start unanswered');
+    ctxRun(`agentVignetteLast.checklist[0].status = 'checked'; agentReviewVignette('accepted');`);
+    assert(ctxRun(`agentVignetteLast.review.status`) === 'accepted', 'the human can accept a vignette');
+    const agentVigMd = ctxRun(`agentVignetteMarkdown(agentVignetteLast)`);
+    assert(agentVigMd.indexOf('## Checklist') !== -1 && agentVigMd.indexOf('- [x]') !== -1 && agentVigMd.indexOf('doi:10.1038/nature17995') !== -1, 'vignette Markdown includes the checklist and citations');
     ctxRun(`agentAutoApprove = true; agentGrants = { imports: { scope: 'today', at: new Date().toISOString() } }; saveAgentPolicy();`);
     const agentPolicySaved = JSON.parse(sandbox.__policyText || '{}');
     assert(agentPolicySaved.schema === 'q2dv.policy/1' && agentPolicySaved.auto_approve.enabled === true && agentPolicySaved.grants.imports, 'the policy file stores auto-approve and grants');
     ctxRun(`agentAutoApprove = false; agentGrants = {};`);
     await ctxRun(`loadAgentPolicy()`);
     assert(ctxRun(`agentAutoApprove`) === true && ctxRun(`agentGrantActive('imports')`) === true, 'the saved policy is applied on load');
-    ctxRun(`agentAutoApprove = false; agentGrants = {}; saveAgentPolicy(); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
+    ctxRun(`agentAutoApprove = false; agentGrants = {}; saveAgentPolicy();`);
+    sandbox.Q2DVHost = {
+        kind: 'chimerax',
+        addonManifests() {
+            return Promise.resolve(JSON.stringify({
+                ok: true,
+                manifests: [{
+                    id: 'chimerax.mutationscores',
+                    actions: [{
+                        id: 'chimerax.mutationscores.open_mavedb',
+                        mode: 'command',
+                        command: 'open {id} from mavedb',
+                        args: { id: { type: 'string', pattern: '^[0-9]+$' } }
+                    }]
+                }]
+            }));
+        },
+        runAgentCommand(command) { sandbox.__lastAddonCommand = command; return Promise.resolve('ok'); }
+    };
+    ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+    const agentAddonPending = await ctxRun(`agentRequest({ action: 'q2dv.addon', args: { id: 'chimerax.mutationscores', action: 'chimerax.mutationscores.open_mavedb', args: { id: '80' } } })`);
+    assert(agentAddonPending.status === 'human_required', 'an add-on action requires approval');
+    await ctxRun(`agentRejectDecision(${JSON.stringify(agentAddonPending.decision.id)})`);
+    assert(ctxRun(`agentGrantToday('commands')`) === true, 'the commands grant covers manifest actions');
+    const agentAddonBad = await ctxRun(`agentRequest({ action: 'q2dv.addon', args: { id: 'chimerax.mutationscores', action: 'chimerax.mutationscores.open_mavedb', args: { id: 'not-a-number' } } })`);
+    assert(agentAddonBad.status === 'error' && agentAddonBad.error.code === 'validation', 'an invalid manifest argument is refused');
+    const agentAddon = await ctxRun(`agentRequest({ action: 'q2dv.addon', args: { id: 'chimerax.mutationscores', action: 'chimerax.mutationscores.open_mavedb', args: { id: '80' } } })`);
+    assert(agentAddon.status === 'ok' && sandbox.__lastAddonCommand === 'open 80 from mavedb', 'a granted manifest action renders and runs its command');
+    ctxRun(`agentRevokeGrant('commands'); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
     ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);
     assert(agentTryImport.status === 'human_required' && ctxRun(`agentDecisionPendingCount()`) === 1, 'the panel queues a request without a console');

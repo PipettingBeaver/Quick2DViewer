@@ -1,7 +1,7 @@
 {
   "schema": "q2dv.tool-cache/1",
-  "app_version": "0.72.14",
-  "generated_at": "2026-11-16T09:12:11.597Z",
+  "app_version": "0.72.15",
+  "generated_at": "2026-11-16T10:24:47.234Z",
   "tools": [
     {
       "id": "q2dv.status",
@@ -443,6 +443,39 @@
       }
     },
     {
+      "id": "q2dv.addon",
+      "name": "q2dv_addon",
+      "title": "Run a structured ChimeraX add-on action",
+      "tier": "require-human",
+      "readOnly": false,
+      "destructive": false,
+      "grantClass": "commands",
+      "flags": {
+        "reversible": true,
+        "network": false,
+        "writes_files": false,
+        "changes_sequence": false
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "action"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "args": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
       "id": "q2dv.propose",
       "name": "q2dv_propose",
       "title": "Propose a decision for review",
@@ -545,7 +578,7 @@
   ],
   "reference": {
     "schema": "q2dv.reference/1",
-    "app_version": "0.72.14",
+    "app_version": "0.72.15",
     "tools": [
       {
         "id": "q2dv.status",
@@ -926,6 +959,35 @@
         "input": {
           "type": "object",
           "properties": {}
+        },
+        "doc": "mcp/README.md"
+      },
+      {
+        "id": "q2dv.addon",
+        "name": "q2dv_addon",
+        "title": "Run a structured ChimeraX add-on action",
+        "tier": "require-human",
+        "readOnly": false,
+        "destructive": false,
+        "effects": "state change",
+        "approval": "human",
+        "input": {
+          "type": "object",
+          "required": [
+            "id",
+            "action"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string"
+            },
+            "args": {
+              "type": "object"
+            }
+          }
         },
         "doc": "mcp/README.md"
       },

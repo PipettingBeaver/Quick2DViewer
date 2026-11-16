@@ -1,7 +1,7 @@
 # Q2DV — manual QA checklist
 
-**Baseline:** app `0.72.14`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
-`npm test` `2077 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
+**Baseline:** app `0.72.15`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
+`npm test` `2085 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
 provider tests). Update the baseline line when the build changes.
 
 **Surface:** every item here is **manual**. `npm test` runs the app script against
@@ -476,6 +476,12 @@ Q2DV host bundle auto-detection.
       approval, effects and input; a new tool appears after `npm run agent:tools`.
 - [ ] `q2dv_literature` returns curated references/checklists; a vignette
       includes the checklist and verified citation metadata.
+- [ ] The vignette card shows evidence, clusters, uncertainty, checklist and
+      citations; Accept/Needs revision/Reject updates the status and records a
+      human event; Copy Markdown includes the checklist.
+- [ ] `q2dv_addon` runs `chimerax.mutationscores.open_mavedb` with `id: 80`
+      after approval; an invalid id is refused; Contacts validates its radius;
+      manifests can be added under `~/Q2DV_files/adapters/`.
 
 **MaveDB backend evidence (2026-11-15):** the real avGFP score set
 `urn:mavedb:00000080-a-2` fetched and parsed 53,990 rows; the target DNA
@@ -493,11 +499,11 @@ expiry edge remain manual.
 **Surface:** `mcp/q2dv_mcp.py`, MCP client, `~/Q2DV_files/agent/agent.sock`.
 
 - [x] `npm run agent:tools` regenerates `mcp/tools.json`; `npm test` agrees with
-      the app registry and version. — 21 tools, `0.72.14`.
+      the app registry and version. — 22 tools, `0.72.15`.
 - [x] `npm run test:mcp` passes without ChimeraX running. — 3 tests pass.
 - [x] With ChimeraX and the Q2DV tool open, `agent.sock` exists, the directory
       is `0700` and the socket is `0600`. — live.
-- [x] An MCP client lists 21 `q2dv_*` tools and reads `q2dv://state`. — live.
+- [x] An MCP client lists 22 `q2dv_*` tools and reads `q2dv://state`. — live.
 - [x] `q2dv_status` returns the app version; an import/command returns
       `human_required`. — live.
 - [ ] Approving in Q2DV → Agent lets a later status/ledger call show the result.
@@ -885,9 +891,9 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 
 | Item | Expected |
 |---|---|
-| App baseline | `0.72.14` (update per build) |
+| App baseline | `0.72.15` (update per build) |
 | Host / ChimeraX | host `0.6.35`, ChimeraX `1.12` |
-| `npm test` | `2077 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
+| `npm test` | `2085 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
 | GFP bundle | 6 claims, 4 relations, 7 features, 10 evidence |
 | GFP chromophore | S65-Y66-G67; 1GFL chain A |
 | GFP structure | 1GFL and 1EMA; 1GFL has 230 resolved residues |

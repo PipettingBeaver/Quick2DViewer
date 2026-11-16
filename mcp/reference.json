@@ -1,6 +1,6 @@
 {
   "schema": "q2dv.reference/1",
-  "app_version": "0.72.14",
+  "app_version": "0.72.15",
   "tools": [
     {
       "id": "q2dv.status",
@@ -381,6 +381,35 @@
       "input": {
         "type": "object",
         "properties": {}
+      },
+      "doc": "mcp/README.md"
+    },
+    {
+      "id": "q2dv.addon",
+      "name": "q2dv_addon",
+      "title": "Run a structured ChimeraX add-on action",
+      "tier": "require-human",
+      "readOnly": false,
+      "destructive": false,
+      "effects": "state change",
+      "approval": "human",
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "action"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "args": {
+            "type": "object"
+          }
+        }
       },
       "doc": "mcp/README.md"
     },

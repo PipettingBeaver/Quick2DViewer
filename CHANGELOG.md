@@ -12,6 +12,21 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.15] - 2026-11-15
+
+### Added
+- **Vignette review UI.** Drafted vignettes render as a card with evidence,
+  ranked clusters, uncertainty, the literature checklist, citations and
+  **Accept / Needs revision / Reject** controls plus Markdown export. Reviews are
+  recorded as human events; acceptance does not auto-promote a claim.
+- **Command-only add-on manifests.** Manifests in `mcp/adapters/*.json` are
+  discovered by the host and run through `q2dv_addon` after argument validation,
+  approval or the `commands` grant. First manifests: Mutation Scores
+  (`open <id> from mavedb`, heatmap, color) and Contacts
+  (`contacts <atoms> radius <radius>`). Structured query adapters are next.
+- **Add-on audit.** `CHIMERAX_ADDON_AUDIT.md` inventories installed and absent
+  candidates, demo priorities, manifest criteria and a roadmap.
+
 ## [0.72.14] - 2026-11-15
 
 ### Added

@@ -23,6 +23,7 @@ Do not edit by hand.
 | `q2dv.literature` | agent-run | agent | read-only | topic |
 | `q2dv.reference` | agent-run | agent | read-only | - |
 | `q2dv.policy` | agent-run | agent | read-only | - |
+| `q2dv.addon` | require-human | human | state change | id, action, args |
 | `q2dv.propose` | agent-run | agent | read-only | tool, tier, title, why, expected, args |
 | `q2dv.decide` | agent-run | agent | state change | id, approve, token |
 | `q2dv.ledger` | agent-run | agent | read-only | limit, since_seq |

@@ -1,0 +1,39 @@
+{
+  "schema": "q2dv.capability/1",
+  "id": "chimerax.mutationscores",
+  "kind": "addon",
+  "bundle": "ChimeraX-MutationScores",
+  "version": "1.0",
+  "probe": { "command": "mutationscores" },
+  "actions": [
+    {
+      "id": "chimerax.mutationscores.open_mavedb",
+      "mode": "command",
+      "title": "Open a MaveDB experiment in Mutation Scores",
+      "command": "open {id} from mavedb",
+      "args": {
+        "id": { "type": "string", "pattern": "^[0-9]+$", "description": "MaveDB experiment id, for example 80" }
+      },
+      "effects": ["opens a mutation-score set", "changes the Mutation Scores panel"],
+      "review": true
+    },
+    {
+      "id": "chimerax.mutationscores.heatmap",
+      "mode": "command",
+      "title": "Show the mutation-score heatmap",
+      "command": "mutationscores heatmap",
+      "args": {},
+      "effects": ["shows a mutation-score heatmap"],
+      "review": true
+    },
+    {
+      "id": "chimerax.mutationscores.color",
+      "mode": "command",
+      "title": "Color the associated structure by mutation score",
+      "command": "mutationscores color",
+      "args": {},
+      "effects": ["colors the associated structure"],
+      "review": true
+    }
+  ]
+}
