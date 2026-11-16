@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nmEHR1AVtcPhbyaLG9hH4rLryHhOzToAC+jwyc3qGZc=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nWH/S9XFL0zyEwgIeJix1AVem65a1b3Ry5RwRmuoSBQ=' 'sha256-5G0aAGqH0CVbOE5r346DE0Ty6OCis0Ro/BJc/Fs9oA8=' 'nonce-9f3a7c1e5b2d8064a1c9e7f30b5d2468'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://rest.uniprot.org https://www.ebi.ac.uk https://rest.ensembl.org https://search.rcsb.org https://data.rcsb.org https://files.rcsb.org https://www.rcsb.org https://alphafold.ebi.ac.uk https://api.esmatlas.com https://search.foldseek.com https://cdn.jsdelivr.net; worker-src blob:; child-src 'self' about: blob:; frame-src 'self' about: blob:; base-uri 'none'; object-src 'none'; form-action 'none'">
     <title>Quick2DViewer - 1D Protein Viewer</title>
     <style>
         :root {
@@ -10611,7 +10611,32 @@ async function agentToolDecide(args) {
     if (!spec) throw agentFail('validation', 'Unknown tool on the decision.');
     if (agentPayloadFor(spec.id, rec.decision.action.args) !== rec.payload) throw agentFail('policy_denied', 'Decision arguments changed after approval.');
     const stateBefore = spec.readOnly ? null : agentStateSnapshot();
-    const data = await spec.handler(rec.decision.action.args, { actor: { kind: 'human', id: 'approval' }, decisionId: rec.decision.id });
+    let data;
+    try {
+        data = await spec.handler(rec.decision.action.args, { actor: { kind: 'human', id: 'approval' }, decisionId: rec.decision.id });
+    } catch (err) {
+        rec.status = 'failed';
+        rec.error = (err && err.message) || String(err);
+        rec.decision.approval = { mode: 'click', token: null, expires_at: null };
+        logAction('agent', 'decision failed', rec.decision.id + ' (' + spec.id + '): ' + rec.error);
+        const failedEvent = {
+            actor: { kind: 'agent', id: 'approval' },
+            call: { tool: spec.id, args: JSON.parse(JSON.stringify(rec.decision.action.args)) },
+            rationale: ['Approved in the Q2DV Agent panel.'],
+            evidence: [],
+            status: 'error',
+            duration_ms: 0,
+            result: { summary: rec.error },
+            decision_id: rec.decision.id
+        };
+        if (stateBefore) failedEvent.state_before = stateBefore;
+        agentRecordEvent(failedEvent);
+        agentUpdateBadge();
+        renderAgentDecisions();
+        const failure = agentFail((err && err.code) || 'internal', rec.error);
+        failure.details = Object.assign({}, (err && err.details) || {}, { decision_id: rec.decision.id });
+        throw failure;
+    }
     rec.status = 'approved';
     rec.decision.approval = { mode: 'click', token: null, expires_at: null };
     logAction('agent', 'decision approved', rec.decision.id + ' (' + spec.id + ')');
@@ -10820,7 +10845,7 @@ function agentDecisionCard(rec) {
         }));
         card.appendChild(actions);
     } else {
-        card.appendChild(agentEl('p', 'agent-resolution', 'Resolved: ' + rec.status));
+        card.appendChild(agentEl('p', 'agent-resolution', 'Resolved: ' + rec.status + (rec.error ? ' - ' + rec.error : '')));
     }
     return card;
 }
@@ -10868,8 +10893,14 @@ function agentApproveDecision(id) {
             agentDecisionNotice('Approved: ' + (rec.decision.title || id));
             showToast('Agent action approved.', 'success');
         } else {
-            agentDecisionNotice('Could not approve: ' + ((res.error && res.error.message) || 'unknown error'));
-            showToast('Agent action was not approved.', 'error');
+            const failure = (res.error && res.error.message) || 'unknown error';
+            if (rec.status === 'failed') {
+                agentDecisionNotice('Action failed: ' + failure);
+                showToast('The approved action failed.', 'error');
+            } else {
+                agentDecisionNotice('Could not approve: ' + failure);
+                showToast('Agent action was not approved.', 'error');
+            }
         }
         agentUpdateBadge();
         renderAgentDecisions();
@@ -15142,7 +15173,7 @@ document.addEventListener('mouseout', (e) => {
 const TYPE_ORDER = ['H', 'P', 'E', 'C', 'M', 'D'];
 // Application version, kept in sync with CHANGELOG.md. Shown next to the
 // header title via #appVersion.
-const APP_VERSION = '0.72.10';
+const APP_VERSION = '0.72.11';
 const TYPE_CX_COLOR = { H: 'red', P: 'cyan', E: 'blue', C: 'green', M: 'purple', D: 'orange' };
 const MODEL_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0d9488', '#db2777', '#ca8a04'];
 // One color per cofactor label (1-9), shared between the heatmap

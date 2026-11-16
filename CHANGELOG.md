@@ -12,6 +12,15 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.11] - 2026-11-15
+
+### Fixed
+- **Failed approved actions resolve as failed.** If an approved command fails
+  (for example `contacts /A` with no atoms loaded), the decision is marked
+  `failed` with the host message instead of staying pending forever. The notice
+  says "Action failed" rather than "Could not approve", and the failed step is
+  recorded in the timeline.
+
 ## [0.72.10] - 2026-11-15
 
 ### Added

@@ -5532,7 +5532,14 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(ctxRun(`agentGrantToday('commands')`) === true, 'a command grant can be issued');
     const agentCmdRun = await ctxRun(`agentRequest({ action: 'q2dv.command', args: { command: 'select /A:1-2' } })`);
     assert(agentCmdRun.status === 'ok' && sandbox.__lastAgentCommand === 'select /A:1-2', 'a granted command runs through the host');
-    ctxRun(`agentRevokeGrant('commands'); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
+    ctxRun(`agentRevokeGrant('commands');`);
+    sandbox.Q2DVHost = { kind: 'chimerax', runAgentCommand: () => Promise.resolve('error: No atoms match given atom specifier') };
+    ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
+    const agentCmdFail = await ctxRun(`agentRequest({ action: 'q2dv.command', args: { command: 'contacts /A' } })`);
+    const agentCmdFailResult = await ctxRun(`agentApproveDecision(${JSON.stringify(agentCmdFail.decision.id)})`);
+    assert(agentCmdFailResult.status === 'error' && ctxRun(`agentDecisions[${JSON.stringify(agentCmdFail.decision.id)}].status`) === 'failed', 'a failed approved action resolves as failed, not pending');
+    assert(/No atoms/.test(ctxRun(`agentDecisions[${JSON.stringify(agentCmdFail.decision.id)}].error`)), 'the failure keeps the host message');
+    ctxRun(`window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge();`);
     ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);
     assert(agentTryImport.status === 'human_required' && ctxRun(`agentDecisionPendingCount()`) === 1, 'the panel queues a request without a console');

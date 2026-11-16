@@ -1,7 +1,7 @@
 # Q2DV — manual QA checklist
 
-**Baseline:** app `0.72.10`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
-`npm test` `2053 passed / 0 failed` (plus 3 MCP protocol tests). Update the
+**Baseline:** app `0.72.11`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
+`npm test` `2055 passed / 0 failed` (plus 3 MCP protocol tests). Update the
 baseline line when the build changes.
 
 **Surface:** every item here is **manual**. `npm test` runs the app script against
@@ -447,6 +447,8 @@ Q2DV host bundle auto-detection.
       is refused. — harness.
 - [x] Grant commands for today; an approved command runs; Revoke restores the
       gate. — harness (fake host).
+- [x] An approved command that fails resolves as `failed` with the host message
+      instead of staying pending. — harness + live `dec-0001` rejection.
 - [ ] The Agent panel lists active grants with Revoke.
 - [x] `~/Q2DV_files/agent/audit.jsonl` gains one line per host call and rotates
       to `.1`/`.2` at 10 MB. — line growth live; rotation not exercised.
@@ -852,9 +854,9 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 
 | Item | Expected |
 |---|---|
-| App baseline | `0.72.10` (update per build) |
+| App baseline | `0.72.11` (update per build) |
 | Host / ChimeraX | host `0.6.35`, ChimeraX `1.12` |
-| `npm test` | `2053 passed, 0 failed` plus 3 MCP tests at this baseline |
+| `npm test` | `2055 passed, 0 failed` plus 3 MCP tests at this baseline |
 | GFP bundle | 6 claims, 4 relations, 7 features, 10 evidence |
 | GFP chromophore | S65-Y66-G67; 1GFL chain A |
 | GFP structure | 1GFL and 1EMA; 1GFL has 230 resolved residues |
@@ -894,7 +896,9 @@ regression (worked before) or an unverified edge case.
 **2026-11-15 backend pass (0.72.10, `a5a8102`):** no defects found. Verified the
 release gate, live MCP initialize/tools/resources, status, capabilities
 (185 bundles), snapshot, command decision without a token, ledger and audit line
-growth. Pending manual work: browser console/CSP, `file://`/`http(s)` loads, the
+growth. **0.72.11** adds the failed-approval resolution (`dec-0001` with no atoms
+now resolves as `failed`, harness-verified); live re-check after reopening the
+tool. Pending manual work: browser console/CSP, `file://`/`http(s)` loads, the
 approval click, grant chips, timeline Step/Restore/Play, and token mid-call
 disconnect.
 
