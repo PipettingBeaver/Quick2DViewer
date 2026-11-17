@@ -5446,6 +5446,17 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentReference.tools.length === agentSpecs.length && agentSpecs.every(s => agentReference.tools.some(t => t.id === s.id && t.effects)), 'the generated reference covers every tool');
     const agentReferenceDoc = fs.readFileSync(path.join(ROOT, 'AGENT_REFERENCE.md'), 'utf-8');
     assert(agentSpecs.every(s => agentReferenceDoc.indexOf(s.id) !== -1), 'the human agent reference lists every tool');
+    const adapterDir = path.join(ROOT, 'mcp', 'adapters');
+    const adapterFiles = fs.readdirSync(adapterDir).filter(name => name.endsWith('.json'));
+    assert(adapterFiles.length >= 3, 'command add-on manifests are present');
+    adapterFiles.forEach(name => {
+        const manifest = JSON.parse(fs.readFileSync(path.join(adapterDir, name), 'utf-8'));
+        assert(manifest.schema === 'q2dv.capability/1' && manifest.id, 'manifest ' + name + ' has a schema and id');
+        assert(Array.isArray(manifest.actions) && manifest.actions.length > 0, 'manifest ' + name + ' has actions');
+        manifest.actions.forEach(action => {
+            assert(action.id && action.command && !/[\n;]/.test(action.command), 'manifest ' + name + ' action ' + action.id + ' has a safe command');
+        });
+    });
     const agentStatus = await ctxRun(`agentRequest({ id: 't1', action: 'q2dv.status', actor: { kind: 'agent', id: 'test' } })`);
     assert(agentStatus.status === 'ok' && agentStatus.data.schema === 'q2dv.agent/1' && agentStatus.data.app_version === ctxRun(`APP_VERSION`), 'status returns the versioned agent envelope');
     assert(agentStatus.data.host.kind === 'standalone', 'status reports the host mode');

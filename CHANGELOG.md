@@ -12,6 +12,17 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.16] - 2026-11-15
+
+### Added
+- **KVFinder command manifest.** `q2dv_addon` can run `chimerax.kvfinder.run`
+  with an atom spec, grid spacing and volume cutoff after approval; cavity
+  models and attributes are created in ChimeraX.
+- **Manifest validation test.** `npm test` now checks every
+  `mcp/adapters/*.json` has a schema, id, actions and single safe commands.
+- **Contacts manifest correction.** The `contacts` command is base
+  (`ChimeraX-StdCommands`), not the `ChimeraX-Contacts` chain-contact-map tool.
+
 ## [0.72.15] - 2026-11-15
 
 ### Added

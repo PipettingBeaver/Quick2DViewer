@@ -1,7 +1,7 @@
 # Q2DV — manual QA checklist
 
-**Baseline:** app `0.72.15`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
-`npm test` `2085 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
+**Baseline:** app `0.72.16`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
+`npm test` `2097 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
 provider tests). Update the baseline line when the build changes.
 
 **Surface:** every item here is **manual**. `npm test` runs the app script against
@@ -891,9 +891,9 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 
 | Item | Expected |
 |---|---|
-| App baseline | `0.72.15` (update per build) |
+| App baseline | `0.72.16` (update per build) |
 | Host / ChimeraX | host `0.6.35`, ChimeraX `1.12` |
-| `npm test` | `2085 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
+| `npm test` | `2097 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
 | GFP bundle | 6 claims, 4 relations, 7 features, 10 evidence |
 | GFP chromophore | S65-Y66-G67; 1GFL chain A |
 | GFP structure | 1GFL and 1EMA; 1GFL has 230 resolved residues |

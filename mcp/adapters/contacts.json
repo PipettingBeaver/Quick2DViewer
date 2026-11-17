@@ -1,9 +1,9 @@
 {
   "schema": "q2dv.capability/1",
   "id": "chimerax.contacts",
-  "kind": "addon",
-  "bundle": "ChimeraX-Contacts",
-  "version": "1.0.1",
+  "kind": "base",
+  "bundle": "ChimeraX-StdCommands",
+  "version": "1.12",
   "probe": { "command": "contacts" },
   "actions": [
     {

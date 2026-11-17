@@ -99,10 +99,12 @@ stable Python APIs.
 
 - `chimerax.mutationscores`: `open <id> from mavedb`, `mutationscores heatmap`,
   `mutationscores color`.
-- `chimerax.contacts`: `contacts <atoms> radius <radius>` (reviewed command;
-  structured pair extraction later).
-- Next: `chimerax.kvfinder` after confirming its command/output format, and
-  `chimerax.contacts.query` returning residue pairs from a Python adapter.
+- `chimerax.contacts`: `contacts <atoms> radius <radius>` (base command; the
+  `ChimeraX-Contacts` bundle is a chain-contact-map tool, not this command).
+- `chimerax.kvfinder`: `kvfinder <atoms> gridSpacing <spacing> volumeCutoff <cutoff>`
+  (command-only; structured cavity output is next).
+- Next: `chimerax.contacts.query` returning residue pairs from a Python adapter,
+  and a KVFinder cavity summary returning volumes/areas.
 
 ### Structured query criteria
 

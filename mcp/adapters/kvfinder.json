@@ -1,0 +1,23 @@
+{
+  "schema": "q2dv.capability/1",
+  "id": "chimerax.kvfinder",
+  "kind": "addon",
+  "bundle": "ChimeraX-KVFinder",
+  "version": "1.8.2",
+  "probe": { "command": "kvfinder" },
+  "actions": [
+    {
+      "id": "chimerax.kvfinder.run",
+      "mode": "command",
+      "title": "Find cavities with KVFinder",
+      "command": "kvfinder {atoms} gridSpacing {spacing} volumeCutoff {cutoff}",
+      "args": {
+        "atoms": { "type": "string", "description": "ChimeraX atom spec, for example /A" },
+        "spacing": { "type": "number", "description": "Grid spacing in Angstrom, for example 0.6" },
+        "cutoff": { "type": "number", "description": "Minimum cavity volume, for example 5.0" }
+      },
+      "effects": ["creates cavity models", "adds cavity volume/area attributes", "changes the model panel"],
+      "review": true
+    }
+  ]
+}
