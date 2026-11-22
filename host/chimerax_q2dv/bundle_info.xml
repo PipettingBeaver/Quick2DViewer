@@ -1,0 +1,30 @@
+<BundleInfo name="ChimeraX-Q2DVFull"
+            version="0.6.35"
+            package="chimerax.q2dv_full"
+            minSessionVersion="1"
+            maxSessionVersion="1">
+  <Author>TerC workbench</Author>
+  <Email>local@example.invalid</Email>
+  <URL>https://www.cgl.ucsf.edu/chimerax/</URL>
+  <Synopsis>Q2DV embedded in ChimeraX</Synopsis>
+  <Description>
+    Loads the pinned Q2DV application from a custom scheme inside ChimeraX and
+    injects the local bundle whose sequence matches the current model.
+  </Description>
+  <Categories>
+    <Category name="General"/>
+  </Categories>
+  <Dependencies>
+    <Dependency name="ChimeraX-Core" version="~=1.1"/>
+    <Dependency name="ChimeraX-UI" version="~=1.0"/>
+  </Dependencies>
+  <DataFiles>
+    <DataFile>html/index.html</DataFile>
+    <DataFile>html/qwebchannel.js</DataFile>
+  </DataFiles>
+  <Classifiers>
+    <PythonClassifier>Development Status :: 3 - Alpha</PythonClassifier>
+    <PythonClassifier>License :: Freeware</PythonClassifier>
+    <ChimeraXClassifier>ChimeraX :: Tool :: Q2DV :: General :: Q2DV embedded in ChimeraX</ChimeraXClassifier>
+  </Classifiers>
+</BundleInfo>

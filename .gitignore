@@ -13,3 +13,7 @@ backups/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Generated host-plugin copies
+host/chimerax_q2dv/src/html/index.html
+host/chimerax_q2dv/src/mavedb_provider.py

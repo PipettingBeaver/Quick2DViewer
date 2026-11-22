@@ -17,6 +17,8 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
 - `DEMO_ROADMAP.md` — two-week implementation, review and test plan using GFP and LacY.
 - `CHIMERAX_INTEGRATION_PLAN.md` — storage redesign, window/layout presets and host-offload roadmap.
 - `MCP_AGENT_PLAN.md` — `q2dv-mcp` domain-layer design: capability registry, decision tiers, step-flow review and test scenarios.
+- `host/chimerax_q2dv/README.md` — tracked ChimeraX plugin source, build/sync steps, environment and licensing note.
+- `COGNI_INTEGRATION.md` — Cogni memory integration design and the 2026-12-01 demo plan.
 - `mcp/README.md` — run and register the `q2dv-mcp` server; generated tool cache and host socket.
 - `AGENT_REFERENCE.md` — generated table of every agent tool, its tier, approval mode, effects and inputs; regenerate with `npm run agent:tools`.
 - `QA_CHECKLIST.md` — the active fillable manual QA pass: session/release gate,
