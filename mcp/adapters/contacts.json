@@ -17,6 +17,19 @@
       },
       "effects": ["writes contact pairs to the ChimeraX log"],
       "review": true
+    },
+    {
+      "id": "chimerax.contacts.query_structured",
+      "mode": "query",
+      "handler": "contacts_query",
+      "title": "Return residue contact pairs",
+      "args": {
+        "atoms": { "type": "string", "description": "ChimeraX atom spec, for example /A:65-67" },
+        "radius": { "type": "number", "description": "Distance cutoff in Angstrom" }
+      },
+      "returns": "q2dv.handoff/1",
+      "effects": ["reads atom geometry", "returns residue pairs and minimum distances", "does not change the scene"],
+      "review": true
     }
   ]
 }

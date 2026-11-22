@@ -1,7 +1,7 @@
 # Q2DV — manual QA checklist
 
-**Baseline:** app `0.72.17`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
-`npm test` `2097 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
+**Baseline:** app `0.72.18`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
+`npm test` `2100 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
 provider tests). Update the baseline line when the build changes.
 
 **Surface:** every item here is **manual**. `npm test` runs the app script against
@@ -482,6 +482,10 @@ Q2DV host bundle auto-detection.
 - [ ] `q2dv_addon` runs `chimerax.mutationscores.open_mavedb` with `id: 80`
       after approval; an invalid id is refused; Contacts validates its radius;
       manifests can be added under `~/Q2DV_files/adapters/`.
+- [ ] `chimerax.contacts.query_structured` returns residue pairs/min distances
+      as `q2dv.handoff/1` and leaves the scene unchanged.
+- [ ] `chimerax.kvfinder.summary` returns cavity volume/area/depth sorted by
+      volume and creates the cavity models.
 
 **MaveDB backend evidence (2026-11-15):** the real avGFP score set
 `urn:mavedb:00000080-a-2` fetched and parsed 53,990 rows; the target DNA
@@ -891,9 +895,9 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 
 | Item | Expected |
 |---|---|
-| App baseline | `0.72.17` (update per build) |
+| App baseline | `0.72.18` (update per build) |
 | Host / ChimeraX | host `0.6.35`, ChimeraX `1.12` |
-| `npm test` | `2097 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
+| `npm test` | `2100 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
 | GFP bundle | 6 claims, 4 relations, 7 features, 10 evidence |
 | GFP chromophore | S65-Y66-G67; 1GFL chain A |
 | GFP structure | 1GFL and 1EMA; 1GFL has 230 resolved residues |

@@ -18,6 +18,20 @@
       },
       "effects": ["creates cavity models", "adds cavity volume/area attributes", "changes the model panel"],
       "review": true
+    },
+    {
+      "id": "chimerax.kvfinder.summary",
+      "mode": "query",
+      "handler": "kvfinder_summary",
+      "title": "Return cavity volume and shape summary",
+      "args": {
+        "atoms": { "type": "string", "description": "ChimeraX atom spec, for example /A" },
+        "spacing": { "type": "number", "description": "Grid spacing in Angstrom, for example 0.6" },
+        "cutoff": { "type": "number", "description": "Minimum cavity volume, for example 5.0" }
+      },
+      "returns": "q2dv.handoff/1",
+      "effects": ["creates cavity models", "returns volume, area and depth per cavity"],
+      "review": true
     }
   ]
 }

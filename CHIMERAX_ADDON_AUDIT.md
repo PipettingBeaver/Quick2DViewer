@@ -102,9 +102,12 @@ stable Python APIs.
 - `chimerax.contacts`: `contacts <atoms> radius <radius>` (base command; the
   `ChimeraX-Contacts` bundle is a chain-contact-map tool, not this command).
 - `chimerax.kvfinder`: `kvfinder <atoms> gridSpacing <spacing> volumeCutoff <cutoff>`
-  (command-only; structured cavity output is next).
-- Next: `chimerax.contacts.query` returning residue pairs from a Python adapter,
-  and a KVFinder cavity summary returning volumes/areas.
+  (command-only) plus `chimerax.kvfinder.summary` (query returning volume/area/
+  depth per cavity).
+- Structured `chimerax.contacts.query_structured` returns residue pairs and
+  minimum distances as `q2dv.handoff/1`.
+- Next: project the structured contacts/cavities into Q2DV tracks or vignette
+  evidence, and add a PyMOL-style handoff for other add-ons with stable APIs.
 
 ### Structured query criteria
 

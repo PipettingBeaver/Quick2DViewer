@@ -5454,7 +5454,11 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
         assert(manifest.schema === 'q2dv.capability/1' && manifest.id, 'manifest ' + name + ' has a schema and id');
         assert(Array.isArray(manifest.actions) && manifest.actions.length > 0, 'manifest ' + name + ' has actions');
         manifest.actions.forEach(action => {
-            assert(action.id && action.command && !/[\n;]/.test(action.command), 'manifest ' + name + ' action ' + action.id + ' has a safe command');
+            if (action.mode === 'query') {
+                assert(action.id && action.handler, 'manifest ' + name + ' query action ' + action.id + ' has a handler');
+            } else {
+                assert(action.id && action.command && !/[\n;]/.test(action.command), 'manifest ' + name + ' action ' + action.id + ' has a safe command');
+            }
         });
     });
     const agentStatus = await ctxRun(`agentRequest({ id: 't1', action: 'q2dv.status', actor: { kind: 'agent', id: 'test' } })`);
@@ -5649,17 +5653,29 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
         addonManifests() {
             return Promise.resolve(JSON.stringify({
                 ok: true,
-                manifests: [{
-                    id: 'chimerax.mutationscores',
-                    actions: [{
-                        id: 'chimerax.mutationscores.open_mavedb',
-                        mode: 'command',
-                        command: 'open {id} from mavedb',
-                        args: { id: { type: 'string', pattern: '^[0-9]+$' } }
-                    }]
-                }]
+                manifests: [
+                    {
+                        id: 'chimerax.mutationscores',
+                        actions: [{
+                            id: 'chimerax.mutationscores.open_mavedb',
+                            mode: 'command',
+                            command: 'open {id} from mavedb',
+                            args: { id: { type: 'string', pattern: '^[0-9]+$' } }
+                        }]
+                    },
+                    {
+                        id: 'chimerax.contacts',
+                        actions: [{
+                            id: 'chimerax.contacts.query_structured',
+                            mode: 'query',
+                            handler: 'contacts_query',
+                            args: { atoms: { type: 'string' }, radius: { type: 'number' } }
+                        }]
+                    }
+                ]
             }));
         },
+        addonQuery(payload) { sandbox.__lastAddonQuery = JSON.parse(payload); return Promise.resolve(JSON.stringify({ ok: true, schema: 'q2dv.handoff/1', values: [{ kind: 'residue_pair' }] })); },
         runAgentCommand(command) { sandbox.__lastAddonCommand = command; return Promise.resolve('ok'); }
     };
     ctxRun(`window.__Q2DV_HOST__ = 'chimerax'; syncQ2DVHostBadge();`);
@@ -5671,6 +5687,8 @@ assert(app.indexOf("window.open(url, '_blank', 'noopener,noreferrer')") !== -1, 
     assert(agentAddonBad.status === 'error' && agentAddonBad.error.code === 'validation', 'an invalid manifest argument is refused');
     const agentAddon = await ctxRun(`agentRequest({ action: 'q2dv.addon', args: { id: 'chimerax.mutationscores', action: 'chimerax.mutationscores.open_mavedb', args: { id: '80' } } })`);
     assert(agentAddon.status === 'ok' && sandbox.__lastAddonCommand === 'open 80 from mavedb', 'a granted manifest action renders and runs its command');
+    const agentAddonQuery = await ctxRun(`agentRequest({ action: 'q2dv.addon', args: { id: 'chimerax.contacts', action: 'chimerax.contacts.query_structured', args: { atoms: '/A:65-67', radius: 4 } } })`);
+    assert(agentAddonQuery.status === 'ok' && agentAddonQuery.data.data.schema === 'q2dv.handoff/1' && sandbox.__lastAddonQuery.handler === 'contacts_query', 'a structured query returns a q2dv.handoff');
     ctxRun(`agentRevokeGrant('commands'); window.Q2DVHost = null; delete window.__Q2DV_HOST__; syncQ2DVHostBadge(); parsedTracks = {};`);
     ctxRun(`agentDecisions = {}; agentUpdateBadge(); agentTryToolValue = 'q2dv.import'; document.getElementById('agentTryArgs').value = '{"kind":"sequence","sequence":"MAMM"}';`);
     const agentTryImport = await ctxRun(`agentTryRequest()`);

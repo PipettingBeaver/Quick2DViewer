@@ -186,6 +186,10 @@ class _Q2DVBridge(QObject):
     def addonManifests(self):
         return self.tool.addon_manifests()
 
+    @Slot(str, result=str)
+    def addonQuery(self, payload):
+        return self.tool.addon_query(payload)
+
 
 class Q2DVFullTool(HtmlToolInstance):
     SESSION_ENDURING = False
@@ -330,7 +334,8 @@ class Q2DVFullTool(HtmlToolInstance):
       literature: function (payload) { return bridge.literature(payload); },
       savePolicy: function (text) { return bridge.savePolicy(text); },
       loadPolicy: function () { return bridge.loadPolicy(); },
-      addonManifests: function () { return bridge.addonManifests(); }
+      addonManifests: function () { return bridge.addonManifests(); },
+      addonQuery: function (payload) { return bridge.addonQuery(payload); }
     };
     window.__q2dvAgentCall = function (requestId, requestJson) {
       let request;
@@ -1105,6 +1110,154 @@ class Q2DVFullTool(HtmlToolInstance):
                 except Exception as exc:
                     self._status("adapter manifest skipped %s: %s" % (path.name, exc))
         return json.dumps({"ok": True, "schema": "q2dv.adapters/1", "manifests": manifests}, ensure_ascii=False)
+
+    def addon_query(self, payload):
+        try:
+            data = json.loads(payload or "{}")
+            handler = str(data.get("handler") or "")
+            args = data.get("args") or {}
+            if handler == "contacts_query":
+                result = self.contacts_query(args)
+            elif handler == "kvfinder_summary":
+                result = self.kvfinder_summary(args)
+            else:
+                result = {"ok": False, "error": "Unknown structured adapter: " + handler}
+            return json.dumps(result, ensure_ascii=False)
+        except Exception as exc:
+            self._status("addon query failed: %s" % exc)
+            return json.dumps({"ok": False, "error": str(exc)})
+
+    def contacts_query(self, args):
+        try:
+            from chimerax.atomic import all_atoms
+            import numpy
+
+            spec = str(args.get("atoms") or "").strip()
+            radius = float(args.get("radius") or 4.0)
+            if not spec:
+                return {"ok": False, "error": "An atom spec is required."}
+            if radius <= 0 or radius > 20:
+                return {"ok": False, "error": "radius must be between 0 and 20 angstrom."}
+            if "\n" in spec or ";" in spec:
+                return {"ok": False, "error": "Atom spec must be a single expression."}
+
+            previous = list(self.session.selection.items("atoms"))
+            self.session.selection.clear()
+            try:
+                run(self.session, "select " + spec)
+                selected = list(self.session.selection.items("atoms"))
+            finally:
+                self.session.selection.clear()
+                for atom in previous:
+                    atom.selected = True
+            if not selected:
+                return {"ok": False, "error": "No atoms matched the atom spec."}
+
+            atoms = all_atoms(self.session)
+            coords = atoms.coords
+            pairs = {}
+            for atom in selected:
+                distances = numpy.linalg.norm(coords - atom.coord, axis=1)
+                for index in numpy.nonzero(distances <= radius)[0]:
+                    other = atoms[int(index)]
+                    if other.residue is atom.residue:
+                        continue
+                    ra, rb = atom.residue, other.residue
+                    ka = (ra.chain_id, int(ra.number), str(ra.insertion_code or ""))
+                    kb = (rb.chain_id, int(rb.number), str(rb.insertion_code or ""))
+                    if ka == kb:
+                        continue
+                    key = tuple(sorted([ka, kb]))
+                    distance = float(distances[int(index)])
+                    if key not in pairs or distance < pairs[key]:
+                        pairs[key] = distance
+
+            values = []
+            for (ka, kb), distance in pairs.items():
+                values.append({
+                    "kind": "residue_pair",
+                    "a": {"chain": ka[0], "number": ka[1], "insertion": ka[2]},
+                    "b": {"chain": kb[0], "number": kb[1], "insertion": kb[2]},
+                    "min_distance": round(distance, 3)
+                })
+            values.sort(key=lambda value: value["min_distance"])
+            model = getattr(selected[0].structure, "id_string", selected[0].structure.name)
+            return {
+                "ok": True,
+                "schema": "q2dv.handoff/1",
+                "source": {"capability": "chimerax.contacts", "version": "1.0", "method": "contacts_query"},
+                "target": {"model": model, "chain": selected[0].residue.chain_id},
+                "mapping": {"kind": "author-numbering"},
+                "values": values[:500],
+                "total": len(values),
+                "returned": min(500, len(values)),
+                "confidence": {"kind": "categorical", "value": "observed"},
+                "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")
+            }
+        except Exception as exc:
+            self._status("contacts query failed: %s" % exc)
+            return {"ok": False, "error": str(exc)}
+
+    def kvfinder_summary(self, args):
+        try:
+            from chimerax.atomic import all_atomic_structures
+
+            spec = str(args.get("atoms") or "").strip()
+            spacing = float(args.get("spacing") or 0.6)
+            cutoff = float(args.get("cutoff") or 5.0)
+            if not spec:
+                return {"ok": False, "error": "An atom spec is required."}
+            if "\n" in spec or ";" in spec:
+                return {"ok": False, "error": "Atom spec must be a single expression."}
+            if spacing <= 0 or spacing > 5:
+                return {"ok": False, "error": "spacing must be between 0 and 5."}
+            if cutoff < 0:
+                return {"ok": False, "error": "cutoff must be zero or greater."}
+
+            command = "kvfinder %s gridSpacing %s volumeCutoff %s" % (spec, spacing, cutoff)
+            result = run(self.session, command)
+            groups = []
+            if isinstance(result, list):
+                for entry in result:
+                    if isinstance(entry, tuple) and len(entry) >= 4 and entry[3] is not None:
+                        groups.append((entry[0], entry[3]))
+            if not groups:
+                for structure in all_atomic_structures(self.session):
+                    for child in structure.child_models():
+                        if getattr(child, "name", "") == "cavities":
+                            groups.append((structure, child))
+            values = []
+            models = []
+            for structure, group in groups:
+                if structure is not None:
+                    models.append(getattr(structure, "id_string", structure.name))
+                for cavity in group.child_models():
+                    if not str(getattr(cavity, "name", "")).startswith("cavity "):
+                        continue
+                    values.append({
+                        "kind": "cavity",
+                        "id": cavity.name,
+                        "volume": round(float(getattr(cavity, "kvfinder_volume", 0) or 0), 3),
+                        "area": round(float(getattr(cavity, "kvfinder_area", 0) or 0), 3),
+                        "max_depth": round(float(getattr(cavity, "kvfinder_max_depth", 0) or 0), 3),
+                        "average_depth": round(float(getattr(cavity, "kvfinder_average_depth", 0) or 0), 3)
+                    })
+            values.sort(key=lambda value: value["volume"], reverse=True)
+            return {
+                "ok": True,
+                "schema": "q2dv.handoff/1",
+                "source": {"capability": "chimerax.kvfinder", "version": "1.8.2", "method": "kvfinder_summary"},
+                "target": {"model": models[0] if models else None, "chain": None},
+                "mapping": {"kind": "cavity-model"},
+                "values": values,
+                "total": len(values),
+                "command": command,
+                "confidence": {"kind": "categorical", "value": "observed"},
+                "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")
+            }
+        except Exception as exc:
+            self._status("kvfinder summary failed: %s" % exc)
+            return {"ok": False, "error": str(exc)}
 
     def mavedb_analysis(self, payload):
         if analyze_mavedb is None:

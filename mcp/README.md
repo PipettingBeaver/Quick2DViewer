@@ -106,11 +106,13 @@ after `npm run agent:tools`. `q2dv_literature` / `q2dv://literature` expose the
 curated references and checklists in `mcp/literature.json`.
 
 `q2dv_addon` runs a declared action from `mcp/adapters/*.json` or
-`~/Q2DV_files/adapters/*.json`. Manifests are `q2dv.capability/1`; the first
-ones cover Mutation Scores and Contacts and are command-only. Arguments are
-validated, the rendered command is reviewed, and the existing `commands` grant
-applies. See `CHIMERAX_ADDON_AUDIT.md` for the candidate set and the structured
-query criteria.
+`~/Q2DV_files/adapters/*.json`. Manifests are `q2dv.capability/1`; actions can be
+command-only (`mode: "command"`) or structured queries (`mode: "query"` with a
+handler). The first ones cover Mutation Scores, Contacts and KVFinder; Contacts
+returns residue pairs and KVFinder returns cavity volume/area/depth as
+`q2dv.handoff/1`. Arguments are validated, the command is reviewed, and the
+existing `commands` grant applies. See `CHIMERAX_ADDON_AUDIT.md` for the
+candidate set and the structured query criteria.
 
 Vignettes are reviewed in the Agent panel: evidence, clusters, checklist,
 citations, Accept / Needs revision / Reject and Markdown export. A review is a

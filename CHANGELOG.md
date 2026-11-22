@@ -12,6 +12,19 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.18] - 2026-11-21
+
+### Added
+- **Structured Contacts query.** `q2dv_addon` can run
+  `chimerax.contacts.query_structured` and receive residue pairs with minimum
+  distances as `q2dv.handoff/1`. It reads geometry without changing the scene.
+- **Structured KVFinder summary.** `chimerax.kvfinder.summary` runs the cavity
+  search and returns cavity volume, area and depth per cavity as
+  `q2dv.handoff/1`.
+- **Query manifest actions.** Manifests may declare `mode: "query"` with a
+  handler; `q2dv_addon` dispatches through the host `addonQuery` bridge and
+  validates arguments like command actions.
+
 ## [0.72.17] - 2026-11-21
 
 ### Changed

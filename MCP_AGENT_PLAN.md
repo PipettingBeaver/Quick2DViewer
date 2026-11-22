@@ -1,15 +1,11 @@
 # Agent access plan: q2dv-mcp, capability registry, and step-flow review
 
 **Status:** Phases 1-5 plus MaveDB, workspace safety, evidence vignettes, a
-persisted policy, an agent reference, a curated literature/checklist layer and
-command-only add-on manifests are implemented 2026-11-15 (Q2DV 0.72.15):
-agent registry and dispatcher, decision queue, `q2dv-mcp`, host socket bridge,
-timeline, scenarios, capability discovery, reviewed commands, grants, persisted
-auto-approve, rotated audit, MaveDB aggregation, backup/clear/restore,
-`q2dv.vignette/1` with a review UI, `q2dv.reference/1`, `q2dv.literature/1`, and
-`q2dv.addon` for Mutation Scores and Contacts. Structured query adapters,
-claim promotion from accepted vignettes and the full policy editor remain. Not
-a production dependency.
+persisted policy, an agent reference, a curated literature/checklist layer,
+command manifests and structured Contacts/KVFinder queries are implemented
+2026-11-21 (Q2DV 0.72.18). The Cogni memory layer remains a local experiment and
+is not part of the public release. Vignette claim promotion and the full policy
+editor remain. Not a production dependency.
 **Baseline:** Q2DV 0.72.1, ChimeraX host 0.6.35, ChimeraX 1.12.
 **Related:** `RECIPE_MODEL.md`, `CHIMERAX_ECOSYSTEM.md`,
 `CHIMERAX_PLUGIN_PLAN.md`, `CHIMERAX_INTEGRATION_PLAN.md`, `DESIGN.md`.
