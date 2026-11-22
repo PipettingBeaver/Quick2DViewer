@@ -1,6 +1,6 @@
 {
   "schema": "q2dv.reference/1",
-  "app_version": "0.72.16",
+  "app_version": "0.72.17",
   "tools": [
     {
       "id": "q2dv.status",

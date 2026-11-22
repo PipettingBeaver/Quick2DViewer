@@ -3,9 +3,9 @@
             package="chimerax.q2dv_full"
             minSessionVersion="1"
             maxSessionVersion="1">
-  <Author>TerC workbench</Author>
-  <Email>local@example.invalid</Email>
-  <URL>https://www.cgl.ucsf.edu/chimerax/</URL>
+  <Author>PipettingBeaver</Author>
+  <Email>noreply@users.noreply.github.com</Email>
+  <URL>https://github.com/PipettingBeaver/Quick2DViewer</URL>
   <Synopsis>Q2DV embedded in ChimeraX</Synopsis>
   <Description>
     Loads the pinned Q2DV application from a custom scheme inside ChimeraX and
@@ -24,7 +24,7 @@
   </DataFiles>
   <Classifiers>
     <PythonClassifier>Development Status :: 3 - Alpha</PythonClassifier>
-    <PythonClassifier>License :: Freeware</PythonClassifier>
+    <PythonClassifier>License :: OSI Approved :: GNU General Public License v3 (GPLv3)</PythonClassifier>
     <ChimeraXClassifier>ChimeraX :: Tool :: Q2DV :: General :: Q2DV embedded in ChimeraX</ChimeraXClassifier>
   </Classifiers>
 </BundleInfo>

@@ -18,7 +18,6 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
 - `CHIMERAX_INTEGRATION_PLAN.md` — storage redesign, window/layout presets and host-offload roadmap.
 - `MCP_AGENT_PLAN.md` — `q2dv-mcp` domain-layer design: capability registry, decision tiers, step-flow review and test scenarios.
 - `host/chimerax_q2dv/README.md` — tracked ChimeraX plugin source, build/sync steps, environment and licensing note.
-- `COGNI_INTEGRATION.md` — Cogni memory integration design and the 2026-12-01 demo plan.
 - `mcp/README.md` — run and register the `q2dv-mcp` server; generated tool cache and host socket.
 - `AGENT_REFERENCE.md` — generated table of every agent tool, its tier, approval mode, effects and inputs; regenerate with `npm run agent:tools`.
 - `QA_CHECKLIST.md` — the active fillable manual QA pass: session/release gate,
@@ -30,3 +29,12 @@ Quick2DViewer is available here: [https://pipettingbeaver.github.io/Quick2DViewe
 - `bundles/LacY/README.md` — public LacY membrane example bundle (5 claims, 3 relations, 3 features).
 - `UX_GUIDELINES.md` — the design-pass checklist and UI conventions.
 - `CHANGELOG.md` — release notes (also readable in-app via the version badge).
+
+## License
+
+Q2DV is licensed under **GPL-3.0**; see `LICENSE` and `NOTICE`.
+
+The ChimeraX host plugin requires ChimeraX, which UCSF licenses separately for
+non-commercial use; commercial use requires a separate UCSF license. Cogni is not
+part of the public release. MaveDB data is fetched at runtime under its own
+license.

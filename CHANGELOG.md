@@ -12,6 +12,20 @@ same stale value and are not reliable; from 0.66.1 on they are the actual releas
 milestone is reserved for the point where the feature set is declared stable (after the QA and copy
 sweeps), from which the usual feature/patch cadence resumes.
 
+## [0.72.17] - 2026-11-21
+
+### Changed
+- **GPL-3.0 license.** Added `LICENSE` and `NOTICE`; the ChimeraX host plugin
+  metadata now declares GPLv3. The notice records ChimeraX's separate UCSF
+  non-commercial license, the Qt qwebchannel license, MaveDB data terms and the
+  local-only Cogni boundary.
+- **Tracked host source.** The ChimeraX plugin source lives in
+  `host/chimerax_q2dv/` with a build/sync script and portable environment
+  defaults; generated app/provider copies are ignored. No app-page behavior
+  change.
+- **Cogni kept local.** Cogni is a personal experiment and is not part of the
+  public release or the tool registry; its design note lives outside the repo.
+
 ## [0.72.16] - 2026-11-15
 
 ### Added

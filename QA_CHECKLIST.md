@@ -1,6 +1,6 @@
 # Q2DV — manual QA checklist
 
-**Baseline:** app `0.72.16`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
+**Baseline:** app `0.72.17`, ChimeraX host `0.6.35`, ChimeraX `1.12`,
 `npm test` `2097 passed / 0 failed` (plus 3 MCP protocol tests and 7 MaveDB
 provider tests). Update the baseline line when the build changes.
 
@@ -891,7 +891,7 @@ release touches shared state. Historical detail: [`QA_ARCHIVE.md`](QA_ARCHIVE.md
 
 | Item | Expected |
 |---|---|
-| App baseline | `0.72.16` (update per build) |
+| App baseline | `0.72.17` (update per build) |
 | Host / ChimeraX | host `0.6.35`, ChimeraX `1.12` |
 | `npm test` | `2097 passed, 0 failed` plus 3 MCP and 7 MaveDB provider tests |
 | GFP bundle | 6 claims, 4 relations, 7 features, 10 evidence |

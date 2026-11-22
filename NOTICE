@@ -1,0 +1,23 @@
+Quick2DViewer
+Copyright (C) 2026 The Quick2DViewer authors
+
+This project is licensed under the GNU General Public License, version 3.
+See LICENSE.
+
+Third-party and external components
+------------------------------------
+- UCSF ChimeraX is copyright The Regents of the University of California and is
+  licensed separately for non-commercial use. Commercial use of ChimeraX requires
+  a separate written UCSF license. The host plugin in host/ depends on ChimeraX;
+  the GPL license for this repository does not grant any rights to ChimeraX.
+- src/html/qwebchannel.js is copyright The Qt Company Ltd. and KDAB, licensed
+  under LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only OR a Qt commercial license.
+  It is distributed here under GPL-3.0.
+- MaveDB score sets are fetched at runtime and are not bundled. The avGFP data is
+  CC0; cite Sarkisyan et al., Nature 2016, doi:10.1038/nature17995.
+- Cogni is not part of the public release. Any local Cogni integration is an
+  optional external experiment subject to Cogni's own terms.
+- The Python MCP server and provider use the standard library only. ChimeraX and
+  PyQt6 are provided by the ChimeraX installation, not bundled here.
+
+This software is provided without warranty, as stated in the GPL.
